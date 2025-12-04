@@ -1,0 +1,1 @@
+              ))}\n            </div>\n          )}\n        </div>\n\n        <Separator className="shadow-sm" />\n        \n        <div className="p-3 space-y-2 bg-gradient-to-r from-blue-50 to-blue-100">\n          {/* Inline Promo Code Input */}

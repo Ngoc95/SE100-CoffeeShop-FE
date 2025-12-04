@@ -1,0 +1,541 @@
+import { useState } from 'react';
+import { Plus, Search, Pencil, Trash2, Filter, X, Power, PowerOff } from 'lucide-react';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Badge } from '../ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from '../ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
+import { Label } from '../ui/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../ui/table';
+import { toast } from 'sonner';
+
+interface TableItem {
+  id: string;
+  name: string;
+  area: string;
+  seats: number;
+  status: 'active' | 'inactive';
+}
+
+interface Area {
+  id: string;
+  name: string;
+}
+
+export function Tables() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedArea, setSelectedArea] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [sortBy, setSortBy] = useState<'name' | 'area' | 'seats'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [quickAreaDialogOpen, setQuickAreaDialogOpen] = useState(false);
+  const [editingTable, setEditingTable] = useState<TableItem | null>(null);
+
+  // Mock data
+  const [tables, setTables] = useState<TableItem[]>([
+    { id: '1', name: 'Bàn 1', area: 'tang1', seats: 2, status: 'active' },
+    { id: '2', name: 'Bàn 2', area: 'tang1', seats: 2, status: 'active' },
+    { id: '3', name: 'Bàn 3', area: 'tang1', seats: 4, status: 'active' },
+    { id: '4', name: 'Bàn 4', area: 'tang1', seats: 4, status: 'inactive' },
+    { id: '5', name: 'Bàn 5', area: 'tang2', seats: 6, status: 'active' },
+    { id: '6', name: 'Bàn 6', area: 'tang2', seats: 4, status: 'active' },
+    { id: '7', name: 'Bàn 7', area: 'tang2', seats: 2, status: 'active' },
+    { id: '8', name: 'Bàn VIP 1', area: 'vip', seats: 8, status: 'active' },
+    { id: '9', name: 'Bàn VIP 2', area: 'vip', seats: 10, status: 'active' },
+    { id: '10', name: 'Bàn sân thượng 1', area: 'rooftop', seats: 4, status: 'active' },
+  ]);
+
+  const [areas, setAreas] = useState<Area[]>([
+    { id: 'tang1', name: 'Tầng 1' },
+    { id: 'tang2', name: 'Tầng 2' },
+    { id: 'vip', name: 'Phòng VIP' },
+    { id: 'rooftop', name: 'Sân thượng' },
+  ]);
+
+  const [formData, setFormData] = useState({
+    name: '',
+    area: '',
+    seats: '',
+  });
+
+  const [newAreaName, setNewAreaName] = useState('');
+
+  // Filtering and sorting
+  const filteredTables = tables
+    .filter((table) => {
+      const matchesSearch = table.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesArea = selectedArea === 'all' || table.area === selectedArea;
+      const matchesStatus = selectedStatus === 'all' || table.status === selectedStatus;
+      return matchesSearch && matchesArea && matchesStatus;
+    })
+    .sort((a, b) => {
+      let comparison = 0;
+      if (sortBy === 'name') {
+        comparison = a.name.localeCompare(b.name, 'vi');
+      } else if (sortBy === 'area') {
+        const areaA = areas.find(area => area.id === a.area)?.name || '';
+        const areaB = areas.find(area => area.id === b.area)?.name || '';
+        comparison = areaA.localeCompare(areaB, 'vi');
+      } else if (sortBy === 'seats') {
+        comparison = a.seats - b.seats;
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+  const handleSort = (field: 'name' | 'area' | 'seats') => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const getSortIcon = (field: 'name' | 'area' | 'seats') => {
+    if (sortBy !== field) return null;
+    return sortOrder === 'asc' ? ' ↑' : ' ↓';
+  };
+
+  const handleSubmit = () => {
+    if (!formData.name || !formData.area || !formData.seats) {
+      toast.error('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+
+    if (editingTable) {
+      // Update existing table
+      setTables(tables.map(table =>
+        table.id === editingTable.id
+          ? { ...table, ...formData, seats: parseInt(formData.seats) }
+          : table
+      ));
+      toast.success('Cập nhật bàn thành công');
+    } else {
+      // Add new table
+      const newTable: TableItem = {
+        id: Date.now().toString(),
+        name: formData.name,
+        area: formData.area,
+        seats: parseInt(formData.seats),
+        status: 'active',
+      };
+      setTables([...tables, newTable]);
+      toast.success('Thêm bàn mới thành công');
+    }
+
+    setDialogOpen(false);
+    resetForm();
+  };
+
+  const handleEdit = (table: TableItem) => {
+    setEditingTable(table);
+    setFormData({
+      name: table.name,
+      area: table.area,
+      seats: table.seats.toString(),
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm('Bạn có chắc chắn muốn xóa bàn này?')) {
+      setTables(tables.filter(table => table.id !== id));
+      toast.success('Xóa bàn thành công');
+    }
+  };
+
+  const handleToggleStatus = (id: string) => {
+    setTables(tables.map(table => {
+      if (table.id === id) {
+        const newStatus = table.status === 'active' ? 'inactive' : 'active';
+        toast.success(newStatus === 'active' ? 'Đã kích hoạt bàn' : 'Đã ngừng hoạt động bàn');
+        return { ...table, status: newStatus };
+      }
+      return table;
+    }));
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      area: '',
+      seats: '',
+    });
+    setEditingTable(null);
+  };
+
+  const handleAddArea = () => {
+    if (!newAreaName.trim()) {
+      toast.error('Vui lòng nhập tên khu vực');
+      return;
+    }
+
+    const newArea: Area = {
+      id: Date.now().toString(),
+      name: newAreaName,
+    };
+    setAreas([...areas, newArea]);
+    toast.success('Thêm khu vực mới thành công');
+    setNewAreaName('');
+    setQuickAreaDialogOpen(false);
+  };
+
+  const getStatusBadge = (status: 'active' | 'inactive') => {
+    if (status === 'active') {
+      return <Badge className="bg-emerald-500">Hoạt động</Badge>;
+    }
+    return <Badge className="bg-red-500">Không hoạt động</Badge>;
+  };
+
+  const totalTables = tables.length;
+  const activeTables = tables.filter(t => t.status === 'active').length;
+  const inactiveTables = tables.filter(t => t.status === 'inactive').length;
+
+  return (
+    <div className="flex h-full bg-slate-50">
+      {/* Left Sidebar - Filters */}
+      <div className="w-64 bg-white border-r p-6 overflow-auto">
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-sm text-slate-700 mb-3 flex items-center gap-2">
+              <Filter className="w-4 h-4" />
+              Bộ lọc
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-xs text-slate-600">Khu vực</Label>
+                <Select value={selectedArea} onValueChange={setSelectedArea}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả khu vực</SelectItem>
+                    {areas.map(area => (
+                      <SelectItem key={area.id} value={area.id}>
+                        {area.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs text-slate-600">Trạng thái</Label>
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                    <SelectItem value="active">Hoạt động</SelectItem>
+                    <SelectItem value="inactive">Không hoạt động</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t">
+            <h3 className="text-sm text-slate-700 mb-3">Thống kê</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600">Tổng số bàn</span>
+                <span className="text-slate-900">{totalTables}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600">Bàn hoạt động</span>
+                <span className="text-emerald-600">{activeTables}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600">Không hoạt động</span>
+                <span className="text-red-600">{inactiveTables}</span>
+              </div>
+            </div>
+          </div>
+
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => {
+              setSelectedArea('all');
+              setSelectedStatus('all');
+              setSearchQuery('');
+            }}
+          >
+            <X className="w-4 h-4 mr-2" />
+            Xóa bộ lọc
+          </Button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="bg-white border-b p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-blue-900 mb-1">Quản lý phòng bàn</h1>
+              <p className="text-sm text-slate-600">
+                Quản lý bàn và khu vực trong quán
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Dialog open={quickAreaDialogOpen} onOpenChange={setQuickAreaDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Khu vực mới
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Thêm khu vực mới</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Tên khu vực</Label>
+                      <Input
+                        placeholder="VD: Tầng 3, Sân vườn..."
+                        value={newAreaName}
+                        onChange={(e) => setNewAreaName(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setQuickAreaDialogOpen(false)}>
+                      Hủy
+                    </Button>
+                    <Button onClick={handleAddArea} className="bg-blue-600 hover:bg-blue-700">
+                      Thêm khu vực
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={dialogOpen} onOpenChange={(open) => {
+                setDialogOpen(open);
+                if (!open) resetForm();
+              }}>
+                <DialogTrigger asChild>
+                  <Button className="bg-blue-600 hover:bg-blue-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Thêm bàn mới
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingTable ? 'Chỉnh sửa bàn' : 'Thêm bàn mới'}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Tên bàn</Label>
+                      <Input
+                        placeholder="VD: Bàn 1, Bàn VIP A..."
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Khu vực</Label>
+                      <div className="flex gap-2">
+                        <Select
+                          value={formData.area}
+                          onValueChange={(value) => setFormData({ ...formData, area: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Chọn khu vực" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {areas.map(area => (
+                              <SelectItem key={area.id} value={area.id}>
+                                {area.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button type="button" variant="outline" size="icon">
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Thêm khu vực mới</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                              <div>
+                                <Label>Tên khu vực</Label>
+                                <Input
+                                  placeholder="VD: Tầng 3, Sân vườn..."
+                                  value={newAreaName}
+                                  onChange={(e) => setNewAreaName(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleAddArea();
+                                    }
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button onClick={handleAddArea} className="bg-blue-600 hover:bg-blue-700">
+                                Thêm khu vực
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Số ghế</Label>
+                      <Input
+                        type="number"
+                        placeholder="VD: 4"
+                        value={formData.seats}
+                        onChange={(e) => setFormData({ ...formData, seats: e.target.value })}
+                        min="1"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                      Hủy
+                    </Button>
+                    <Button onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-700">
+                      {editingTable ? 'Cập nhật' : 'Thêm bàn'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Input
+              placeholder="Tìm kiếm bàn..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="flex-1 overflow-auto p-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Danh sách bàn ({filteredTables.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-slate-50"
+                      onClick={() => handleSort('name')}
+                    >
+                      Tên bàn{getSortIcon('name')}
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-slate-50"
+                      onClick={() => handleSort('area')}
+                    >
+                      Khu vực{getSortIcon('area')}
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-slate-50"
+                      onClick={() => handleSort('seats')}
+                    >
+                      Số ghế{getSortIcon('seats')}
+                    </TableHead>
+                    <TableHead>Trạng thái</TableHead>
+                    <TableHead className="text-right">Thao tác</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTables.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                        Không tìm thấy bàn nào
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredTables.map((table) => (
+                      <TableRow key={table.id}>
+                        <TableCell className="text-slate-900">{table.name}</TableCell>
+                        <TableCell className="text-slate-600">
+                          {areas.find(a => a.id === table.area)?.name || table.area}
+                        </TableCell>
+                        <TableCell className="text-slate-600">
+                          {table.seats} chỗ
+                        </TableCell>
+                        <TableCell>{getStatusBadge(table.status)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(table)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(table.id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleToggleStatus(table.id)}
+                              className={table.status === 'active' ? 'text-red-600 hover:text-red-700 hover:bg-red-50' : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'}
+                            >
+                              {table.status === 'active' ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
