@@ -10,6 +10,7 @@ import { ImportExport } from './components/pages/ImportExport';
 import { MenuRecipe } from './components/pages/MenuRecipe';
 import { Scheduling } from './components/pages/Scheduling';
 import { Staff } from './components/pages/Staff';
+import { StaffSettings } from './components/staff/StaffSettings';
 import { Customers } from './components/pages/Customers';
 import { CustomerGroups } from './components/pages/CustomerGroups';
 import { Suppliers } from './components/pages/Suppliers';
@@ -31,6 +32,7 @@ export type PageType =
   | 'tables'
   | 'scheduling' 
   | 'staff' 
+  | 'staff-settings'
   | 'customers' 
   | 'customer-groups'
   | 'suppliers'
@@ -132,6 +134,8 @@ function AppContent() {
         return <Scheduling />;
       case 'staff':
         return <Staff />;
+      case 'staff-settings':
+        return <StaffSettings />;
       case 'customers':
         return <Customers />;
       case 'customer-groups':

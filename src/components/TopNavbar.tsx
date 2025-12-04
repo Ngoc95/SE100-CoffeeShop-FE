@@ -71,6 +71,7 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
   const staffMenuItems = [
     { id: 'staff' as PageType, label: 'Nhân viên' },
     { id: 'scheduling' as PageType, label: 'Lịch làm việc' },
+    { id: 'staff-settings' as PageType, label: 'Thiết lập' },
   ];
 
   const financeMenuItems = [

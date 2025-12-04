@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Download, Upload, Calendar as CalendarIcon, Filter, X } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { ChevronLeft, ChevronRight, Plus, Download, Upload, Calendar as CalendarIcon, Filter, X, FileSpreadsheet } from 'lucide-react';
+import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Label } from '../ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Checkbox } from '../ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Calendar } from '../ui/calendar';
 import { toast } from 'sonner@2.0.3';
+import { staffMembers, initialSchedule } from '../../data/staffData';
 
 interface Shift {
   id: string;
@@ -21,6 +23,7 @@ interface StaffMember {
   id: string;
   name: string;
   role: string;
+  positionLabel: string;
 }
 
 interface ScheduleEntry {
@@ -31,54 +34,61 @@ interface ScheduleEntry {
 
 interface ScheduleCalendarProps {
   shifts: Shift[];
+  schedule?: Record<string, Record<string, string[]>>;
+  setSchedule?: (schedule: Record<string, Record<string, string[]>>) => void;
 }
 
-export function ScheduleCalendar({ shifts: propsShifts }: ScheduleCalendarProps) {
+export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule, setSchedule: setPropsSchedule }: ScheduleCalendarProps) {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [addShiftDialogOpen, setAddShiftDialogOpen] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{ staffId: string; day: string } | null>(null);
   const [filterRoles, setFilterRoles] = useState<string[]>([]);
   const [filterShifts, setFilterShifts] = useState<string[]>([]);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   // Use shifts from props - convert to the format needed for ScheduleCalendar
+  // Mỗi ca có màu khác nhau
+  const shiftColors: Record<string, string> = {
+    '1': 'bg-yellow-100 text-yellow-800 border-yellow-200', // Ca sáng
+    '2': 'bg-blue-100 text-blue-800 border-blue-200', // Ca chiều
+    '3': 'bg-purple-100 text-purple-800 border-purple-200', // Ca tối
+  };
+  
   const shifts = propsShifts.map(shift => ({
     id: shift.id,
     name: shift.name,
     startTime: shift.startTime,
     endTime: shift.endTime,
-    color: shift.color.includes('amber') ? 'bg-amber-100 text-amber-800' :
-           shift.color.includes('blue') ? 'bg-blue-100 text-blue-800' :
-           shift.color.includes('purple') ? 'bg-purple-100 text-purple-800' :
-           shift.color.includes('green') ? 'bg-green-100 text-green-800' :
-           shift.color.includes('pink') ? 'bg-pink-100 text-pink-800' :
-           shift.color.includes('red') ? 'bg-red-100 text-red-800' :
-           'bg-amber-100 text-amber-800',
+    color: shiftColors[shift.id] || 'bg-blue-100 text-blue-800 border-blue-200',
   }));
 
-  const staff: StaffMember[] = [
-    { id: '1', name: 'Nguyễn Văn A', role: 'Quản lý' },
-    { id: '2', name: 'Trần Thị B', role: 'Pha chế' },
-    { id: '3', name: 'Lê Văn C', role: 'Thu ngân' },
-    { id: '4', name: 'Phạm Thị D', role: 'Phục vụ' },
-    { id: '5', name: 'Hoàng Văn E', role: 'Pha chế' },
-    { id: '6', name: 'Võ Thị F', role: 'Phục vụ' },
-    { id: '7', name: 'Đặng Văn G', role: 'Thu ngân' },
-    { id: '8', name: 'Phan Thị H', role: 'Pha chế' },
-  ];
+  // Chỉ lấy 4-5 nhân viên đầu tiên (không có quản lý)
+  const staff: StaffMember[] = staffMembers.slice(0, 4).map(s => ({
+    id: s.id,
+    name: s.fullName,
+    role: s.position,
+    positionLabel: s.positionLabel,
+  }));
 
   const daysOfWeek = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-  const roles = ['Quản lý', 'Pha chế', 'Thu ngân', 'Phục vụ'];
+  const roles = ['Pha chế', 'Thu ngân', 'Phục vụ'];
 
-  const [schedule, setSchedule] = useState<Record<string, Record<string, string[]>>>({
-    '1': { 'T2': ['1'], 'T3': ['1'], 'T4': ['1'], 'T5': ['1'], 'T6': ['1'], 'T7': [], 'CN': [] },
-    '2': { 'T2': ['1'], 'T3': ['1', '2'], 'T4': ['1'], 'T5': ['1'], 'T6': ['1', '2'], 'T7': ['2'], 'CN': ['2'] },
-    '3': { 'T2': ['2'], 'T3': [], 'T4': ['2'], 'T5': ['2'], 'T6': [], 'T7': ['1', '2'], 'CN': ['1'] },
-    '4': { 'T2': ['2'], 'T3': ['2'], 'T4': [], 'T5': ['2'], 'T6': ['2'], 'T7': ['2'], 'CN': [] },
-    '5': { 'T2': ['1'], 'T3': ['1'], 'T4': ['1', '2'], 'T5': ['1'], 'T6': ['1'], 'T7': ['1'], 'CN': ['2'] },
-    '6': { 'T2': ['2'], 'T3': ['2'], 'T4': ['2'], 'T5': [], 'T6': ['2'], 'T7': ['2'], 'CN': ['1'] },
-    '7': { 'T2': ['1', '2'], 'T3': ['2'], 'T4': [], 'T5': ['2'], 'T6': ['1'], 'T7': [], 'CN': ['2'] },
-    '8': { 'T2': [], 'T3': ['1'], 'T4': ['1'], 'T5': ['1', '2'], 'T6': [], 'T7': ['1', '2'], 'CN': [] },
-  });
+  // Use schedule from props or local state
+  const [localSchedule, setLocalSchedule] = useState<Record<string, Record<string, string[]>>>(
+    propsSchedule || initialSchedule
+  );
+  const schedule = propsSchedule !== undefined ? propsSchedule : localSchedule;
+
+  // Sync schedule với parent component
+  const updateSchedule = (newSchedule: Record<string, Record<string, string[]>>) => {
+    if (setPropsSchedule) {
+      setPropsSchedule(newSchedule);
+    } else {
+      setLocalSchedule(newSchedule);
+    }
+  };
 
   const [selectedShifts, setSelectedShifts] = useState<string[]>([]);
 
@@ -91,13 +101,14 @@ export function ScheduleCalendar({ shifts: propsShifts }: ScheduleCalendarProps)
   const handleSaveShifts = () => {
     if (!selectedCell) return;
 
-    setSchedule(prev => ({
-      ...prev,
+    const newSchedule = {
+      ...schedule,
       [selectedCell.staffId]: {
-        ...prev[selectedCell.staffId],
+        ...schedule[selectedCell.staffId],
         [selectedCell.day]: selectedShifts,
       },
-    }));
+    };
+    updateSchedule(newSchedule);
 
     toast.success('Đã cập nhật lịch làm việc');
     setAddShiftDialogOpen(false);
@@ -113,15 +124,13 @@ export function ScheduleCalendar({ shifts: propsShifts }: ScheduleCalendarProps)
 
   const getShiftById = (id: string) => shifts.find(s => s.id === id);
 
-  // Apply role filter
-  let filteredStaff = filterRoles.length > 0
-    ? staff.filter(s => filterRoles.includes(s.role))
-    : staff;
-
-  // Apply shift filter - only show staff that have at least one of the selected shifts
+  // Apply filters
+  let filteredStaff = staff;
+  if (filterRoles.length > 0) {
+    filteredStaff = filteredStaff.filter(s => filterRoles.includes(s.positionLabel));
+  }
   if (filterShifts.length > 0) {
     filteredStaff = filteredStaff.filter(person => {
-      // Check if this person has any of the selected shifts in their schedule
       return daysOfWeek.some(day => {
         const personShifts = schedule[person.id]?.[day] || [];
         return personShifts.some(shiftId => filterShifts.includes(shiftId));
@@ -149,6 +158,14 @@ export function ScheduleCalendar({ shifts: propsShifts }: ScheduleCalendarProps)
     setFilterRoles([]);
     setFilterShifts([]);
   };
+
+  const isCurrentWeek = () => {
+    const today = new Date();
+    const weekStart = getWeekDates()[0];
+    const weekEnd = getWeekDates()[6];
+    return today >= weekStart && today <= weekEnd;
+  };
+
 
   const goToPreviousWeek = () => {
     const newDate = new Date(currentWeek);
@@ -206,15 +223,6 @@ export function ScheduleCalendar({ shifts: propsShifts }: ScheduleCalendarProps)
     return total;
   };
 
-  // Statistics
-  const totalStaff = staff.length;
-  const staffByRole = roles.map(role => ({
-    role,
-    count: staff.filter(s => s.role === role).length
-  }));
-  const totalShiftsThisWeek = filteredStaff.reduce((sum, person) => {
-    return sum + getTotalShiftsPerPerson(person.id);
-  }, 0);
 
   return (
     <div className="flex h-full bg-slate-50">
@@ -287,7 +295,7 @@ export function ScheduleCalendar({ shifts: propsShifts }: ScheduleCalendarProps)
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Tổng nhân viên</span>
-                <span className="text-slate-900">{totalStaff}</span>
+                <span className="text-slate-900">{staff.length}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Đang hiển thị</span>
@@ -295,7 +303,9 @@ export function ScheduleCalendar({ shifts: propsShifts }: ScheduleCalendarProps)
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Tổng ca tuần này</span>
-                <span className="text-slate-900">{totalShiftsThisWeek}</span>
+                <span className="text-slate-900">
+                  {filteredStaff.reduce((sum, person) => sum + getTotalShiftsPerPerson(person.id), 0)}
+                </span>
               </div>
             </div>
           </div>
@@ -326,11 +336,11 @@ export function ScheduleCalendar({ shifts: propsShifts }: ScheduleCalendarProps)
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(true)}>
                 <Upload className="w-4 h-4 mr-2" />
                 Import
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => setExportDialogOpen(true)}>
                 <Download className="w-4 h-4 mr-2" />
                 Export
               </Button>
@@ -343,29 +353,36 @@ export function ScheduleCalendar({ shifts: propsShifts }: ScheduleCalendarProps)
               <Button variant="outline" size="sm" onClick={goToPreviousWeek}>
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={goToCurrentWeek}
-                className="text-sm text-neutral-700 hover:text-amber-700"
-              >
-                <CalendarIcon className="w-4 h-4 mr-2" />
-                {formatWeekRange()}
-              </Button>
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-sm text-neutral-700 hover:text-amber-700"
+                  >
+                    <CalendarIcon className="w-4 h-4 mr-2" />
+                    {formatWeekRange()}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={currentWeek}
+                    onSelect={(date) => {
+                      if (date) {
+                        setCurrentWeek(date);
+                        setCalendarOpen(false);
+                      }
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
               <Button variant="outline" size="sm" onClick={goToNextWeek}>
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
 
-            {/* Legend */}
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-slate-600">Ca làm việc:</span>
-              {shifts.map(shift => (
-                <Badge key={shift.id} className={shift.color}>
-                  {shift.name}
-                </Badge>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -383,17 +400,29 @@ export function ScheduleCalendar({ shifts: propsShifts }: ScheduleCalendarProps)
                           {filteredStaff.length} người
                         </div>
                       </th>
-                      {daysOfWeek.map((day, index) => (
-                        <th key={day} className="p-3 text-center bg-amber-50 min-w-[120px]">
-                          <div className="text-sm text-neutral-700">{day}</div>
-                          <div className="text-xs text-neutral-500 mt-1">
-                            {weekDates[index].getDate()}/{weekDates[index].getMonth() + 1}
-                          </div>
-                          <Badge variant="secondary" className="text-xs mt-1">
-                            {getTotalShiftsPerDay(day)} ca
-                          </Badge>
-                        </th>
-                      ))}
+                      {daysOfWeek.map((day, index) => {
+                        const date = weekDates[index];
+                        const today = new Date();
+                        const isToday = date.toDateString() === today.toDateString();
+                        return (
+                          <th 
+                            key={day} 
+                            className={`p-3 text-center bg-amber-50 min-w-[120px] ${
+                              isToday ? 'bg-blue-100 border-2 border-blue-500' : ''
+                            }`}
+                          >
+                            <div className={`text-sm ${isToday ? 'text-blue-700 font-semibold' : 'text-neutral-700'}`}>
+                              {day}
+                            </div>
+                            <div className={`text-xs mt-1 ${isToday ? 'text-blue-600 font-medium' : 'text-neutral-500'}`}>
+                              {date.getDate()}/{date.getMonth() + 1}
+                            </div>
+                            <Badge variant="secondary" className="text-xs mt-1">
+                              {getTotalShiftsPerDay(day)} ca
+                            </Badge>
+                          </th>
+                        );
+                      })}
                       <th className="p-3 text-center bg-amber-50 text-sm text-neutral-700">
                         Tổng
                       </th>
@@ -410,7 +439,7 @@ export function ScheduleCalendar({ shifts: propsShifts }: ScheduleCalendarProps)
                         <td className="p-3 bg-white sticky left-0 z-10 border-r">
                           <div>
                             <p className="text-sm text-neutral-900">{person.name}</p>
-                            <p className="text-xs text-neutral-500">{person.role}</p>
+                            <p className="text-xs text-neutral-500">{person.positionLabel}</p>
                           </div>
                         </td>
                         {daysOfWeek.map(day => (
@@ -514,6 +543,72 @@ export function ScheduleCalendar({ shifts: propsShifts }: ScheduleCalendarProps)
             </Button>
             <Button onClick={handleSaveShifts} className="bg-amber-700 hover:bg-amber-800">
               Lưu lịch
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import lịch làm việc</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center">
+              <Upload className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+              <p className="text-sm text-slate-600 mb-2">
+                Kéo thả file Excel vào đây hoặc click để chọn file
+              </p>
+              <Button variant="outline" size="sm">
+                Chọn file
+              </Button>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <FileSpreadsheet className="w-4 h-4" />
+              <Button
+                variant="link"
+                className="p-0 h-auto text-blue-600"
+                onClick={() => {
+                  // Download template file
+                  toast.success('Đang tải file mẫu...');
+                }}
+              >
+                Tải file Excel mẫu
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
+              Bỏ qua
+            </Button>
+            <Button className="bg-blue-600 hover:bg-blue-700">
+              Import
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Export Dialog */}
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Export lịch làm việc</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Bạn muốn export lịch làm việc cho tuần này?
+            </p>
+            <div className="bg-slate-50 p-3 rounded-lg">
+              <p className="text-sm font-medium text-slate-900">{formatWeekRange()}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialogOpen(false)}>
+              Bỏ qua
+            </Button>
+            <Button className="bg-blue-600 hover:bg-blue-700">
+              Export
             </Button>
           </DialogFooter>
         </DialogContent>
