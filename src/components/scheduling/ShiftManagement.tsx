@@ -37,6 +37,7 @@ import {
   TableRow,
 } from "../ui/table";
 import { Badge } from "../ui/badge";
+import { toast } from "sonner@2.0.3";
 
 // Generate time options from 00:00 to 23:45 with 15-minute intervals
 const generateTimeOptions = () => {
@@ -103,6 +104,7 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
 
   const handleSave = () => {
     if (!formData.name || !formData.startTime || !formData.endTime) {
+      toast.error("Vui lòng điền đầy đủ thông tin");
       return;
     }
 
@@ -123,11 +125,13 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
     }
 
     setDialogOpen(false);
+    toast.success("Đã lưu ca làm việc");
   };
 
   const handleDelete = (id: string) => {
     if (confirm("Bạn có chắc muốn xóa ca làm việc này?")) {
       setShifts(shifts.filter((s) => s.id !== id));
+      toast.success("Đã xóa ca làm việc");
     }
   };
 
@@ -184,6 +188,19 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
     return `${checkOutHour.toString().padStart(2, "0")}:${minute
       .toString()
       .padStart(2, "0")}`;
+  };
+
+  const handleToggleStatus = (id: string) => {
+    setShifts(
+      shifts.map((s) =>
+        s.id === id ? { ...s, active: s.active === false ? true : false } : s
+      )
+    );
+    toast.success(
+      shifts.find((s) => s.id === id)?.active === false
+        ? "Đã vô hiệu hóa ca làm việc"
+        : "Đã kích hoạt ca làm việc"
+    );
   };
 
   return (
@@ -270,13 +287,7 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
                           : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
                       }
                       onClick={() => {
-                        setShifts(
-                          shifts.map((s) =>
-                            s.id === shift.id
-                              ? { ...s, active: !(s.active !== false) }
-                              : s
-                          )
-                        );
+                        handleToggleStatus(shift.id);
                       }}
                       title={
                         shift.active !== false ? "Ngừng hoạt động" : "Hoạt động"

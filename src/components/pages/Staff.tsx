@@ -9,6 +9,8 @@ import {
   X,
   ArrowUpDown,
   Info,
+  Power,
+  PowerOff,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
@@ -776,6 +778,24 @@ export function Staff() {
       setStaffMembers(staffMembers.filter((s) => s.id !== staff.id));
       toast.success("Đã xóa nhân viên");
     }
+  };
+
+  const handleToggleStatus = (id: string) => {
+    setStaffMembers(
+      staffMembers.map((staff) =>
+        staff.id === id
+          ? {
+              ...staff,
+              status: staff.status === "active" ? "inactive" : "active",
+            }
+          : staff
+      )
+    );
+    toast.success(
+      staffMembers.find((s) => s.id === id)?.status === "active"
+        ? "Đã vô hiệu hóa nhân viên"
+        : "Đã kích hoạt nhân viên"
+    );
   };
 
   return (
@@ -1885,6 +1905,22 @@ export function Staff() {
                               onClick={() => handleDelete(staff)}
                             >
                               <Trash2 className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleToggleStatus(staff.id)}
+                              className={
+                                staff.status === "active"
+                                  ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                              }
+                            >
+                              {staff.status === "active" ? (
+                                <PowerOff className="w-4 h-4" />
+                              ) : (
+                                <Power className="w-4 h-4" />
+                              )}
                             </Button>
                           </div>
                         </TableCell>

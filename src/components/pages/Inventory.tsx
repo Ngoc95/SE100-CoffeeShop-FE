@@ -6,7 +6,7 @@ import {
   Package, 
   Calendar,
   TrendingDown,
-  Edit,
+  Pencil,
   Trash2,
   ArrowUpDown,
   ArrowUp,
@@ -1209,7 +1209,7 @@ export function Inventory() {
                               <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex justify-end gap-2">
                                   <Button variant="ghost" size="sm">
-                                    <Edit className="w-4 h-4" />
+                                    <Pencil className="w-4 h-4" />
                                   </Button>
                                   <Button variant="ghost" size="sm">
                                     <Trash2 className="w-4 h-4 text-red-600" />
@@ -1400,7 +1400,7 @@ export function Inventory() {
                               <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex justify-end gap-2">
                                   <Button variant="ghost" size="sm">
-                                    <Edit className="w-4 h-4" />
+                                    <Pencil className="w-4 h-4" />
                                   </Button>
                                   <Button variant="ghost" size="sm">
                                     <Trash2 className="w-4 h-4 text-red-600" />
@@ -1627,7 +1627,7 @@ export function Inventory() {
                               <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex justify-end gap-2">
                                   <Button variant="ghost" size="sm">
-                                    <Edit className="w-4 h-4" />
+                                    <Pencil className="w-4 h-4" />
                                   </Button>
                                   <Button variant="ghost" size="sm">
                                     <Trash2 className="w-4 h-4 text-red-600" />

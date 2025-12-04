@@ -1,17 +1,26 @@
-import { useState } from 'react';
-import { Plus, Edit, Trash2, Search, Power, PowerOff, Filter, X } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { useState } from "react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Search,
+  Power,
+  PowerOff,
+  Filter,
+  X,
+} from "lucide-react";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../ui/select';
+} from "../ui/select";
 import {
   Table,
   TableBody,
@@ -19,11 +28,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../ui/table';
-import { toast } from 'sonner@2.0.3';
-import { PromotionFormDialog } from '../PromotionFormDialog';
+} from "../ui/table";
+import { toast } from "sonner@2.0.3";
+import { PromotionFormDialog } from "../PromotionFormDialog";
 
-export type PromotionType = 'percentage' | 'amount' | 'fixed-price' | 'free-item';
+export type PromotionType =
+  | "percentage"
+  | "amount"
+  | "fixed-price"
+  | "free-item";
 
 interface MenuItem {
   id: string;
@@ -71,126 +84,131 @@ export interface Promotion {
   applicableCombos?: Combo[];
   applicableCustomerGroups?: CustomerGroup[];
   applicableCustomers?: Customer[];
-  status: 'active' | 'inactive';
+  status: "active" | "inactive";
 }
 
 export function Promotions() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedType, setSelectedType] = useState<string>('all');
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedType, setSelectedType] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
+  const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(
+    null
+  );
 
   const [promotions, setPromotions] = useState<Promotion[]>([
     {
-      id: '1',
-      code: 'KM001',
-      name: 'Giảm 20% cho hóa đơn trên 200k',
-      type: 'percentage',
+      id: "1",
+      code: "KM001",
+      name: "Giảm 20% cho hóa đơn trên 200k",
+      type: "percentage",
       minOrderValue: 200000,
       maxDiscountValue: 50000,
       promotionValue: 20,
-      startDate: '01/12/2024',
-      startTime: '00:00',
-      endDate: '31/12/2024',
-      endTime: '23:59',
+      startDate: "01/12/2024",
+      startTime: "00:00",
+      endDate: "31/12/2024",
+      endTime: "23:59",
       applicableItems: [],
       applicableCategories: [],
       applicableCombos: [],
       applicableCustomerGroups: [],
       applicableCustomers: [],
-      status: 'active',
+      status: "active",
     },
     {
-      id: '2',
-      code: 'KM002',
-      name: 'Giảm 50k cho đơn từ 300k',
-      type: 'amount',
+      id: "2",
+      code: "KM002",
+      name: "Giảm 50k cho đơn từ 300k",
+      type: "amount",
       minOrderValue: 300000,
       promotionValue: 50000,
-      startDate: '15/11/2024',
-      startTime: '08:00',
-      endDate: '15/12/2024',
-      endTime: '22:00',
+      startDate: "15/11/2024",
+      startTime: "08:00",
+      endDate: "15/12/2024",
+      endTime: "22:00",
       applicableItems: [],
       applicableCategories: [],
       applicableCombos: [],
       applicableCustomerGroups: [],
       applicableCustomers: [],
-      status: 'active',
+      status: "active",
     },
     {
-      id: '3',
-      code: 'KM003',
-      name: 'Tặng cà phê sữa cho HĐ trên 150k',
-      type: 'free-item',
+      id: "3",
+      code: "KM003",
+      name: "Tặng cà phê sữa cho HĐ trên 150k",
+      type: "free-item",
       minOrderValue: 150000,
-      startDate: '01/11/2024',
-      startTime: '00:00',
-      endDate: '30/11/2024',
-      endTime: '23:59',
-      freeItems: [
-        { id: '1', code: 'CF001', name: 'Cà phê sữa', quantity: 1 }
-      ],
+      startDate: "01/11/2024",
+      startTime: "00:00",
+      endDate: "30/11/2024",
+      endTime: "23:59",
+      freeItems: [{ id: "1", code: "CF001", name: "Cà phê sữa", quantity: 1 }],
       applicableItems: [],
       applicableCategories: [],
       applicableCombos: [],
       applicableCustomerGroups: [],
       applicableCustomers: [],
-      status: 'inactive',
+      status: "inactive",
     },
   ]);
 
   const filteredPromotions = promotions.filter((promo) => {
-    const matchesSearch = 
+    const matchesSearch =
       promo.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       promo.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = selectedType === 'all' || promo.type === selectedType;
-    const matchesStatus = selectedStatus === 'all' || promo.status === selectedStatus;
+    const matchesType = selectedType === "all" || promo.type === selectedType;
+    const matchesStatus =
+      selectedStatus === "all" || promo.status === selectedStatus;
     return matchesSearch && matchesType && matchesStatus;
   });
 
-  const handleAddPromotion = (formData: Omit<Promotion, 'id' | 'code'>) => {
+  const handleAddPromotion = (formData: Omit<Promotion, "id" | "code">) => {
     const newPromotion: Promotion = {
       id: Date.now().toString(),
-      code: `KM${String(promotions.length + 1).padStart(3, '0')}`,
+      code: `KM${String(promotions.length + 1).padStart(3, "0")}`,
       ...formData,
     };
     setPromotions([...promotions, newPromotion]);
     setDialogOpen(false);
-    toast.success('Đã thêm khuyến mại mới');
+    toast.success("Đã thêm khuyến mại mới");
   };
 
-  const handleEditPromotion = (formData: Omit<Promotion, 'id' | 'code'>) => {
+  const handleEditPromotion = (formData: Omit<Promotion, "id" | "code">) => {
     if (!editingPromotion) return;
     setPromotions(
       promotions.map((p) =>
-        p.id === editingPromotion.id
-          ? { ...p, ...formData }
-          : p
+        p.id === editingPromotion.id ? { ...p, ...formData } : p
       )
     );
     setEditingPromotion(null);
     setDialogOpen(false);
-    toast.success('Đã cập nhật khuyến mại');
+    toast.success("Đã cập nhật khuyến mại");
   };
 
   const handleDeletePromotion = (id: string) => {
-    if (confirm('Bạn có chắc chắn muốn xóa khuyến mại này?')) {
+    if (confirm("Bạn có chắc chắn muốn xóa khuyến mại này?")) {
       setPromotions(promotions.filter((p) => p.id !== id));
-      toast.success('Đã xóa khuyến mại');
+      toast.success("Đã xóa khuyến mại");
     }
   };
 
   const handleToggleStatus = (id: string) => {
-    setPromotions(promotions.map(promo => {
-      if (promo.id === id) {
-        const newStatus = promo.status === 'active' ? 'inactive' : 'active';
-        toast.success(newStatus === 'active' ? 'Đã kích hoạt khuyến mại' : 'Đã vô hiệu hóa khuyến mại');
-        return { ...promo, status: newStatus };
-      }
-      return promo;
-    }));
+    setPromotions(
+      promotions.map((promo) => {
+        if (promo.id === id) {
+          const newStatus = promo.status === "active" ? "inactive" : "active";
+          toast.success(
+            newStatus === "active"
+              ? "Đã kích hoạt khuyến mại"
+              : "Đã vô hiệu hóa khuyến mại"
+          );
+          return { ...promo, status: newStatus };
+        }
+        return promo;
+      })
+    );
   };
 
   const openEditDialog = (promo: Promotion) => {
@@ -200,39 +218,53 @@ export function Promotions() {
 
   const getPromotionTypeLabel = (type: PromotionType) => {
     switch (type) {
-      case 'percentage':
-        return 'Theo phần trăm';
-      case 'amount':
-        return 'Theo số tiền';
-      case 'fixed-price':
-        return 'Đồng giá';
-      case 'free-item':
-        return 'Tặng món';
+      case "percentage":
+        return "Theo phần trăm";
+      case "amount":
+        return "Theo số tiền";
+      case "fixed-price":
+        return "Đồng giá";
+      case "free-item":
+        return "Tặng món";
       default:
-        return '';
+        return "";
     }
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(value);
   };
 
   const formatPromotionValue = (promo: Promotion) => {
-    if (promo.type === 'free-item') {
-      return promo.freeItems?.map(item => `${item.name}${item.quantity ? ` (x${item.quantity})` : ''}`).join(', ') || '-';
+    if (promo.type === "free-item") {
+      return (
+        promo.freeItems
+          ?.map(
+            (item) =>
+              `${item.name}${item.quantity ? ` (x${item.quantity})` : ""}`
+          )
+          .join(", ") || "-"
+      );
     }
-    if (promo.type === 'percentage') {
+    if (promo.type === "percentage") {
       return `${promo.promotionValue}%`;
     }
-    if (promo.type === 'amount' || promo.type === 'fixed-price') {
+    if (promo.type === "amount" || promo.type === "fixed-price") {
       return formatCurrency(promo.promotionValue || 0);
     }
-    return '-';
+    return "-";
   };
 
   const totalPromotions = promotions.length;
-  const activePromotions = promotions.filter(p => p.status === 'active').length;
-  const inactivePromotions = promotions.filter(p => p.status === 'inactive').length;
+  const activePromotions = promotions.filter(
+    (p) => p.status === "active"
+  ).length;
+  const inactivePromotions = promotions.filter(
+    (p) => p.status === "inactive"
+  ).length;
 
   return (
     <div className="flex h-full bg-slate-50">
@@ -246,7 +278,9 @@ export function Promotions() {
             </h3>
             <div className="space-y-4">
               <div>
-                <Label className="text-xs text-slate-600">Loại khuyến mại</Label>
+                <Label className="text-xs text-slate-600">
+                  Loại khuyến mại
+                </Label>
                 <Select value={selectedType} onValueChange={setSelectedType}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
@@ -263,7 +297,10 @@ export function Promotions() {
 
               <div>
                 <Label className="text-xs text-slate-600">Trạng thái</Label>
-                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <Select
+                  value={selectedStatus}
+                  onValueChange={setSelectedStatus}
+                >
                   <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
@@ -299,9 +336,9 @@ export function Promotions() {
             variant="outline"
             className="w-full"
             onClick={() => {
-              setSelectedType('all');
-              setSelectedStatus('all');
-              setSearchQuery('');
+              setSelectedType("all");
+              setSelectedStatus("all");
+              setSearchQuery("");
             }}
           >
             <X className="w-4 h-4 mr-2" />
@@ -373,35 +410,64 @@ export function Promotions() {
                 <TableBody>
                   {filteredPromotions.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={12} className="text-center py-8 text-slate-500">
+                      <TableCell
+                        colSpan={12}
+                        className="text-center py-8 text-slate-500"
+                      >
                         Không tìm thấy khuyến mại nào
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredPromotions.map((promo) => (
                       <TableRow key={promo.id}>
-                        <TableCell className="text-slate-900">{promo.code}</TableCell>
-                        <TableCell className="text-slate-900">{promo.name}</TableCell>
-                        <TableCell className="text-slate-600">{getPromotionTypeLabel(promo.type)}</TableCell>
-                        <TableCell className="text-slate-600">{formatCurrency(promo.minOrderValue)}</TableCell>
-                        <TableCell className="text-slate-600">{formatPromotionValue(promo)}</TableCell>
-                        <TableCell className="text-slate-600">
-                          {promo.maxDiscountValue ? formatCurrency(promo.maxDiscountValue) : '-'}
+                        <TableCell className="text-slate-900">
+                          {promo.code}
                         </TableCell>
-                        <TableCell className="text-slate-600">{promo.startDate}</TableCell>
-                        <TableCell className="text-slate-600">{promo.startTime}</TableCell>
-                        <TableCell className="text-slate-600">{promo.endDate}</TableCell>
-                        <TableCell className="text-slate-600">{promo.endTime}</TableCell>
+                        <TableCell className="text-slate-900">
+                          {promo.name}
+                        </TableCell>
+                        <TableCell className="text-slate-600">
+                          {getPromotionTypeLabel(promo.type)}
+                        </TableCell>
+                        <TableCell className="text-slate-600">
+                          {formatCurrency(promo.minOrderValue)}
+                        </TableCell>
+                        <TableCell className="text-slate-600">
+                          {formatPromotionValue(promo)}
+                        </TableCell>
+                        <TableCell className="text-slate-600">
+                          {promo.maxDiscountValue
+                            ? formatCurrency(promo.maxDiscountValue)
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="text-slate-600">
+                          {promo.startDate}
+                        </TableCell>
+                        <TableCell className="text-slate-600">
+                          {promo.startTime}
+                        </TableCell>
+                        <TableCell className="text-slate-600">
+                          {promo.endDate}
+                        </TableCell>
+                        <TableCell className="text-slate-600">
+                          {promo.endTime}
+                        </TableCell>
                         <TableCell>
                           <Badge
-                            variant={promo.status === 'active' ? 'default' : 'secondary'}
+                            variant={
+                              promo.status === "active"
+                                ? "default"
+                                : "secondary"
+                            }
                             className={
-                              promo.status === 'active'
-                                ? 'bg-emerald-500'
-                                : 'bg-red-500 text-white hover:bg-red-500'
+                              promo.status === "active"
+                                ? "bg-emerald-500"
+                                : "bg-red-500 text-white hover:bg-red-500"
                             }
                           >
-                            {promo.status === 'active' ? 'Hoạt động' : 'Không hoạt động'}
+                            {promo.status === "active"
+                              ? "Hoạt động"
+                              : "Không hoạt động"}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
@@ -412,7 +478,7 @@ export function Promotions() {
                               onClick={() => openEditDialog(promo)}
                               className="hover:bg-blue-50"
                             >
-                              <Edit className="w-4 h-4 text-blue-600" />
+                              <Pencil className="w-4 h-4" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -426,10 +492,22 @@ export function Promotions() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleToggleStatus(promo.id)}
-                              className={promo.status === 'active' ? 'text-red-600 hover:text-red-700 hover:bg-red-50' : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'}
-                              title={promo.status === 'active' ? 'Vô hiệu hóa' : 'Kích hoạt'}
+                              className={
+                                promo.status === "active"
+                                  ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                              }
+                              title={
+                                promo.status === "active"
+                                  ? "Vô hiệu hóa"
+                                  : "Kích hoạt"
+                              }
                             >
-                              {promo.status === 'active' ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
+                              {promo.status === "active" ? (
+                                <PowerOff className="w-4 h-4" />
+                              ) : (
+                                <Power className="w-4 h-4" />
+                              )}
                             </Button>
                           </div>
                         </TableCell>
