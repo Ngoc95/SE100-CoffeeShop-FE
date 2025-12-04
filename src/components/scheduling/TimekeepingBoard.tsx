@@ -484,6 +484,7 @@ export function TimekeepingBoard({
     setCurrentWeek(new Date());
   };
 
+  // Chỉ lấy các ca đang hoạt động
   const activeShifts = shifts.filter((s) => s.active !== false);
 
   return (
@@ -663,12 +664,7 @@ export function TimekeepingBoard({
             <thead>
               <tr className="bg-slate-50 border-b">
                 <th className="text-left p-3 text-sm font-medium text-slate-700 sticky left-0 bg-slate-50 z-10 border-r">
-                  <div className="flex items-center gap-2">
-                    Ca làm việc
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  <div className="flex items-center gap-2">Ca làm việc</div>
                 </th>
                 {daysOfWeek.map((day, index) => {
                   const date = weekDates[index];

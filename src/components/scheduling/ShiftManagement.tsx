@@ -36,6 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
+import { Badge } from "../ui/badge";
 
 // Generate time options from 00:00 to 23:45 with 15-minute intervals
 const generateTimeOptions = () => {
@@ -218,6 +219,7 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
               </TableHead>
               <TableHead>Thời gian</TableHead>
               <TableHead>Tổng thời gian làm việc</TableHead>
+              <TableHead>Trạng thái</TableHead>
               <TableHead>Thao tác</TableHead>
             </TableRow>
           </TableHeader>
@@ -233,6 +235,13 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
                 </TableCell>
                 <TableCell>
                   {calculateShiftDuration(shift.startTime, shift.endTime)}h
+                </TableCell>
+                <TableCell>
+                  {shift.active !== false ? (
+                    <Badge className="bg-emerald-500">Hoạt động</Badge>
+                  ) : (
+                    <Badge variant="secondary">Ngừng hoạt động</Badge>
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">

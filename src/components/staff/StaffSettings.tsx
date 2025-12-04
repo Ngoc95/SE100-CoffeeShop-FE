@@ -1,4 +1,5 @@
 import { useState } from "react";
+import * as React from "react";
 import { Button } from "../ui/button";
 import {
   Dialog,
@@ -135,6 +136,7 @@ export function StaffSettings() {
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <Checkbox
+                id="late-enabled"
                 checked={lateEarlySettings.lateEnabled}
                 onCheckedChange={(checked) =>
                   setLateEarlySettings({
@@ -143,7 +145,9 @@ export function StaffSettings() {
                   })
                 }
               />
-              <Label className="flex-1">Tính đi muộn sau</Label>
+              <Label htmlFor="late-enabled" className="flex-1 cursor-pointer">
+                Tính đi muộn sau
+              </Label>
               <Input
                 type="number"
                 value={lateEarlySettings.lateMinutes}
@@ -161,6 +165,7 @@ export function StaffSettings() {
             </div>
             <div className="flex items-center gap-3">
               <Checkbox
+                id="early-enabled"
                 checked={lateEarlySettings.earlyEnabled}
                 onCheckedChange={(checked) =>
                   setLateEarlySettings({
@@ -169,7 +174,9 @@ export function StaffSettings() {
                   })
                 }
               />
-              <Label className="flex-1">Tính về sớm trước</Label>
+              <Label htmlFor="early-enabled" className="flex-1 cursor-pointer">
+                Tính về sớm trước
+              </Label>
               <Input
                 type="number"
                 value={lateEarlySettings.earlyMinutes}
@@ -215,6 +222,7 @@ export function StaffSettings() {
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <Checkbox
+                id="before-shift-enabled"
                 checked={overtimeSettings.beforeShiftEnabled}
                 onCheckedChange={(checked) =>
                   setOvertimeSettings({
@@ -223,7 +231,12 @@ export function StaffSettings() {
                   })
                 }
               />
-              <Label className="flex-1">Tính làm thêm giờ trước ca</Label>
+              <Label
+                htmlFor="before-shift-enabled"
+                className="flex-1 cursor-pointer"
+              >
+                Tính làm thêm giờ trước ca
+              </Label>
               <Input
                 type="number"
                 value={overtimeSettings.beforeShiftMinutes}
@@ -241,6 +254,7 @@ export function StaffSettings() {
             </div>
             <div className="flex items-center gap-3">
               <Checkbox
+                id="after-shift-enabled"
                 checked={overtimeSettings.afterShiftEnabled}
                 onCheckedChange={(checked) =>
                   setOvertimeSettings({
@@ -249,7 +263,12 @@ export function StaffSettings() {
                   })
                 }
               />
-              <Label className="flex-1">Tính làm thêm giờ sau ca</Label>
+              <Label
+                htmlFor="after-shift-enabled"
+                className="flex-1 cursor-pointer"
+              >
+                Tính làm thêm giờ sau ca
+              </Label>
               <Input
                 type="number"
                 value={overtimeSettings.afterShiftMinutes}

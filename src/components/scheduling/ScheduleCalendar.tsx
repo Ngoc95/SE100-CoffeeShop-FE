@@ -56,13 +56,16 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
     '3': 'bg-purple-100 text-purple-800 border-purple-200', // Ca tối
   };
   
-  const shifts = propsShifts.map(shift => ({
-    id: shift.id,
-    name: shift.name,
-    startTime: shift.startTime,
-    endTime: shift.endTime,
-    color: shiftColors[shift.id] || 'bg-blue-100 text-blue-800 border-blue-200',
-  }));
+  // Chỉ lấy các ca đang hoạt động
+  const shifts = propsShifts
+    .filter(shift => shift.active !== false)
+    .map(shift => ({
+      id: shift.id,
+      name: shift.name,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+      color: shiftColors[shift.id] || 'bg-blue-100 text-blue-800 border-blue-200',
+    }));
 
   // Chỉ lấy 4-5 nhân viên đầu tiên (không có quản lý)
   const staff: StaffMember[] = staffMembers.slice(0, 4).map(s => ({
@@ -463,7 +466,7 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
                                 })
                               ) : (
                                 <div className="text-center">
-                                  <Plus className="w-4 h-4 text-neutral-300 mx-auto" />
+                                  <Plus className="w-5 h-5 text-slate-400 mx-auto" />
                                 </div>
                               )}
                             </div>
