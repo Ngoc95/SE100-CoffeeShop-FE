@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Switch } from "../ui/switch";
 import {
@@ -837,19 +838,39 @@ export function Staff() {
                 <Label className="text-xs text-slate-600 mb-2 block">
                   Trạng thái
                 </Label>
-                <Select
+                <RadioGroup
                   value={filterStatus}
                   onValueChange={(value) => setFilterStatus(value)}
+                  className="space-y-2"
                 >
-                  <SelectTrigger className="mt-1.5">
-                    <SelectValue placeholder="Chọn trạng thái" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tất cả</SelectItem>
-                    <SelectItem value="active">Đang làm việc</SelectItem>
-                    <SelectItem value="inactive">Nghỉ việc</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="all" id="status-all" />
+                    <Label
+                      htmlFor="status-all"
+                      className="text-xs text-slate-700 cursor-pointer font-normal"
+                    >
+                      Tất cả
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="active" id="status-active" />
+                    <Label
+                      htmlFor="status-active"
+                      className="text-xs text-slate-700 cursor-pointer font-normal"
+                    >
+                      Đang làm việc
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="inactive" id="status-inactive" />
+                    <Label
+                      htmlFor="status-inactive"
+                      className="text-xs text-slate-700 cursor-pointer font-normal"
+                    >
+                      Nghỉ việc
+                    </Label>
+                  </div>
+                </RadioGroup>
               </div>
             </div>
           </div>

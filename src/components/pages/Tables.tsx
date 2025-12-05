@@ -38,6 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { toast } from "sonner";
 
 interface TableItem {
@@ -255,9 +256,20 @@ export function Tables() {
             </h3>
             <div className="space-y-4">
               <div>
-                <Label className="text-xs text-slate-600 mb-1 block">
-                  Khu vực
-                </Label>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-xs text-slate-600">Khu vực</Label>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5"
+                    onClick={() => {
+                      setNewAreaName("");
+                      setQuickAreaDialogOpen(true);
+                    }}
+                  >
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                </div>
                 <div className="flex items-center gap-2">
                   <Select value={selectedArea} onValueChange={setSelectedArea}>
                     <SelectTrigger className="flex-1">
@@ -293,22 +305,42 @@ export function Tables() {
               </div>
 
               <div>
-                <Label className="text-xs text-slate-600 mb-1 block">
+                <Label className="text-xs text-slate-600 mb-2 block">
                   Trạng thái
                 </Label>
-                <Select
+                <RadioGroup
                   value={selectedStatus}
                   onValueChange={setSelectedStatus}
+                  className="space-y-2"
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                    <SelectItem value="active">Hoạt động</SelectItem>
-                    <SelectItem value="inactive">Không hoạt động</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="all" id="status-all" />
+                    <Label
+                      htmlFor="status-all"
+                      className="text-xs text-slate-700 cursor-pointer font-normal"
+                    >
+                      Tất cả trạng thái
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="active" id="status-active" />
+                    <Label
+                      htmlFor="status-active"
+                      className="text-xs text-slate-700 cursor-pointer font-normal"
+                    >
+                      Hoạt động
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="inactive" id="status-inactive" />
+                    <Label
+                      htmlFor="status-inactive"
+                      className="text-xs text-slate-700 cursor-pointer font-normal"
+                    >
+                      Không hoạt động
+                    </Label>
+                  </div>
+                </RadioGroup>
               </div>
             </div>
           </div>
@@ -683,6 +715,52 @@ export function Tables() {
               className="bg-blue-600 hover:bg-blue-700"
             >
               Lưu
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Add Area Dialog */}
+      <Dialog
+        open={quickAreaDialogOpen}
+        onOpenChange={(open) => {
+          setQuickAreaDialogOpen(open);
+          if (!open) {
+            setNewAreaName("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Thêm khu vực mới</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="mb-1 block">Tên khu vực</Label>
+              <Input
+                placeholder="VD: Tầng 3, Sân vườn..."
+                value={newAreaName}
+                onChange={(e) => setNewAreaName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleAddArea();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setQuickAreaDialogOpen(false)}
+            >
+              Hủy
+            </Button>
+            <Button
+              onClick={handleAddArea}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Thêm khu vực
             </Button>
           </DialogFooter>
         </DialogContent>
