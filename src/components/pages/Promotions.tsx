@@ -1,4 +1,5 @@
 import { useState } from "react";
+import * as React from "react";
 import {
   Plus,
   Pencil,
@@ -8,6 +9,9 @@ import {
   PowerOff,
   Filter,
   X,
+  Upload,
+  Download,
+  Printer,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -351,23 +355,49 @@ export function Promotions() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="bg-white border-b p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-blue-900 mb-1">Khuyến mại</h1>
-              <p className="text-sm text-slate-600">
+              <h1 className="text-slate-900 mb-2">Khuyến mại</h1>
+              <p className="text-slate-600 text-sm">
                 Quản lý chương trình khuyến mại
               </p>
             </div>
-            <Button
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                setEditingPromotion(null);
-                setDialogOpen(true);
-              }}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Thêm khuyến mại
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => toast.info("Chức năng import đang phát triển")}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Import Excel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => toast.info("Chức năng export đang phát triển")}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export Excel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  toast.info("Chức năng in đang phát triển");
+                  window.print();
+                }}
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                In danh sách
+              </Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  setEditingPromotion(null);
+                  setDialogOpen(true);
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Tạo khuyến mại
+              </Button>
+            </div>
           </div>
 
           <div className="relative">

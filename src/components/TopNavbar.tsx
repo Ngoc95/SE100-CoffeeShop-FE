@@ -52,8 +52,9 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
   ];
 
   const goodsMenuItems = [
-    { id: 'inventory' as PageType, label: 'Kho' },
-    { id: 'import-export' as PageType, label: 'Nhập/Xuất hàng' },
+    { id: 'inventory' as PageType, label: 'Danh mục' },
+    { id: 'product-pricing' as PageType, label: 'Thiết lập giá' },
+    { id: 'stock-check' as PageType, label: 'Kiểm kho' },
     { id: 'new-item-requests' as PageType, label: 'Yêu cầu món mới' },
   ];
 
@@ -74,6 +75,14 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
     { id: 'staff-settings' as PageType, label: 'Thiết lập' },
   ];
 
+  const transactionMenuItems = [
+    { id: 'invoices' as PageType, label: 'Hóa đơn' },
+    { id: 'returns' as PageType, label: 'Trả hàng' },
+    { id: 'purchase-orders' as PageType, label: 'Nhập hàng' },
+    { id: 'purchase-returns' as PageType, label: 'Trả hàng nhập' },
+    { id: 'write-offs' as PageType, label: 'Xuất hủy' },
+  ];
+
   const financeMenuItems = [
     { id: 'finance' as PageType, label: 'Sổ quỹ' },
   ];
@@ -90,6 +99,7 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
   const isStaffActive = staffMenuItems.some(item => item.id === currentPage);
   const isGoodsActive = goodsMenuItems.some(item => item.id === currentPage);
   const isPartnerActive = partnerMenuItems.some(item => item.id === currentPage);
+  const isTransactionActive = transactionMenuItems.some(item => item.id === currentPage);
 
   if (isFullscreen) {
     return (
@@ -287,6 +297,33 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   {staffMenuItems.map((item) => (
+                    <DropdownMenuItem
+                      key={item.id}
+                      onClick={() => onNavigate(item.id)}
+                      className={currentPage === item.id ? 'bg-blue-50' : ''}
+                    >
+                      {item.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Giao dịch Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all text-sm ${
+                      isTransactionActive
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    Giao dịch
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  {transactionMenuItems.map((item) => (
                     <DropdownMenuItem
                       key={item.id}
                       onClick={() => onNavigate(item.id)}
@@ -507,6 +544,30 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
               <div className="pt-2">
                 <p className="px-3 py-1 text-xs text-slate-500">Nhân viên</p>
                 {staffMenuItems.map((item) => {
+                  const isActive = currentPage === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        onNavigate(item.id);
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : 'text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Giao dịch section */}
+              <div className="pt-2">
+                <p className="px-3 py-1 text-xs text-slate-500">Giao dịch</p>
+                {transactionMenuItems.map((item) => {
                   const isActive = currentPage === item.id;
                   return (
                     <button

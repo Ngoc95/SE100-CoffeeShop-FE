@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Search, Pencil, Trash2, Filter, X, Power, PowerOff, Eye } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Filter, X, Power, PowerOff, Eye, Upload, Download, Printer } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
@@ -441,23 +441,47 @@ export function Customers() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="bg-white border-b p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-blue-900 mb-1">Quản lý khách hàng</h1>
-              <p className="text-sm text-slate-600">
-                Quản lý thông tin và lịch sử mua hàng của khách hàng
-              </p>
+              <h1 className="text-slate-900 mb-2">Khách hàng</h1>
+              <p className="text-slate-600 text-sm">Quản lý thông tin khách hàng</p>
             </div>
-            <Button
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                setEditingCustomer(null);
-                setDialogOpen(true);
-              }}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Thêm khách hàng
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => toast.info('Chức năng import đang phát triển')}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Import Excel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => toast.info('Chức năng export đang phát triển')}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export Excel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  toast.info('Chức năng in đang phát triển');
+                  window.print();
+                }}
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                In danh sách
+              </Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  setEditingCustomer(null);
+                  setDialogOpen(true);
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Thêm khách hàng
+              </Button>
+            </div>
           </div>
 
           <div className="relative">
