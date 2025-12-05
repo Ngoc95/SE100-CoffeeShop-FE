@@ -535,6 +535,15 @@ export function EndOfDayReport({
                       </tr>
                     </thead>
                     <tbody>
+                      <tr className="bg-amber-50 border-b border-slate-200">
+                        <td colSpan={4} className="py-3 px-4 text-sm text-slate-900 font-medium">Tổng cộng</td>
+                        <td className="py-3 px-4 text-sm font-medium">
+                          <span className={filteredCashflowData.reduce((sum, item) => sum + item.amount, 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}>
+                            {filteredCashflowData.reduce((sum, item) => sum + item.amount, 0).toLocaleString()}₫
+                          </span>
+                        </td>
+                        <td colSpan={3}></td>
+                      </tr>
                       {filteredCashflowData.map((item) => (
                         <tr key={item.id} className="border-b border-slate-200 hover:bg-slate-50">
                           <td className="py-3 px-4 text-sm text-slate-900">{item.id}</td>
@@ -552,17 +561,6 @@ export function EndOfDayReport({
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-slate-50 border-t-2 border-slate-300">
-                      <tr>
-                        <td colSpan={4} className="py-3 px-4 text-sm text-slate-900">Tổng cộng</td>
-                        <td className="py-3 px-4 text-sm">
-                          <span className={filteredCashflowData.reduce((sum, item) => sum + item.amount, 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}>
-                            {filteredCashflowData.reduce((sum, item) => sum + item.amount, 0).toLocaleString()}₫
-                          </span>
-                        </td>
-                        <td colSpan={3}></td>
-                      </tr>
-                    </tfoot>
                   </table>
                 )}
               </div>
@@ -613,6 +611,13 @@ export function EndOfDayReport({
                       </tr>
                     </thead>
                     <tbody>
+                      <tr className="bg-amber-50 border-b border-slate-200">
+                        <td colSpan={4} className="py-3 px-4 text-sm text-slate-900 font-medium">Tổng cộng ({filteredSalesData.length} hóa đơn)</td>
+                        <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">
+                          {filteredSalesData.reduce((sum, item) => sum + item.total, 0).toLocaleString()}₫
+                        </td>
+                        <td colSpan={2}></td>
+                      </tr>
                       {filteredSalesData.map((item) => (
                         <tr key={item.id} className="border-b border-slate-200 hover:bg-slate-50">
                           <td className="py-3 px-4 text-sm text-slate-900">{item.id}</td>
@@ -625,15 +630,6 @@ export function EndOfDayReport({
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-slate-50 border-t-2 border-slate-300">
-                      <tr>
-                        <td colSpan={4} className="py-3 px-4 text-sm text-slate-900">Tổng cộng ({filteredSalesData.length} hóa đơn)</td>
-                        <td className="text-right py-3 px-4 text-sm text-emerald-600">
-                          {filteredSalesData.reduce((sum, item) => sum + item.total, 0).toLocaleString()}₫
-                        </td>
-                        <td colSpan={2}></td>
-                      </tr>
-                    </tfoot>
                   </table>
                 )}
               </div>
@@ -685,6 +681,18 @@ export function EndOfDayReport({
                       </tr>
                     </thead>
                     <tbody>
+                      <tr className="bg-amber-50 border-b border-slate-200">
+                        <td colSpan={5} className="py-3 px-4 text-sm text-slate-900 font-medium">Tổng cộng ({filteredProductsData.length} sản phẩm)</td>
+                        <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">
+                          {filteredProductsData.reduce((sum, item) => sum + item.soldAmount, 0).toLocaleString()}₫
+                        </td>
+                        <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">
+                          {filteredProductsData.reduce((sum, item) => sum + item.returnAmount, 0).toLocaleString()}₫
+                        </td>
+                        <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">
+                          {filteredProductsData.reduce((sum, item) => sum + item.netRevenue, 0).toLocaleString()}₫
+                        </td>
+                      </tr>
                       {filteredProductsData.map((item) => (
                         <tr key={item.id} className="border-b border-slate-200 hover:bg-slate-50">
                           <td className="py-3 px-4 text-sm text-slate-900">{item.code}</td>
@@ -699,20 +707,6 @@ export function EndOfDayReport({
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-slate-50 border-t-2 border-slate-300">
-                      <tr>
-                        <td colSpan={5} className="py-3 px-4 text-sm text-slate-900">Tổng cộng ({filteredProductsData.length} sản phẩm)</td>
-                        <td className="text-right py-3 px-4 text-sm text-emerald-600">
-                          {filteredProductsData.reduce((sum, item) => sum + item.soldAmount, 0).toLocaleString()}₫
-                        </td>
-                        <td className="text-right py-3 px-4 text-sm text-red-600">
-                          {filteredProductsData.reduce((sum, item) => sum + item.returnAmount, 0).toLocaleString()}₫
-                        </td>
-                        <td className="text-right py-3 px-4 text-sm text-emerald-600">
-                          {filteredProductsData.reduce((sum, item) => sum + item.netRevenue, 0).toLocaleString()}₫
-                        </td>
-                      </tr>
-                    </tfoot>
                   </table>
                 )}
               </div>
@@ -766,6 +760,16 @@ export function EndOfDayReport({
                       </tr>
                     </thead>
                     <tbody>
+                      <tr className="bg-amber-50 border-b border-slate-200">
+                        <td colSpan={6} className="py-3 px-4 text-sm text-slate-900 font-medium">Tổng cộng ({filteredCancellationsData.length} đơn hủy)</td>
+                        <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">
+                          {filteredCancellationsData.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()}
+                        </td>
+                        <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">
+                          {filteredCancellationsData.reduce((sum, item) => sum + item.totalValue, 0).toLocaleString()}₫
+                        </td>
+                        <td colSpan={3}></td>
+                      </tr>
                       {filteredCancellationsData.map((item) => (
                         <tr key={item.id} className="border-b border-slate-200 hover:bg-slate-50">
                           <td className="py-3 px-4 text-sm text-slate-900">{item.code}</td>
@@ -782,18 +786,6 @@ export function EndOfDayReport({
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-slate-50 border-t-2 border-slate-300">
-                      <tr>
-                        <td colSpan={6} className="py-3 px-4 text-sm text-slate-900">Tổng cộng ({filteredCancellationsData.length} đơn hủy)</td>
-                        <td className="text-right py-3 px-4 text-sm text-slate-900">
-                          {filteredCancellationsData.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()}
-                        </td>
-                        <td className="text-right py-3 px-4 text-sm text-slate-900">
-                          {filteredCancellationsData.reduce((sum, item) => sum + item.totalValue, 0).toLocaleString()}₫
-                        </td>
-                        <td colSpan={3}></td>
-                      </tr>
-                    </tfoot>
                   </table>
                 )}
               </div>
@@ -867,6 +859,27 @@ export function EndOfDayReport({
                           </tr>
                         </thead>
                         <tbody>
+                          <tr className="bg-amber-50 border-b border-slate-200">
+                            <td className="py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">Tổng</td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">
+                              {(cashflowByCashMethod['cash'] || 0).toLocaleString()}₫
+                            </td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">
+                              {(cashflowByCashMethod['transfer'] || 0).toLocaleString()}₫
+                            </td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">
+                              {(cashflowByCashMethod['card'] || 0).toLocaleString()}₫
+                            </td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">
+                              {(cashflowByCashMethod['ewallet'] || 0).toLocaleString()}₫
+                            </td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">
+                              {(cashflowByCashMethod['points'] || 0).toLocaleString()}₫
+                            </td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">
+                              {filteredSummaryData.reduce((sum, item) => sum + item.amount, 0).toLocaleString()}₫
+                            </td>
+                          </tr>
                           <tr className="border-b border-slate-200">
                             <td className="py-3 px-4 text-sm text-slate-900 border-r border-slate-200">Tổng thu chi</td>
                             <td className="text-right py-3 px-4 text-sm text-slate-900 border-r border-slate-200">
@@ -917,6 +930,30 @@ export function EndOfDayReport({
                           </tr>
                         </thead>
                         <tbody>
+                          <tr className="bg-amber-50 border-b border-slate-200">
+                            <td className="py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">Tổng</td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">
+                              {totalSalesValue.toLocaleString()}₫
+                            </td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">
+                              {(salesByCashMethod['cash']?.total || 0).toLocaleString()}₫
+                            </td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">
+                              {(salesByCashMethod['transfer']?.total || 0).toLocaleString()}₫
+                            </td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">
+                              {(salesByCashMethod['card']?.total || 0).toLocaleString()}₫
+                            </td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">
+                              {(salesByCashMethod['points']?.total || 0).toLocaleString()}₫
+                            </td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">
+                              {(salesByCashMethod['ewallet']?.total || 0).toLocaleString()}₫
+                            </td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">
+                              {totalSalesValue.toLocaleString()}₫
+                            </td>
+                          </tr>
                           <tr className="border-b border-slate-200">
                             <td className="py-3 px-4 text-sm text-slate-900 border-r border-slate-200">Bán hàng</td>
                             <td className="text-right py-3 px-4 text-sm text-slate-900 border-r border-slate-200">
@@ -969,6 +1006,27 @@ export function EndOfDayReport({
                           </tr>
                         </thead>
                         <tbody>
+                          <tr className="bg-amber-50 border-b border-slate-200">
+                            <td className="py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">Tổng</td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">
+                              {totalSalesCount.toLocaleString()}
+                            </td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">
+                              {(salesByCashMethod['cash']?.count || 0).toLocaleString()}
+                            </td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">
+                              {(salesByCashMethod['transfer']?.count || 0).toLocaleString()}
+                            </td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">
+                              {(salesByCashMethod['card']?.count || 0).toLocaleString()}
+                            </td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">
+                              {(salesByCashMethod['points']?.count || 0).toLocaleString()}
+                            </td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">
+                              {(salesByCashMethod['ewallet']?.count || 0).toLocaleString()}
+                            </td>
+                          </tr>
                           <tr className="border-b border-slate-200">
                             <td className="py-3 px-4 text-sm text-slate-900 border-r border-slate-200">Bán hàng</td>
                             <td className="text-right py-3 px-4 text-sm text-slate-900 border-r border-slate-200">
@@ -1014,6 +1072,15 @@ export function EndOfDayReport({
                           </tr>
                         </thead>
                         <tbody>
+                          <tr className="bg-amber-50 border-b border-slate-200">
+                            <td className="py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">Tổng</td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium border-r border-slate-200">
+                              {totalProductTypes.toLocaleString()}
+                            </td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">
+                              {totalProductItems.toLocaleString()}
+                            </td>
+                          </tr>
                           <tr className="border-b border-slate-200">
                             <td className="py-3 px-4 text-sm text-slate-900 border-r border-slate-200">Bán hàng</td>
                             <td className="text-right py-3 px-4 text-sm text-slate-900 border-r border-slate-200">

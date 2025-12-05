@@ -37,7 +37,6 @@ export function SupplierFormDialog({
     email: '',
     address: '',
     city: '',
-    debt: 0,
     status: 'active' as 'active' | 'inactive',
   });
 
@@ -51,7 +50,6 @@ export function SupplierFormDialog({
         email: editingSupplier.email,
         address: editingSupplier.address,
         city: editingSupplier.city,
-        debt: editingSupplier.debt,
         status: editingSupplier.status,
       });
     } else {
@@ -63,7 +61,6 @@ export function SupplierFormDialog({
         email: '',
         address: '',
         city: '',
-        debt: 0,
         status: 'active',
       });
     }
@@ -207,35 +204,19 @@ export function SupplierFormDialog({
             />
           </div>
 
-          {/* Row 5: Công nợ & Trạng thái */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-[3px]">
-              <label className="font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950">
-                Công nợ (VNĐ)
-              </label>
-              <input
-                type="number"
-                value={formData.debt}
-                onChange={(e) => setFormData({ ...formData, debt: Number(e.target.value) })}
-                placeholder="0"
-                min="0"
-                className="bg-white border border-[rgba(0,0,0,0.1)] border-solid rounded-md h-10 px-3 font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="flex flex-col gap-[3px]">
-              <label className="font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950">
-                Trạng thái
-              </label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' | 'inactive' })}
-                className="bg-white border border-[rgba(0,0,0,0.1)] border-solid rounded-md h-10 px-3 font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="active">Hoạt động</option>
-                <option value="inactive">Không hoạt động</option>
-              </select>
-            </div>
+          {/* Row 5: Trạng thái */}
+          <div className="flex flex-col gap-[3px]">
+            <label className="font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950">
+              Trạng thái
+            </label>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' | 'inactive' })}
+              className="bg-white border border-[rgba(0,0,0,0.1)] border-solid rounded-md h-10 px-3 font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="active">Hoạt động</option>
+              <option value="inactive">Không hoạt động</option>
+            </select>
           </div>
         </div>
 

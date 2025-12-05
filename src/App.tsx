@@ -6,6 +6,8 @@ import { Dashboard } from './components/pages/Dashboard';
 import { POSOrdering } from './components/pages/POSOrdering';
 import { KitchenDisplay } from './components/pages/KitchenDisplay';
 import { Inventory } from './components/pages/Inventory';
+import { ProductPricing } from './components/pages/ProductPricing';
+import { StockCheck } from './components/pages/StockCheck';
 import { ImportExport } from './components/pages/ImportExport';
 import { MenuRecipe } from './components/pages/MenuRecipe';
 import { Scheduling } from './components/pages/Scheduling';
@@ -18,6 +20,11 @@ import { Finance } from './components/pages/Finance';
 import { Reports } from './components/pages/Reports';
 import { Tables } from './components/pages/Tables';
 import { NewItemRequests } from './components/pages/NewItemRequests';
+import { Invoices } from './components/pages/Invoices';
+import { Returns } from './components/pages/Returns';
+import { PurchaseOrders } from './components/pages/PurchaseOrders';
+import { PurchaseReturns } from './components/pages/PurchaseReturns';
+import { WriteOffs } from './components/pages/WriteOffs';
 import { POSOrderPanelRestockedDemo } from './components/POSOrderPanelRestockedDemo';
 import { Toaster } from './components/ui/sonner';
 
@@ -25,7 +32,9 @@ export type PageType =
   | 'dashboard' 
   | 'pos' 
   | 'kitchen' 
-  | 'inventory' 
+  | 'inventory'
+  | 'product-pricing'
+  | 'stock-check'
   | 'import-export' 
   | 'menu' 
   | 'tables'
@@ -37,6 +46,11 @@ export type PageType =
   | 'promotions'
   | 'finance' 
   | 'reports'
+  | 'invoices'
+  | 'returns'
+  | 'purchase-orders'
+  | 'purchase-returns'
+  | 'write-offs'
   | 'new-item-requests'
   | 'pos-demo-restocked';
 
@@ -122,6 +136,10 @@ function AppContent() {
         return <KitchenDisplay />;
       case 'inventory':
         return <Inventory />;
+      case 'product-pricing':
+        return <ProductPricing />;
+      case 'stock-check':
+        return <StockCheck />;
       case 'import-export':
         return <ImportExport />;
       case 'menu':
@@ -144,6 +162,16 @@ function AppContent() {
         return <Finance />;
       case 'reports':
         return <Reports />;
+      case 'invoices':
+        return <Invoices />;
+      case 'returns':
+        return <Returns />;
+      case 'purchase-orders':
+        return <PurchaseOrders />;
+      case 'purchase-returns':
+        return <PurchaseReturns />;
+      case 'write-offs':
+        return <WriteOffs />;
       case 'new-item-requests':
         return <NewItemRequests />;
       case 'pos-demo-restocked':

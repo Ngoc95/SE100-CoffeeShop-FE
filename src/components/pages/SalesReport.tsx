@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Download } from 'lucide-react';
 import { Button } from '../ui/button';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 type ViewType = 'chart' | 'report';
 type ConcernType = 'time' | 'profit' | 'discount' | 'return' | 'table' | 'category';
@@ -24,53 +26,42 @@ export function SalesReport({
   selectedArea,
   selectedTable 
 }: SalesReportProps) {
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const toggleRow = (time: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(time)) {
+      newExpanded.delete(time);
+    } else {
+      newExpanded.add(time);
+    }
+    setExpandedRows(newExpanded);
+  };
   
-  // Sample chart data for revenue by day
-  const revenueByDayData = [
-    { day: '01', revenue: 2800000 },
-    { day: '02', revenue: 3200000 },
-    { day: '03', revenue: 2900000 },
-    { day: '04', revenue: 3400000 },
-    { day: '05', revenue: 3100000 },
-    { day: '06', revenue: 3800000 },
-    { day: '07', revenue: 3600000 },
-    { day: '08', revenue: 2700000 },
-    { day: '09', revenue: 3000000 },
-    { day: '10', revenue: 3500000 },
-    { day: '11', revenue: 3300000 },
-    { day: '12', revenue: 3700000 },
-    { day: '13', revenue: 3900000 },
-    { day: '14', revenue: 4000000 },
-    { day: '15', revenue: 3400000 },
-    { day: '16', revenue: 3200000 },
-    { day: '17', revenue: 3600000 },
-    { day: '18', revenue: 3800000 },
-    { day: '19', revenue: 3500000 },
-    { day: '20', revenue: 3900000 },
-    { day: '21', revenue: 4200000 },
-    { day: '22', revenue: 3700000 },
-    { day: '23', revenue: 3300000 },
-    { day: '24', revenue: 3500000 },
-    { day: '25', revenue: 3800000 },
-    { day: '26', revenue: 4100000 },
-    { day: '27', revenue: 3900000 },
-    { day: '28', revenue: 3600000 },
-    { day: '29', revenue: 3400000 },
-    { day: '30', revenue: 3800000 },
+  // Chart data for time concern - by day (net revenue)
+  const timeChartDataByDay = [
+    { day: '01', netRevenue: 4063000 },
+    { day: '02', netRevenue: 2344000 },
   ];
 
-  // Chart data for profit concern
-  const profitChartData = [
-    { day: '01', revenue: 2800000, profit: 1050000 },
-    { day: '02', revenue: 3200000, profit: 1200000 },
-    { day: '03', revenue: 2900000, profit: 1085000 },
-    { day: '04', revenue: 3400000, profit: 1275000 },
-    { day: '05', revenue: 3100000, profit: 1160000 },
-    { day: '06', revenue: 3800000, profit: 1425000 },
-    { day: '07', revenue: 3600000, profit: 1350000 },
-    { day: '08', revenue: 2700000, profit: 1012500 },
-    { day: '09', revenue: 3000000, profit: 1125000 },
-    { day: '10', revenue: 3500000, profit: 1312500 },
+  // Chart data for time concern - by month (net revenue)
+  const timeChartDataByMonth = [
+    { month: '10-2025', netRevenue: 19984000 },
+    { month: '11-2025', netRevenue: 24867000 },
+    { month: '12-2025', netRevenue: 6417000 },
+  ];
+
+  // Chart data for profit concern - by day
+  const profitChartDataByDay = [
+    { day: '01', revenue: 4000000, profit: 1000000, cost: 3000000 },
+    { day: '02', revenue: 2400000, profit: 600000, cost: 1800000 },
+  ];
+
+  // Chart data for profit concern - by month
+  const profitChartDataByMonth = [
+    { month: '10-2025', revenue: 20000000, profit: 5000000, cost: 15000000 },
+    { month: '11-2025', revenue: 25000000, profit: 7000000, cost: 18000000 },
+    { month: '12-2025', revenue: 6000000, profit: 2000000, cost: 4000000 },
   ];
 
   // Chart data for discount concern
@@ -121,21 +112,81 @@ export function SalesReport({
     { name: 'Sinh tố', revenue: 5225000 },
   ];
 
-  // Sample data for tables
-  const salesByTimeData = [
-    { date: '01/12/2025', invoiceCount: 45, revenue: 12500000, returnCount: 2, returnValue: 150000, netRevenue: 12350000 },
-    { date: '02/12/2025', invoiceCount: 52, revenue: 14800000, returnCount: 1, returnValue: 80000, netRevenue: 14720000 },
-    { date: '03/12/2025', invoiceCount: 48, revenue: 13200000, returnCount: 3, returnValue: 220000, netRevenue: 12980000 },
-    { date: '04/12/2025', invoiceCount: 61, revenue: 16500000, returnCount: 2, returnValue: 160000, netRevenue: 16340000 },
-    { date: '05/12/2025', invoiceCount: 55, revenue: 15100000, returnCount: 0, returnValue: 0, netRevenue: 15100000 },
+  // Time report data by day
+  const timeReportDataByDay = [
+    {
+      time: '01/12/2025',
+      revenue: 4073000,
+      returnValue: 0,
+      netRevenue: 4073000,
+      invoices: [
+        { code: 'HD000047', time: '01/12/2025 10:00', customer: 'Nguyễn Văn Hải', netRevenue: 2060000 },
+        { code: 'HD000046', time: '01/12/2025 09:00', customer: 'Anh Giang - Kim Mã', netRevenue: 1968000 },
+        { code: 'HD000045', time: '01/12/2025 08:00', customer: 'Phạm Thu Hương', netRevenue: 45000 },
+      ],
+    },
+    {
+      time: '02/12/2025',
+      revenue: 2344000,
+      returnValue: 0,
+      netRevenue: 2344000,
+      invoices: [
+        { code: 'HD000050', time: '02/12/2025 16:00', customer: 'Anh Giang - Kim Mã', netRevenue: 1377000 },
+        { code: 'HD000049', time: '02/12/2025 15:00', customer: 'Nguyễn Văn Hải', netRevenue: 685000 },
+        { code: 'HD000048', time: '02/12/2025 14:00', customer: 'Anh Giang - Kim Mã', netRevenue: 282000 },
+      ],
+    },
   ];
 
-  const profitData = [
-    { invoiceCode: 'HD-001', date: '01/12/2025', revenue: 450000, cost: 280000, profit: 170000, margin: 37.8 },
-    { invoiceCode: 'HD-002', date: '01/12/2025', revenue: 320000, cost: 195000, profit: 125000, margin: 39.1 },
-    { invoiceCode: 'HD-003', date: '01/12/2025', revenue: 580000, cost: 350000, profit: 230000, margin: 39.7 },
-    { invoiceCode: 'HD-004', date: '02/12/2025', revenue: 410000, cost: 260000, profit: 150000, margin: 36.6 },
-    { invoiceCode: 'HD-005', date: '02/12/2025', revenue: 690000, cost: 420000, profit: 270000, margin: 39.1 },
+  // Time report data by month
+  const timeReportDataByMonth = [
+    {
+      time: '12-2025',
+      revenue: 6417000,
+      returnValue: 0,
+      netRevenue: 6417000,
+      invoices: [
+        { code: 'HD000050', time: '02/12/2025 16:00', customer: 'Anh Giang - Kim Mã', netRevenue: 1377000 },
+        { code: 'HD000049', time: '02/12/2025 15:00', customer: 'Nguyễn Văn Hải', netRevenue: 685000 },
+        { code: 'HD000048', time: '02/12/2025 14:00', customer: 'Anh Giang - Kim Mã', netRevenue: 282000 },
+        { code: 'HD000047', time: '01/12/2025 10:00', customer: 'Nguyễn Văn Hải', netRevenue: 2060000 },
+        { code: 'HD000046', time: '01/12/2025 09:00', customer: 'Anh Giang - Kim Mã', netRevenue: 1968000 },
+        { code: 'HD000045', time: '01/12/2025 08:00', customer: 'Phạm Thu Hương', netRevenue: 45000 },
+      ],
+    },
+    {
+      time: '11-2025',
+      revenue: 24867000,
+      returnValue: 0,
+      netRevenue: 24867000,
+      invoices: [
+        { code: 'HD000040', time: '30/11/2025 20:00', customer: 'Trần Văn Nam', netRevenue: 1500000 },
+        { code: 'HD000039', time: '30/11/2025 19:00', customer: 'Lê Thị Mai', netRevenue: 850000 },
+      ],
+    },
+    {
+      time: '10-2025',
+      revenue: 19984000,
+      returnValue: 0,
+      netRevenue: 19984000,
+      invoices: [
+        { code: 'HD000030', time: '31/10/2025 18:00', customer: 'Phạm Văn Đức', netRevenue: 1200000 },
+        { code: 'HD000029', time: '31/10/2025 17:00', customer: 'Nguyễn Thị Lan', netRevenue: 950000 },
+      ],
+    },
+  ];
+
+  // Profit report data by day
+  const profitReportDataByDay = [
+    { time: '01/12/2025', totalMerchandise: 4080000, invoiceDiscount: -7000, revenue: 4073000, totalCost: 3054500, grossProfit: 1018500 },
+    { time: '02/12/2025', totalMerchandise: 2355000, invoiceDiscount: -11000, revenue: 2344000, totalCost: 1751000, grossProfit: 593000 },
+  ];
+
+  // Profit report data by month
+  const profitReportDataByMonth = [
+    { time: '12-2025', totalMerchandise: 6435000, invoiceDiscount: -18000, revenue: 6417000, totalCost: 4805500, grossProfit: 1611500 },
+    { time: '11-2025', totalMerchandise: 24925000, invoiceDiscount: -58000, revenue: 24867000, totalCost: 18042500, grossProfit: 6824500 },
+    { time: '10-2025', totalMerchandise: 20020000, invoiceDiscount: -36000, revenue: 19984000, totalCost: 14696000, grossProfit: 5288000 },
   ];
 
   const discountData = [
@@ -193,12 +244,23 @@ export function SalesReport({
     return labels[concern] || '';
   };
 
+  // Calculate days between dates
+  const getDaysBetween = (from?: Date, to?: Date): number => {
+    if (!from || !to) return 0;
+    const diffTime = Math.abs(to.getTime() - from.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
   const getChartData = () => {
     switch (concern) {
       case 'time':
-        return revenueByDayData;
+        // If time range <= 1 month (30 days), show by day, otherwise by month
+        const daysDiff = getDaysBetween(dateFrom, dateTo);
+        return daysDiff <= 30 ? timeChartDataByDay : timeChartDataByMonth;
       case 'profit':
-        return profitChartData;
+        // If time range <= 1 month (30 days), show by day, otherwise by month
+        const profitDaysDiff = getDaysBetween(dateFrom, dateTo);
+        return profitDaysDiff <= 30 ? profitChartDataByDay : profitChartDataByMonth;
       case 'discount':
         return discountChartData;
       case 'return':
@@ -208,24 +270,42 @@ export function SalesReport({
       case 'category':
         return categoryChartData;
       default:
-        return revenueByDayData;
+        const defaultDaysDiff = getDaysBetween(dateFrom, dateTo);
+        return defaultDaysDiff <= 30 ? timeChartDataByDay : timeChartDataByMonth;
     }
   };
 
   const renderChart = () => {
     const chartData = getChartData();
-    const dataKey = concern === 'table' || concern === 'category' ? 'name' : 'day';
+    let dataKey = concern === 'table' || concern === 'category' ? 'name' : 'day';
+    let valueKey = 'revenue';
+    
+    // For time and profit concerns, determine data key based on time range
+    if (concern === 'time' || concern === 'profit') {
+      const daysDiff = getDaysBetween(dateFrom, dateTo);
+      dataKey = daysDiff <= 30 ? 'day' : 'month';
+      if (concern === 'time') {
+        valueKey = 'netRevenue';
+      }
+    }
+    
+    // Determine chart title based on concern
+    const getChartTitle = () => {
+      if (concern === 'profit') {
+        const daysDiff = getDaysBetween(dateFrom, dateTo);
+        return daysDiff <= 30 ? 'Lợi nhuận Tháng này' : 'Lợi nhuận Năm nay';
+      }
+      if (concern === 'time') {
+        const daysDiff = getDaysBetween(dateFrom, dateTo);
+        return daysDiff <= 30 ? 'Doanh thu thuần Tháng này' : 'Doanh thu thuần Năm nay';
+      }
+      return `Doanh thu thuần ${getConcernLabel()} ${getTimeRangeLabel()}`;
+    };
     
     return (
       <div className="bg-white rounded-lg border border-slate-200 p-6">
         <div className="mb-6">
-          <h2 className="text-slate-900 mb-1">Doanh thu thuần {getConcernLabel()} {getTimeRangeLabel()}</h2>
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-blue-600 rounded"></div>
-              <span>Chi nhánh trung tâm</span>
-            </div>
-          </div>
+          <h2 className="text-slate-900 mb-1">{getChartTitle()}</h2>
         </div>
         
         <ResponsiveContainer width="100%" height={400}>
@@ -242,8 +322,20 @@ export function SalesReport({
               tickFormatter={(value) => `${(value / 1000000).toFixed(1)}tr`}
             />
             <Tooltip 
-              formatter={(value: number) => [formatCurrency(value), 'Doanh thu']}
-              labelFormatter={(label) => concern === 'table' || concern === 'category' ? label : `Ngày ${label}`}
+              formatter={(value: number, name: string) => {
+                const labels: { [key: string]: string } = {
+                  'revenue': 'Doanh thu',
+                  'netRevenue': 'Doanh thu thuần',
+                  'profit': 'Lợi nhuận',
+                  'cost': 'Giá vốn',
+                };
+                return [formatCurrency(value), labels[name] || name];
+              }}
+              labelFormatter={(label) => {
+                if (concern === 'table' || concern === 'category') return label;
+                if ((concern === 'time' || concern === 'profit') && dataKey === 'month') return label;
+                return `Ngày ${label}`;
+              }}
               contentStyle={{ 
                 backgroundColor: 'white', 
                 border: '1px solid #e2e8f0',
@@ -251,7 +343,25 @@ export function SalesReport({
                 fontSize: '14px'
               }}
             />
-            <Bar dataKey="revenue" fill="#2563eb" radius={[4, 4, 0, 0]} />
+            {concern === 'profit' ? (
+              <>
+                <Bar dataKey="profit" fill="#2563eb" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="cost" fill="#fbbf24" radius={[4, 4, 0, 0]} />
+                <Legend 
+                  formatter={(value) => {
+                    const labels: { [key: string]: string } = {
+                      'profit': 'Lợi nhuận',
+                      'revenue': 'Doanh thu',
+                      'cost': 'Giá vốn',
+                    };
+                    return labels[value] || value;
+                  }}
+                />
+              </>
+            ) : (
+              <Bar dataKey={valueKey} fill="#2563eb" radius={[4, 4, 0, 0]} />
+            )}
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -269,86 +379,183 @@ export function SalesReport({
               Ngày lập {format(new Date(), 'dd/MM/yyyy HH:mm', { locale: vi })}
             </p>
             <h2 className="text-slate-900 mb-2 text-center">
-              Báo cáo bán hàng {getConcernLabel()}
+              {concern === 'profit' ? 'Báo cáo lợi nhuận theo hóa đơn' : concern === 'time' ? 'Báo cáo bán hàng theo thời gian' : `Báo cáo bán hàng ${getConcernLabel()}`}
             </h2>
-            <p className="text-sm text-slate-600 text-center">
-              Khoảng thời gian: {getTimeRangeLabel()}
-            </p>
+            {(concern === 'profit' || concern === 'time') && dateFrom && dateTo && (
+              <p className="text-sm text-slate-600 text-center mb-2">
+                Từ ngày {format(dateFrom, 'dd/MM/yyyy', { locale: vi })} đến ngày {format(dateTo, 'dd/MM/yyyy', { locale: vi })}
+              </p>
+            )}
+            {concern !== 'profit' && concern !== 'time' && (
+              <p className="text-sm text-slate-600 text-center">
+                Khoảng thời gian: {getTimeRangeLabel()}
+              </p>
+            )}
           </div>
 
           {/* Report Tables based on concern */}
-          {concern === 'time' && (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-slate-50">
-                    <th className="border border-slate-300 px-4 py-2 text-left text-sm text-slate-700">Ngày</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Số HĐ</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Doanh thu</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">SL trả</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Giá trị trả</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Doanh thu thuần</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="bg-yellow-50">
-                    <td className="border border-slate-300 px-4 py-2 text-sm text-slate-900">Tổng</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">261</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatCurrency(72100000)}</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">8</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatCurrency(610000)}</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatCurrency(71490000)}</td>
-                  </tr>
-                  {salesByTimeData.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="border border-slate-300 px-4 py-2 text-sm text-slate-700">{item.date}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{item.invoiceCount}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatCurrency(item.revenue)}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{item.returnCount}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatCurrency(item.returnValue)}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatCurrency(item.netRevenue)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {concern === 'time' && (() => {
+            const daysDiff = getDaysBetween(dateFrom, dateTo);
+            const isByDay = daysDiff <= 30;
+            const timeData = isByDay ? timeReportDataByDay : timeReportDataByMonth;
+            
+            // Calculate totals
+            const totals = timeData.reduce(
+              (acc, item) => ({
+                revenue: acc.revenue + item.revenue,
+                returnValue: acc.returnValue + item.returnValue,
+                netRevenue: acc.netRevenue + item.netRevenue,
+              }),
+              {
+                revenue: 0,
+                returnValue: 0,
+                netRevenue: 0,
+              }
+            );
 
-          {concern === 'profit' && (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-slate-50">
-                    <th className="border border-slate-300 px-4 py-2 text-left text-sm text-slate-700">Mã HĐ</th>
-                    <th className="border border-slate-300 px-4 py-2 text-left text-sm text-slate-700">Ngày</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Doanh thu</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Giá vốn</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Lợi nhuận</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Tỷ suất LN (%)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="bg-yellow-50">
-                    <td className="border border-slate-300 px-4 py-2 text-sm text-slate-900" colSpan={2}>Tổng</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatCurrency(2450000)}</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatCurrency(1505000)}</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatCurrency(945000)}</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">38.6%</td>
-                  </tr>
-                  {profitData.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="border border-slate-300 px-4 py-2 text-sm text-slate-700">{item.invoiceCode}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-sm text-slate-700">{item.date}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatCurrency(item.revenue)}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatCurrency(item.cost)}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatCurrency(item.profit)}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{item.margin.toFixed(1)}%</td>
+            return (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead className="bg-blue-100">
+                    <tr>
+                      <th className="text-left py-3 px-4 text-sm text-slate-900">Thời gian</th>
+                      <th className="text-right py-3 px-4 text-sm text-slate-900">Doanh thu</th>
+                      <th className="text-right py-3 px-4 text-sm text-slate-900">Giá trị trả</th>
+                      <th className="text-right py-3 px-4 text-sm text-slate-900">Doanh thu thuần</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    <tr className="bg-amber-50 border-b border-slate-200">
+                      <td className="py-3 px-4 text-sm text-slate-900 font-medium">Tổng</td>
+                      <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">{formatNumber(totals.revenue)}</td>
+                      <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">{formatNumber(totals.returnValue)}</td>
+                      <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">{formatNumber(totals.netRevenue)}</td>
+                    </tr>
+                    {timeData.map((item) => {
+                      const isExpanded = expandedRows.has(item.time);
+                      const hasInvoices = item.invoices && item.invoices.length > 0;
+
+                      return (
+                        <>
+                          <tr
+                            key={item.time}
+                            className="border-b border-slate-200 cursor-pointer hover:bg-blue-50"
+                            onClick={() => hasInvoices && toggleRow(item.time)}
+                          >
+                            <td className="border border-slate-300 px-4 py-2 text-sm text-slate-900">
+                              <div className="flex items-center gap-2">
+                                {hasInvoices ? (
+                                  isExpanded ? (
+                                    <ChevronDown className="w-4 h-4 text-slate-600" />
+                                  ) : (
+                                    <ChevronRight className="w-4 h-4 text-slate-600" />
+                                  )
+                                ) : null}
+                                <span className="text-blue-600">{item.time}</span>
+                              </div>
+                            </td>
+                            <td className="border border-slate-300 px-4 py-2 text-sm text-slate-900"></td>
+                            <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatNumber(item.revenue)}</td>
+                            <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatNumber(item.returnValue)}</td>
+                            <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatNumber(item.netRevenue)}</td>
+                          </tr>
+
+                          {/* Invoice Details */}
+                          {isExpanded && hasInvoices && (
+                            <tr className="bg-slate-50">
+                              <td colSpan={5} className="py-2 px-4">
+                                <table className="w-full">
+                                  <thead>
+                                    <tr>
+                                      <th className="text-left py-2 px-4 text-xs text-slate-600">Mã giao dịch</th>
+                                      <th className="text-left py-2 px-4 text-xs text-slate-600">Thời gian</th>
+                                      <th className="text-left py-2 px-4 text-xs text-slate-600">Khách hàng</th>
+                                      <th className="text-right py-2 px-4 text-xs text-slate-600">Doanh thu thuần</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {item.invoices!.map((invoice, idx) => (
+                                      <tr key={idx} className="border-b border-slate-100">
+                                        <td className="py-2 px-4 text-xs text-slate-700">{invoice.code}</td>
+                                        <td className="py-2 px-4 text-xs text-slate-700">{invoice.time}</td>
+                                        <td className="py-2 px-4 text-xs text-slate-700">{invoice.customer}</td>
+                                        <td className="text-right py-2 px-4 text-xs text-slate-700">{formatNumber(invoice.netRevenue)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+
+          {concern === 'profit' && (() => {
+            const daysDiff = getDaysBetween(dateFrom, dateTo);
+            const isByDay = daysDiff <= 30;
+            const profitData = isByDay ? profitReportDataByDay : profitReportDataByMonth;
+            
+            // Calculate totals
+            const totals = profitData.reduce(
+              (acc, item) => ({
+                totalMerchandise: acc.totalMerchandise + item.totalMerchandise,
+                invoiceDiscount: acc.invoiceDiscount + item.invoiceDiscount,
+                revenue: acc.revenue + item.revenue,
+                totalCost: acc.totalCost + item.totalCost,
+                grossProfit: acc.grossProfit + item.grossProfit,
+              }),
+              {
+                totalMerchandise: 0,
+                invoiceDiscount: 0,
+                revenue: 0,
+                totalCost: 0,
+                grossProfit: 0,
+              }
+            );
+
+            return (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-blue-100">
+                      <th className="border border-slate-300 px-4 py-2 text-left text-sm text-slate-900">Thời gian</th>
+                      <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">Tổng tiền hàng</th>
+                      <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">Giảm giá HĐ</th>
+                      <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">Doanh thu</th>
+                      <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">Tổng giá vốn</th>
+                      <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">Lợi nhuận gộp</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="bg-amber-50">
+                      <td className="border border-slate-300 px-4 py-2 text-sm text-slate-900">Tổng</td>
+                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatNumber(totals.totalMerchandise)}</td>
+                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatNumber(totals.invoiceDiscount)}</td>
+                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatNumber(totals.revenue)}</td>
+                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatNumber(totals.totalCost)}</td>
+                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-blue-600 font-medium">{formatNumber(totals.grossProfit)}</td>
+                    </tr>
+                    {profitData.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="border border-slate-300 px-4 py-2 text-sm text-blue-600">{item.time}</td>
+                        <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatNumber(item.totalMerchandise)}</td>
+                        <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatNumber(item.invoiceDiscount)}</td>
+                        <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatNumber(item.revenue)}</td>
+                        <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatNumber(item.totalCost)}</td>
+                        <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatNumber(item.grossProfit)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
 
           {concern === 'discount' && (
             <div className="overflow-x-auto">

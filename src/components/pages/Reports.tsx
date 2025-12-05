@@ -1,3 +1,4 @@
+//src/components/pages/Reports.tsx
 import { useState } from 'react';
 import {
   TrendingUp,
@@ -38,8 +39,12 @@ import { RevenueReportTable } from '../reports/RevenueReportTable';
 import { ProductsReportTable } from '../reports/ProductsReportTable';
 import { ProductsReportExcel } from '../reports/ProductsReportExcel';
 import { EmployeesReportTable } from '../reports/EmployeesReportTable';
+import { EmployeeProfitReport } from '../reports/EmployeeProfitReport';
+import { EmployeeSalesReport } from '../reports/EmployeeSalesReport';
 import { FinanceReport } from '../reports/FinanceReport';
 import { SalesReport } from './SalesReport';
+import { InventoryImportExportReport } from '../reports/InventoryImportExportReport';
+import { InventoryWriteOffReport } from '../reports/InventoryWriteOffReport';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -126,7 +131,7 @@ export function Reports() {
   const [productsDateFrom, setProductsDateFrom] = useState<Date | undefined>(new Date(2025, 9, 28));
   const [productsDateTo, setProductsDateTo] = useState<Date | undefined>(new Date(2025, 10, 27));
   const [productsSearchQuery, setProductsSearchQuery] = useState('');
-  const [productsConcern, setProductsConcern] = useState<'sales' | 'profit'>('sales');
+  const [productsConcern, setProductsConcern] = useState<'sales' | 'profit' | 'import-export' | 'write-off'>('sales');
   const [productsProductTypes, setProductsProductTypes] = useState<string[]>(['finished', 'composite', 'ingredient']);
   const [productsCategory, setProductsCategory] = useState('all');
   
@@ -164,6 +169,14 @@ export function Reports() {
   const [productsViewType, setProductsViewType] = useState<'chart' | 'report'>('chart');
   const [employeesViewType, setEmployeesViewType] = useState<'chart' | 'report'>('chart');
   const [eodViewType, setEodViewType] = useState<'chart' | 'report'>('chart');
+
+  // Employee report specific filters
+  const [employeeConcern, setEmployeeConcern] = useState<'profit' | 'sales-by-employee'>('profit');
+  const [employeeDateRangeType, setEmployeeDateRangeType] = useState<'preset' | 'custom'>('preset');
+  const [employeePresetTimeRange, setEmployeePresetTimeRange] = useState('this-week');
+  const [employeeDateFrom, setEmployeeDateFrom] = useState<Date | undefined>(new Date(2025, 11, 1));
+  const [employeeDateTo, setEmployeeDateTo] = useState<Date | undefined>(new Date(2025, 11, 4));
+  const [employeeSalesMode, setEmployeeSalesMode] = useState<'invoice' | 'items'>('invoice');
 
   // Finance tab specific filters
   const [financeDateRangeType, setFinanceDateRangeType] = useState<'preset' | 'custom'>('preset');
@@ -248,18 +261,14 @@ export function Reports() {
       { id: 'slowmoving', label: 'Bán chậm' },
       { id: 'profitability', label: 'Lợi nhuận' },
       { id: 'trends', label: 'Xu hướng' },
+      { id: 'import-export', label: 'Xuất nhập tồn' },
+      { id: 'write-off', label: 'Xuất hủy' },
     ],
     employees: [
       { id: 'revenue', label: 'Doanh thu' },
       { id: 'performance', label: 'Hiệu suất' },
       { id: 'attendance', label: 'Chuyên cần' },
       { id: 'orders', label: 'Đơn hàng' },
-    ],
-    inventory: [
-      { id: 'stockvalue', label: 'Giá trị kho' },
-      { id: 'lowstock', label: 'Tồn thấp' },
-      { id: 'expiring', label: 'Hết hạn' },
-      { id: 'movement', label: 'Xuất nhập' },
     ],
     customers: [
       { id: 'new', label: 'Khách mới' },
@@ -439,6 +448,149 @@ export function Reports() {
     { metric: 'Teamwork', value: 89 },
   ];
 
+  // Employee Profit Report Data (based on image 1)
+  const employeeProfitData = [
+    {
+      employeeName: 'Hương - Kế Toán',
+      totalMerchandise: 3360000,
+      invoiceDiscount: 15000,
+      revenue: 3345000,
+      returnValue: 0,
+      netRevenue: 3345000,
+      totalCost: 2580000,
+      grossProfit: 765000,
+    },
+    {
+      employeeName: 'kaka123',
+      totalMerchandise: 2105000,
+      invoiceDiscount: 0,
+      revenue: 2105000,
+      returnValue: 0,
+      netRevenue: 2105000,
+      totalCost: 1542500,
+      grossProfit: 562500,
+    },
+    {
+      employeeName: 'Hoàng - Kinh Doanh',
+      totalMerchandise: 970000,
+      invoiceDiscount: 3000,
+      revenue: 967000,
+      returnValue: 0,
+      netRevenue: 967000,
+      totalCost: 683000,
+      grossProfit: 284000,
+    },
+  ];
+
+  // Employee Sales Report Data (based on image 2)
+  const employeeSalesData = [
+    {
+      employeeName: 'Hương - Kế Toán',
+      totalSold: 48,
+      revenue: 3360000,
+      totalReturned: 0,
+      returnValue: 0,
+      netRevenue: 3360000,
+      items: [
+        {
+          itemCode: 'SP000012',
+          itemName: 'Súp kem gà nữ hoàng',
+          quantitySold: 24,
+          revenue: 3000000,
+          quantityReturned: 0,
+          returnValue: 0,
+          netRevenue: 3000000,
+        },
+        {
+          itemCode: 'SP000019',
+          itemName: 'Lipton with milk',
+          quantitySold: 15,
+          revenue: 225000,
+          quantityReturned: 0,
+          returnValue: 0,
+          netRevenue: 225000,
+        },
+        {
+          itemCode: 'SP000046',
+          itemName: 'Lemon Tea',
+          quantitySold: 9,
+          revenue: 135000,
+          quantityReturned: 0,
+          returnValue: 0,
+          netRevenue: 135000,
+        },
+      ],
+    },
+    {
+      employeeName: 'kaka123',
+      totalSold: 33,
+      revenue: 2105000,
+      totalReturned: 0,
+      returnValue: 0,
+      netRevenue: 2105000,
+      items: [],
+    },
+    {
+      employeeName: 'Hoàng - Kinh Doanh',
+      totalSold: 25,
+      revenue: 970000,
+      totalReturned: 0,
+      returnValue: 0,
+      netRevenue: 970000,
+      items: [],
+    },
+  ];
+
+  // Filter employee data based on date range
+  const getFilteredEmployeeProfitData = () => {
+    // In a real app, this would filter based on dateFrom and dateTo
+    // For now, return the sample data
+    return employeeProfitData;
+  };
+
+  const getFilteredEmployeeSalesData = () => {
+    // In a real app, this would filter based on dateFrom and dateTo
+    // For now, return the sample data
+    return employeeSalesData;
+  };
+
+  // Top 10 employees by profit (for chart)
+  const getTop10EmployeesByProfit = () => {
+    const sorted = [...employeeProfitData].sort((a, b) => b.grossProfit - a.grossProfit);
+    return sorted.slice(0, 10).map(emp => ({
+      name: emp.employeeName,
+      profit: emp.grossProfit,
+    }));
+  };
+
+  // Top 10 employees by sales (for chart)
+  const getTop10EmployeesBySales = () => {
+    if (employeeSalesMode === 'invoice') {
+      // Calculate by number of invoices (using totalSold as proxy)
+      const sorted = [...employeeSalesData].sort((a, b) => b.totalSold - a.totalSold);
+      return sorted.slice(0, 10).map(emp => ({
+        name: emp.employeeName,
+        value: emp.totalSold,
+        label: 'Số hóa đơn',
+      }));
+    } else {
+      // Calculate by number of items
+      const sorted = [...employeeSalesData].sort((a, b) => {
+        const aItems = a.items.reduce((sum, item) => sum + item.quantitySold, 0);
+        const bItems = b.items.reduce((sum, item) => sum + item.quantitySold, 0);
+        return bItems - aItems;
+      });
+      return sorted.slice(0, 10).map(emp => {
+        const totalItems = emp.items.reduce((sum, item) => sum + item.quantitySold, 0);
+        return {
+          name: emp.employeeName,
+          value: totalItems,
+          label: 'Số mặt hàng',
+        };
+      });
+    }
+  };
+
   // ============= DATA FOR TAB 4: INVENTORY REPORT =============
   const inventoryValueData = [
     { category: 'Cà phê', value: 15600000, color: '#1e40af' },
@@ -471,6 +623,89 @@ export function Reports() {
     { date: '25/11/2024 14:28', order: 'HD-2024-0846', product: 'Bạc xỉu', qty: -1, employee: 'Trần Thị B' },
     { date: '25/11/2024 14:25', order: 'HD-2024-0845', product: 'Trà sữa trân châu', qty: -1, employee: 'Nguyễn Văn A' },
     { date: '25/11/2024 14:20', order: 'Nhập kho', product: 'Cà phê hạt Arabica', qty: 5, employee: 'Admin' },
+  ];
+
+  // ============= DATA FOR INVENTORY IMPORT/EXPORT REPORT =============
+  const inventoryImportExportData = [
+    {
+      code: 'SP000014',
+      name: 'Súp kém bí đỏ với sữa dừa',
+      beginningQty: 1091,
+      beginningValue: 109645500,
+      importQty: 0,
+      importValue: 0,
+      exportQty: 0,
+      exportValue: 0,
+      endingQty: 1091,
+      endingValue: 109645500,
+    },
+    {
+      code: 'SP000002',
+      name: 'APEROL SPRITZ',
+      beginningQty: 1051,
+      beginningValue: 15765000,
+      importQty: 0,
+      importValue: 0,
+      exportQty: 0,
+      exportValue: 0,
+      endingQty: 1051,
+      endingValue: 15765000,
+    },
+    {
+      code: 'SP000003',
+      name: 'CUBA LIBRE',
+      beginningQty: 1050,
+      beginningValue: 15750000,
+      importQty: 0,
+      importValue: 0,
+      exportQty: 0,
+      exportValue: 0,
+      endingQty: 1050,
+      endingValue: 15750000,
+    },
+    {
+      code: 'SP000022',
+      name: 'Bia Hà Nội',
+      beginningQty: 1047,
+      beginningValue: 21463500,
+      importQty: 0,
+      importValue: 0,
+      exportQty: 0,
+      exportValue: 0,
+      endingQty: 1047,
+      endingValue: 21463500,
+    },
+    {
+      code: 'SP000019',
+      name: 'Lipton with milk',
+      beginningQty: 1044,
+      beginningValue: 7308000,
+      importQty: 0,
+      importValue: 0,
+      exportQty: 0,
+      exportValue: 0,
+      endingQty: 1044,
+      endingValue: 7308000,
+    },
+  ];
+
+  // ============= DATA FOR INVENTORY WRITE-OFF REPORT =============
+  const inventoryWriteOffData = [
+    {
+      code: 'SP000018',
+      name: 'Mint Tea',
+      totalQuantity: 101,
+      totalValue: 707000,
+      details: [
+        {
+          writeOffCode: 'XH000001',
+          dateTime: '04/12/2025 13:10',
+          quantity: 101,
+          unitPrice: 7000,
+          totalValue: 707000,
+        },
+      ],
+    },
   ];
 
   // ============= DATA FOR TAB 5: PROFIT REPORT =============
@@ -1801,7 +2036,9 @@ export function Reports() {
           ) : activeTab === 'products' ? (
             // PRODUCTS SPECIFIC FILTERS
             <>
-              {/* Kiểu hiển thị */}
+              {/* Kiểu hiển thị - chỉ hiển thị khi không phải import-export hoặc write-off */}
+              {(productsConcern !== 'import-export' && productsConcern !== 'write-off') && (
+                <>
               <div>
                 <h3 className="text-sm text-slate-900 mb-3">Kiểu hiển thị</h3>
                 <div className="flex gap-2">
@@ -1827,6 +2064,8 @@ export function Reports() {
               </div>
 
               <Separator />
+                </>
+              )}
 
               {/* Mối quan tâm */}
               <div>
@@ -1838,10 +2077,22 @@ export function Reports() {
                       Bán hàng
                     </Label>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 mb-2">
                     <RadioGroupItem value="profit" id="products-concern-profit" />
                     <Label htmlFor="products-concern-profit" className="text-sm text-slate-700 cursor-pointer">
                       Lợi nhuận
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2 mb-2">
+                    <RadioGroupItem value="import-export" id="products-concern-import-export" />
+                    <Label htmlFor="products-concern-import-export" className="text-sm text-slate-700 cursor-pointer">
+                      Xuất nhập tồn
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="write-off" id="products-concern-write-off" />
+                    <Label htmlFor="products-concern-write-off" className="text-sm text-slate-700 cursor-pointer">
+                      Xuất hủy
                     </Label>
                   </div>
                 </RadioGroup>
@@ -2348,6 +2599,217 @@ export function Reports() {
                     </RadioGroup>
                   </div>
                 </>
+              ) : activeTab === 'employees' ? (
+                <>
+                  <Separator />
+
+                  {/* Employee Concerns */}
+                  <div>
+                    <h3 className="text-sm text-slate-900 mb-3">Mối quan tâm</h3>
+                    <RadioGroup value={employeeConcern} onValueChange={(value) => setEmployeeConcern(value as 'profit' | 'sales-by-employee')}>
+                      <div className="flex items-center space-x-2 mb-2">
+                        <RadioGroupItem value="profit" id="employee-concern-profit" />
+                        <Label htmlFor="employee-concern-profit" className="text-sm text-slate-700 cursor-pointer">
+                          Lợi nhuận
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="sales-by-employee" id="employee-concern-sales" />
+                        <Label htmlFor="employee-concern-sales" className="text-sm text-slate-700 cursor-pointer">
+                          Hàng bán theo nhân viên
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  <Separator />
+
+                  {/* Employee Time Range */}
+                  <div>
+                    <h3 className="text-sm text-slate-900 mb-3">Thời gian</h3>
+                    <RadioGroup value={employeeDateRangeType} onValueChange={(value) => setEmployeeDateRangeType(value as 'preset' | 'custom')}>
+                      {/* Preset Time Ranges */}
+                      <div className="flex items-center space-x-2 mb-3">
+                        <RadioGroupItem value="preset" id="employee-date-preset" />
+                        <div className="flex-1">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-between text-left text-sm"
+                                onClick={() => setEmployeeDateRangeType('preset')}
+                              >
+                                <span>
+                                  {employeePresetTimeRange === 'today' && 'Hôm nay'}
+                                  {employeePresetTimeRange === 'yesterday' && 'Hôm qua'}
+                                  {employeePresetTimeRange === 'this-week' && 'Tuần này'}
+                                  {employeePresetTimeRange === 'last-week' && 'Tuần trước'}
+                                  {employeePresetTimeRange === 'last-7-days' && '7 ngày qua'}
+                                  {employeePresetTimeRange === 'this-month' && 'Tháng này'}
+                                  {employeePresetTimeRange === 'last-month' && 'Tháng trước'}
+                                  {employeePresetTimeRange === 'this-month-lunar' && 'Tháng này (âm lịch)'}
+                                  {employeePresetTimeRange === 'last-month-lunar' && 'Tháng trước (âm lịch)'}
+                                  {employeePresetTimeRange === 'last-30-days' && '30 ngày qua'}
+                                  {employeePresetTimeRange === 'this-quarter' && 'Quý này'}
+                                  {employeePresetTimeRange === 'last-quarter' && 'Quý trước'}
+                                  {employeePresetTimeRange === 'this-year' && 'Năm nay'}
+                                  {employeePresetTimeRange === 'last-year' && 'Năm trước'}
+                                  {employeePresetTimeRange === 'this-year-lunar' && 'Năm nay (âm lịch)'}
+                                  {employeePresetTimeRange === 'last-year-lunar' && 'Năm trước (âm lịch)'}
+                                </span>
+                                <ChevronDown className="h-4 w-4 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[600px] p-4" align="start">
+                              <div className="grid grid-cols-3 gap-6">
+                                {/* Column 1: Theo ngày và tuần */}
+                                <div>
+                                  <h4 className="text-sm text-slate-700 mb-3">Theo ngày và tuần</h4>
+                                  <div className="space-y-2">
+                                    {[
+                                      { value: 'today', label: 'Hôm nay' },
+                                      { value: 'yesterday', label: 'Hôm qua' },
+                                      { value: 'this-week', label: 'Tuần này' },
+                                      { value: 'last-week', label: 'Tuần trước' },
+                                      { value: 'last-7-days', label: '7 ngày qua' },
+                                    ].map((option) => (
+                                      <button
+                                        key={option.value}
+                                        onClick={() => {
+                                          setEmployeePresetTimeRange(option.value);
+                                          setEmployeeDateRangeType('preset');
+                                        }}
+                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                                          employeePresetTimeRange === option.value
+                                            ? 'bg-blue-600 text-white'
+                                            : 'text-blue-600 hover:bg-blue-50'
+                                        }`}
+                                      >
+                                        {option.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Column 2: Theo tháng và quý */}
+                                <div>
+                                  <h4 className="text-sm text-slate-700 mb-3">Theo tháng và quý</h4>
+                                  <div className="space-y-2">
+                                    {[
+                                      { value: 'this-month', label: 'Tháng này' },
+                                      { value: 'last-month', label: 'Tháng trước' },
+                                      { value: 'this-month-lunar', label: 'Tháng này (âm lịch)' },
+                                      { value: 'last-month-lunar', label: 'Tháng trước (âm lịch)' },
+                                      { value: 'last-30-days', label: '30 ngày qua' },
+                                      { value: 'this-quarter', label: 'Quý này' },
+                                      { value: 'last-quarter', label: 'Quý trước' },
+                                    ].map((option) => (
+                                      <button
+                                        key={option.value}
+                                        onClick={() => {
+                                          setEmployeePresetTimeRange(option.value);
+                                          setEmployeeDateRangeType('preset');
+                                        }}
+                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                                          employeePresetTimeRange === option.value
+                                            ? 'bg-blue-600 text-white'
+                                            : 'text-blue-600 hover:bg-blue-50'
+                                        }`}
+                                      >
+                                        {option.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Column 3: Theo năm */}
+                                <div>
+                                  <h4 className="text-sm text-slate-700 mb-3">Theo năm</h4>
+                                  <div className="space-y-2">
+                                    {[
+                                      { value: 'this-year', label: 'Năm nay' },
+                                      { value: 'last-year', label: 'Năm trước' },
+                                      { value: 'this-year-lunar', label: 'Năm nay (âm lịch)' },
+                                      { value: 'last-year-lunar', label: 'Năm trước (âm lịch)' },
+                                    ].map((option) => (
+                                      <button
+                                        key={option.value}
+                                        onClick={() => {
+                                          setEmployeePresetTimeRange(option.value);
+                                          setEmployeeDateRangeType('preset');
+                                        }}
+                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                                          employeePresetTimeRange === option.value
+                                            ? 'bg-blue-600 text-white'
+                                            : 'text-blue-600 hover:bg-blue-50'
+                                        }`}
+                                      >
+                                        {option.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+
+                      {/* Custom Date Range */}
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="custom" id="employee-date-custom" />
+                        <div className="flex-1">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-start text-left text-sm"
+                                onClick={() => setEmployeeDateRangeType('custom')}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {employeeDateFrom && employeeDateTo
+                                  ? `${format(employeeDateFrom, 'dd/MM', { locale: vi })} - ${format(employeeDateTo, 'dd/MM/yyyy', { locale: vi })}`
+                                  : 'Lựa chọn khác'}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-4" align="start">
+                              <div className="flex gap-4">
+                                <div>
+                                  <Label className="text-xs text-slate-600 mb-2 block">Từ ngày</Label>
+                                  <CalendarComponent
+                                    mode="single"
+                                    selected={employeeDateFrom}
+                                    onSelect={(date) => {
+                                      if (date) {
+                                        setEmployeeDateFrom(date);
+                                        setEmployeeDateRangeType('custom');
+                                      }
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs text-slate-600 mb-2 block">Đến ngày</Label>
+                                  <CalendarComponent
+                                    mode="single"
+                                    selected={employeeDateTo}
+                                    onSelect={(date) => {
+                                      if (date) {
+                                        setEmployeeDateTo(date);
+                                        setEmployeeDateRangeType('custom');
+                                      }
+                                    }}
+                                    disabled={(date) => employeeDateFrom ? date < employeeDateFrom : false}
+                                  />
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                </>
               ) : (
                 <>
                   <Separator />
@@ -2515,13 +2977,6 @@ export function Reports() {
                 Nhân viên
               </TabsTrigger>
               <TabsTrigger 
-                value="inventory" 
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-900 px-4 py-3"
-              >
-                <ShoppingBag className="w-4 h-4 mr-2" />
-                Kho hàng
-              </TabsTrigger>
-              <TabsTrigger 
                 value="customers" 
                 className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-900 px-4 py-3"
               >
@@ -2541,7 +2996,19 @@ export function Reports() {
           <div className="flex-1 overflow-y-auto">
             {/* TAB 3: PRODUCTS REPORT */}
             <TabsContent value="products" className="m-0 p-8 space-y-6">
-              {productsViewType === 'report' ? (
+              {productsConcern === 'import-export' ? (
+                <InventoryImportExportReport
+                  dateFrom={productsDateFrom || new Date(2025, 11, 5)}
+                  dateTo={productsDateTo || new Date(2025, 11, 5)}
+                  data={inventoryImportExportData}
+                />
+              ) : productsConcern === 'write-off' ? (
+                <InventoryWriteOffReport
+                  dateFrom={productsDateFrom || new Date(2025, 11, 1)}
+                  dateTo={productsDateTo || new Date(2025, 11, 31)}
+                  data={inventoryWriteOffData}
+                />
+              ) : productsViewType === 'report' ? (
                 <ProductsReportExcel
                   concern={productsConcern}
                   dateFrom={productsDateFrom || new Date(2025, 9, 28)}
@@ -2871,277 +3338,125 @@ export function Reports() {
             {/* TAB 4: EMPLOYEE REPORT */}
             <TabsContent value="employees" className="m-0 p-8 space-y-6">
               {employeesViewType === 'report' ? (
-                <EmployeesReportTable employeeData={employeeData} />
+                <>
+                  {employeeConcern === 'profit' ? (
+                    <EmployeeProfitReport
+                      dateFrom={employeeDateFrom}
+                      dateTo={employeeDateTo}
+                      employeeData={getFilteredEmployeeProfitData()}
+                    />
+                  ) : (
+                    <EmployeeSalesReport
+                      dateFrom={employeeDateFrom}
+                      dateTo={employeeDateTo}
+                      employeeData={getFilteredEmployeeSalesData()}
+                    />
+                  )}
+                </>
               ) : (
                 <>
-              {/* Employee Revenue Chart */}
-              <Card className="border-blue-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-blue-900">
-                    <BarChart3 className="w-5 h-5" />
-                    Doanh thu theo nhân viên
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={employeeData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} />
-                      <YAxis 
-                        tick={{ fill: '#64748b', fontSize: 12 }}
-                        tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
-                      />
-                      <Tooltip 
-                        formatter={(value: number) => `${value.toLocaleString()}₫`}
-                        contentStyle={{ 
-                          backgroundColor: '#eff6ff', 
-                          border: '1px solid #bfdbfe',
-                          borderRadius: '8px'
-                        }}
-                      />
-                      <Legend />
-                      <Bar dataKey="revenue" fill="#2563eb" name="Doanh thu" radius={[8, 8, 0, 0]} />
-                      <Bar dataKey="profit" fill="#10b981" name="Lợi nhuận" radius={[8, 8, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              {/* Employee Performance Table */}
-              <Card className="border-blue-200">
-                <CardHeader>
-                  <CardTitle className="text-blue-900">Chi tiết hiệu suất nhân viên</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-slate-200">
-                          <th className="text-left py-3 px-4 text-sm text-slate-600">Nhân viên</th>
-                          <th className="text-left py-3 px-4 text-sm text-slate-600">Vai trò</th>
-                          <th className="text-right py-3 px-4 text-sm text-slate-600">Doanh thu</th>
-                          <th className="text-right py-3 px-4 text-sm text-slate-600">Lợi nhuận</th>
-                          <th className="text-center py-3 px-4 text-sm text-slate-600">Số ca</th>
-                          <th className="text-center py-3 px-4 text-sm text-slate-600">Đơn hàng</th>
-                          <th className="text-center py-3 px-4 text-sm text-slate-600">Hiệu suất</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {employeeData.map((emp) => (
-                          <tr key={emp.name} className="border-b border-slate-100 hover:bg-slate-50">
-                            <td className="py-3 px-4 text-sm text-slate-900">{emp.name}</td>
-                            <td className="py-3 px-4">
-                              <Badge variant="outline" className="text-xs">
-                                {emp.role}
-                              </Badge>
-                            </td>
-                            <td className="text-right py-3 px-4 text-sm text-slate-900">
-                              {emp.revenue.toLocaleString()}₫
-                            </td>
-                            <td className="text-right py-3 px-4 text-sm text-emerald-600">
-                              {emp.profit.toLocaleString()}₫
-                            </td>
-                            <td className="text-center py-3 px-4 text-sm text-slate-900">
-                              {emp.shifts} ca
-                            </td>
-                            <td className="text-center py-3 px-4 text-sm text-slate-900">
-                              {emp.ordersServed} đơn
-                            </td>
-                            <td className="text-center py-3 px-4">
-                              <div className="flex items-center justify-center gap-2">
-                                <div className="flex-1 bg-slate-200 rounded-full h-2 max-w-[60px]">
-                                  <div 
-                                    className={`h-2 rounded-full ${
-                                      emp.performance >= 90 ? 'bg-emerald-500' : 
-                                      emp.performance >= 80 ? 'bg-blue-500' : 
-                                      'bg-orange-500'
-                                    }`}
-                                    style={{ width: `${emp.performance}%` }}
-                                  />
-                                </div>
-                                <span className="text-sm text-slate-900">{emp.performance}%</span>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Performance Radar Chart */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="border-blue-200">
-                  <CardHeader>
-                    <CardTitle className="text-blue-900">Đánh giá hiệu suất</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <RadarChart data={employeePerformanceRadar}>
-                        <PolarGrid stroke="#e2e8f0" />
-                        <PolarAngleAxis dataKey="metric" tick={{ fill: '#64748b', fontSize: 12 }} />
-                        <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10 }} />
-                        <Radar name="Hiệu suất" dataKey="value" stroke="#2563eb" fill="#2563eb" fillOpacity={0.5} />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: '#eff6ff', 
-                            border: '1px solid #bfdbfe',
-                            borderRadius: '8px'
-                          }}
-                        />
-                      </RadarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-slate-200">
-                  <CardHeader>
-                    <CardTitle className="text-slate-900">Thống kê tổng quan</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                        <span className="text-sm text-slate-700">Tổng doanh thu</span>
-                        <span className="text-blue-900">
-                          {employeeData.reduce((sum, emp) => sum + emp.revenue, 0).toLocaleString()}₫
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg">
-                        <span className="text-sm text-slate-700">Tổng lợi nhuận</span>
-                        <span className="text-emerald-900">
-                          {employeeData.reduce((sum, emp) => sum + emp.profit, 0).toLocaleString()}₫
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                        <span className="text-sm text-slate-700">Tổng số ca</span>
-                        <span className="text-slate-900">
-                          {employeeData.reduce((sum, emp) => sum + emp.shifts, 0)} ca
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                        <span className="text-sm text-slate-700">Tổng đơn hàng</span>
-                        <span className="text-slate-900">
-                          {employeeData.reduce((sum, emp) => sum + emp.ordersServed, 0)} đơn
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+                  {employeeConcern === 'profit' ? (
+                    <>
+                      {/* Top 10 Employees by Profit Chart */}
+                      <Card className="border-emerald-200">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-emerald-900">
+                            <BarChart3 className="w-5 h-5" />
+                            Top 10 nhân viên có lợi nhuận cao nhất
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={400}>
+                            <BarChart data={getTop10EmployeesByProfit()} layout="vertical">
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                              <XAxis 
+                                type="number"
+                                tick={{ fill: '#64748b', fontSize: 12 }}
+                                tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                              />
+                              <YAxis 
+                                type="category"
+                                dataKey="name" 
+                                tick={{ fill: '#64748b', fontSize: 11 }}
+                                width={200}
+                              />
+                              <Tooltip 
+                                formatter={(value: number) => `${value.toLocaleString()}₫`}
+                                contentStyle={{ 
+                                  backgroundColor: '#f0fdf4', 
+                                  border: '1px solid #86efac',
+                                  borderRadius: '8px'
+                                }}
+                              />
+                              <Bar dataKey="profit" fill="#10b981" radius={[0, 8, 8, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    </>
+                  ) : (
+                    <>
+                      {/* Top 10 Employees by Sales Chart */}
+                      <Card className="border-blue-200">
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="flex items-center gap-2 text-blue-900">
+                              <BarChart3 className="w-5 h-5" />
+                              Top 10 nhân viên bán nhiều nhất
+                            </CardTitle>
+                            <div className="flex gap-2">
+                              <Button
+                                variant={employeeSalesMode === 'invoice' ? 'default' : 'outline'}
+                                size="sm"
+                                className={employeeSalesMode === 'invoice' ? 'bg-blue-600' : ''}
+                                onClick={() => setEmployeeSalesMode('invoice')}
+                              >
+                                Tính theo số hóa đơn
+                              </Button>
+                              <Button
+                                variant={employeeSalesMode === 'items' ? 'default' : 'outline'}
+                                size="sm"
+                                className={employeeSalesMode === 'items' ? 'bg-blue-600' : ''}
+                                onClick={() => setEmployeeSalesMode('items')}
+                              >
+                                Tính theo số mặt hàng
+                              </Button>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={400}>
+                            <BarChart data={getTop10EmployeesBySales()} layout="vertical">
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                              <XAxis 
+                                type="number"
+                                tick={{ fill: '#64748b', fontSize: 12 }}
+                              />
+                              <YAxis 
+                                type="category"
+                                dataKey="name" 
+                                tick={{ fill: '#64748b', fontSize: 11 }}
+                                width={200}
+                              />
+                              <Tooltip 
+                                formatter={(value: number) => `${value.toLocaleString()} ${employeeSalesMode === 'invoice' ? 'hóa đơn' : 'mặt hàng'}`}
+                                contentStyle={{ 
+                                  backgroundColor: '#eff6ff', 
+                                  border: '1px solid #bfdbfe',
+                                  borderRadius: '8px'
+                                }}
+                              />
+                              <Bar dataKey="value" fill="#2563eb" radius={[0, 8, 8, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    </>
+                  )}
                 </>
               )}
             </TabsContent>
 
-            {/* TAB 5: INVENTORY REPORT */}
-            <TabsContent value="inventory" className="m-0 p-8 space-y-6">
-              {/* Summary Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-slate-600">Giá trị tồn kho</span>
-                      <Package className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div className="text-2xl text-blue-900">
-                      {inventoryValueData.reduce((sum, item) => sum + item.value, 0).toLocaleString()}₫
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-white">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-slate-600">Cảnh báo tồn thấp</span>
-                      <AlertTriangle className="w-5 h-5 text-orange-600" />
-                    </div>
-                    <div className="text-2xl text-orange-900">
-                      {lowStockItems.length} mặt hàng
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-slate-600">Sắp hết hạn</span>
-                      <Clock className="w-5 h-5 text-amber-600" />
-                    </div>
-                    <div className="text-2xl text-amber-900">
-                      {expiringItems.length} mặt hàng
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-red-200 bg-gradient-to-br from-red-50 to-white">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-slate-600">Đã hết hạn</span>
-                      <XCircle className="w-5 h-5 text-red-600" />
-                    </div>
-                    <div className="text-2xl text-red-900">
-                      {expiredItems.length} mặt hàng
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Inventory Value Chart */}
-              <Card className="border-blue-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-blue-900">
-                    <PieChartIcon className="w-5 h-5" />
-                    Giá trị tồn kho theo nhóm
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={inventoryValueData}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={100}
-                          paddingAngle={2}
-                          dataKey="value"
-                          label={(entry) => `${entry.category}: ${(entry.value / 1000000).toFixed(1)}M`}
-                        >
-                          {inventoryValueData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          formatter={(value: number) => `${value.toLocaleString()}₫`}
-                          contentStyle={{ 
-                            backgroundColor: '#eff6ff', 
-                            border: '1px solid #bfdbfe',
-                            borderRadius: '8px'
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-
-                    <div className="space-y-3">
-                      {inventoryValueData.map((item) => (
-                        <div key={item.category} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <div 
-                              className="w-4 h-4 rounded" 
-                              style={{ backgroundColor: item.color }}
-                            />
-                            <span className="text-sm text-slate-900">{item.category}</span>
-                          </div>
-                          <span className="text-sm text-slate-900">
-                            {item.value.toLocaleString()}₫
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
 
             {/* TAB 1: END OF DAY REPORT */}
             <TabsContent value="endofday" className="m-0 p-8">

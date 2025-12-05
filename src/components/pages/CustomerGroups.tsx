@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit, Trash2, Search, Power, PowerOff, X, Filter, Check, ChevronDown } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Power, PowerOff, Filter, X, ChevronDown, Upload, Download, Printer } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
@@ -322,23 +322,47 @@ export function CustomerGroups() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="bg-white border-b p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-blue-900 mb-1">Nhóm khách hàng</h1>
-              <p className="text-sm text-slate-600">
-                Quản lý phân loại khách hàng
-              </p>
+              <h1 className="text-slate-900 mb-2">Nhóm khách hàng</h1>
+              <p className="text-slate-600 text-sm">Quản lý nhóm khách hàng và phân loại</p>
             </div>
-            <Button
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                setEditingGroup(null);
-                setDialogOpen(true);
-              }}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Thêm nhóm
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => toast.info('Chức năng import đang phát triển')}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Import Excel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => toast.info('Chức năng export đang phát triển')}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export Excel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  toast.info('Chức năng in đang phát triển');
+                  window.print();
+                }}
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                In danh sách
+              </Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  setEditingGroup(null);
+                  setDialogOpen(true);
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Thêm nhóm
+              </Button>
+            </div>
           </div>
 
           <div className="relative">

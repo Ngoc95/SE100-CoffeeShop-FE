@@ -1,5 +1,5 @@
 import { useState, Fragment } from 'react';
-import { Plus, Search, Filter, X, ChevronRight, Clock, User, CheckCircle, XCircle, AlertCircle, X as XIcon, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Search, Filter, X, ChevronRight, Clock, User, CheckCircle, XCircle, AlertCircle, X as XIcon, ChevronDown, ChevronUp, Upload, Package } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -121,6 +121,7 @@ export function NewItemRequests() {
   const [formData, setFormData] = useState({
     name: '',
     code: '',
+    type: 'product',
     category: '',
     unit: 'ly',
     price: 0,
@@ -678,213 +679,197 @@ export function NewItemRequests() {
         <Dialog open={createItemDialogOpen} onOpenChange={setCreateItemDialogOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
             <DialogHeader>
-              <DialogTitle>Tạo món mới</DialogTitle>
+              <DialogTitle>Thêm mặt hàng mới</DialogTitle>
             </DialogHeader>
             
-            <div className="space-y-6">
-              {/* A. Thông tin mặt hàng */}
+            <div className="space-y-4">
+              {/* Loại mặt hàng */}
               <div>
-                <h3 className="text-sm text-slate-700 mb-4">A. Thông tin mặt hàng</h3>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Tên món *</Label>
-                      <Input
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="Nhập tên món"
-                      />
-                    </div>
+                <Label>Loại mặt hàng *</Label>
+                <Select value={formData.type || 'product'} onValueChange={(value) => setFormData({ ...formData, type: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="product">
+                      <div className="flex items-center gap-2">
+                        <Package className="w-4 h-4" />
+                        Hàng hóa cấu thành
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="combo">
+                      <div className="flex items-center gap-2">
+                        <Package className="w-4 h-4" />
+                        Hàng hóa combo
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                    <div>
-                      <Label>Mã món</Label>
-                      <Input
-                        value={formData.code}
-                        placeholder="Tự động tạo"
-                        disabled
-                        className="bg-slate-100"
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Danh mục *</Label>
-                      <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Chọn danh mục" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Cà phê">Cà phê</SelectItem>
-                          <SelectItem value="Trà">Trà</SelectItem>
-                          <SelectItem value="Sinh tố">Sinh tố</SelectItem>
-                          <SelectItem value="Bánh ngọt">Bánh ngọt</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label>Đơn vị tính</Label>
-                      <Select value={formData.unit} onValueChange={(value) => setFormData({ ...formData, unit: value })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ly">Ly</SelectItem>
-                          <SelectItem value="cái">Cái</SelectItem>
-                          <SelectItem value="phần">Phần</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+              {/* Mã & Tên hàng hóa */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Mã hàng hóa *</Label>
+                  <Input
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                    placeholder="Nhập mã hàng hóa"
+                  />
+                </div>
+                <div>
+                  <Label>Tên hàng hóa *</Label>
+                  <Input
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Nhập tên hàng hóa"
+                  />
                 </div>
               </div>
 
-              {/* B. Giá bán & tồn kho */}
-              <div>
-                <h3 className="text-sm text-slate-700 mb-4">B. Giá bán & tồn kho</h3>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label>Giá bán *</Label>
-                      <Input
-                        type="number"
-                        value={formData.price}
-                        onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
-                        placeholder="0"
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Giá vốn (tự động)</Label>
-                      <Input
-                        type="number"
-                        value={totalCost}
-                        disabled
-                        className="bg-slate-100"
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Trạng thái</Label>
-                      <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="active">Đang kinh doanh</SelectItem>
-                          <SelectItem value="inactive">Ngừng kinh doanh</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label>Mô tả món</Label>
-                    <Textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="Nhập mô tả chi tiết về món..."
-                      rows={3}
-                    />
-                  </div>
+              {/* Danh mục & Đơn vị */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Danh mục *</Label>
+                  <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn danh mục" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Cà phê">Cà phê</SelectItem>
+                      <SelectItem value="Trà">Trà</SelectItem>
+                      <SelectItem value="Sinh tố">Sinh tố</SelectItem>
+                      <SelectItem value="Bánh ngọt">Bánh ngọt</SelectItem>
+                      <div className="px-2 py-1.5 border-t mt-1">
+                        <button className="text-purple-600 text-sm flex items-center gap-1 hover:underline">
+                          <Plus className="w-3 h-3" />
+                          Thêm danh mục
+                        </button>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Đơn vị *</Label>
+                  <Select value={formData.unit} onValueChange={(value) => setFormData({ ...formData, unit: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn đơn vị" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ly">Ly</SelectItem>
+                      <SelectItem value="cái">Cái</SelectItem>
+                      <SelectItem value="phần">Phần</SelectItem>
+                      <div className="px-2 py-1.5 border-t mt-1">
+                        <button className="text-purple-600 text-sm flex items-center gap-1 hover:underline">
+                          <Plus className="w-3 h-3" />
+                          Thêm đơn vị
+                        </button>
+                      </div>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
-              {/* C. Công thức chuẩn (BM1) */}
+              {/* Hình ảnh */}
               <div>
-                <h3 className="text-sm text-slate-700 mb-4">C. Công thức chuẩn (BM1)</h3>
-                <div className="space-y-4">
-                  <div className="border rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-slate-50">
-                          <TableHead>Nguyên liệu</TableHead>
-                          <TableHead>Đơn vị</TableHead>
-                          <TableHead>Định lượng</TableHead>
-                          <TableHead>Giá vốn/đơn vị</TableHead>
-                          <TableHead className="w-12"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {ingredients.map((ingredient) => (
-                          <TableRow key={ingredient.id}>
-                            <TableCell>
-                              <Select
-                                value={ingredient.name}
-                                onValueChange={(value) => handleIngredientChange(ingredient.id, 'name', value)}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Chọn nguyên liệu" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="Cà phê phin">Cà phê phin</SelectItem>
-                                  <SelectItem value="Trà">Trà</SelectItem>
-                                  <SelectItem value="Sữa đặc">Sữa đặc</SelectItem>
-                                  <SelectItem value="Đường">Đường</SelectItem>
-                                  <SelectItem value="Đá viên">Đá viên</SelectItem>
-                                  <SelectItem value="Đào">Đào</SelectItem>
-                                  <SelectItem value="Phúc bồn tử">Phúc bồn tử</SelectItem>
-                                  <SelectItem value="Cam">Cam</SelectItem>
-                                  <SelectItem value="Sả">Sả</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              <Select
-                                value={ingredient.unit}
-                                onValueChange={(value) => handleIngredientChange(ingredient.id, 'unit', value)}
-                              >
-                                <SelectTrigger className="w-20">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="g">g</SelectItem>
-                                  <SelectItem value="ml">ml</SelectItem>
-                                  <SelectItem value="kg">kg</SelectItem>
-                                  <SelectItem value="lít">lít</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                value={ingredient.quantity}
-                                onChange={(e) => handleIngredientChange(ingredient.id, 'quantity', Number(e.target.value))}
-                                className="w-24"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                value={ingredient.cost}
-                                onChange={(e) => handleIngredientChange(ingredient.id, 'cost', Number(e.target.value))}
-                                className="w-28"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveIngredient(ingredient.id)}
-                                disabled={ingredients.length === 1}
-                              >
-                                <X className="w-4 h-4 text-red-500" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                <Label>Hình ảnh</Label>
+                <div className="mt-2 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-400 transition-colors cursor-pointer">
+                  <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-600">Kéo thả hoặc chọn ảnh</p>
+                  <p className="text-xs text-gray-400 mt-1">PNG, JPG (tối đa 2MB)</p>
+                </div>
+              </div>
 
-                  <Button variant="outline" onClick={handleAddIngredient} className="w-full">
+              {/* Công thức nguyên liệu */}
+              <div>
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-purple-900">Công thức nguyên liệu</Label>
+                  </div>
+                  
+                  {ingredients.length > 0 && (
+                    <div className="space-y-2 mb-3">
+                      {ingredients.map((ingredient) => (
+                        <div key={ingredient.id} className="bg-white rounded p-3 flex items-center gap-3">
+                          <div className="flex-1 grid grid-cols-3 gap-2">
+                            <Select
+                              value={ingredient.name}
+                              onValueChange={(value) => handleIngredientChange(ingredient.id, 'name', value)}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Nguyên liệu" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Cà phê phin">Cà phê phin</SelectItem>
+                                <SelectItem value="Trà">Trà</SelectItem>
+                                <SelectItem value="Sữa đặc">Sữa đặc</SelectItem>
+                                <SelectItem value="Đường">Đường</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="number"
+                              placeholder="Số lượng"
+                              value={ingredient.quantity}
+                              onChange={(e) => handleIngredientChange(ingredient.id, 'quantity', Number(e.target.value))}
+                              className="h-9"
+                            />
+                            <Select
+                              value={ingredient.unit}
+                              onValueChange={(value) => handleIngredientChange(ingredient.id, 'unit', value)}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="g">g</SelectItem>
+                                <SelectItem value="ml">ml</SelectItem>
+                                <SelectItem value="kg">kg</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveIngredient(ingredient.id)}
+                            className="h-9 w-9 p-0"
+                          >
+                            <X className="w-4 h-4 text-red-500" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <Button 
+                    variant="outline" 
+                    onClick={handleAddIngredient}
+                    className="w-full border-purple-300 text-purple-700 hover:bg-purple-50"
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Thêm nguyên liệu
                   </Button>
+                </div>
+              </div>
 
-                  <div className="flex justify-between items-center p-4 bg-slate-50 rounded-lg">
-                    <span className="text-sm">Tổng giá vốn:</span>
-                    <span className="text-lg">{totalCost.toLocaleString('vi-VN')}đ</span>
-                  </div>
+              {/* Giá bán */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Giá bán *</Label>
+                  <Input
+                    type="number"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <Label>Giá vốn</Label>
+                  <Input
+                    type="number"
+                    value={totalCost}
+                    disabled
+                    className="bg-slate-100"
+                  />
                 </div>
               </div>
             </div>
@@ -900,7 +885,7 @@ export function NewItemRequests() {
                 Hủy
               </Button>
               <Button
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-purple-600 hover:bg-purple-700 text-white"
                 onClick={() => {
                   if (selectedRequest) {
                     setRequests(requests.map(req =>

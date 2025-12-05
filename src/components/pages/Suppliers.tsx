@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Search, Pencil, Trash2, Filter, X, Power, PowerOff, ArrowUpDown } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Power, PowerOff, Filter, X, Upload, Download, Printer, ArrowUpDown, Pencil } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
@@ -276,7 +276,7 @@ export function Suppliers() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                    <SelectItem value="all">Tất c trạng thái</SelectItem>
                     <SelectItem value="active">Hoạt động</SelectItem>
                     <SelectItem value="inactive">Không hoạt động</SelectItem>
                   </SelectContent>
@@ -327,23 +327,47 @@ export function Suppliers() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="bg-white border-b p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-blue-900 mb-1">Quản lý nhà cung cấp</h1>
-              <p className="text-sm text-slate-600">
-                Quản lý thông tin và giao dịch với nhà cung cấp
-              </p>
+              <h1 className="text-slate-900 mb-2">Nhà cung cấp</h1>
+              <p className="text-slate-600 text-sm">Quản lý thông tin nhà cung cấp</p>
             </div>
-            <Button
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                setEditingSupplier(null);
-                setDialogOpen(true);
-              }}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Thêm nhà cung cấp
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => toast.success('Chức năng import đang phát triển')}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Import Excel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => toast.success('Chức năng export đang phát triển')}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export Excel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  toast.success('Chức năng in đang phát triển');
+                  window.print();
+                }}
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                In danh sách
+              </Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  setEditingSupplier(null);
+                  setDialogOpen(true);
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Thêm nhà cung cấp
+              </Button>
+            </div>
           </div>
 
           <div className="relative">

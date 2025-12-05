@@ -49,9 +49,6 @@ export function ProductsReportExcel({
         <p className="text-sm text-slate-600">
           Từ ngày {format(dateFrom, 'dd/MM/yyyy', { locale: vi })} đến ngày {format(dateTo, 'dd/MM/yyyy', { locale: vi })}
         </p>
-        <p className="text-xs text-slate-500 mt-1">
-          Chi nhánh: Chi nhánh trung tâm
-        </p>
         <p className="text-xs text-slate-400 mt-2 italic">
           (Đã phân bổ giảm giá hóa đơn, giảm giá phiếu trả)
         </p>
