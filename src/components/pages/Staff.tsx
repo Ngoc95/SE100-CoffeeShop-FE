@@ -491,7 +491,7 @@ export function Staff() {
 
   // Apply filters
   let filteredStaff = staffMembers.filter((staff) => {
-    const matchesSearch =
+    const matchesSearch = 
       staff.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       staff.staffCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
       staff.phone.includes(searchQuery) ||
@@ -659,7 +659,7 @@ export function Staff() {
     };
 
     setStaffMembers([...staffMembers, newStaff]);
-
+    
     // Show success message with account info if created
     if (accountData.username) {
       toast.success(
@@ -668,7 +668,7 @@ export function Staff() {
     } else {
       toast.success("Đã thêm nhân viên mới thành công");
     }
-
+    
     setAddDialogOpen(false);
     resetForm();
   };
@@ -851,7 +851,7 @@ export function Staff() {
                     >
                       Tất cả
                     </Label>
-                  </div>
+              </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="active" id="status-active" />
                     <Label
@@ -932,7 +932,7 @@ export function Staff() {
                 <DialogHeader>
                   <DialogTitle>Thêm nhân viên mới</DialogTitle>
                 </DialogHeader>
-
+                
                 <Tabs defaultValue="info" className="w-full">
                   <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="info">Thông tin</TabsTrigger>
@@ -954,8 +954,8 @@ export function Staff() {
                             <Label>
                               Họ và tên <span className="text-red-500">*</span>
                             </Label>
-                            <Input
-                              placeholder="VD: Nguyễn Văn A"
+                            <Input 
+                              placeholder="VD: Nguyễn Văn A" 
                               value={formData.fullName}
                               onChange={(e) =>
                                 setFormData({
@@ -971,8 +971,8 @@ export function Staff() {
                               Số điện thoại{" "}
                               <span className="text-red-500">*</span>
                             </Label>
-                            <Input
-                              placeholder="VD: 0901234567"
+                            <Input 
+                              placeholder="VD: 0901234567" 
                               value={formData.phone}
                               onChange={(e) =>
                                 setFormData({
@@ -987,8 +987,8 @@ export function Staff() {
                             <Label>
                               Số CCCD <span className="text-red-500">*</span>
                             </Label>
-                            <Input
-                              placeholder="VD: 001234567890"
+                            <Input 
+                              placeholder="VD: 001234567890" 
                               value={formData.idCard}
                               onChange={(e) =>
                                 setFormData({
@@ -1022,8 +1022,8 @@ export function Staff() {
                             <Label>
                               Ngày sinh <span className="text-red-500">*</span>
                             </Label>
-                            <Input
-                              type="date"
+                            <Input 
+                              type="date" 
                               value={formData.birthDate}
                               onChange={(e) =>
                                 setFormData({
@@ -1070,8 +1070,8 @@ export function Staff() {
                               Ngày vào làm{" "}
                               <span className="text-red-500">*</span>
                             </Label>
-                            <Input
-                              type="date"
+                            <Input 
+                              type="date" 
                               value={formData.joinDate}
                               onChange={(e) =>
                                 setFormData({
@@ -1135,8 +1135,8 @@ export function Staff() {
                               Địa chỉ cụ thể{" "}
                               <span className="text-red-500">*</span>
                             </Label>
-                            <Input
-                              placeholder="VD: Số nhà, tên đường..."
+                            <Input 
+                              placeholder="VD: Số nhà, tên đường..." 
                               value={formData.addressDetail}
                               onChange={(e) =>
                                 setFormData({
@@ -1193,7 +1193,7 @@ export function Staff() {
                                     </SelectItem>
                                   </SelectContent>
                                 </Select>
-                              </div>
+                      </div>
                             </div>
                           </div>
 
@@ -1712,8 +1712,8 @@ export function Staff() {
                         <div className="grid grid-cols-2 gap-4">
                           <div className="col-span-2">
                             <Label>Tên đăng nhập</Label>
-                            <Input
-                              placeholder="VD: nguyenvana"
+                            <Input 
+                              placeholder="VD: nguyenvana" 
                               value={accountData.username}
                               onChange={(e) =>
                                 setAccountData({
@@ -1726,9 +1726,9 @@ export function Staff() {
                           </div>
                           <div>
                             <Label>Mật khẩu</Label>
-                            <Input
-                              type="password"
-                              placeholder="Tối thiểu 6 ký tự"
+                            <Input 
+                              type="password" 
+                              placeholder="Tối thiểu 6 ký tự" 
                               value={accountData.password}
                               onChange={(e) =>
                                 setAccountData({
@@ -1741,9 +1741,9 @@ export function Staff() {
                           </div>
                           <div>
                             <Label>Xác nhận mật khẩu</Label>
-                            <Input
-                              type="password"
-                              placeholder="Nhập lại mật khẩu"
+                            <Input 
+                              type="password" 
+                              placeholder="Nhập lại mật khẩu" 
                               value={accountData.confirmPassword}
                               onChange={(e) =>
                                 setAccountData({
@@ -1803,7 +1803,7 @@ export function Staff() {
                   >
                     Hủy
                   </Button>
-                  <Button
+                  <Button 
                     className="bg-blue-600 hover:bg-blue-700"
                     onClick={handleSubmit}
                   >
@@ -1834,13 +1834,13 @@ export function Staff() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-blue-50">
-                    <TableHead
+                    <TableHead 
                       className="w-24 cursor-pointer hover:bg-blue-100"
                       onClick={() => handleSort("staffCode")}
                     >
                       Mã NV{getSortIcon("staffCode")}
                     </TableHead>
-                    <TableHead
+                    <TableHead 
                       className="cursor-pointer hover:bg-blue-100"
                       onClick={() => handleSort("fullName")}
                     >
@@ -1848,13 +1848,13 @@ export function Staff() {
                     </TableHead>
                     <TableHead className="w-32">SĐT</TableHead>
                     <TableHead className="w-36">CCCD</TableHead>
-                    <TableHead
+                    <TableHead 
                       className="w-32 cursor-pointer hover:bg-blue-100"
                       onClick={() => handleSort("joinDate")}
                     >
                       Ngày vào làm{getSortIcon("joinDate")}
                     </TableHead>
-                    <TableHead
+                    <TableHead 
                       className="w-28 cursor-pointer hover:bg-blue-100"
                       onClick={() => handleSort("position")}
                     >
@@ -1887,8 +1887,8 @@ export function Staff() {
                           {new Date(staff.joinDate).toLocaleDateString("vi-VN")}
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            variant="outline"
+                          <Badge 
+                            variant="outline" 
                             className={
                               staff.position === "manager"
                                 ? "border-purple-300 text-purple-700"
@@ -1911,17 +1911,17 @@ export function Staff() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1 justify-center">
-                            <Button
-                              variant="ghost"
-                              size="sm"
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
                               className="h-8 w-8 p-0"
                               onClick={() => handleEdit(staff)}
                             >
                               <Pencil className="w-4 h-4" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
                               className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                               onClick={() => handleDelete(staff)}
                             >
@@ -1964,7 +1964,7 @@ export function Staff() {
           <DialogHeader>
             <DialogTitle>Chỉnh sửa thông tin nhân viên</DialogTitle>
           </DialogHeader>
-
+          
           <Tabs defaultValue="info" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="info">Thông tin</TabsTrigger>
@@ -1984,8 +1984,8 @@ export function Staff() {
                       <Label>
                         Họ và tên <span className="text-red-500">*</span>
                       </Label>
-                      <Input
-                        placeholder="VD: Nguyễn Văn A"
+                      <Input 
+                        placeholder="VD: Nguyễn Văn A" 
                         value={formData.fullName}
                         onChange={(e) =>
                           setFormData({ ...formData, fullName: e.target.value })
@@ -1997,8 +1997,8 @@ export function Staff() {
                       <Label>
                         Số điện thoại <span className="text-red-500">*</span>
                       </Label>
-                      <Input
-                        placeholder="VD: 0901234567"
+                      <Input 
+                        placeholder="VD: 0901234567" 
                         value={formData.phone}
                         onChange={(e) =>
                           setFormData({ ...formData, phone: e.target.value })
@@ -2010,8 +2010,8 @@ export function Staff() {
                       <Label>
                         Số CCCD <span className="text-red-500">*</span>
                       </Label>
-                      <Input
-                        placeholder="VD: 001234567890"
+                      <Input 
+                        placeholder="VD: 001234567890" 
                         value={formData.idCard}
                         onChange={(e) =>
                           setFormData({ ...formData, idCard: e.target.value })
@@ -2042,8 +2042,8 @@ export function Staff() {
                       <Label>
                         Ngày sinh <span className="text-red-500">*</span>
                       </Label>
-                      <Input
-                        type="date"
+                      <Input 
+                        type="date" 
                         value={formData.birthDate}
                         onChange={(e) =>
                           setFormData({
@@ -2089,8 +2089,8 @@ export function Staff() {
                       <Label>
                         Ngày vào làm <span className="text-red-500">*</span>
                       </Label>
-                      <Input
-                        type="date"
+                      <Input 
+                        type="date" 
                         value={formData.joinDate}
                         onChange={(e) =>
                           setFormData({ ...formData, joinDate: e.target.value })
@@ -2103,9 +2103,9 @@ export function Staff() {
                         Lương cơ bản (VNĐ){" "}
                         <span className="text-red-500">*</span>
                       </Label>
-                      <Input
-                        type="number"
-                        placeholder="0"
+                      <Input 
+                        type="number" 
+                        placeholder="0" 
                         value={formData.salary}
                         onChange={(e) =>
                           setFormData({ ...formData, salary: e.target.value })
@@ -2157,8 +2157,8 @@ export function Staff() {
                       <Label>
                         Địa chỉ cụ thể <span className="text-red-500">*</span>
                       </Label>
-                      <Input
-                        placeholder="VD: Số nhà, tên đường..."
+                      <Input 
+                        placeholder="VD: Số nhà, tên đường..." 
                         value={formData.addressDetail}
                         onChange={(e) =>
                           setFormData({
@@ -2690,8 +2690,8 @@ export function Staff() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
                       <Label>Tên đăng nhập</Label>
-                      <Input
-                        placeholder="VD: nguyenvana"
+                      <Input 
+                        placeholder="VD: nguyenvana" 
                         value={accountData.username}
                         onChange={(e) =>
                           setAccountData({
@@ -2704,9 +2704,9 @@ export function Staff() {
                     </div>
                     <div>
                       <Label>Mật khẩu mới</Label>
-                      <Input
-                        type="password"
-                        placeholder="Tối thiểu 6 ký tự"
+                      <Input 
+                        type="password" 
+                        placeholder="Tối thiểu 6 ký tự" 
                         value={accountData.password}
                         onChange={(e) =>
                           setAccountData({
@@ -2719,9 +2719,9 @@ export function Staff() {
                     </div>
                     <div>
                       <Label>Xác nhận mật khẩu</Label>
-                      <Input
-                        type="password"
-                        placeholder="Nhập lại mật khẩu"
+                      <Input 
+                        type="password" 
+                        placeholder="Nhập lại mật khẩu" 
                         value={accountData.confirmPassword}
                         onChange={(e) =>
                           setAccountData({
@@ -2784,7 +2784,7 @@ export function Staff() {
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
               Hủy
             </Button>
-            <Button
+            <Button 
               className="bg-blue-600 hover:bg-blue-700"
               onClick={handleUpdate}
             >

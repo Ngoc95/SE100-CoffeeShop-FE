@@ -60,10 +60,10 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
   const shifts = propsShifts
     .filter(shift => shift.active !== false)
     .map(shift => ({
-      id: shift.id,
-      name: shift.name,
-      startTime: shift.startTime,
-      endTime: shift.endTime,
+    id: shift.id,
+    name: shift.name,
+    startTime: shift.startTime,
+    endTime: shift.endTime,
       color: shiftColors[shift.id] || 'bg-blue-100 text-blue-800 border-blue-200',
     }));
 
@@ -358,14 +358,14 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
               </Button>
               <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-sm text-neutral-700 hover:text-amber-700"
-                  >
-                    <CalendarIcon className="w-4 h-4 mr-2" />
-                    {formatWeekRange()}
-                  </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-sm text-neutral-700 hover:text-amber-700"
+              >
+                <CalendarIcon className="w-4 h-4 mr-2" />
+                {formatWeekRange()}
+              </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
@@ -419,11 +419,11 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
                             </div>
                             <div className={`text-xs mt-1 ${isToday ? 'text-blue-600 font-medium' : 'text-neutral-500'}`}>
                               {date.getDate()}/{date.getMonth() + 1}
-                            </div>
-                            <Badge variant="secondary" className="text-xs mt-1">
-                              {getTotalShiftsPerDay(day)} ca
-                            </Badge>
-                          </th>
+                          </div>
+                          <Badge variant="secondary" className="text-xs mt-1">
+                            {getTotalShiftsPerDay(day)} ca
+                          </Badge>
+                        </th>
                         );
                       })}
                       <th className="p-3 text-center bg-amber-50 text-sm text-neutral-700">
