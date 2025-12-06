@@ -560,32 +560,32 @@ export function SalesReport({
           {concern === 'discount' && (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-slate-50">
-                    <th className="border border-slate-300 px-4 py-2 text-left text-sm text-slate-700">Mã HĐ</th>
-                    <th className="border border-slate-300 px-4 py-2 text-left text-sm text-slate-700">Ngày</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Số tiền gốc</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Giảm giá</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Thành tiền</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">% Giảm</th>
+                <thead className="bg-blue-100">
+                  <tr>
+                    <th className="text-left py-3 px-4 text-sm text-slate-900">Mã HĐ</th>
+                    <th className="text-left py-3 px-4 text-sm text-slate-900">Ngày</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">Số tiền gốc</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">Giảm giá</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">Thành tiền</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">% Giảm</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="bg-yellow-50">
-                    <td className="border border-slate-300 px-4 py-2 text-sm text-slate-900" colSpan={2}>Tổng</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatCurrency(2500000)}</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatCurrency(295000)}</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatCurrency(2205000)}</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">11.8%</td>
+                  <tr className="bg-amber-50 border-b border-slate-200">
+                    <td className="py-3 px-4 text-sm text-slate-900 font-medium" colSpan={2}>Tổng</td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">{formatCurrency(2500000)}</td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">{formatCurrency(295000)}</td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">{formatCurrency(2205000)}</td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">11.8%</td>
                   </tr>
                   {discountData.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="border border-slate-300 px-4 py-2 text-sm text-slate-700">{item.invoiceCode}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-sm text-slate-700">{item.date}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatCurrency(item.originalAmount)}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatCurrency(item.discountAmount)}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatCurrency(item.finalAmount)}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{item.discountPercent.toFixed(1)}%</td>
+                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="px-4 py-3 text-sm text-slate-700">{item.invoiceCode}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700">{item.date}</td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">{formatCurrency(item.originalAmount)}</td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">{formatCurrency(item.discountAmount)}</td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">{formatCurrency(item.finalAmount)}</td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">{item.discountPercent.toFixed(1)}%</td>
                     </tr>
                   ))}
                 </tbody>
@@ -596,31 +596,31 @@ export function SalesReport({
           {concern === 'return' && (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-slate-50">
-                    <th className="border border-slate-300 px-4 py-2 text-left text-sm text-slate-700">Mã HĐ</th>
-                    <th className="border border-slate-300 px-4 py-2 text-left text-sm text-slate-700">Ngày</th>
-                    <th className="border border-slate-300 px-4 py-2 text-left text-sm text-slate-700">Sản phẩm</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Số lượng</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Giá trị trả</th>
-                    <th className="border border-slate-300 px-4 py-2 text-left text-sm text-slate-700">Lý do</th>
+                <thead className="bg-blue-100">
+                  <tr>
+                    <th className="text-left py-3 px-4 text-sm text-slate-900">Mã HĐ</th>
+                    <th className="text-left py-3 px-4 text-sm text-slate-900">Ngày</th>
+                    <th className="text-left py-3 px-4 text-sm text-slate-900">Sản phẩm</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">Số lượng</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">Giá trị trả</th>
+                    <th className="text-left py-3 px-4 text-sm text-slate-900">Lý do</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="bg-yellow-50">
-                    <td className="border border-slate-300 px-4 py-2 text-sm text-slate-900" colSpan={3}>Tổng</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">6</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatCurrency(245000)}</td>
-                    <td className="border border-slate-300 px-4 py-2 text-sm text-slate-900">-</td>
+                  <tr className="bg-amber-50 border-b border-slate-200">
+                    <td className="py-3 px-4 text-sm text-slate-900 font-medium" colSpan={3}>Tổng</td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">6</td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">{formatCurrency(245000)}</td>
+                    <td className="py-3 px-4 text-sm text-slate-900 font-medium">-</td>
                   </tr>
                   {returnData.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="border border-slate-300 px-4 py-2 text-sm text-slate-700">{item.invoiceCode}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-sm text-slate-700">{item.date}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-sm text-slate-700">{item.productName}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{item.quantity}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatCurrency(item.returnValue)}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-sm text-slate-700">{item.reason}</td>
+                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="px-4 py-3 text-sm text-slate-700">{item.invoiceCode}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700">{item.date}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700">{item.productName}</td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">{item.quantity}</td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">{formatCurrency(item.returnValue)}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700">{item.reason}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -631,32 +631,32 @@ export function SalesReport({
           {concern === 'table' && (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-slate-50">
-                    <th className="border border-slate-300 px-4 py-2 text-left text-sm text-slate-700">Phòng/Bàn</th>
-                    <th className="border border-slate-300 px-4 py-2 text-left text-sm text-slate-700">Khu vực</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Số lượt sử dụng</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Tổng doanh thu</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">DT trung bình</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Tỷ lệ sử dụng (%)</th>
+                <thead className="bg-blue-100">
+                  <tr>
+                    <th className="text-left py-3 px-4 text-sm text-slate-900">Phòng/Bàn</th>
+                    <th className="text-left py-3 px-4 text-sm text-slate-900">Khu vực</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">Số lượt sử dụng</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">Tổng doanh thu</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">DT trung bình</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">Tỷ lệ sử dụng (%)</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="bg-yellow-50">
-                    <td className="border border-slate-300 px-4 py-2 text-sm text-slate-900" colSpan={2}>Tổng</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">45</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatCurrency(25100000)}</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatCurrency(557778)}</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">77%</td>
+                  <tr className="bg-amber-50 border-b border-slate-200">
+                    <td className="py-3 px-4 text-sm text-slate-900 font-medium" colSpan={2}>Tổng</td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">45</td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">{formatCurrency(25100000)}</td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">{formatCurrency(557778)}</td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">77%</td>
                   </tr>
                   {tableData.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="border border-slate-300 px-4 py-2 text-sm text-slate-700">{item.tableName}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-sm text-slate-700">{item.area}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{item.usageCount}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatCurrency(item.totalRevenue)}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatCurrency(item.avgRevenue)}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{item.occupancyRate}%</td>
+                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="px-4 py-3 text-sm text-slate-700">{item.tableName}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700">{item.area}</td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">{item.usageCount}</td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">{formatCurrency(item.totalRevenue)}</td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">{formatCurrency(item.avgRevenue)}</td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">{item.occupancyRate}%</td>
                     </tr>
                   ))}
                 </tbody>
@@ -667,33 +667,33 @@ export function SalesReport({
           {concern === 'category' && (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-slate-50">
-                    <th className="border border-slate-300 px-4 py-2 text-left text-sm text-slate-700">Danh mục hàng hóa</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">SL bán</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Doanh thu</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">SL trả</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Giá trị trả</th>
-                    <th className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">Doanh thu thuần</th>
+                <thead className="bg-blue-100">
+                  <tr>
+                    <th className="text-left py-3 px-4 text-sm text-slate-900">Danh mục hàng hóa</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">SL bán</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">Doanh thu</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">SL trả</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">Giá trị trả</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">Doanh thu thuần</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="bg-yellow-50">
-                    <td className="border border-slate-300 px-4 py-2 text-sm text-slate-900">Tổng</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">1,170</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatCurrency(63700000)}</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">28</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatCurrency(1305000)}</td>
-                    <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatCurrency(62395000)}</td>
+                  <tr className="bg-amber-50 border-b border-slate-200">
+                    <td className="py-3 px-4 text-sm text-slate-900 font-medium">Tổng</td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">1,170</td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">{formatCurrency(63700000)}</td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">28</td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">{formatCurrency(1305000)}</td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">{formatCurrency(62395000)}</td>
                   </tr>
                   {categoryData.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="border border-slate-300 px-4 py-2 text-sm text-slate-700">{item.category}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatNumber(item.soldQty)}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatCurrency(item.revenue)}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{item.returnQty}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatCurrency(item.returnValue)}</td>
-                      <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatCurrency(item.netRevenue)}</td>
+                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="px-4 py-3 text-sm text-slate-700">{item.category}</td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">{formatNumber(item.soldQty)}</td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">{formatCurrency(item.revenue)}</td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">{item.returnQty}</td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">{formatCurrency(item.returnValue)}</td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">{formatCurrency(item.netRevenue)}</td>
                     </tr>
                   ))}
                 </tbody>

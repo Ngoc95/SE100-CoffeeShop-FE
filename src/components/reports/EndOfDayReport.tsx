@@ -8,6 +8,7 @@ type DateRangeType = 'single' | 'range';
 interface SelectableItem {
   id: string;
   name: string;
+  code?: string;
 }
 
 interface EndOfDayReportProps {
@@ -438,7 +439,7 @@ export function EndOfDayReport({
     if (selectedCreators.length > 0) {
       filterLines.push(
         <p key="creators" className="text-sm text-slate-600">
-          Người tạo: {selectedCreators.map(c => c.name).join(', ')}
+          Người tạo: {selectedCreators.map(c => c.code ? `${c.code} - ${c.name}` : c.name).join(', ')}
         </p>
       );
     }

@@ -277,28 +277,51 @@ export function SupplierReport({ viewType, concern, searchQuery, dateFrom, dateT
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="bg-blue-100 text-blue-900 sticky top-0 z-10">Mã nhà cung cấp</TableHead>
-                <TableHead className="bg-blue-100 text-blue-900 sticky top-0 z-10">Tên nhà cung cấp</TableHead>
-                <TableHead className="bg-blue-100 text-blue-900 text-right sticky top-0 z-10">SL hàng nhập</TableHead>
-                <TableHead className="bg-blue-100 text-blue-900 text-right sticky top-0 z-10">Giá trị nhập</TableHead>
-                <TableHead className="bg-blue-100 text-blue-900 text-right sticky top-0 z-10">SL hàng trả</TableHead>
-                <TableHead className="bg-blue-100 text-blue-900 text-right sticky top-0 z-10">Giá trị trả</TableHead>
-                <TableHead className="bg-blue-100 text-blue-900 text-right sticky top-0 z-10">Giá trị nhập thuần</TableHead>
+                <TableHead className="bg-blue-100 text-slate-900 sticky top-0 z-10">Mã nhà cung cấp</TableHead>
+                <TableHead className="bg-blue-100 text-slate-900 sticky top-0 z-10">Tên nhà cung cấp</TableHead>
+                <TableHead className="bg-blue-100 text-slate-900 text-right sticky top-0 z-10">SL hàng nhập</TableHead>
+                <TableHead className="bg-blue-100 text-slate-900 text-right sticky top-0 z-10">Giá trị nhập</TableHead>
+                <TableHead className="bg-blue-100 text-slate-900 text-right sticky top-0 z-10">SL hàng trả</TableHead>
+                <TableHead className="bg-blue-100 text-slate-900 text-right sticky top-0 z-10">Giá trị trả</TableHead>
+                <TableHead className="bg-blue-100 text-slate-900 text-right sticky top-0 z-10">Giá trị nhập thuần</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredSuppliers.length > 0 ? (
-                filteredSuppliers.map((supplier) => (
-                  <TableRow key={supplier.id}>
-                    <TableCell className="text-blue-600">{supplier.code}</TableCell>
-                    <TableCell>{supplier.name}</TableCell>
-                    <TableCell className="text-right">{supplier.importQuantity}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(supplier.importValue)}</TableCell>
-                    <TableCell className="text-right">{supplier.returnQuantity}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(supplier.returnValue)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(supplier.netImportValue)}</TableCell>
+                <>
+                  {/* Summary row */}
+                  <TableRow className="bg-amber-50">
+                    <TableCell colSpan={2} className="text-slate-900 font-medium">
+                      Tổng
+                    </TableCell>
+                    <TableCell className="text-right text-slate-900 font-medium">
+                      {filteredSuppliers.reduce((sum, s) => sum + s.importQuantity, 0)}
+                    </TableCell>
+                    <TableCell className="text-right text-slate-900 font-medium">
+                      {formatCurrency(filteredSuppliers.reduce((sum, s) => sum + s.importValue, 0))}
+                    </TableCell>
+                    <TableCell className="text-right text-slate-900 font-medium">
+                      {filteredSuppliers.reduce((sum, s) => sum + s.returnQuantity, 0)}
+                    </TableCell>
+                    <TableCell className="text-right text-slate-900 font-medium">
+                      {formatCurrency(filteredSuppliers.reduce((sum, s) => sum + s.returnValue, 0))}
+                    </TableCell>
+                    <TableCell className="text-right text-slate-900 font-medium">
+                      {formatCurrency(filteredSuppliers.reduce((sum, s) => sum + s.netImportValue, 0))}
+                    </TableCell>
                   </TableRow>
-                ))
+                  {filteredSuppliers.map((supplier) => (
+                    <TableRow key={supplier.id} className="hover:bg-slate-50">
+                      <TableCell className="text-blue-600">{supplier.code}</TableCell>
+                      <TableCell className="text-slate-700">{supplier.name}</TableCell>
+                      <TableCell className="text-right text-slate-700">{supplier.importQuantity}</TableCell>
+                      <TableCell className="text-right text-slate-700">{formatCurrency(supplier.importValue)}</TableCell>
+                      <TableCell className="text-right text-slate-700">{supplier.returnQuantity}</TableCell>
+                      <TableCell className="text-right text-slate-700">{formatCurrency(supplier.returnValue)}</TableCell>
+                      <TableCell className="text-right text-slate-700">{formatCurrency(supplier.netImportValue)}</TableCell>
+                    </TableRow>
+                  ))}
+                </>
               ) : (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-slate-500 py-8">
@@ -335,26 +358,46 @@ export function SupplierReport({ viewType, concern, searchQuery, dateFrom, dateT
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="bg-blue-100 text-blue-900 sticky top-0 z-10">Mã nhà cung cấp</TableHead>
-              <TableHead className="bg-blue-100 text-blue-900 sticky top-0 z-10">Tên nhà cung cấp</TableHead>
-              <TableHead className="bg-blue-100 text-blue-900 text-right sticky top-0 z-10">Nợ đầu kỳ</TableHead>
-              <TableHead className="bg-blue-100 text-blue-900 text-right sticky top-0 z-10">Ghi nợ</TableHead>
-              <TableHead className="bg-blue-100 text-blue-900 text-right sticky top-0 z-10">Ghi có</TableHead>
-              <TableHead className="bg-blue-100 text-blue-900 text-right sticky top-0 z-10">Nợ cuối kỳ</TableHead>
+              <TableHead className="bg-blue-100 text-slate-900 sticky top-0 z-10">Mã nhà cung cấp</TableHead>
+              <TableHead className="bg-blue-100 text-slate-900 sticky top-0 z-10">Tên nhà cung cấp</TableHead>
+              <TableHead className="bg-blue-100 text-slate-900 text-right sticky top-0 z-10">Nợ đầu kỳ</TableHead>
+              <TableHead className="bg-blue-100 text-slate-900 text-right sticky top-0 z-10">Ghi nợ</TableHead>
+              <TableHead className="bg-blue-100 text-slate-900 text-right sticky top-0 z-10">Ghi có</TableHead>
+              <TableHead className="bg-blue-100 text-slate-900 text-right sticky top-0 z-10">Nợ cuối kỳ</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredSuppliers.length > 0 ? (
-              filteredSuppliers.map((supplier) => (
-                <TableRow key={supplier.id}>
-                  <TableCell className="text-blue-600">{supplier.code}</TableCell>
-                  <TableCell>{supplier.name}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(supplier.openingDebt)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(supplier.debitPayment)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(supplier.creditPayment)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(supplier.closingDebt)}</TableCell>
+              <>
+                {/* Summary row */}
+                <TableRow className="bg-amber-50">
+                  <TableCell colSpan={2} className="text-slate-900 font-medium">
+                    Tổng
+                  </TableCell>
+                  <TableCell className="text-right text-slate-900 font-medium">
+                    {formatCurrency(filteredSuppliers.reduce((sum, s) => sum + s.openingDebt, 0))}
+                  </TableCell>
+                  <TableCell className="text-right text-slate-900 font-medium">
+                    {formatCurrency(filteredSuppliers.reduce((sum, s) => sum + s.debitPayment, 0))}
+                  </TableCell>
+                  <TableCell className="text-right text-slate-900 font-medium">
+                    {formatCurrency(filteredSuppliers.reduce((sum, s) => sum + s.creditPayment, 0))}
+                  </TableCell>
+                  <TableCell className="text-right text-slate-900 font-medium">
+                    {formatCurrency(filteredSuppliers.reduce((sum, s) => sum + s.closingDebt, 0))}
+                  </TableCell>
                 </TableRow>
-              ))
+                {filteredSuppliers.map((supplier) => (
+                  <TableRow key={supplier.id} className="hover:bg-slate-50">
+                    <TableCell className="text-blue-600">{supplier.code}</TableCell>
+                    <TableCell className="text-slate-700">{supplier.name}</TableCell>
+                    <TableCell className="text-right text-slate-700">{formatCurrency(supplier.openingDebt)}</TableCell>
+                    <TableCell className="text-right text-slate-700">{formatCurrency(supplier.debitPayment)}</TableCell>
+                    <TableCell className="text-right text-slate-700">{formatCurrency(supplier.creditPayment)}</TableCell>
+                    <TableCell className="text-right text-slate-700">{formatCurrency(supplier.closingDebt)}</TableCell>
+                  </TableRow>
+                ))}
+              </>
             ) : (
               <TableRow>
                 <TableCell colSpan={6} className="text-center text-slate-500 py-8">

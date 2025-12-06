@@ -276,27 +276,27 @@ export function CustomerReport({
                   </thead>
                   <tbody>
                     {/* Summary row */}
-                    <tr className="bg-slate-50 border-b-2 border-slate-300">
-                      <td colSpan={2} className="py-3 px-4 text-sm text-slate-900">
+                    <tr className="bg-amber-50 border-b border-slate-200">
+                      <td colSpan={2} className="py-3 px-4 text-sm text-slate-900 font-medium">
                         SL Khách hàng: {filteredCustomerData.length}
                       </td>
-                      <td className="text-right py-3 px-4 text-sm text-slate-900">
+                      <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">
                         {totalQuantitySold}
                       </td>
-                      <td className="text-right py-3 px-4 text-sm text-blue-600">
+                      <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">
                         {totalRevenue.toLocaleString()}
                       </td>
                     </tr>
                     
                     {/* Customer rows */}
                     {filteredCustomerData.map((item) => (
-                      <tr key={item.id} className="border-b border-slate-200 hover:bg-slate-50">
-                        <td className="py-3 px-4 text-sm text-blue-600">{item.code}</td>
-                        <td className="py-3 px-4 text-sm text-slate-900">{item.name}</td>
-                        <td className="text-right py-3 px-4 text-sm text-slate-900">
+                      <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="px-4 py-3 text-sm text-blue-600">{item.code}</td>
+                        <td className="px-4 py-3 text-sm text-slate-700">{item.name}</td>
+                        <td className="text-right px-4 py-3 text-sm text-slate-700">
                           {item.quantitySold}
                         </td>
-                        <td className="text-right py-3 px-4 text-sm text-slate-900">
+                        <td className="text-right px-4 py-3 text-sm text-slate-700">
                           {item.totalRevenue.toLocaleString()}
                         </td>
                       </tr>

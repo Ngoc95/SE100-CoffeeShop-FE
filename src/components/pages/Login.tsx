@@ -113,28 +113,6 @@ export function Login() {
               )}
             </Button>
           </form>
-
-          <div className="mt-6 pt-6 border-t border-slate-200">
-            <p className="text-sm text-slate-600 mb-3">Tài khoản demo:</p>
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between items-center p-2 bg-slate-50 rounded">
-                <span className="text-slate-600">Quản lý:</span>
-                <span className="font-mono">admin / admin123</span>
-              </div>
-              <div className="flex justify-between items-center p-2 bg-slate-50 rounded">
-                <span className="text-slate-600">Pha chế:</span>
-                <span className="font-mono">phache / phache123</span>
-              </div>
-              <div className="flex justify-between items-center p-2 bg-slate-50 rounded">
-                <span className="text-slate-600">Thu ngân:</span>
-                <span className="font-mono">thungan / thungan123</span>
-              </div>
-              <div className="flex justify-between items-center p-2 bg-slate-50 rounded">
-                <span className="text-slate-600">Phục vụ:</span>
-                <span className="font-mono">phucvu / phucvu123</span>
-              </div>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>

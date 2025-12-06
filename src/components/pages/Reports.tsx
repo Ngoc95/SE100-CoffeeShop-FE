@@ -57,6 +57,14 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar as CalendarComponent } from '../ui/calendar';
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '../ui/command';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -87,6 +95,8 @@ import {
 } from 'recharts';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { EmployeeFilter, Employee } from '../EmployeeFilter';
+import { CategoryFilter, Category } from '../CategoryFilter';
 
 type TimeRange = 'today' | 'week' | 'month' | 'custom';
 type ViewType = 'grid' | 'list';
@@ -96,6 +106,7 @@ type DateRangeType = 'single' | 'range';
 interface SelectableItem {
   id: string;
   name: string;
+  code?: string;
 }
 
 export function Reports() {
@@ -118,10 +129,10 @@ export function Reports() {
   const [dateTo, setDateTo] = useState<Date | undefined>(new Date(2025, 9, 15));
   const [customerSearch, setCustomerSearch] = useState('');
   const [productSearch, setProductSearch] = useState('');
-  const [selectedCreators, setSelectedCreators] = useState<SelectableItem[]>([]);
+  const [selectedCreators, setSelectedCreators] = useState<string[]>([]);
   const [selectedReceivers, setSelectedReceivers] = useState<SelectableItem[]>([]);
-  const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<SelectableItem[]>([]);
-  const [selectedCashflowTypes, setSelectedCashflowTypes] = useState<SelectableItem[]>([]);
+  const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<string[]>([]);
+  const [selectedCashflowTypes, setSelectedCashflowTypes] = useState<string[]>([]);
   const [selectedProductCategories, setSelectedProductCategories] = useState<SelectableItem[]>([]);
   const [selectedCancelers, setSelectedCancelers] = useState<SelectableItem[]>([]);
 
@@ -134,6 +145,7 @@ export function Reports() {
   const [productsConcern, setProductsConcern] = useState<'sales' | 'profit' | 'import-export' | 'write-off'>('sales');
   const [productsProductTypes, setProductsProductTypes] = useState<string[]>(['finished', 'composite', 'ingredient']);
   const [productsCategory, setProductsCategory] = useState('all');
+  const [productCategorySearchOpen, setProductCategorySearchOpen] = useState(false);
   
   // Customer report filters
   const [customerTimeRange, setCustomerTimeRange] = useState<TimeRange>('week');
@@ -163,6 +175,7 @@ export function Reports() {
   const [salesDateTo, setSalesDateTo] = useState<Date | undefined>(new Date(2025, 11, 2));
   const [salesSelectedArea, setSalesSelectedArea] = useState('all');
   const [salesSelectedTable, setSalesSelectedTable] = useState('all');
+  const [tableSearchOpen, setTableSearchOpen] = useState(false);
 
   // View types for other tabs
   const [financeViewType, setFinanceViewType] = useState<'chart' | 'report'>('chart');
@@ -186,12 +199,12 @@ export function Reports() {
   const [selectedFinanceConcerns, setSelectedFinanceConcerns] = useState<string[]>(['revenue', 'profit']);
 
   // Sample data
-  const employees: SelectableItem[] = [
-    { id: 'emp1', name: 'Nguyễn Văn A - Thu ngân' },
-    { id: 'emp2', name: 'Trần Thị B - Phục vụ' },
-    { id: 'emp3', name: 'Lê Văn C - Quản lý' },
-    { id: 'emp4', name: 'Hương - Kế Toán' },
-    { id: 'emp5', name: 'Hoàng - Kinh Doanh' },
+  const employees: Employee[] = [
+    { id: 'emp1', code: 'NV001', name: 'Nguyễn Văn A' },
+    { id: 'emp2', code: 'NV002', name: 'Trần Thị B' },
+    { id: 'emp3', code: 'NV003', name: 'Lê Văn C' },
+    { id: 'emp4', code: 'NV004', name: 'Hương' },
+    { id: 'emp5', code: 'NV005', name: 'Hoàng' },
   ];
 
   const paymentMethods: SelectableItem[] = [
@@ -201,7 +214,7 @@ export function Reports() {
     { id: 'card', name: 'Thẻ tín dụng' },
   ];
 
-  const cashflowTypes: SelectableItem[] = [
+  const cashflowTypes: Category[] = [
     { id: 'receive-customer', name: 'Thu tiền khách trả' },
     { id: 'pay-customer', name: 'Chi tiền khách trả' },
     { id: 'receive-supplier', name: 'Thu tiền NCC hoàn trả' },
@@ -1468,7 +1481,7 @@ export function Reports() {
                               className="flex items-center justify-between p-2 hover:bg-slate-100 rounded cursor-pointer"
                               onClick={() => handleMultiSelect(emp, selectedCancelers, setSelectedCancelers)}
                             >
-                              <span className="text-sm text-slate-900">{emp.name}</span>
+                              <span className="text-sm text-slate-900">{emp.code ? `${emp.code} - ${emp.name}` : emp.name}</span>
                               {selectedCancelers.some(s => s.id === emp.id) && (
                                 <CheckCircle2 className="h-4 w-4 text-blue-600" />
                               )}
@@ -1537,55 +1550,13 @@ export function Reports() {
                   <Separator />
 
                   {/* Người tạo */}
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Người tạo</h3>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className="w-full text-left border border-slate-300 rounded-lg px-3 py-2 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-auto min-h-[40px]">
-                          <div className="flex flex-wrap gap-1.5 items-center">
-                            {selectedCreators.length > 0 ? (
-                              selectedCreators.map((item) => (
-                                <Badge
-                                  key={item.id}
-                                  variant="secondary"
-                                  className="bg-slate-200 text-slate-900 pr-1 text-xs"
-                                >
-                                  {item.name}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleRemoveItem(item.id, selectedCreators, setSelectedCreators);
-                                    }}
-                                    className="ml-1 hover:bg-slate-300 rounded-sm p-0.5"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </Badge>
-                              ))
-                            ) : (
-                              <span className="text-slate-500 text-sm">Chọn người tạo</span>
-                            )}
-                          </div>
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-72 p-3" align="start">
-                        <div className="space-y-2">
-                          {employees.map((emp) => (
-                            <div
-                              key={emp.id}
-                              className="flex items-center justify-between p-2 hover:bg-slate-100 rounded cursor-pointer"
-                              onClick={() => handleMultiSelect(emp, selectedCreators, setSelectedCreators)}
-                            >
-                              <span className="text-sm text-slate-900">{emp.name}</span>
-                              {selectedCreators.some(s => s.id === emp.id) && (
-                                <CheckCircle2 className="h-4 w-4 text-blue-600" />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                  <EmployeeFilter
+                    employees={employees}
+                    selectedEmployeeIds={selectedCreators}
+                    onSelectionChange={setSelectedCreators}
+                    label="Người tạo"
+                    placeholder="Tìm người tạo..."
+                  />
                 </>
               )}
 
@@ -1605,107 +1576,56 @@ export function Reports() {
                   <Separator />
 
                   {/* Người tạo */}
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Người tạo</h3>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className="w-full text-left border border-slate-300 rounded-lg px-3 py-2 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-auto min-h-[40px]">
-                          <div className="flex flex-wrap gap-1.5 items-center">
-                            {selectedCreators.length > 0 ? (
-                              selectedCreators.map((item) => (
-                                <Badge
-                                  key={item.id}
-                                  variant="secondary"
-                                  className="bg-slate-200 text-slate-900 pr-1 text-xs"
-                                >
-                                  {item.name}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleRemoveItem(item.id, selectedCreators, setSelectedCreators);
-                                    }}
-                                    className="ml-1 hover:bg-slate-300 rounded-sm p-0.5"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </Badge>
-                              ))
-                            ) : (
-                              <span className="text-slate-500 text-sm">Chọn người tạo</span>
-                            )}
-                          </div>
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-72 p-3" align="start">
-                        <div className="space-y-2">
-                          {employees.map((emp) => (
-                            <div
-                              key={emp.id}
-                              className="flex items-center justify-between p-2 hover:bg-slate-100 rounded cursor-pointer"
-                              onClick={() => handleMultiSelect(emp, selectedCreators, setSelectedCreators)}
-                            >
-                              <span className="text-sm text-slate-900">{emp.name}</span>
-                              {selectedCreators.some(s => s.id === emp.id) && (
-                                <CheckCircle2 className="h-4 w-4 text-blue-600" />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                  <EmployeeFilter
+                    employees={employees}
+                    selectedEmployeeIds={selectedCreators}
+                    onSelectionChange={setSelectedCreators}
+                    label="Người tạo"
+                    placeholder="Tìm người tạo..."
+                  />
 
                   <Separator />
 
                   {/* Phương thức thanh toán */}
                   <div>
                     <h3 className="text-sm text-slate-900 mb-3">Phương thức thanh toán</h3>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className="w-full text-left border border-slate-300 rounded-lg px-3 py-2 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-auto min-h-[40px]">
-                          <div className="flex flex-wrap gap-1.5 items-center">
-                            {selectedPaymentMethods.length > 0 ? (
-                              selectedPaymentMethods.map((item) => (
-                                <Badge
-                                  key={item.id}
-                                  variant="secondary"
-                                  className="bg-slate-200 text-slate-900 pr-1 text-xs"
-                                >
-                                  {item.name}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleRemoveItem(item.id, selectedPaymentMethods, setSelectedPaymentMethods);
-                                    }}
-                                    className="ml-1 hover:bg-slate-300 rounded-sm p-0.5"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </Badge>
-                              ))
-                            ) : (
-                              <span className="text-slate-500 text-sm">Chọn phương thức</span>
-                            )}
-                          </div>
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-72 p-3" align="start">
-                        <div className="space-y-2">
-                          {paymentMethods.map((method) => (
-                            <div
-                              key={method.id}
-                              className="flex items-center justify-between p-2 hover:bg-slate-100 rounded cursor-pointer"
-                              onClick={() => handleMultiSelect(method, selectedPaymentMethods, setSelectedPaymentMethods)}
-                            >
-                              <span className="text-sm text-slate-900">{method.name}</span>
-                              {selectedPaymentMethods.some(s => s.id === method.id) && (
-                                <CheckCircle2 className="h-4 w-4 text-blue-600" />
-                              )}
-                            </div>
-                          ))}
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="payment-all"
+                          checked={selectedPaymentMethods.length === 0 || selectedPaymentMethods.length === paymentMethods.length}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedPaymentMethods(paymentMethods.map(m => m.id));
+                            } else {
+                              setSelectedPaymentMethods([]);
+                            }
+                          }}
+                        />
+                        <label htmlFor="payment-all" className="text-sm text-slate-700 cursor-pointer">
+                          Tất cả
+                        </label>
+                      </div>
+                      {paymentMethods.map((method) => (
+                        <div key={method.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`payment-${method.id}`}
+                            checked={selectedPaymentMethods.includes(method.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedPaymentMethods([...selectedPaymentMethods, method.id]);
+                              } else {
+                                const newSelection = selectedPaymentMethods.filter(id => id !== method.id);
+                                setSelectedPaymentMethods(newSelection);
+                              }
+                            }}
+                          />
+                          <label htmlFor={`payment-${method.id}`} className="text-sm text-slate-700 cursor-pointer">
+                            {method.name}
+                          </label>
                         </div>
-                      </PopoverContent>
-                    </Popover>
+                      ))}
+                    </div>
                   </div>
 
                   {eodConcern === 'cashflow' && (
@@ -1713,55 +1633,11 @@ export function Reports() {
                       <Separator />
 
                       {/* Loại thu chi */}
-                      <div>
-                        <h3 className="text-sm text-slate-900 mb-3">Loại thu chi</h3>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <button className="w-full text-left border border-slate-300 rounded-lg px-3 py-2 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-auto min-h-[40px]">
-                              <div className="flex flex-wrap gap-1.5 items-center">
-                                {selectedCashflowTypes.length > 0 ? (
-                                  selectedCashflowTypes.map((item) => (
-                                    <Badge
-                                      key={item.id}
-                                      variant="secondary"
-                                      className="bg-slate-200 text-slate-900 pr-1 text-xs"
-                                    >
-                                      {item.name}
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleRemoveItem(item.id, selectedCashflowTypes, setSelectedCashflowTypes);
-                                        }}
-                                        className="ml-1 hover:bg-slate-300 rounded-sm p-0.5"
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </button>
-                                    </Badge>
-                                  ))
-                                ) : (
-                                  <span className="text-slate-500 text-sm">Loại thu chi</span>
-                                )}
-                              </div>
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-72 p-3" align="start">
-                            <div className="space-y-2">
-                              {cashflowTypes.map((type) => (
-                                <div
-                                  key={type.id}
-                                  className="flex items-center justify-between p-2 hover:bg-slate-100 rounded cursor-pointer"
-                                  onClick={() => handleMultiSelect(type, selectedCashflowTypes, setSelectedCashflowTypes)}
-                                >
-                                  <span className="text-sm text-slate-900">{type.name}</span>
-                                  {selectedCashflowTypes.some(s => s.id === type.id) && (
-                                    <CheckCircle2 className="h-4 w-4 text-blue-600" />
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      </div>
+                      <CategoryFilter
+                        categories={cashflowTypes}
+                        selectedCategoryNames={selectedCashflowTypes}
+                        onSelectionChange={setSelectedCashflowTypes}
+                      />
                     </>
                   )}
                 </>
@@ -2017,19 +1893,81 @@ export function Reports() {
                     </SelectContent>
                   </Select>
 
-                  <Select value={salesSelectedTable} onValueChange={setSalesSelectedTable}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Chọn phòng/bàn" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tất cả phòng/bàn</SelectItem>
-                      <SelectItem value="table1">Bàn 01</SelectItem>
-                      <SelectItem value="table2">Bàn 02</SelectItem>
-                      <SelectItem value="table3">Bàn 03</SelectItem>
-                      <SelectItem value="vip1">Bàn VIP 1</SelectItem>
-                      <SelectItem value="vip2">Bàn VIP 2</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Popover open={tableSearchOpen} onOpenChange={setTableSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <button className="flex w-full items-center justify-between gap-2 rounded-md border border-input bg-input-background px-3 py-2 text-sm h-9 whitespace-nowrap transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50">
+                        <span className={salesSelectedTable ? '' : 'text-muted-foreground'}>
+                          {salesSelectedTable === 'all' 
+                            ? 'Tất cả phòng/bàn'
+                            : salesSelectedTable === 'table1' ? 'Bàn 01'
+                            : salesSelectedTable === 'table2' ? 'Bàn 02'
+                            : salesSelectedTable === 'table3' ? 'Bàn 03'
+                            : salesSelectedTable === 'vip1' ? 'Bàn VIP 1'
+                            : salesSelectedTable === 'vip2' ? 'Bàn VIP 2'
+                            : 'Chọn phòng/bàn'}
+                        </span>
+                        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[var(--radix-select-trigger-width)] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Tìm phòng/bàn..." />
+                        <CommandList>
+                          <CommandEmpty>Không tìm thấy.</CommandEmpty>
+                          <CommandGroup className="max-h-64 overflow-auto">
+                            <CommandItem
+                              onSelect={() => {
+                                setSalesSelectedTable('all');
+                                setTableSearchOpen(false);
+                              }}
+                            >
+                              Tất cả phòng/bàn
+                            </CommandItem>
+                            <CommandItem
+                              onSelect={() => {
+                                setSalesSelectedTable('table1');
+                                setTableSearchOpen(false);
+                              }}
+                            >
+                              Bàn 01
+                            </CommandItem>
+                            <CommandItem
+                              onSelect={() => {
+                                setSalesSelectedTable('table2');
+                                setTableSearchOpen(false);
+                              }}
+                            >
+                              Bàn 02
+                            </CommandItem>
+                            <CommandItem
+                              onSelect={() => {
+                                setSalesSelectedTable('table3');
+                                setTableSearchOpen(false);
+                              }}
+                            >
+                              Bàn 03
+                            </CommandItem>
+                            <CommandItem
+                              onSelect={() => {
+                                setSalesSelectedTable('vip1');
+                                setTableSearchOpen(false);
+                              }}
+                            >
+                              Bàn VIP 1
+                            </CommandItem>
+                            <CommandItem
+                              onSelect={() => {
+                                setSalesSelectedTable('vip2');
+                                setTableSearchOpen(false);
+                              }}
+                            >
+                              Bàn VIP 2
+                            </CommandItem>
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
             </>
@@ -2363,22 +2301,47 @@ export function Reports() {
               {/* Danh mục hàng hóa */}
               <div>
                 <h3 className="text-sm text-slate-900 mb-3">Danh mục hàng hóa</h3>
-                <RadioGroup value={productsCategory} onValueChange={setProductsCategory}>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="all" id="category-all" />
-                    <Label htmlFor="category-all" className="text-sm text-slate-700 cursor-pointer">
-                      Tất cả
-                    </Label>
-                  </div>
-                  {productCategories.map((cat) => (
-                    <div key={cat.id} className="flex items-center space-x-2 mb-2">
-                      <RadioGroupItem value={cat.id} id={`category-${cat.id}`} />
-                      <Label htmlFor={`category-${cat.id}`} className="text-sm text-slate-700 cursor-pointer">
-                        {cat.name}
-                      </Label>
-                    </div>
-                  ))}
-                </RadioGroup>
+                <Popover open={productCategorySearchOpen} onOpenChange={setProductCategorySearchOpen}>
+                  <PopoverTrigger asChild>
+                    <button className="flex w-full items-center justify-between gap-2 rounded-md border border-input bg-input-background px-3 py-2 text-sm h-9 whitespace-nowrap transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50">
+                      <span className={productsCategory ? '' : 'text-muted-foreground'}>
+                        {productsCategory === 'all'
+                          ? 'Tất cả'
+                          : productCategories.find(cat => cat.id === productsCategory)?.name || 'Chọn danh mục'}
+                      </span>
+                      <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[var(--radix-select-trigger-width)] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Tìm danh mục..." />
+                      <CommandList>
+                        <CommandEmpty>Không tìm thấy.</CommandEmpty>
+                        <CommandGroup className="max-h-64 overflow-auto">
+                          <CommandItem
+                            onSelect={() => {
+                              setProductsCategory('all');
+                              setProductCategorySearchOpen(false);
+                            }}
+                          >
+                            Tất cả
+                          </CommandItem>
+                          {productCategories.map((cat) => (
+                            <CommandItem
+                              key={cat.id}
+                              onSelect={() => {
+                                setProductsCategory(cat.id);
+                                setProductCategorySearchOpen(false);
+                              }}
+                            >
+                              {cat.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </>
           ) : (
@@ -3468,10 +3431,19 @@ export function Reports() {
                 dateTo={dateTo}
                 customerSearch={customerSearch}
                 productSearch={productSearch}
-                selectedCreators={selectedCreators}
+                selectedCreators={selectedCreators.map(id => {
+                  const creator = employees.find(e => e.id === id);
+                  return creator ? { id: creator.id, name: creator.name, code: creator.code } : { id, name: '' };
+                })}
                 selectedReceivers={selectedReceivers}
-                selectedPaymentMethods={selectedPaymentMethods}
-                selectedCashflowTypes={selectedCashflowTypes}
+                selectedPaymentMethods={selectedPaymentMethods.map(id => {
+                  const method = paymentMethods.find(m => m.id === id);
+                  return method ? { id: method.id, name: method.name } : { id, name: '' };
+                })}
+                selectedCashflowTypes={selectedCashflowTypes.map(name => {
+                  const type = cashflowTypes.find(t => t.name === name);
+                  return type ? { id: type.id, name: type.name } : { id: '', name };
+                })}
                 selectedProductCategories={selectedProductCategories}
                 selectedCancelers={selectedCancelers}
               />
