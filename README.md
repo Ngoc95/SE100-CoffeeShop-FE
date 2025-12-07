@@ -1,7 +1,5 @@
 # Coffee Shop Management System UI
 
-This is a code bundle for Coffee Shop Management System UI. The original project is available at https://www.figma.com/design/uEU1VNW7q7belEiFw7TZgH/Coffee-Shop-Management-System-UI.
-
 ## Prerequisites
 
 Before running this project, make sure you have the following installed:
