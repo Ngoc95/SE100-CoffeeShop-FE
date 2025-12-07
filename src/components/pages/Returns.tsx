@@ -1,9 +1,17 @@
 import { useState } from 'react';
-import { Search, RotateCcw, Eye, ChevronDown, ChevronUp, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { Search, RotateCcw, Eye, ChevronDown, ChevronUp, CheckCircle, Clock, XCircle, ArrowUp, ArrowDown } from 'lucide-react';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
 import { Separator } from '../ui/separator';
 import { Button } from '../ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../ui/table';
 
 interface ReturnItem {
   id: number;
@@ -35,6 +43,12 @@ export function Returns() {
   const [selectedDateRange, setSelectedDateRange] = useState('today');
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['pending', 'completed', 'rejected']);
   const [expandedReturnId, setExpandedReturnId] = useState<number | null>(null);
+  
+  // Sort states
+  type SortField = "code" | "invoiceCode" | "date" | "customer" | "items" | "refundAmount" | "reason" | "status" | null;
+  type SortOrder = "asc" | "desc" | "none";
+  const [sortField, setSortField] = useState<SortField>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("none");
 
   // Mock data with detailed items
   const [returns] = useState<ReturnRecord[]>([
@@ -104,13 +118,83 @@ export function Returns() {
     setExpandedReturnId(expandedReturnId === returnId ? null : returnId);
   };
 
-  const filteredReturns = returns.filter(ret => {
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortOrder === "asc") {
+        setSortOrder("desc");
+      } else if (sortOrder === "desc") {
+        setSortOrder("none");
+        setSortField(null);
+      } else {
+        setSortField(field);
+        setSortOrder("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field || sortOrder === "none") {
+      return null;
+    }
+    if (sortOrder === "asc") {
+      return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
+    }
+    return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
+  };
+
+  let filteredReturns = returns.filter(ret => {
     const matchesSearch = ret.code.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          ret.invoiceCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          ret.customer.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(ret.status);
     return matchesSearch && matchesStatus;
   });
+
+  // Apply sorting
+  if (sortField && sortOrder !== "none") {
+    filteredReturns = [...filteredReturns].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      if (sortField === "code") {
+        aValue = a.code;
+        bValue = b.code;
+      } else if (sortField === "invoiceCode") {
+        aValue = a.invoiceCode;
+        bValue = b.invoiceCode;
+      } else if (sortField === "date") {
+        aValue = new Date(a.date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1-$2-$3')).getTime();
+        bValue = new Date(b.date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1-$2-$3')).getTime();
+      } else if (sortField === "customer") {
+        aValue = a.customer;
+        bValue = b.customer;
+      } else if (sortField === "items") {
+        aValue = a.items;
+        bValue = b.items;
+      } else if (sortField === "refundAmount") {
+        aValue = a.refundAmount;
+        bValue = b.refundAmount;
+      } else if (sortField === "reason") {
+        aValue = a.reason;
+        bValue = b.reason;
+      } else if (sortField === "status") {
+        aValue = a.status;
+        bValue = b.status;
+      }
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        const comparison = aValue.localeCompare(bValue, "vi");
+        return sortOrder === "asc" ? comparison : -comparison;
+      }
+
+      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
 
   const totalRefund = filteredReturns.reduce((sum, ret) => sum + ret.refundAmount, 0);
   const pendingCount = returns.filter(r => r.status === 'pending').length;
@@ -220,72 +304,136 @@ export function Returns() {
 
         {/* Search Bar */}
         <div className="mb-4">
-          <div className="relative max-w-md">
+          <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               placeholder="Tìm theo mã đơn trả, hóa đơn hoặc khách hàng..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm bg-white shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
         </div>
 
         {/* Table */}
         <div className="bg-white rounded-lg border border-slate-200 flex-1 overflow-hidden flex flex-col">
-          <div className="overflow-x-auto flex-1">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600 w-12"></th>
-                  <th className="px-4 py-3 text-center text-xs text-slate-600 w-16">STT</th>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">Mã trả hàng</th>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">Hóa đơn gốc</th>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">Ngày giờ</th>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">Khách hàng</th>
-                  <th className="px-4 py-3 text-center text-xs text-slate-600">Số SP</th>
-                  <th className="px-4 py-3 text-right text-xs text-slate-600">Hoàn tiền</th>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">Lý do</th>
-                  <th className="px-4 py-3 text-center text-xs text-slate-600">Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+          <div className="overflow-x-auto flex-1 rounded-xl">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-blue-50">
+                  <TableHead className="w-12 text-sm"></TableHead>
+                  <TableHead className="w-16 text-sm text-center">STT</TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("code")}
+                  >
+                    <div className="flex items-center">
+                      Mã trả hàng
+                      {getSortIcon("code")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("invoiceCode")}
+                  >
+                    <div className="flex items-center">
+                      Hóa đơn gốc
+                      {getSortIcon("invoiceCode")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("date")}
+                  >
+                    <div className="flex items-center">
+                      Ngày giờ
+                      {getSortIcon("date")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("customer")}
+                  >
+                    <div className="flex items-center">
+                      Khách hàng
+                      {getSortIcon("customer")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("items")}
+                  >
+                    <div className="flex items-center justify-center">
+                      Số SP
+                      {getSortIcon("items")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm text-right cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("refundAmount")}
+                  >
+                    <div className="flex items-center justify-end">
+                      Hoàn tiền
+                      {getSortIcon("refundAmount")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("reason")}
+                  >
+                    <div className="flex items-center">
+                      Lý do
+                      {getSortIcon("reason")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("status")}
+                  >
+                    <div className="flex items-center justify-center">
+                      Trạng thái
+                      {getSortIcon("status")}
+                    </div>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {filteredReturns.map((ret, index) => (
                   <>
-                    <tr 
+                    <TableRow 
                       key={ret.id} 
-                      className="hover:bg-slate-50 cursor-pointer"
+                      className="hover:bg-blue-50/50 cursor-pointer"
                       onClick={() => toggleExpand(ret.id)}
                     >
-                      <td className="px-4 py-3 text-center">
+                      <TableCell className="text-sm text-center">
                         {expandedReturnId === ret.id ? (
                           <ChevronUp className="w-4 h-4 text-slate-600" />
                         ) : (
                           <ChevronDown className="w-4 h-4 text-slate-600" />
                         )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-600 text-center">{index + 1}</td>
-                      <td className="px-4 py-3 text-sm text-blue-600">{ret.code}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{ret.invoiceCode}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{ret.date}</td>
-                      <td className="px-4 py-3 text-sm text-slate-900">{ret.customer}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600 text-center">{ret.items}</td>
-                      <td className="px-4 py-3 text-sm text-red-600 text-right">
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700 text-center">{index + 1}</TableCell>
+                      <TableCell className="text-sm text-blue-600">{ret.code}</TableCell>
+                      <TableCell className="text-sm text-slate-700">{ret.invoiceCode}</TableCell>
+                      <TableCell className="text-sm text-slate-700">{ret.date}</TableCell>
+                      <TableCell className="text-sm text-slate-900">{ret.customer}</TableCell>
+                      <TableCell className="text-sm text-slate-700 text-center">{ret.items}</TableCell>
+                      <TableCell className="text-sm text-red-600 text-right">
                         {ret.refundAmount.toLocaleString('vi-VN')}đ
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{ret.reason}</td>
-                      <td className="px-4 py-3 text-center">
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700">{ret.reason}</TableCell>
+                      <TableCell className="text-sm text-center">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${getStatusColor(ret.status)}`}>
                           {getStatusLabel(ret.status)}
                         </span>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
 
                     {/* Expanded Detail Row */}
                     {expandedReturnId === ret.id && (
-                      <tr>
-                        <td colSpan={10} className="px-4 py-4 bg-slate-50">
+                      <TableRow>
+                        <TableCell colSpan={10} className="px-4 py-4 bg-slate-50">
                           <div className="bg-white rounded-lg border border-slate-200 p-6">
                             {/* Return Info Grid */}
                             <div className="grid grid-cols-2 gap-x-8 gap-y-3 mb-6">
@@ -401,13 +549,13 @@ export function Returns() {
                               </div>
                             )}
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     )}
                   </>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
 
           {/* Footer */}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Edit, Package, TrendingDown, DollarSign, Plus, Minus } from 'lucide-react';
+import { Search, Edit, Package, TrendingDown, DollarSign, Plus, Minus, ArrowUp, ArrowDown } from 'lucide-react';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
 import { Separator } from '../ui/separator';
@@ -19,6 +19,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../ui/table';
 
 interface PriceEditDialogProps {
   open: boolean;
@@ -76,21 +84,21 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-[900px]" aria-describedby={undefined}>
+      <DialogContent className="max-w-none w-[98vw] max-h-[98vh] overflow-y-auto" style={{ maxWidth: '1600px' }} aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Chỉnh sửa giá bán - {product?.name}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 px-2">
+        <div className="space-y-6 px-4">
           {/* Price Adjustment Row */}
-          <div className="flex items-center gap-3 justify-start">
+          <div className="flex items-center gap-3 justify-start flex-wrap">
             <span className="text-sm text-slate-700 whitespace-nowrap shrink-0">
-              Giá mới <span className="text-green-600">[{currentPrice.toLocaleString('vi-VN')}]</span> =
+              Giá mới <span className="text-blue-600">[{currentPrice.toLocaleString('vi-VN')}]</span> =
             </span>
             
             {/* Base Price Selector */}
             <Select value={priceType} onValueChange={setPriceType}>
-              <SelectTrigger className="w-[180px] shrink-0">
+              <SelectTrigger className="w-[180px] shrink-0 bg-white border-slate-300 shadow-none">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -104,7 +112,7 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={increment}
-                className="w-10 h-10 flex items-center justify-center bg-green-500 hover:bg-green-600 text-white rounded transition-colors"
+                className="w-10 h-10 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -121,7 +129,7 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
               type="number"
               value={adjustmentValue}
               onChange={(e) => setAdjustmentValue(Number(e.target.value))}
-              className="w-28 shrink-0 px-3 py-2.5 border border-slate-200 rounded text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-28 shrink-0 px-3 py-2.5 bg-white border border-slate-300 rounded text-sm text-center shadow-none focus:outline-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
 
             {/* Unit Toggle Buttons */}
@@ -140,7 +148,7 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
                 onClick={() => setAdjustmentType('percent')}
                 className={`px-4 py-2.5 text-sm font-medium rounded transition-colors ${
                   adjustmentType === 'percent'
-                    ? 'bg-green-500 text-white'
+                    ? 'bg-blue-600 text-white'
                     : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                 }`}
               >
@@ -150,16 +158,16 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
           </div>
 
           {/* New Price Display */}
-          <div className="p-5 bg-green-50 border border-green-200 rounded-lg">
+          <div className="p-5 bg-white border border-slate-300 rounded-lg">
             <div className="flex justify-between items-center">
               <span className="text-base text-slate-700">Giá bán mới:</span>
-              <span className="text-2xl font-semibold text-green-600">
+              <span className="text-2xl font-semibold text-blue-600">
                 {newPrice.toLocaleString('vi-VN')}đ
               </span>
             </div>
             <div className="flex justify-between items-center mt-3 text-sm">
               <span className="text-slate-600">Lợi nhuận:</span>
-              <span className="text-green-600 font-medium">
+              <span className="text-blue-600 font-medium">
                 {product?.costPrice ? ((newPrice - product.costPrice) / newPrice * 100).toFixed(1) : 0}%
                 <span className="ml-2 text-slate-600">
                   ({product?.costPrice ? (newPrice - product.costPrice).toLocaleString('vi-VN') : 0}đ)
@@ -169,12 +177,12 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
           </div>
 
           {/* Apply to All Checkbox */}
-          <div className="flex items-start space-x-3 p-4 border border-slate-200 rounded-lg bg-slate-50">
+          <div className="flex items-start space-x-3 p-4 border border-slate-300 rounded-lg bg-white">
             <Checkbox 
               id="applyToAll"
               checked={applyToAll}
               onCheckedChange={(checked) => setApplyToAll(checked as boolean)}
-              className="mt-0.5"
+              className="mt-0.5 border-slate-300"
             />
             <Label htmlFor="applyToAll" className="text-sm text-slate-700 cursor-pointer leading-relaxed">
               Áp dụng công thức cho tất cả sản phẩm trong danh mục <strong>{categoryLabel}</strong>
@@ -186,7 +194,7 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
           <Button variant="outline" onClick={onClose} className="min-w-24">
             Hủy
           </Button>
-          <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 min-w-24">
+          <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 min-w-24">
             OK
           </Button>
         </DialogFooter>
@@ -195,12 +203,17 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
   );
 }
 
+type SortField = "code" | "name" | "category" | "type" | "costPrice" | "lastPurchasePrice" | "sellingPrice" | "margin";
+type SortOrder = "asc" | "desc" | "none";
+
 export function ProductPricing() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['all']);
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['ready-made', 'composite', 'ingredient']);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("none");
 
   // Mock data
   const [products, setProducts] = useState([
@@ -266,13 +279,88 @@ export function ProductPricing() {
     }
   };
 
-  const filteredProducts = products.filter(product => {
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Cycle through: asc -> desc -> none -> asc
+      if (sortOrder === "asc") {
+        setSortOrder("desc");
+      } else if (sortOrder === "desc") {
+        setSortOrder("none");
+        setSortField(null);
+      } else {
+        setSortField(field);
+        setSortOrder("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field || sortOrder === "none") {
+      return null;
+    }
+    if (sortOrder === "asc") {
+      return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
+    }
+    return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
+  };
+
+  let filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          product.code.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategories.includes('all') || selectedCategories.includes(product.category);
     const matchesType = selectedTypes.includes(product.type);
     return matchesSearch && matchesCategory && matchesType;
   });
+
+  // Apply sorting
+  if (sortField && sortOrder !== "none") {
+    filteredProducts = [...filteredProducts].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      if (sortField === "code") {
+        aValue = a.code;
+        bValue = b.code;
+      } else if (sortField === "name") {
+        aValue = a.name;
+        bValue = b.name;
+      } else if (sortField === "category") {
+        const aCategory = categories.find((c) => c.id === a.category)?.name || "";
+        const bCategory = categories.find((c) => c.id === b.category)?.name || "";
+        aValue = aCategory;
+        bValue = bCategory;
+      } else if (sortField === "type") {
+        aValue = getTypeLabel(a.type);
+        bValue = getTypeLabel(b.type);
+      } else if (sortField === "costPrice") {
+        aValue = a.costPrice;
+        bValue = b.costPrice;
+      } else if (sortField === "lastPurchasePrice") {
+        aValue = a.lastPurchasePrice;
+        bValue = b.lastPurchasePrice;
+      } else if (sortField === "sellingPrice") {
+        aValue = a.sellingPrice;
+        bValue = b.sellingPrice;
+      } else if (sortField === "margin") {
+        const aMargin = ((a.sellingPrice - a.costPrice) / a.sellingPrice * 100);
+        const bMargin = ((b.sellingPrice - b.costPrice) / b.sellingPrice * 100);
+        aValue = aMargin;
+        bValue = bMargin;
+      }
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        const comparison = aValue.localeCompare(bValue, "vi");
+        return sortOrder === "asc" ? comparison : -comparison;
+      }
+
+      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
 
   return (
     <div className="flex h-full bg-slate-50">
@@ -352,73 +440,137 @@ export function ProductPricing() {
 
         {/* Search Bar */}
         <div className="mb-4">
-          <div className="relative max-w-md">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               placeholder="Tìm theo tên hoặc mã hàng..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 bg-white border-slate-300 rounded-lg text-sm shadow-none focus:outline-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2"
             />
           </div>
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-lg border border-slate-200 flex-1 overflow-hidden flex flex-col">
-          <div className="overflow-x-auto flex-1">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">Mã hàng</th>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">Tên hàng hóa</th>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">Danh mục</th>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">Loại hàng hóa</th>
-                  <th className="px-4 py-3 text-right text-xs text-slate-600">Giá vốn</th>
-                  <th className="px-4 py-3 text-right text-xs text-slate-600">Giá nhập cuối</th>
-                  <th className="px-4 py-3 text-right text-xs text-slate-600">Giá bán</th>
-                  <th className="px-4 py-3 text-right text-xs text-slate-600">Lợi nhuận (%)</th>
-                  <th className="px-4 py-3 text-center text-xs text-slate-600">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+        <div className="bg-white rounded-xl border border-slate-200 flex-1 overflow-hidden flex flex-col">
+          <div className="overflow-x-auto flex-1 rounded-xl">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-blue-50">
+                  <TableHead
+                    className="cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("code")}
+                  >
+                    <div className="flex items-center">
+                      Mã hàng
+                      {getSortIcon("code")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("name")}
+                  >
+                    <div className="flex items-center">
+                      Tên hàng hóa
+                      {getSortIcon("name")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("category")}
+                  >
+                    <div className="flex items-center">
+                      Danh mục
+                      {getSortIcon("category")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("type")}
+                  >
+                    <div className="flex items-center">
+                      Loại hàng hóa
+                      {getSortIcon("type")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-right cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("costPrice")}
+                  >
+                    <div className="flex items-center justify-end">
+                      Giá vốn
+                      {getSortIcon("costPrice")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-right cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("lastPurchasePrice")}
+                  >
+                    <div className="flex items-center justify-end">
+                      Giá nhập cuối
+                      {getSortIcon("lastPurchasePrice")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-right cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("sellingPrice")}
+                  >
+                    <div className="flex items-center justify-end">
+                      Giá bán
+                      {getSortIcon("sellingPrice")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-right cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("margin")}
+                  >
+                    <div className="flex items-center justify-end">
+                      Lợi nhuận (%)
+                      {getSortIcon("margin")}
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-center">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {filteredProducts.map((product) => {
                   const margin = ((product.sellingPrice - product.costPrice) / product.sellingPrice * 100).toFixed(0);
                   const categoryLabel = categories.find(c => c.id === product.category)?.name || product.category;
                   
                   return (
-                    <tr key={product.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 text-sm text-slate-600">{product.code}</td>
-                      <td className="px-4 py-3 text-sm text-slate-900">{product.name}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{categoryLabel}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600">
+                    <TableRow key={product.id} className="hover:bg-slate-50">
+                      <TableCell className="text-sm text-slate-700">{product.code}</TableCell>
+                      <TableCell className="text-sm text-slate-900">{product.name}</TableCell>
+                      <TableCell className="text-sm text-slate-700">{categoryLabel}</TableCell>
+                      <TableCell className="text-sm text-slate-700">
                         {getTypeLabel(product.type)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-900 text-right">
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-900 text-right">
                         {product.costPrice.toLocaleString('vi-VN')}đ
-                      </td>
-                      <td className="px-4 py-3 text-sm text-blue-600 text-right">
+                      </TableCell>
+                      <TableCell className="text-sm text-blue-600 text-right">
                         {product.lastPurchasePrice.toLocaleString('vi-VN')}đ
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-900 text-right">
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-900 text-right">
                         {product.sellingPrice.toLocaleString('vi-VN')}đ
-                      </td>
-                      <td className="px-4 py-3 text-sm text-green-600 text-right">
+                      </TableCell>
+                      <TableCell className="text-sm text-green-600 text-right">
                         {margin}%
-                      </td>
-                      <td className="px-4 py-3 text-center">
+                      </TableCell>
+                      <TableCell className="text-center">
                         <button 
                           onClick={() => handleEditClick(product)}
                           className="text-blue-600 hover:text-blue-700 p-1"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
 
           {/* Footer */}

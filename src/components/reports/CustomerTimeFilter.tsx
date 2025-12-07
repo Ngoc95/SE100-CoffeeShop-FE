@@ -34,13 +34,13 @@ export function CustomerTimeFilter({
       <RadioGroup value={dateRangeType} onValueChange={(value) => onDateRangeTypeChange(value as 'preset' | 'custom')}>
         {/* Preset Time Ranges */}
         <div className="flex items-center space-x-2 mb-3">
-          <RadioGroupItem value="preset" id="customer-date-preset" />
+          <RadioGroupItem value="preset" id="customer-date-preset" className="border-slate-300" />
           <div className="flex-1">
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-full justify-between text-left text-sm"
+                  className="w-full justify-between text-left text-sm bg-white border-slate-300"
                   onClick={() => onDateRangeTypeChange('preset')}
                 >
                   <span>
@@ -161,13 +161,13 @@ export function CustomerTimeFilter({
 
         {/* Custom Date Range */}
         <div className="flex items-center space-x-2">
-          <RadioGroupItem value="custom" id="customer-date-custom" />
+          <RadioGroupItem value="custom" id="customer-date-custom" className="border-slate-300" />
           <div className="flex-1">
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-full justify-start text-left text-sm"
+                  className="w-full justify-start text-left text-sm bg-white border-slate-300"
                   onClick={() => onDateRangeTypeChange('custom')}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />

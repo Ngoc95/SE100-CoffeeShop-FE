@@ -14,6 +14,8 @@ import {
   Eye,
   Pencil,
   Check,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";
@@ -47,6 +49,14 @@ import {
 import { Calendar } from "../ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Textarea } from "../ui/textarea";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../ui/table";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { toast } from "sonner@2.0.3";
@@ -126,6 +136,12 @@ export function WriteOffs() {
   ]);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [editingDates, setEditingDates] = useState<Record<number, string>>({});
+  
+  // Sort states
+  type SortField = "code" | "date" | "items" | "totalValue" | "reason" | "status" | null;
+  type SortOrder = "asc" | "desc" | "none";
+  const [sortField, setSortField] = useState<SortField>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("none");
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingWriteOffId, setEditingWriteOffId] = useState<number | null>(
@@ -753,7 +769,34 @@ export function WriteOffs() {
     );
   };
 
-  const filteredWriteOffs = writeOffs.filter((wo) => {
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortOrder === "asc") {
+        setSortOrder("desc");
+      } else if (sortOrder === "desc") {
+        setSortOrder("none");
+        setSortField(null);
+      } else {
+        setSortField(field);
+        setSortOrder("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field || sortOrder === "none") {
+      return null;
+    }
+    if (sortOrder === "asc") {
+      return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
+    }
+    return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
+  };
+
+  let filteredWriteOffs = writeOffs.filter((wo) => {
     try {
       const matchesSearch = wo.code
         .toLowerCase()
@@ -784,6 +827,45 @@ export function WriteOffs() {
       return false;
     }
   });
+
+  // Apply sorting
+  if (sortField && sortOrder !== "none") {
+    filteredWriteOffs = [...filteredWriteOffs].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      if (sortField === "code") {
+        aValue = a.code;
+        bValue = b.code;
+      } else if (sortField === "date") {
+        const aDateStr = a.date ? a.date.split(" ")[0] : "";
+        const bDateStr = b.date ? b.date.split(" ")[0] : "";
+        aValue = aDateStr ? new Date(aDateStr).getTime() : 0;
+        bValue = bDateStr ? new Date(bDateStr).getTime() : 0;
+      } else if (sortField === "items") {
+        aValue = a.items;
+        bValue = b.items;
+      } else if (sortField === "totalValue") {
+        aValue = a.totalValue;
+        bValue = b.totalValue;
+      } else if (sortField === "reason") {
+        aValue = getReasonText(a.reason);
+        bValue = getReasonText(b.reason);
+      } else if (sortField === "status") {
+        aValue = a.status;
+        bValue = b.status;
+      }
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        const comparison = aValue.localeCompare(bValue, "vi");
+        return sortOrder === "asc" ? comparison : -comparison;
+      }
+
+      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
 
   const totalValue = filteredWriteOffs.reduce(
     (sum, wo) => sum + wo.totalValue,
@@ -1051,13 +1133,17 @@ export function WriteOffs() {
             >
               {/* Preset Time Ranges */}
               <div className="flex items-center space-x-2 mb-3">
-                <RadioGroupItem value="preset" id="date-preset" />
+                <RadioGroupItem
+                  value="preset"
+                  id="date-preset"
+                  className="border-slate-300"
+                />
                 <div className="flex-1">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="w-full justify-between text-left text-sm"
+                        className="w-full justify-between text-left text-sm bg-white border-slate-300"
                         onClick={() => setDateRangeType("preset")}
                       >
                         <span>
@@ -1200,15 +1286,19 @@ export function WriteOffs() {
 
               {/* Custom Date Range */}
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="custom" id="date-custom" />
+                <RadioGroupItem
+                  value="custom"
+                  id="date-custom"
+                  className="border-slate-300"
+                />
                 <div className="flex-1">
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left text-sm"
-                        onClick={() => setDateRangeType("custom")}
-                      >
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left text-sm bg-white border-slate-300"
+                      onClick={() => setDateRangeType("custom")}
+                    >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {dateFrom && dateTo
                           ? `${format(dateFrom, "dd/MM", {
@@ -1371,55 +1461,91 @@ export function WriteOffs() {
 
         {/* Search Bar */}
         <div className="mb-4">
-          <div className="relative max-w-md">
+          <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               placeholder="Tìm theo mã phiếu..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-none focus:outline-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
         </div>
 
         {/* Table */}
         <div className="bg-white rounded-lg border border-slate-200 flex-1 overflow-hidden flex flex-col">
-          <div className="overflow-x-auto flex-1">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">
-                    Mã phiếu
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">
-                    Ngày giờ
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs text-slate-600">
-                    Số mặt hàng
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs text-slate-600">
-                    Tổng giá trị
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">
-                    Lý do
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs text-slate-600">
-                    Trạng thái
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+          <div className="overflow-x-auto flex-1 rounded-xl">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-blue-50">
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("code")}
+                  >
+                    <div className="flex items-center">
+                      Mã phiếu
+                      {getSortIcon("code")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("date")}
+                  >
+                    <div className="flex items-center">
+                      Ngày giờ
+                      {getSortIcon("date")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("items")}
+                  >
+                    <div className="flex items-center justify-center">
+                      Số mặt hàng
+                      {getSortIcon("items")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm text-right cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("totalValue")}
+                  >
+                    <div className="flex items-center justify-end">
+                      Tổng giá trị
+                      {getSortIcon("totalValue")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("reason")}
+                  >
+                    <div className="flex items-center">
+                      Lý do
+                      {getSortIcon("reason")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("status")}
+                  >
+                    <div className="flex items-center justify-center">
+                      Trạng thái
+                      {getSortIcon("status")}
+                    </div>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {filteredWriteOffs.map((wo, index) => (
                   <>
-                    <tr
+                    <TableRow
                       key={wo.id}
-                      className="hover:bg-slate-50 cursor-pointer"
+                      className="hover:bg-blue-50/50 cursor-pointer"
                       onClick={() =>
                         setExpandedRow(expandedRow === wo.id ? null : wo.id)
                       }
                     >
-                      <td className="px-4 py-3 text-sm">
+                      <TableCell className="text-sm">
                         <div className="flex items-center gap-2">
                           {expandedRow === wo.id ? (
                             <ChevronDown className="w-4 h-4 text-slate-400" />
@@ -1428,20 +1554,20 @@ export function WriteOffs() {
                           )}
                           <span className="text-blue-600">{wo.code}</span>
                         </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-600">
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700">
                         {wo.date}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-600 text-center">
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700 text-center">
                         {wo.items}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-red-600 text-right">
+                      </TableCell>
+                      <TableCell className="text-sm text-red-600 text-right">
                         {wo.totalValue.toLocaleString("vi-VN")}đ
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-600">
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700">
                         {getReasonText(wo.reason)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
+                      </TableCell>
+                      <TableCell className="text-sm text-center">
                         <span
                           className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
                             wo.status === "completed"
@@ -1457,12 +1583,12 @@ export function WriteOffs() {
                             ? "Phiếu tạm"
                             : "Đã huỷ"}
                         </span>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                     {/* Expanded Row */}
                     {expandedRow === wo.id && wo.details && (
-                      <tr>
-                        <td colSpan={6} className="bg-slate-50 px-4 py-4">
+                      <TableRow>
+                        <TableCell colSpan={6} className="bg-slate-50 px-4 py-4">
                           <Tabs defaultValue="info" className="w-full">
                             <TabsList>
                               <TabsTrigger value="info">Thông tin</TabsTrigger>
@@ -1519,7 +1645,7 @@ export function WriteOffs() {
                                             [wo.id]: e.target.value,
                                           })
                                         }
-                                        className="text-sm"
+                                        className="text-sm bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                                         onClick={(e) => e.stopPropagation()}
                                       />
                                     </div>
@@ -1737,13 +1863,13 @@ export function WriteOffs() {
                               </div>
                             </TabsContent>
                           </Tabs>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     )}
                   </>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
 
           {/* Footer */}
@@ -1759,7 +1885,7 @@ export function WriteOffs() {
       <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Import phiếu xuất hủy từ Excel</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Import phiếu xuất hủy từ Excel</DialogTitle>
           </DialogHeader>
 
           <div className="py-6">
@@ -1831,7 +1957,7 @@ export function WriteOffs() {
           />
           <DialogHeader>
             <div className="flex items-center justify-between">
-              <DialogTitle>
+              <DialogTitle className="text-lg font-semibold">
                 {editingWriteOffId !== null
                   ? "Chỉnh sửa phiếu xuất hủy"
                   : "Thêm phiếu xuất hủy"}
@@ -1854,7 +1980,7 @@ export function WriteOffs() {
                 <Input
                   value={formData.code}
                   disabled
-                  className="bg-slate-100"
+                  className="bg-slate-100 border-slate-300 shadow-none"
                 />
               </div>
               <div className="space-y-2">
@@ -1865,6 +1991,7 @@ export function WriteOffs() {
                   onChange={(e) =>
                     setFormData({ ...formData, date: e.target.value })
                   }
+                  className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
               </div>
               <div className="space-y-2">
@@ -1875,7 +2002,7 @@ export function WriteOffs() {
                     setFormData({ ...formData, reason: value })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white border-slate-300 shadow-none">
                     <SelectValue placeholder="Chọn lý do" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1991,7 +2118,7 @@ export function WriteOffs() {
                                       numValue
                                     );
                                   }}
-                                  className="h-8 text-right"
+                                  className="h-8 text-right bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                                   onClick={(e) => e.stopPropagation()}
                                   min={0}
                                   max={maxQuantity}
@@ -2018,7 +2145,7 @@ export function WriteOffs() {
                                     e.target.value
                                   )
                                 }
-                                className="h-8"
+                                className="h-8 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                                 onClick={(e) => e.stopPropagation()}
                               />
                             </td>
@@ -2049,7 +2176,7 @@ export function WriteOffs() {
                   setFormData({ ...formData, note: e.target.value })
                 }
                 placeholder="Nhập ghi chú về phiếu xuất hủy..."
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+                className="w-full px-3 py-2 bg-white border-slate-300 rounded-lg text-sm shadow-none focus:outline-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 min-h-[80px]"
               />
             </div>
           </div>
@@ -2139,7 +2266,7 @@ export function WriteOffs() {
                   placeholder="Tìm kiếm hàng hóa..."
                   value={itemSearchQuery}
                   onChange={(e) => setItemSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-none focus:outline-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
               </div>
             </div>

@@ -1,5 +1,5 @@
 import { useState, Fragment } from 'react';
-import { Plus, Search, Filter, X, ChevronRight, Clock, User, CheckCircle, XCircle, AlertCircle, X as XIcon, ChevronDown, ChevronUp, Upload, Package } from 'lucide-react';
+import { Plus, Search, Filter, X, ChevronRight, Clock, User, CheckCircle, XCircle, AlertCircle, X as XIcon, ChevronDown, ChevronUp, Upload, Package, ArrowUp, ArrowDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -60,6 +60,12 @@ export function NewItemRequests() {
   const [searchTerm, setSearchTerm] = useState('');
   const [successModalOpen, setSuccessModalOpen] = useState(false);
   const [createdItemName, setCreatedItemName] = useState('');
+  
+  // Sort state
+  type SortField = "name" | "staff" | "timestamp" | "note" | "status";
+  type SortOrder = "asc" | "desc" | "none";
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("none");
 
   // Mock data
   const [requests, setRequests] = useState<NewItemRequest[]>([
@@ -173,13 +179,76 @@ export function NewItemRequests() {
     }
   };
 
-  const filteredRequests = requests.filter((req) => {
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Cycle through: asc -> desc -> none -> asc
+      if (sortOrder === "asc") {
+        setSortOrder("desc");
+      } else if (sortOrder === "desc") {
+        setSortOrder("none");
+        setSortField(null);
+      } else {
+        setSortField(field);
+        setSortOrder("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field || sortOrder === "none") {
+      return null;
+    }
+    if (sortOrder === "asc") {
+      return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
+    }
+    return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
+  };
+
+  let filteredRequests = requests.filter((req) => {
     if (statusFilter.length > 0 && !statusFilter.includes(req.status)) return false;
     if (!categoryFilter.includes('all') && req.suggestedCategory && !categoryFilter.includes(req.suggestedCategory)) return false;
     if (!staffFilter.includes('all') && !staffFilter.includes(req.staffId)) return false;
     if (searchTerm && !req.suggestedName.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
   });
+
+  // Apply sorting
+  if (sortField && sortOrder !== "none") {
+    filteredRequests = [...filteredRequests].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      if (sortField === "name") {
+        aValue = a.suggestedName;
+        bValue = b.suggestedName;
+      } else if (sortField === "staff") {
+        aValue = a.staffName;
+        bValue = b.staffName;
+      } else if (sortField === "timestamp") {
+        aValue = a.timestamp.getTime();
+        bValue = b.timestamp.getTime();
+      } else if (sortField === "note") {
+        aValue = a.note;
+        bValue = b.note;
+      } else if (sortField === "status") {
+        const statusOrder = { pending: 0, approved: 1, rejected: 2 };
+        aValue = statusOrder[a.status] ?? 0;
+        bValue = statusOrder[b.status] ?? 0;
+      }
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        const comparison = aValue.localeCompare(bValue, "vi");
+        return sortOrder === "asc" ? comparison : -comparison;
+      }
+
+      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
 
   const pendingCount = requests.filter(r => r.status === 'pending').length;
   const approvedCount = requests.filter(r => r.status === 'approved').length;
@@ -477,7 +546,7 @@ export function NewItemRequests() {
                     placeholder="Tìm theo tên món..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 h-9 bg-white border-slate-200 rounded-lg"
+                    className="pl-9 h-9 bg-white border-slate-300 shadow-none rounded-lg focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   />
                   {searchTerm && (
                     <button
@@ -491,17 +560,57 @@ export function NewItemRequests() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto rounded-xl">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-amber-50">
                       <TableHead className="w-10"></TableHead>
                       <TableHead className="w-16">STT</TableHead>
-                      <TableHead>Tên món đề xuất</TableHead>
-                      <TableHead>Nhân viên gửi</TableHead>
-                      <TableHead>Thời gian</TableHead>
-                      <TableHead>Ghi chú</TableHead>
-                      <TableHead>Trạng thái</TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-amber-100 transition-colors"
+                        onClick={() => handleSort("name")}
+                      >
+                        <div className="flex items-center">
+                          Tên món đề xuất
+                          {getSortIcon("name")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-amber-100 transition-colors"
+                        onClick={() => handleSort("staff")}
+                      >
+                        <div className="flex items-center">
+                          Nhân viên gửi
+                          {getSortIcon("staff")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-amber-100 transition-colors"
+                        onClick={() => handleSort("timestamp")}
+                      >
+                        <div className="flex items-center">
+                          Thời gian
+                          {getSortIcon("timestamp")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-amber-100 transition-colors"
+                        onClick={() => handleSort("note")}
+                      >
+                        <div className="flex items-center">
+                          Ghi chú
+                          {getSortIcon("note")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-amber-100 transition-colors"
+                        onClick={() => handleSort("status")}
+                      >
+                        <div className="flex items-center">
+                          Trạng thái
+                          {getSortIcon("status")}
+                        </div>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -529,35 +638,35 @@ export function NewItemRequests() {
                                   <ChevronDown className="w-4 h-4 text-slate-400" />
                                 )}
                               </TableCell>
-                              <TableCell className="text-center text-neutral-600">{index + 1}</TableCell>
-                              <TableCell>
+                              <TableCell className="text-sm text-center text-slate-600">{index + 1}</TableCell>
+                              <TableCell className="text-sm">
                                 <div>
-                                  <p className="text-sm text-slate-900">{request.suggestedName}</p>
+                                  <p className="text-slate-900">{request.suggestedName}</p>
                                   {request.suggestedCategory && (
                                     <p className="text-xs text-slate-500">{request.suggestedCategory}</p>
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="text-sm">
                                 <div className="flex items-center gap-2">
                                   <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
                                     <User className="w-4 h-4 text-blue-600" />
                                   </div>
-                                  <span className="text-sm">{request.staffName}</span>
+                                  <span>{request.staffName}</span>
                                 </div>
                               </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2 text-sm">
+                              <TableCell className="text-sm">
+                                <div className="flex items-center gap-2">
                                   <Clock className="w-4 h-4 text-slate-400" />
                                   <span>
                                     {request.timestamp.toLocaleDateString('vi-VN')} {request.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                                   </span>
                                 </div>
                               </TableCell>
-                              <TableCell className="max-w-xs">
-                                <p className="truncate text-sm text-slate-600">{request.note}</p>
+                              <TableCell className="text-sm max-w-xs">
+                                <p className="truncate text-slate-700">{request.note}</p>
                               </TableCell>
-                              <TableCell>{getStatusBadge(request.status)}</TableCell>
+                              <TableCell className="text-sm">{getStatusBadge(request.status)}</TableCell>
                             </TableRow>
 
                             {/* Expanded Detail Row */}
@@ -687,7 +796,7 @@ export function NewItemRequests() {
               <div>
                 <Label>Loại mặt hàng *</Label>
                 <Select value={formData.type || 'product'} onValueChange={(value) => setFormData({ ...formData, type: value })}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white border-slate-300 shadow-none">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -715,6 +824,7 @@ export function NewItemRequests() {
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                     placeholder="Nhập mã hàng hóa"
+                    className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   />
                 </div>
                 <div>
@@ -723,6 +833,7 @@ export function NewItemRequests() {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="Nhập tên hàng hóa"
+                    className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   />
                 </div>
               </div>
@@ -732,7 +843,7 @@ export function NewItemRequests() {
                 <div>
                   <Label>Danh mục *</Label>
                   <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-white border-slate-300 shadow-none">
                       <SelectValue placeholder="Chọn danh mục" />
                     </SelectTrigger>
                     <SelectContent>
@@ -752,7 +863,7 @@ export function NewItemRequests() {
                 <div>
                   <Label>Đơn vị *</Label>
                   <Select value={formData.unit} onValueChange={(value) => setFormData({ ...formData, unit: value })}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-white border-slate-300 shadow-none">
                       <SelectValue placeholder="Chọn đơn vị" />
                     </SelectTrigger>
                     <SelectContent>
@@ -811,13 +922,13 @@ export function NewItemRequests() {
                               placeholder="Số lượng"
                               value={ingredient.quantity}
                               onChange={(e) => handleIngredientChange(ingredient.id, 'quantity', Number(e.target.value))}
-                              className="h-9"
+                              className="h-9 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                             />
                             <Select
                               value={ingredient.unit}
                               onValueChange={(value) => handleIngredientChange(ingredient.id, 'unit', value)}
                             >
-                              <SelectTrigger className="h-9">
+                              <SelectTrigger className="h-9 bg-white border-slate-300 shadow-none">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -860,6 +971,7 @@ export function NewItemRequests() {
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
                     placeholder="0"
+                    className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   />
                 </div>
                 <div>
@@ -868,7 +980,7 @@ export function NewItemRequests() {
                     type="number"
                     value={totalCost}
                     disabled
-                    className="bg-slate-100"
+                    className="bg-slate-100 border-slate-300"
                   />
                 </div>
               </div>
@@ -1141,6 +1253,7 @@ export function NewItemRequests() {
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       placeholder="Nhập tên món"
+                      className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                     />
                   </div>
 
@@ -1151,13 +1264,14 @@ export function NewItemRequests() {
                       onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                       placeholder="Tự động tạo"
                       disabled
+                      className="bg-slate-100 border-slate-300"
                     />
                   </div>
 
                   <div>
                     <Label>Danh mục *</Label>
                     <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-white border-slate-300 shadow-none">
                         <SelectValue placeholder="Chọn danh mục" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1172,7 +1286,7 @@ export function NewItemRequests() {
                   <div>
                     <Label>Đơn vị tính</Label>
                     <Select value={formData.unit} onValueChange={(value) => setFormData({ ...formData, unit: value })}>
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-white border-slate-300 shadow-none">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1200,6 +1314,7 @@ export function NewItemRequests() {
                       value={formData.price}
                       onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
                       placeholder="0"
+                      className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                     />
                   </div>
 
@@ -1209,14 +1324,14 @@ export function NewItemRequests() {
                       type="number"
                       value={totalCost}
                       disabled
-                      className="bg-slate-100"
+                      className="bg-slate-100 border-slate-300"
                     />
                   </div>
 
                   <div>
                     <Label>Trạng thái mặt hàng</Label>
                     <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-white border-slate-300 shadow-none">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1263,7 +1378,7 @@ export function NewItemRequests() {
                             value={ingredient.name}
                             onValueChange={(value) => handleIngredientChange(ingredient.id, 'name', value)}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="bg-white border-slate-300 shadow-none">
                               <SelectValue placeholder="Chọn nguyên liệu" />
                             </SelectTrigger>
                             <SelectContent>
@@ -1284,7 +1399,7 @@ export function NewItemRequests() {
                             value={ingredient.unit}
                             onValueChange={(value) => handleIngredientChange(ingredient.id, 'unit', value)}
                           >
-                            <SelectTrigger className="w-24">
+                            <SelectTrigger className="w-24 bg-white border-slate-300 shadow-none">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1300,7 +1415,7 @@ export function NewItemRequests() {
                             type="number"
                             value={ingredient.quantity}
                             onChange={(e) => handleIngredientChange(ingredient.id, 'quantity', Number(e.target.value))}
-                            className="w-28"
+                            className="w-28 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                           />
                         </TableCell>
                         <TableCell>
@@ -1308,7 +1423,7 @@ export function NewItemRequests() {
                             type="number"
                             value={ingredient.cost}
                             onChange={(e) => handleIngredientChange(ingredient.id, 'cost', Number(e.target.value))}
-                            className="w-32"
+                            className="w-32 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                           />
                         </TableCell>
                         <TableCell>

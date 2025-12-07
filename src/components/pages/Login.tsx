@@ -64,6 +64,7 @@ export function Login() {
                 onChange={(e) => setUsername(e.target.value)}
                 disabled={isLoading}
                 autoComplete="username"
+                className="bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
             
@@ -78,7 +79,7 @@ export function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
                   autoComplete="current-password"
-                  className="pr-10"
+                  className="pr-10 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
                 <button
                   type="button"

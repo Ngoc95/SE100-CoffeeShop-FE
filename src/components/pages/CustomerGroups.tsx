@@ -13,6 +13,8 @@ import {
   Upload,
   Download,
   Printer,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -55,6 +57,12 @@ export function CustomerGroups() {
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
   const [customerFilterOpen, setCustomerFilterOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  
+  // Sort state
+  type SortField = "code" | "name" | "customers" | "status";
+  type SortOrder = "asc" | "desc" | "none";
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("none");
 
   // Mock available customers
   const availableCustomers: Customer[] = [
@@ -151,7 +159,35 @@ export function CustomerGroups() {
     );
   });
 
-  const filteredGroups = groups.filter((group) => {
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Cycle through: asc -> desc -> none -> asc
+      if (sortOrder === "asc") {
+        setSortOrder("desc");
+      } else if (sortOrder === "desc") {
+        setSortOrder("none");
+        setSortField(null);
+      } else {
+        setSortField(field);
+        setSortOrder("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field || sortOrder === "none") {
+      return null;
+    }
+    if (sortOrder === "asc") {
+      return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
+    }
+    return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
+  };
+
+  let filteredGroups = groups.filter((group) => {
     // Search filter
     const matchesSearch =
       group.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -166,6 +202,38 @@ export function CustomerGroups() {
 
     return matchesSearch && matchesCustomerFilter;
   });
+
+  // Apply sorting
+  if (sortField && sortOrder !== "none") {
+    filteredGroups = [...filteredGroups].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      if (sortField === "code") {
+        aValue = a.code;
+        bValue = b.code;
+      } else if (sortField === "name") {
+        aValue = a.name;
+        bValue = b.name;
+      } else if (sortField === "customers") {
+        aValue = a.customers.length;
+        bValue = b.customers.length;
+      } else if (sortField === "status") {
+        const statusOrder = { active: 0, inactive: 1 };
+        aValue = statusOrder[a.status] ?? 0;
+        bValue = statusOrder[b.status] ?? 0;
+      }
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        const comparison = aValue.localeCompare(bValue, "vi");
+        return sortOrder === "asc" ? comparison : -comparison;
+      }
+
+      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
 
   const toggleCustomerFilter = (customerId: string) => {
     setSelectedCustomers((prev) =>
@@ -291,7 +359,7 @@ export function CustomerGroups() {
                     <Button
                       variant="outline"
                       role="combobox"
-                      className="w-full justify-between mt-1 h-10"
+                      className="w-full justify-between mt-1 h-10 bg-white border-slate-300"
                     >
                       <span className="truncate">
                         {getSelectedCustomerNames()}
@@ -300,7 +368,7 @@ export function CustomerGroups() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[280px] p-0" align="start">
-                    <div className="p-2 border-b">
+                    <div className="p-2 border-b border-slate-200">
                       <div className="relative">
                         <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
                         <Input
@@ -309,7 +377,7 @@ export function CustomerGroups() {
                           onChange={(e) =>
                             setCustomerSearchQuery(e.target.value)
                           }
-                          className="pl-8 h-8 text-sm"
+                          className="pl-8 h-8 text-sm bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                         />
                       </div>
                     </div>
@@ -330,6 +398,7 @@ export function CustomerGroups() {
                               onCheckedChange={() =>
                                 toggleCustomerFilter(customer.id)
                               }
+                              className="border-slate-300"
                             />
                             <label className="text-sm flex-1 cursor-pointer font-normal">
                               <div className="flex flex-col">
@@ -473,7 +542,7 @@ export function CustomerGroups() {
               placeholder="Tìm kiếm theo mã nhm, tên nhóm..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
         </div>
@@ -486,17 +555,50 @@ export function CustomerGroups() {
                 Danh sách nhóm khách hàng ({filteredGroups.length})
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mã nhóm KH</TableHead>
-                    <TableHead>Tên nhóm KH</TableHead>
-                    <TableHead>Số khách hàng</TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                    <TableHead className="text-right">Thao tác</TableHead>
-                  </TableRow>
-                </TableHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto rounded-xl">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-blue-50">
+                      <TableHead
+                        className="cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("code")}
+                      >
+                        <div className="flex items-center">
+                          Mã nhóm KH
+                          {getSortIcon("code")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("name")}
+                      >
+                        <div className="flex items-center">
+                          Tên nhóm KH
+                          {getSortIcon("name")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("customers")}
+                      >
+                        <div className="flex items-center">
+                          Số khách hàng
+                          {getSortIcon("customers")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("status")}
+                      >
+                        <div className="flex items-center">
+                          Trạng thái
+                          {getSortIcon("status")}
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-right">Thao tác</TableHead>
+                    </TableRow>
+                  </TableHeader>
                 <TableBody>
                   {filteredGroups.length === 0 ? (
                     <TableRow>
@@ -510,16 +612,16 @@ export function CustomerGroups() {
                   ) : (
                     filteredGroups.map((group) => (
                       <TableRow key={group.id}>
-                        <TableCell className="text-slate-900">
+                        <TableCell className="text-sm text-slate-900">
                           {group.code}
                         </TableCell>
-                        <TableCell className="text-slate-900">
+                        <TableCell className="text-sm text-slate-900">
                           {group.name}
                         </TableCell>
-                        <TableCell className="text-slate-600">
+                        <TableCell className="text-sm text-slate-700">
                           {group.customers.length}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-sm">
                           <Badge
                             variant={
                               group.status === "active"
@@ -537,7 +639,7 @@ export function CustomerGroups() {
                               : "Không hoạt động"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-sm text-right">
                           <div className="flex items-center justify-end gap-2">
                             <Button
                               variant="ghost"
@@ -583,6 +685,7 @@ export function CustomerGroups() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </div>

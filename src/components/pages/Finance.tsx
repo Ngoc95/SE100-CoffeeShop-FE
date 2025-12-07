@@ -7,7 +7,9 @@ import {
   X,
   ChevronDown,
   Edit2,
-  Trash2
+  Trash2,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -37,6 +39,14 @@ import {
   PopoverTrigger,
 } from '../ui/popover';
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../ui/table';
+import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -56,6 +66,12 @@ export function Finance() {
   const [searchNote, setSearchNote] = useState('');
   const [statusCompleted, setStatusCompleted] = useState(true);
   const [statusCancelled, setStatusCancelled] = useState(false);
+  
+  // Sort states
+  type SortField = "id" | "time" | "category" | "person" | "amount" | null;
+  type SortOrder = "asc" | "desc" | "none";
+  const [sortField, setSortField] = useState<SortField>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("none");
   
   // Time filter states (similar to Reports)
   const [dateRangeType, setDateRangeType] = useState<'preset' | 'custom'>('preset');
@@ -223,8 +239,36 @@ export function Finance() {
     { id: 'THD000045', time: '01/12/2025 08:00', type: 'thu', category: 'Tiền khách trả', person: 'Phạm Thu Hương', amount: 45000, status: 'completed', note: '', method: 'cash' },
   ];
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Cycle through: asc -> desc -> none -> asc
+      if (sortOrder === "asc") {
+        setSortOrder("desc");
+      } else if (sortOrder === "desc") {
+        setSortOrder("none");
+        setSortField(null);
+      } else {
+        setSortField(field);
+        setSortOrder("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field || sortOrder === "none") {
+      return null;
+    }
+    if (sortOrder === "asc") {
+      return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
+    }
+    return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
+  };
+
   // Filtering logic
-  const filteredTransactions = allTransactions.filter(transaction => {
+  let filteredTransactions = allTransactions.filter(transaction => {
     // Filter by tab
     if (activeTab === 'cash' && transaction.method !== 'cash') return false;
     if (activeTab === 'bank' && transaction.method !== 'bank') return false;
@@ -252,6 +296,40 @@ export function Finance() {
 
     return true;
   });
+
+  // Apply sorting
+  if (sortField && sortOrder !== "none") {
+    filteredTransactions = [...filteredTransactions].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      if (sortField === "id") {
+        aValue = a.id;
+        bValue = b.id;
+      } else if (sortField === "time") {
+        aValue = new Date(a.time.split(' ').reverse().join('-').replace(/\//g, '-')).getTime();
+        bValue = new Date(b.time.split(' ').reverse().join('-').replace(/\//g, '-')).getTime();
+      } else if (sortField === "category") {
+        aValue = a.category;
+        bValue = b.category;
+      } else if (sortField === "person") {
+        aValue = a.person;
+        bValue = b.person;
+      } else if (sortField === "amount") {
+        aValue = a.amount;
+        bValue = b.amount;
+      }
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        const comparison = aValue.localeCompare(bValue, "vi");
+        return sortOrder === "asc" ? comparison : -comparison;
+      }
+
+      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
 
   const toggleCreator = (creatorId: string) => {
     setSelectedCreators(prev => 
@@ -452,13 +530,13 @@ export function Finance() {
                 placeholder="Theo mã phiếu"
                 value={searchCode}
                 onChange={(e) => setSearchCode(e.target.value)}
-                className="h-9"
+                className="h-9 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
               <Input
                 placeholder="Ghi chú"
                 value={searchNote}
                 onChange={(e) => setSearchNote(e.target.value)}
-                className="h-9"
+                className="h-9 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
           </div>
@@ -500,13 +578,13 @@ export function Finance() {
             <RadioGroup value={dateRangeType} onValueChange={(value) => setDateRangeType(value as 'preset' | 'custom')}>
               {/* Preset Time Ranges */}
               <div className="flex items-center space-x-2 mb-3">
-                <RadioGroupItem value="preset" id="date-preset" />
+                <RadioGroupItem value="preset" id="date-preset" className="border-slate-300" />
                 <div className="flex-1">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="w-full justify-between text-left text-sm"
+                        className="w-full justify-between text-left text-sm bg-white border-slate-300"
                         onClick={() => setDateRangeType('preset')}
                       >
                         <span>
@@ -627,13 +705,13 @@ export function Finance() {
 
               {/* Custom Date Range */}
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="custom" id="date-custom" />
+                <RadioGroupItem value="custom" id="date-custom" className="border-slate-300" />
                 <div className="flex-1">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="w-full justify-start text-left text-sm"
+                        className="w-full justify-start text-left text-sm bg-white border-slate-300"
                         onClick={() => setDateRangeType('custom')}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
@@ -755,13 +833,13 @@ export function Finance() {
                 placeholder="Tên người nộp/nhận"
                 value={personName}
                 onChange={(e) => setPersonName(e.target.value)}
-                className="h-9"
+                className="h-9 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
               <Input
                 placeholder="Điện thoại"
                 value={personPhone}
                 onChange={(e) => setPersonPhone(e.target.value)}
-                className="h-9"
+                className="h-9 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
           </div>
@@ -936,43 +1014,83 @@ export function Finance() {
           {/* Transactions Table */}
           <Card>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-blue-50 border-b border-slate-200">
-                    <tr>
-                      <th className="text-left px-4 py-3 text-sm text-slate-700">Mã phiếu</th>
-                      <th className="text-left px-4 py-3 text-sm text-slate-700">Thời gian</th>
-                      <th className="text-left px-4 py-3 text-sm text-slate-700">Loại thu chi</th>
-                      <th className="text-left px-4 py-3 text-sm text-slate-700">Người nộp/nhận</th>
-                      <th className="text-right px-4 py-3 text-sm text-slate-700">Giá trị</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <div className="overflow-x-auto rounded-xl">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-blue-50">
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("id")}
+                      >
+                        <div className="flex items-center">
+                          Mã phiếu
+                          {getSortIcon("id")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("time")}
+                      >
+                        <div className="flex items-center">
+                          Thời gian
+                          {getSortIcon("time")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("category")}
+                      >
+                        <div className="flex items-center">
+                          Loại thu chi
+                          {getSortIcon("category")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("person")}
+                      >
+                        <div className="flex items-center">
+                          Người nộp/nhận
+                          {getSortIcon("person")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="text-sm text-right cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("amount")}
+                      >
+                        <div className="flex items-center justify-end">
+                          Giá trị
+                          {getSortIcon("amount")}
+                        </div>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {filteredTransactions.length > 0 ? (
                       filteredTransactions.map((transaction) => (
-                        <tr key={transaction.id} className="border-b border-slate-100 hover:bg-slate-50">
-                          <td className="px-4 py-3 text-sm text-blue-600">{transaction.id}</td>
-                          <td className="px-4 py-3 text-sm text-slate-700">{transaction.time}</td>
-                          <td className="px-4 py-3 text-sm text-slate-700">
+                        <TableRow key={transaction.id} className="hover:bg-blue-50/50">
+                          <TableCell className="text-sm text-blue-600">{transaction.id}</TableCell>
+                          <TableCell className="text-sm text-slate-700">{transaction.time}</TableCell>
+                          <TableCell className="text-sm text-slate-700">
                             {transaction.type === 'thu' ? 'Thu' : 'Chi'} {transaction.category}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-700">{transaction.person}</td>
-                          <td className="px-4 py-3 text-right text-sm">
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-700">{transaction.person}</TableCell>
+                          <TableCell className="text-sm text-right">
                             <span className={transaction.amount > 0 ? 'text-emerald-600' : 'text-red-600'}>
                               {transaction.amount.toLocaleString('vi-VN')}
                             </span>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ))
                     ) : (
-                      <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-sm text-slate-500 py-8">
                           Không tìm thấy giao dịch phù hợp
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     )}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
               
               {/* Pagination */}
@@ -1038,7 +1156,7 @@ export function Finance() {
                 <Label htmlFor="receipt-category">Loại thu</Label>
                 <div className="flex gap-2">
                   <Select value={receiptCategory} onValueChange={setReceiptCategory}>
-                    <SelectTrigger className="flex-1">
+                    <SelectTrigger className="flex-1 bg-white border border-slate-300 shadow-none">
                       <SelectValue placeholder="Tìm loại thu" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1081,7 +1199,7 @@ export function Finance() {
                     value={receiptAmount}
                     onChange={(e) => setReceiptAmount(e.target.value)}
                     placeholder="0"
-                    className="pr-8"
+                    className="pr-8 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">₫</span>
                 </div>
@@ -1094,7 +1212,7 @@ export function Finance() {
                   value={receiptNote}
                   onChange={(e) => setReceiptNote(e.target.value)}
                   placeholder="Nhập ghi chú"
-                  className="h-9"
+                  className="h-9 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
               </div>
             </div>
@@ -1104,7 +1222,7 @@ export function Finance() {
               <div className="space-y-2">
                 <Label htmlFor="receipt-person-group">Nhóm người nộp</Label>
                 <Select value={receiptPersonGroup} onValueChange={setReceiptPersonGroup}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white border border-slate-300 shadow-none">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1128,7 +1246,7 @@ export function Finance() {
                           value={receiptPersonName}
                           onChange={(e) => setReceiptPersonName(e.target.value)}
                           placeholder="Tìm kiếm"
-                          className="pl-9"
+                          className="pl-9 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                         />
                       </div>
                       {(receiptPersonGroup === 'other' || !receiptPersonGroup) && (
@@ -1185,7 +1303,7 @@ export function Finance() {
                   <div className="space-y-2">
                     <Label htmlFor="receipt-payment-method">Phương thức</Label>
                     <Select value={receiptPaymentMethod} onValueChange={setReceiptPaymentMethod}>
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-white border border-slate-300 shadow-none">
                         <SelectValue placeholder="--Chọn phương thức--" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1202,7 +1320,7 @@ export function Finance() {
                     <Label htmlFor="receipt-bank-account">Tài khoản nhận</Label>
                     <div className="flex gap-2">
                       <Select value={receiptBankAccount} onValueChange={setReceiptBankAccount}>
-                        <SelectTrigger className="flex-1">
+                        <SelectTrigger className="flex-1 bg-white border border-slate-300 shadow-none">
                           <SelectValue placeholder="--Chọn tài khoản nhận--" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1255,7 +1373,7 @@ export function Finance() {
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
         <DialogContent className="sm:max-w-[900px]">
           <DialogHeader>
-            <DialogTitle>Lập phiếu chi ({activeTab === 'bank' ? 'ngân hàng' : 'tiền mặt'})</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Lập phiếu chi ({activeTab === 'bank' ? 'ngân hàng' : 'tiền mặt'})</DialogTitle>
             <button
               onClick={() => setPaymentDialogOpen(false)}
               className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-white transition-opacity hover:opacity-100"
@@ -1275,7 +1393,7 @@ export function Finance() {
                   value={paymentCode}
                   disabled
                   placeholder="Mã phiếu tự động"
-                  className="bg-slate-50"
+                  className="bg-slate-50 border-slate-300 shadow-none"
                 />
               </div>
 
@@ -1283,7 +1401,7 @@ export function Finance() {
                 <Label htmlFor="payment-date">Thời gian</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left">
+                    <Button variant="outline" className="w-full justify-start text-left bg-white border-slate-300">
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {paymentDate ? format(paymentDate, 'dd/MM/yyyy', { locale: vi }) : 'Chọn ngày'}
                     </Button>
@@ -1303,7 +1421,7 @@ export function Finance() {
                 <Label htmlFor="payment-category">Loại chi</Label>
                 <div className="flex gap-2">
                   <Select value={paymentCategory} onValueChange={setPaymentCategory}>
-                    <SelectTrigger className="flex-1">
+                    <SelectTrigger className="flex-1 bg-white border-slate-300 shadow-none">
                       <SelectValue placeholder="Tìm loại chi" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1340,14 +1458,14 @@ export function Finance() {
               <div className="space-y-2">
                 <Label htmlFor="payment-amount">Giá trị</Label>
                 <div className="relative">
-                  <Input
-                    id="payment-amount"
-                    type="number"
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    placeholder="0"
-                    className="pr-8"
-                  />
+                    <Input
+                      id="payment-amount"
+                      type="number"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      placeholder="0"
+                      className="pr-8 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                    />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">₫</span>
                 </div>
               </div>
@@ -1359,7 +1477,7 @@ export function Finance() {
                   value={paymentNote}
                   onChange={(e) => setPaymentNote(e.target.value)}
                   placeholder="Nhập ghi chú"
-                  className="h-9"
+                  className="h-9 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
               </div>
             </div>
@@ -1369,7 +1487,7 @@ export function Finance() {
               <div className="space-y-2">
                 <Label htmlFor="payment-person-group">Nhóm người nhận</Label>
                 <Select value={paymentPersonGroup} onValueChange={setPaymentPersonGroup}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white border-slate-300 shadow-none">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1393,7 +1511,7 @@ export function Finance() {
                           value={paymentPersonName}
                           onChange={(e) => setPaymentPersonName(e.target.value)}
                           placeholder="Tìm kiếm"
-                          className="pl-9"
+                          className="pl-9 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                         />
                       </div>
                       {(paymentPersonGroup === 'other' || !paymentPersonGroup) && (
@@ -1450,7 +1568,7 @@ export function Finance() {
                   <div className="space-y-2">
                     <Label htmlFor="payment-payment-method">Phương thức</Label>
                     <Select value={paymentPaymentMethod} onValueChange={setPaymentPaymentMethod}>
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-white border-slate-300 shadow-none">
                         <SelectValue placeholder="--Chọn phương thức--" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1467,7 +1585,7 @@ export function Finance() {
                     <Label htmlFor="payment-bank-account">Tài khoản gửi</Label>
                     <div className="flex gap-2">
                       <Select value={paymentBankAccount} onValueChange={setPaymentBankAccount}>
-                        <SelectTrigger className="flex-1">
+                        <SelectTrigger className="flex-1 bg-white border-slate-300 shadow-none">
                           <SelectValue placeholder="--Chọn tài khoản gửi--" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1520,7 +1638,7 @@ export function Finance() {
       <Dialog open={addPersonDialogOpen} onOpenChange={setAddPersonDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Thêm người nộp/nhận</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Thêm người nộp/nhận</DialogTitle>
             <DialogDescription>
               Thêm thông tin người nộp/nhận tiền mới
             </DialogDescription>
@@ -1535,6 +1653,7 @@ export function Finance() {
                 value={newPersonName}
                 onChange={(e) => setNewPersonName(e.target.value)}
                 placeholder="Nhập tên"
+                className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
             <div className="space-y-2">
@@ -1546,6 +1665,7 @@ export function Finance() {
                 value={newPersonPhone}
                 onChange={(e) => setNewPersonPhone(e.target.value)}
                 placeholder="Nhập số điện thoại"
+                className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
             <div className="space-y-2">
@@ -1555,6 +1675,7 @@ export function Finance() {
                 value={newPersonAddress}
                 onChange={(e) => setNewPersonAddress(e.target.value)}
                 placeholder="Nhập địa chỉ"
+                className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
             <div className="space-y-2">
@@ -1564,6 +1685,7 @@ export function Finance() {
                 value={newPersonNote}
                 onChange={(e) => setNewPersonNote(e.target.value)}
                 placeholder="Nhập ghi chú"
+                className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
           </div>
@@ -1585,7 +1707,7 @@ export function Finance() {
       <Dialog open={addReceiptCategoryDialogOpen} onOpenChange={setAddReceiptCategoryDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Thêm loại thu</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Thêm loại thu</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -1595,6 +1717,7 @@ export function Finance() {
                 value={categoryName}
                 onChange={(e) => setCategoryName(e.target.value)}
                 placeholder="Nhập tên loại thu"
+                className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
             <div className="space-y-2">
@@ -1604,6 +1727,7 @@ export function Finance() {
                 value={categoryDescription}
                 onChange={(e) => setCategoryDescription(e.target.value)}
                 placeholder="Nhập mô tả"
+                className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
           </div>
@@ -1628,7 +1752,7 @@ export function Finance() {
       <Dialog open={addPaymentCategoryDialogOpen} onOpenChange={setAddPaymentCategoryDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Thêm loại chi</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Thêm loại chi</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -1638,6 +1762,7 @@ export function Finance() {
                 value={categoryName}
                 onChange={(e) => setCategoryName(e.target.value)}
                 placeholder="Nhập tên loại chi"
+                className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
             <div className="space-y-2">
@@ -1647,6 +1772,7 @@ export function Finance() {
                 value={categoryDescription}
                 onChange={(e) => setCategoryDescription(e.target.value)}
                 placeholder="Nhập mô tả"
+                className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
           </div>
@@ -1671,7 +1797,7 @@ export function Finance() {
       <Dialog open={editCategoryDialogOpen} onOpenChange={setEditCategoryDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Sửa loại {editingCategoryType === 'receipt' ? 'thu' : 'chi'}</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Sửa loại {editingCategoryType === 'receipt' ? 'thu' : 'chi'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -1681,6 +1807,7 @@ export function Finance() {
                 value={categoryName}
                 onChange={(e) => setCategoryName(e.target.value)}
                 placeholder={editingCategoryType === 'receipt' ? 'Nhập tên loại thu' : 'Nhập tên loại chi'}
+                className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
             <div className="space-y-2">
@@ -1690,6 +1817,7 @@ export function Finance() {
                 value={categoryDescription}
                 onChange={(e) => setCategoryDescription(e.target.value)}
                 placeholder="Nhập mô tả"
+                className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
           </div>
@@ -1720,7 +1848,7 @@ export function Finance() {
       <Dialog open={addBankAccountDialogOpen} onOpenChange={setAddBankAccountDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Thêm tài khoản ngân hàng</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Thêm tài khoản ngân hàng</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -1732,6 +1860,7 @@ export function Finance() {
                 value={bankAccountName}
                 onChange={(e) => setBankAccountName(e.target.value)}
                 placeholder="Nhập tên tài khoản"
+                className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
             <div className="space-y-2">
@@ -1743,6 +1872,7 @@ export function Finance() {
                 value={bankAccountNumber}
                 onChange={(e) => setBankAccountNumber(e.target.value)}
                 placeholder="Nhập số tài khoản"
+                className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
             <div className="space-y-2">
@@ -1754,7 +1884,7 @@ export function Finance() {
                   <Button
                     variant="outline"
                     role="combobox"
-                    className="w-full justify-between"
+                    className="w-full justify-between bg-white border-slate-300"
                   >
                     {bankAccountBank
                       ? vietnameseBanks.find((bank) => bank.id === bankAccountBank)?.name
@@ -1795,6 +1925,7 @@ export function Finance() {
                 value={bankAccountOwner}
                 onChange={(e) => setBankAccountOwner(e.target.value)}
                 placeholder="Nhập tên chủ tài khoản"
+                className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
             <div className="space-y-2">
@@ -1804,6 +1935,7 @@ export function Finance() {
                 value={bankAccountNote}
                 onChange={(e) => setBankAccountNote(e.target.value)}
                 placeholder="Nhập ghi chú"
+                className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
           </div>

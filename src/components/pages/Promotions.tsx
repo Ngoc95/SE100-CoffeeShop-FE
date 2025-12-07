@@ -12,6 +12,8 @@ import {
   Upload,
   Download,
   Printer,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -99,6 +101,12 @@ export function Promotions() {
   const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(
     null
   );
+  
+  // Sort state
+  type SortField = "code" | "name" | "type" | "minOrderValue" | "promotionValue" | "maxDiscountValue" | "startDate" | "endDate" | "status";
+  type SortOrder = "asc" | "desc" | "none";
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("none");
 
   const [promotions, setPromotions] = useState<Promotion[]>([
     {
@@ -158,7 +166,35 @@ export function Promotions() {
     },
   ]);
 
-  const filteredPromotions = promotions.filter((promo) => {
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Cycle through: asc -> desc -> none -> asc
+      if (sortOrder === "asc") {
+        setSortOrder("desc");
+      } else if (sortOrder === "desc") {
+        setSortOrder("none");
+        setSortField(null);
+      } else {
+        setSortField(field);
+        setSortOrder("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field || sortOrder === "none") {
+      return null;
+    }
+    if (sortOrder === "asc") {
+      return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
+    }
+    return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
+  };
+
+  let filteredPromotions = promotions.filter((promo) => {
     const matchesSearch =
       promo.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       promo.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -167,6 +203,60 @@ export function Promotions() {
       selectedStatus === "all" || promo.status === selectedStatus;
     return matchesSearch && matchesType && matchesStatus;
   });
+
+  // Apply sorting
+  if (sortField && sortOrder !== "none") {
+    filteredPromotions = [...filteredPromotions].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      if (sortField === "code") {
+        aValue = a.code;
+        bValue = b.code;
+      } else if (sortField === "name") {
+        aValue = a.name;
+        bValue = b.name;
+      } else if (sortField === "type") {
+        // Sort by type enum value directly for consistency
+        const typeOrder = { "percentage": 0, "amount": 1, "fixed-price": 2, "free-item": 3 };
+        aValue = typeOrder[a.type] ?? 999;
+        bValue = typeOrder[b.type] ?? 999;
+      } else if (sortField === "minOrderValue") {
+        aValue = a.minOrderValue;
+        bValue = b.minOrderValue;
+      } else if (sortField === "promotionValue") {
+        aValue = a.promotionValue || 0;
+        bValue = b.promotionValue || 0;
+      } else if (sortField === "maxDiscountValue") {
+        aValue = a.maxDiscountValue || 0;
+        bValue = b.maxDiscountValue || 0;
+      } else if (sortField === "startDate") {
+        // Parse date string DD/MM/YYYY
+        const aParts = a.startDate.split("/");
+        const bParts = b.startDate.split("/");
+        aValue = new Date(parseInt(aParts[2]), parseInt(aParts[1]) - 1, parseInt(aParts[0])).getTime();
+        bValue = new Date(parseInt(bParts[2]), parseInt(bParts[1]) - 1, parseInt(bParts[0])).getTime();
+      } else if (sortField === "endDate") {
+        const aParts = a.endDate.split("/");
+        const bParts = b.endDate.split("/");
+        aValue = new Date(parseInt(aParts[2]), parseInt(aParts[1]) - 1, parseInt(aParts[0])).getTime();
+        bValue = new Date(parseInt(bParts[2]), parseInt(bParts[1]) - 1, parseInt(bParts[0])).getTime();
+      } else if (sortField === "status") {
+        const statusOrder = { active: 0, inactive: 1 };
+        aValue = statusOrder[a.status] ?? 0;
+        bValue = statusOrder[b.status] ?? 0;
+      }
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        const comparison = aValue.localeCompare(bValue, "vi");
+        return sortOrder === "asc" ? comparison : -comparison;
+      }
+
+      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
 
   const handleAddPromotion = (formData: Omit<Promotion, "id" | "code">) => {
     const newPromotion: Promotion = {
@@ -286,7 +376,7 @@ export function Promotions() {
                   Loại khuyến mại
                 </Label>
                 <Select value={selectedType} onValueChange={setSelectedType}>
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="mt-1 bg-white border-slate-300 shadow-none">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -305,7 +395,7 @@ export function Promotions() {
                   value={selectedStatus}
                   onValueChange={setSelectedStatus}
                 >
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="mt-1 bg-white border-slate-300 shadow-none">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -406,7 +496,7 @@ export function Promotions() {
               placeholder="Tìm kiếm theo mã, tên khuyến mại..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
         </div>
@@ -419,24 +509,97 @@ export function Promotions() {
                 Danh sách khuyến mại ({filteredPromotions.length})
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mã KM</TableHead>
-                    <TableHead>Tên KM</TableHead>
-                    <TableHead>Loại KM</TableHead>
-                    <TableHead>Giá trị HĐ tối thiểu</TableHead>
-                    <TableHead>Giá trị KM</TableHead>
-                    <TableHead>Giá trị giảm tối đa</TableHead>
-                    <TableHead>Ngày bắt đầu</TableHead>
-                    <TableHead>Giờ bắt đầu</TableHead>
-                    <TableHead>Ngày kết thúc</TableHead>
-                    <TableHead>Giờ kết thúc</TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                    <TableHead className="text-right">Thao tác</TableHead>
-                  </TableRow>
-                </TableHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto rounded-xl">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-blue-50">
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("code")}
+                      >
+                        <div className="flex items-center">
+                          Mã KM
+                          {getSortIcon("code")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("name")}
+                      >
+                        <div className="flex items-center">
+                          Tên KM
+                          {getSortIcon("name")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("type")}
+                      >
+                        <div className="flex items-center">
+                          Loại KM
+                          {getSortIcon("type")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("minOrderValue")}
+                      >
+                        <div className="flex items-center">
+                          Giá trị HĐ tối thiểu
+                          {getSortIcon("minOrderValue")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("promotionValue")}
+                      >
+                        <div className="flex items-center">
+                          Giá trị KM
+                          {getSortIcon("promotionValue")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("maxDiscountValue")}
+                      >
+                        <div className="flex items-center">
+                          Giá trị giảm tối đa
+                          {getSortIcon("maxDiscountValue")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("startDate")}
+                      >
+                        <div className="flex items-center">
+                          Ngày bắt đầu
+                          {getSortIcon("startDate")}
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-sm">Giờ bắt đầu</TableHead>
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("endDate")}
+                      >
+                        <div className="flex items-center">
+                          Ngày kết thúc
+                          {getSortIcon("endDate")}
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-sm">Giờ kết thúc</TableHead>
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("status")}
+                      >
+                        <div className="flex items-center">
+                          Trạng thái
+                          {getSortIcon("status")}
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-sm text-right">Thao tác</TableHead>
+                    </TableRow>
+                  </TableHeader>
                 <TableBody>
                   {filteredPromotions.length === 0 ? (
                     <TableRow>
@@ -450,39 +613,39 @@ export function Promotions() {
                   ) : (
                     filteredPromotions.map((promo) => (
                       <TableRow key={promo.id}>
-                        <TableCell className="text-slate-900">
+                        <TableCell className="text-sm text-slate-900">
                           {promo.code}
                         </TableCell>
-                        <TableCell className="text-slate-900">
+                        <TableCell className="text-sm text-slate-900">
                           {promo.name}
                         </TableCell>
-                        <TableCell className="text-slate-600">
+                        <TableCell className="text-sm text-slate-700">
                           {getPromotionTypeLabel(promo.type)}
                         </TableCell>
-                        <TableCell className="text-slate-600">
+                        <TableCell className="text-sm text-slate-700">
                           {formatCurrency(promo.minOrderValue)}
                         </TableCell>
-                        <TableCell className="text-slate-600">
+                        <TableCell className="text-sm text-slate-700">
                           {formatPromotionValue(promo)}
                         </TableCell>
-                        <TableCell className="text-slate-600">
+                        <TableCell className="text-sm text-slate-700">
                           {promo.maxDiscountValue
                             ? formatCurrency(promo.maxDiscountValue)
                             : "-"}
                         </TableCell>
-                        <TableCell className="text-slate-600">
+                        <TableCell className="text-sm text-slate-700">
                           {promo.startDate}
                         </TableCell>
-                        <TableCell className="text-slate-600">
+                        <TableCell className="text-sm text-slate-700">
                           {promo.startTime}
                         </TableCell>
-                        <TableCell className="text-slate-600">
+                        <TableCell className="text-sm text-slate-700">
                           {promo.endDate}
                         </TableCell>
-                        <TableCell className="text-slate-600">
+                        <TableCell className="text-sm text-slate-700">
                           {promo.endTime}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-sm">
                           <Badge
                             variant={
                               promo.status === "active"
@@ -500,7 +663,7 @@ export function Promotions() {
                               : "Không hoạt động"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-sm text-right">
                           <div className="flex items-center justify-end gap-2">
                             <Button
                               variant="ghost"
@@ -546,6 +709,7 @@ export function Promotions() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </div>

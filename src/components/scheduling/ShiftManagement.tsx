@@ -8,6 +8,8 @@ import {
   Clock,
   PowerOff,
   Power,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import {
@@ -73,6 +75,12 @@ interface ShiftManagementProps {
 export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
+  
+  // Sort state
+  type SortField = "name" | "startTime" | "endTime" | "duration" | "status";
+  type SortOrder = "asc" | "desc" | "none";
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("none");
 
   // Form state
   const [formData, setFormData] = useState<Partial<Shift>>({
@@ -142,13 +150,24 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
     let hours = endHour - startHour;
     let mins = endMin - startMin;
 
-    if (hours < 0) hours += 24; // Handle overnight shifts
-    if (mins < 0) {
-      hours -= 1;
-      mins += 60;
-    }
+    const isOvernight = startHour > endHour || (startHour === endHour && startMin > endMin);
 
-    return `${hours}`;
+    if (isOvernight) {
+      // Handle overnight shifts
+      hours = (24 - startHour) + endHour;
+      mins = endMin - startMin;
+      if (mins < 0) {
+        hours -= 1;
+        mins += 60;
+      }
+      return { hours, minutes: mins, isOvernight: true };
+    } else {
+      if (mins < 0) {
+        hours -= 1;
+        mins += 60;
+      }
+      return { hours, minutes: mins, isOvernight: false };
+    }
   };
 
   const formatTime = (time: string) => {
@@ -203,6 +222,77 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
     );
   };
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Cycle through: asc -> desc -> none -> asc
+      if (sortOrder === "asc") {
+        setSortOrder("desc");
+      } else if (sortOrder === "desc") {
+        setSortOrder("none");
+        setSortField(null);
+      } else {
+        setSortField(field);
+        setSortOrder("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field || sortOrder === "none") {
+      return null;
+    }
+    if (sortOrder === "asc") {
+      return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
+    }
+    return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
+  };
+
+  let sortedShifts = [...shifts];
+  
+  // Apply sorting
+  if (sortField && sortOrder !== "none") {
+    sortedShifts = sortedShifts.sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      if (sortField === "name") {
+        aValue = a.name;
+        bValue = b.name;
+      } else if (sortField === "startTime") {
+        const [aHour, aMin] = a.startTime.split(":").map(Number);
+        const [bHour, bMin] = b.startTime.split(":").map(Number);
+        aValue = aHour * 60 + aMin;
+        bValue = bHour * 60 + bMin;
+      } else if (sortField === "endTime") {
+        const [aHour, aMin] = a.endTime.split(":").map(Number);
+        const [bHour, bMin] = b.endTime.split(":").map(Number);
+        aValue = aHour * 60 + aMin;
+        bValue = bHour * 60 + bMin;
+      } else if (sortField === "duration") {
+        const aDuration = calculateShiftDuration(a.startTime, a.endTime);
+        const bDuration = calculateShiftDuration(b.startTime, b.endTime);
+        aValue = aDuration.hours * 60 + aDuration.minutes;
+        bValue = bDuration.hours * 60 + bDuration.minutes;
+      } else if (sortField === "status") {
+        // Sort by active status: true (active) = 0, false (inactive) = 1
+        aValue = a.active === false ? 1 : 0;
+        bValue = b.active === false ? 1 : 0;
+      }
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        const comparison = aValue.localeCompare(bValue, "vi");
+        return sortOrder === "asc" ? comparison : -comparison;
+      }
+
+      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -223,44 +313,75 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
         </Button>
       </div>
 
-      <div className="border rounded-lg overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-slate-50">
-              <TableHead className="w-16">STT</TableHead>
-              <TableHead>
-                <div className="flex items-center gap-2">
-                  Ca làm việc
-                  <ArrowUpDown className="w-4 h-4 text-slate-400" />
-                </div>
-              </TableHead>
-              <TableHead>Thời gian</TableHead>
-              <TableHead>Tổng thời gian làm việc</TableHead>
-              <TableHead>Trạng thái</TableHead>
-              <TableHead>Thao tác</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {shifts.map((shift, index) => (
+      <div className="border rounded-xl overflow-hidden">
+        <div className="overflow-x-auto rounded-xl">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-blue-50">
+                <TableHead className="w-16 text-sm">STT</TableHead>
+                <TableHead
+                  className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("name")}
+                >
+                  <div className="flex items-center">
+                    Ca làm việc
+                    {getSortIcon("name")}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("startTime")}
+                >
+                  <div className="flex items-center">
+                    Thời gian
+                    {getSortIcon("startTime")}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("duration")}
+                >
+                  <div className="flex items-center">
+                    Tổng thời gian làm việc
+                    {getSortIcon("duration")}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("status")}
+                >
+                  <div className="flex items-center">
+                    Trạng thái
+                    {getSortIcon("status")}
+                  </div>
+                </TableHead>
+                <TableHead className="text-sm">Thao tác</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedShifts.map((shift, index) => (
               <TableRow key={shift.id}>
-                <TableCell className="font-medium text-blue-600">
+                <TableCell className="text-sm font-medium text-blue-600">
                   {index + 1}
                 </TableCell>
-                <TableCell className="font-medium">{shift.name}</TableCell>
-                <TableCell>
+                <TableCell className="text-sm text-slate-900">{shift.name}</TableCell>
+                <TableCell className="text-sm text-slate-700">
                   {formatTime(shift.startTime)} - {formatTime(shift.endTime)}
                 </TableCell>
-                <TableCell>
-                  {calculateShiftDuration(shift.startTime, shift.endTime)}h
+                <TableCell className="text-sm text-slate-700">
+                  {(() => {
+                    const duration = calculateShiftDuration(shift.startTime, shift.endTime);
+                    return `${duration.hours}h${duration.minutes}p`;
+                  })()}
                 </TableCell>
-                <TableCell>
+                <TableCell className="text-sm">
                   {shift.active !== false ? (
                     <Badge className="bg-emerald-500">Hoạt động</Badge>
                   ) : (
                     <Badge variant="secondary">Ngừng hoạt động</Badge>
                   )}
                 </TableCell>
-                <TableCell>
+                <TableCell className="text-sm">
                   <div className="flex items-center gap-2">
                     <Button
                       variant="ghost"
@@ -305,13 +426,14 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
             ))}
           </TableBody>
         </Table>
+        </div>
       </div>
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-lg font-semibold">
               {editingShift ? "Cập nhật ca làm việc" : "Thêm ca làm việc mới"}
             </DialogTitle>
           </DialogHeader>
@@ -327,6 +449,7 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
+                className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
 
@@ -334,7 +457,7 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Label>Giờ làm việc</Label>
-                <Info className="w-4 h-4 text-slate-400" />
+             
               </div>
               <div className="flex items-center gap-3">
                 <Select
@@ -357,7 +480,7 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
                     }
                   }}
                 >
-                  <SelectTrigger className="flex-1">
+                  <SelectTrigger className="flex-1 bg-white border-slate-300 shadow-none">
                     <SelectValue placeholder="Chọn giờ" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
@@ -375,7 +498,7 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
                     setFormData({ ...formData, endTime: value })
                   }
                 >
-                  <SelectTrigger className="flex-1">
+                  <SelectTrigger className="flex-1 bg-white border-slate-300 shadow-none">
                     <SelectValue placeholder="Chọn giờ" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
@@ -386,15 +509,20 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
                     ))}
                   </SelectContent>
                 </Select>
-                {formData.startTime && formData.endTime && (
-                  <span className="text-sm text-slate-600 whitespace-nowrap flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    {calculateShiftDuration(
-                      formData.startTime,
-                      formData.endTime
-                    )}
-                  </span>
-                )}
+                {formData.startTime && formData.endTime && (() => {
+                  const duration = calculateShiftDuration(
+                    formData.startTime,
+                    formData.endTime
+                  );
+                  return (
+                    <span className="text-sm text-slate-600 whitespace-nowrap flex items-center gap-1">
+                      {duration.hours}h{duration.minutes}p
+                      {duration.isOvernight && (
+                        <span className="text-sm text-slate-600 whitespace-nowrap flex items-center gap-1">, qua đêm</span>
+                      )}
+                    </span>
+                  );
+                })()}
               </div>
             </div>
 
@@ -402,7 +530,7 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Label>Giờ cho phép chấm công</Label>
-                <Info className="w-4 h-4 text-slate-400" />
+                
               </div>
               <div className="flex items-center gap-3">
                 <Select
@@ -411,7 +539,7 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
                     setFormData({ ...formData, checkInTime: value })
                   }
                 >
-                  <SelectTrigger className="flex-1">
+                  <SelectTrigger className="flex-1 bg-white border-slate-300 shadow-none">
                     <SelectValue placeholder="Chọn giờ" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
@@ -429,7 +557,7 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
                     setFormData({ ...formData, checkOutTime: value })
                   }
                 >
-                  <SelectTrigger className="flex-1">
+                  <SelectTrigger className="flex-1 bg-white border-slate-300 shadow-none">
                     <SelectValue placeholder="Chọn giờ" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
@@ -440,7 +568,6 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
                     ))}
                   </SelectContent>
                 </Select>
-                <Clock className="w-4 h-4 text-slate-400" />
               </div>
             </div>
 
@@ -455,7 +582,7 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
                   }
                 >
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="active" id="active" />
+                    <RadioGroupItem value="active" id="active" className="border-slate-300" />
                     <Label
                       htmlFor="active"
                       className="cursor-pointer font-normal"
@@ -464,7 +591,7 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="inactive" id="inactive" />
+                    <RadioGroupItem value="inactive" id="inactive" className="border-slate-300" />
                     <Label
                       htmlFor="inactive"
                       className="cursor-pointer font-normal"

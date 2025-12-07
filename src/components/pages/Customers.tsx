@@ -1,9 +1,24 @@
-import { useState } from 'react';
-import { Plus, Search, Pencil, Trash2, Filter, X, Power, PowerOff, Eye, Upload, Download, Printer } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Badge } from '../ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { useState } from "react";
+import {
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  Filter,
+  X,
+  Power,
+  PowerOff,
+  Eye,
+  Upload,
+  Download,
+  Printer,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Badge } from "../ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import {
   Dialog,
   DialogContent,
@@ -12,15 +27,15 @@ import {
   DialogTrigger,
   DialogFooter,
   DialogDescription,
-} from '../ui/dialog';
+} from "../ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../ui/select';
-import { Label } from '../ui/label';
+} from "../ui/select";
+import { Label } from "../ui/label";
 import {
   Table,
   TableBody,
@@ -28,9 +43,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../ui/table';
-import { toast } from 'sonner@2.0.3';
-import { CustomerFormDialog } from '../CustomerFormDialog';
+} from "../ui/table";
+import { toast } from "sonner@2.0.3";
+import { CustomerFormDialog } from "../CustomerFormDialog";
 
 interface Customer {
   id: string;
@@ -45,7 +60,7 @@ interface Customer {
   group: string;
   orders: number;
   totalSpent: number;
-  status: 'active' | 'inactive';
+  status: "active" | "inactive";
 }
 
 interface CustomerGroup {
@@ -54,13 +69,13 @@ interface CustomerGroup {
 }
 
 export function Customers() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedGroup, setSelectedGroup] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('all');
-  const [selectedGender, setSelectedGender] = useState('all');
-  const [selectedCity, setSelectedCity] = useState('all');
-  const [sortBy, setSortBy] = useState<'name' | 'orders' | 'totalSpent'>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedGroup, setSelectedGroup] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedGender, setSelectedGender] = useState("all");
+  const [selectedCity, setSelectedCity] = useState("all");
+  const [sortBy, setSortBy] = useState<"name" | "orders" | "totalSpent" | null>(null);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc" | "none">("none");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [quickGroupDialogOpen, setQuickGroupDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -68,193 +83,220 @@ export function Customers() {
   // Mock data
   const [customers, setCustomers] = useState<Customer[]>([
     {
-      id: '1',
-      code: 'KH001',
-      name: 'Nguyễn Văn A',
-      gender: 'Nam',
-      birthday: '15/01/1990',
-      phone: '0901234567',
-      email: 'nguyenvana@email.com',
-      city: 'Hồ Chí Minh',
-      address: '123 Đường ABC, Quận 1',
-      group: 'vip',
+      id: "1",
+      code: "KH001",
+      name: "Nguyễn Văn A",
+      gender: "Nam",
+      birthday: "15/01/1990",
+      phone: "0901234567",
+      email: "nguyenvana@email.com",
+      city: "Hồ Chí Minh",
+      address: "123 Đường ABC, Quận 1",
+      group: "vip",
       orders: 15,
       totalSpent: 25500000,
-      status: 'active',
+      status: "active",
     },
     {
-      id: '2',
-      code: 'KH002',
-      name: 'Trần Thị B',
-      gender: 'Nữ',
-      birthday: '22/05/1992',
-      phone: '0912345678',
-      email: 'tranthib@email.com',
-      city: 'Hà Nội',
-      address: '456 Đường XYZ, Hoàn Kiếm',
-      group: 'regular',
+      id: "2",
+      code: "KH002",
+      name: "Trần Thị B",
+      gender: "Nữ",
+      birthday: "22/05/1992",
+      phone: "0912345678",
+      email: "tranthib@email.com",
+      city: "Hà Nội",
+      address: "456 Đường XYZ, Hoàn Kiếm",
+      group: "regular",
       orders: 8,
       totalSpent: 12300000,
-      status: 'active',
+      status: "active",
     },
     {
-      id: '3',
-      code: 'KH003',
-      name: 'Lê Văn C',
-      gender: 'Nam',
-      birthday: '10/03/1988',
-      phone: '0923456789',
-      email: 'levanc@email.com',
-      city: 'Đà Nẵng',
-      address: '789 Đường DEF, Hải Châu',
-      group: 'vip',
+      id: "3",
+      code: "KH003",
+      name: "Lê Văn C",
+      gender: "Nam",
+      birthday: "10/03/1988",
+      phone: "0923456789",
+      email: "levanc@email.com",
+      city: "Đà Nẵng",
+      address: "789 Đường DEF, Hải Châu",
+      group: "vip",
       orders: 22,
       totalSpent: 35800000,
-      status: 'inactive',
+      status: "inactive",
     },
     {
-      id: '4',
-      code: 'KH004',
-      name: 'Phạm Thị D',
-      gender: 'Nữ',
-      birthday: '18/07/1995',
-      phone: '0934567890',
-      email: 'phamthid@email.com',
-      city: 'Cần Thơ',
-      address: '321 Đường GHI, Ninh Kiều',
-      group: 'new',
+      id: "4",
+      code: "KH004",
+      name: "Phạm Thị D",
+      gender: "Nữ",
+      birthday: "18/07/1995",
+      phone: "0934567890",
+      email: "phamthid@email.com",
+      city: "Cần Thơ",
+      address: "321 Đường GHI, Ninh Kiều",
+      group: "new",
       orders: 5,
       totalSpent: 8500000,
-      status: 'active',
+      status: "active",
     },
     {
-      id: '5',
-      code: 'KH005',
-      name: 'Hoàng Văn E',
-      gender: 'Nam',
-      birthday: '25/11/1985',
-      phone: '0945678901',
-      email: 'hoangvane@email.com',
-      city: 'Hải Phòng',
-      address: '654 Đường JKL, Lê Chân',
-      group: 'regular',
+      id: "5",
+      code: "KH005",
+      name: "Hoàng Văn E",
+      gender: "Nam",
+      birthday: "25/11/1985",
+      phone: "0945678901",
+      email: "hoangvane@email.com",
+      city: "Hải Phòng",
+      address: "654 Đường JKL, Lê Chân",
+      group: "regular",
       orders: 18,
       totalSpent: 28900000,
-      status: 'active',
+      status: "active",
     },
     {
-      id: '6',
-      code: 'KH006',
-      name: 'Vũ Thị F',
-      gender: 'Nữ',
-      birthday: '05/09/1993',
-      phone: '0956789012',
-      email: 'vuthif@email.com',
-      city: 'Nha Trang',
-      address: '987 Đường MNO, Vĩnh Hải',
-      group: 'regular',
+      id: "6",
+      code: "KH006",
+      name: "Vũ Thị F",
+      gender: "Nữ",
+      birthday: "05/09/1993",
+      phone: "0956789012",
+      email: "vuthif@email.com",
+      city: "Nha Trang",
+      address: "987 Đường MNO, Vĩnh Hải",
+      group: "regular",
       orders: 12,
       totalSpent: 19200000,
-      status: 'inactive',
+      status: "inactive",
     },
     {
-      id: '7',
-      code: 'KH007',
-      name: 'Đặng Văn G',
-      gender: 'Nam',
-      birthday: '30/12/1991',
-      phone: '0967890123',
-      email: 'dangvang@email.com',
-      city: 'Huế',
-      address: '147 Đường PQR, Phú Nhuận',
-      group: 'new',
+      id: "7",
+      code: "KH007",
+      name: "Đặng Văn G",
+      gender: "Nam",
+      birthday: "30/12/1991",
+      phone: "0967890123",
+      email: "dangvang@email.com",
+      city: "Huế",
+      address: "147 Đường PQR, Phú Nhuận",
+      group: "new",
       orders: 9,
       totalSpent: 14700000,
-      status: 'active',
+      status: "active",
     },
     {
-      id: '8',
-      code: 'KH008',
-      name: 'Bùi Thị H',
-      gender: 'Nữ',
-      birthday: '14/04/1994',
-      phone: '0978901234',
-      email: 'buithih@email.com',
-      city: 'Vũng Tàu',
-      address: '258 Đường STU, Phường 1',
-      group: 'vip',
+      id: "8",
+      code: "KH008",
+      name: "Bùi Thị H",
+      gender: "Nữ",
+      birthday: "14/04/1994",
+      phone: "0978901234",
+      email: "buithih@email.com",
+      city: "Vũng Tàu",
+      address: "258 Đường STU, Phường 1",
+      group: "vip",
       orders: 7,
       totalSpent: 11400000,
-      status: 'active',
+      status: "active",
     },
   ]);
 
   const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([
-    { id: 'vip', name: 'VIP' },
-    { id: 'regular', name: 'Thường xuyên' },
-    { id: 'new', name: 'Khách mới' },
+    { id: "vip", name: "VIP" },
+    { id: "regular", name: "Thường xuyên" },
+    { id: "new", name: "Khách mới" },
   ]);
 
-  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupName, setNewGroupName] = useState("");
 
   // Filtering and sorting
-  const filteredCustomers = customers
-    .filter((customer) => {
-      const matchesSearch = 
-        customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        customer.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        customer.phone.includes(searchQuery);
-      const matchesGroup = selectedGroup === 'all' || customer.group === selectedGroup;
-      const matchesStatus = selectedStatus === 'all' || customer.status === selectedStatus;
-      const matchesGender = selectedGender === 'all' || customer.gender === selectedGender;
-      const matchesCity = selectedCity === 'all' || customer.city === selectedCity;
-      return matchesSearch && matchesGroup && matchesStatus && matchesGender && matchesCity;
-    })
-    .sort((a, b) => {
+  let filteredCustomers = customers.filter((customer) => {
+    const matchesSearch =
+      customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      customer.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      customer.phone.includes(searchQuery);
+    const matchesGroup =
+      selectedGroup === "all" || customer.group === selectedGroup;
+    const matchesStatus =
+      selectedStatus === "all" || customer.status === selectedStatus;
+    const matchesGender =
+      selectedGender === "all" || customer.gender === selectedGender;
+    const matchesCity =
+      selectedCity === "all" || customer.city === selectedCity;
+    return (
+      matchesSearch &&
+      matchesGroup &&
+      matchesStatus &&
+      matchesGender &&
+      matchesCity
+    );
+  });
+
+  // Apply sorting
+  if (sortBy && sortOrder !== "none") {
+    filteredCustomers = [...filteredCustomers].sort((a, b) => {
       let comparison = 0;
-      if (sortBy === 'name') {
-        comparison = a.name.localeCompare(b.name, 'vi');
-      } else if (sortBy === 'orders') {
+      if (sortBy === "name") {
+        comparison = a.name.localeCompare(b.name, "vi");
+      } else if (sortBy === "orders") {
         comparison = a.orders - b.orders;
-      } else if (sortBy === 'totalSpent') {
+      } else if (sortBy === "totalSpent") {
         comparison = a.totalSpent - b.totalSpent;
       }
-      return sortOrder === 'asc' ? comparison : -comparison;
+      return sortOrder === "asc" ? comparison : -comparison;
     });
+  }
 
-  const handleSort = (field: 'name' | 'orders' | 'totalSpent') => {
+  const handleSort = (field: "name" | "orders" | "totalSpent") => {
     if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+      // Cycle through: asc -> desc -> none -> asc
+      if (sortOrder === "asc") {
+        setSortOrder("desc");
+      } else if (sortOrder === "desc") {
+        setSortOrder("none");
+        setSortBy(null);
+      } else {
+        setSortBy(field);
+        setSortOrder("asc");
+      }
     } else {
       setSortBy(field);
-      setSortOrder('asc');
+      setSortOrder("asc");
     }
   };
 
-  const getSortIcon = (field: 'name' | 'orders' | 'totalSpent') => {
-    if (sortBy !== field) return null;
-    return sortOrder === 'asc' ? ' ↑' : ' ↓';
+  const getSortIcon = (field: "name" | "orders" | "totalSpent") => {
+    if (sortBy !== field || sortOrder === "none") return null;
+    if (sortOrder === "asc") {
+      return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
+    }
+    return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
   };
 
   const handleSubmit = (formData: any) => {
     if (!formData.name || !formData.phone || !formData.group) {
-      toast.error('Vui lòng điền đầy đủ thông tin bắt buộc');
+      toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
       return;
     }
 
     if (editingCustomer) {
       // Update existing customer
-      setCustomers(customers.map(customer =>
-        customer.id === editingCustomer.id
-          ? { ...customer, ...formData }
-          : customer
-      ));
-      toast.success('Cập nhật khách hàng thành công');
+      setCustomers(
+        customers.map((customer) =>
+          customer.id === editingCustomer.id
+            ? { ...customer, ...formData }
+            : customer
+        )
+      );
+      toast.success("Cập nhật khách hàng thành công");
     } else {
       // Add new customer
       const newCustomer: Customer = {
         id: Date.now().toString(),
-        code: `KH${String(customers.length + 1).padStart(3, '0')}`,
+        code: `KH${String(customers.length + 1).padStart(3, "0")}`,
         name: formData.name,
         gender: formData.gender,
         birthday: formData.birthday,
@@ -265,10 +307,10 @@ export function Customers() {
         group: formData.group,
         orders: 0,
         totalSpent: 0,
-        status: 'active',
+        status: "active",
       };
       setCustomers([...customers, newCustomer]);
-      toast.success('Thêm khách hàng mới thành công');
+      toast.success("Thêm khách hàng mới thành công");
     }
 
     setDialogOpen(false);
@@ -281,21 +323,28 @@ export function Customers() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Bạn có chắc chắn muốn xóa khách hàng này?')) {
-      setCustomers(customers.filter(customer => customer.id !== id));
-      toast.success('Xóa khách hàng thành công');
+    if (confirm("Bạn có chắc chắn muốn xóa khách hàng này?")) {
+      setCustomers(customers.filter((customer) => customer.id !== id));
+      toast.success("Xóa khách hàng thành công");
     }
   };
 
   const handleToggleStatus = (id: string) => {
-    setCustomers(customers.map(customer => {
-      if (customer.id === id) {
-        const newStatus = customer.status === 'active' ? 'inactive' : 'active';
-        toast.success(newStatus === 'active' ? 'Đã kích hoạt khách hàng' : 'Đã vô hiệu hóa khách hàng');
-        return { ...customer, status: newStatus };
-      }
-      return customer;
-    }));
+    setCustomers(
+      customers.map((customer) => {
+        if (customer.id === id) {
+          const newStatus =
+            customer.status === "active" ? "inactive" : "active";
+          toast.success(
+            newStatus === "active"
+              ? "Đã kích hoạt khách hàng"
+              : "Đã vô hiệu hóa khách hàng"
+          );
+          return { ...customer, status: newStatus };
+        }
+        return customer;
+      })
+    );
   };
 
   const resetForm = () => {
@@ -304,7 +353,7 @@ export function Customers() {
 
   const handleAddGroup = () => {
     if (!newGroupName.trim()) {
-      toast.error('Vui lòng nhập tên nhóm khách hàng');
+      toast.error("Vui lòng nhập tên nhóm khách hàng");
       return;
     }
 
@@ -313,28 +362,30 @@ export function Customers() {
       name: newGroupName,
     };
     setCustomerGroups([...customerGroups, newGroup]);
-    toast.success('Thêm nhóm khách hàng mới thành công');
-    setNewGroupName('');
+    toast.success("Thêm nhóm khách hàng mới thành công");
+    setNewGroupName("");
     setQuickGroupDialogOpen(false);
   };
 
-  const getStatusBadge = (status: 'active' | 'inactive') => {
-    if (status === 'active') {
+  const getStatusBadge = (status: "active" | "inactive") => {
+    if (status === "active") {
       return <Badge className="bg-emerald-500">Hoạt động</Badge>;
     }
     return <Badge className="bg-red-500">Không hoạt động</Badge>;
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
     }).format(amount);
   };
 
   const totalCustomers = customers.length;
-  const activeCustomers = customers.filter(c => c.status === 'active').length;
-  const inactiveCustomers = customers.filter(c => c.status === 'inactive').length;
+  const activeCustomers = customers.filter((c) => c.status === "active").length;
+  const inactiveCustomers = customers.filter(
+    (c) => c.status === "inactive"
+  ).length;
   const totalRevenue = customers.reduce((sum, c) => sum + c.totalSpent, 0);
 
   return (
@@ -350,8 +401,11 @@ export function Customers() {
             <div className="space-y-4">
               <div>
                 <Label className="text-xs text-slate-600">Giới tính</Label>
-                <Select value={selectedGender} onValueChange={setSelectedGender}>
-                  <SelectTrigger className="mt-1">
+                <Select
+                  value={selectedGender}
+                  onValueChange={setSelectedGender}
+                >
+                  <SelectTrigger className="mt-1 bg-white border-slate-300 shadow-none">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -363,9 +417,11 @@ export function Customers() {
               </div>
 
               <div>
-                <Label className="text-xs text-slate-600">Tỉnh / Thành phố</Label>
+                <Label className="text-xs text-slate-600">
+                  Tỉnh / Thành phố
+                </Label>
                 <Select value={selectedCity} onValueChange={setSelectedCity}>
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="mt-1 bg-white border-slate-300 shadow-none">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -384,8 +440,11 @@ export function Customers() {
 
               <div>
                 <Label className="text-xs text-slate-600">Trạng thái</Label>
-                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                  <SelectTrigger className="mt-1">
+                <Select
+                  value={selectedStatus}
+                  onValueChange={setSelectedStatus}
+                >
+                  <SelectTrigger className="mt-1 bg-white border-slate-300 shadow-none">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -415,7 +474,9 @@ export function Customers() {
               </div>
               <div className="flex justify-between text-sm pt-2 border-t">
                 <span className="text-slate-600">Tổng doanh thu</span>
-                <span className="text-blue-600">{formatCurrency(totalRevenue)}</span>
+                <span className="text-blue-600">
+                  {formatCurrency(totalRevenue)}
+                </span>
               </div>
             </div>
           </div>
@@ -424,11 +485,11 @@ export function Customers() {
             variant="outline"
             className="w-full"
             onClick={() => {
-              setSelectedGroup('all');
-              setSelectedGender('all');
-              setSelectedStatus('all');
-              setSelectedCity('all');
-              setSearchQuery('');
+              setSelectedGroup("all");
+              setSelectedGender("all");
+              setSelectedStatus("all");
+              setSelectedCity("all");
+              setSearchQuery("");
             }}
           >
             <X className="w-4 h-4 mr-2" />
@@ -444,19 +505,21 @@ export function Customers() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-slate-900 mb-2">Khách hàng</h1>
-              <p className="text-slate-600 text-sm">Quản lý thông tin khách hàng</p>
+              <p className="text-slate-600 text-sm">
+                Quản lý thông tin khách hàng
+              </p>
             </div>
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"
-                onClick={() => toast.info('Chức năng import đang phát triển')}
+                onClick={() => toast.info("Chức năng import đang phát triển")}
               >
                 <Upload className="w-4 h-4 mr-2" />
                 Import Excel
               </Button>
               <Button
                 variant="outline"
-                onClick={() => toast.info('Chức năng export đang phát triển')}
+                onClick={() => toast.info("Chức năng export đang phát triển")}
               >
                 <Download className="w-4 h-4 mr-2" />
                 Export Excel
@@ -464,7 +527,7 @@ export function Customers() {
               <Button
                 variant="outline"
                 onClick={() => {
-                  toast.info('Chức năng in đang phát triển');
+                  toast.info("Chức năng in đang phát triển");
                   window.print();
                 }}
               >
@@ -490,7 +553,7 @@ export function Customers() {
               placeholder="Tìm kiếm theo tên, mã, số điện thoại..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
         </div>
@@ -503,61 +566,88 @@ export function Customers() {
                 Danh sách khách hàng ({filteredCustomers.length})
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mã KH</TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-slate-50"
-                      onClick={() => handleSort('name')}
-                    >
-                      Tên khách hàng{getSortIcon('name')}
-                    </TableHead>
-                    <TableHead>Giới tính</TableHead>
-                    <TableHead>Ngày sinh</TableHead>
-                    <TableHead>Liên hệ</TableHead>
-                    <TableHead>Địa chỉ</TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-slate-50"
-                      onClick={() => handleSort('orders')}
-                    >
-                      Đơn hàng{getSortIcon('orders')}
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-slate-50"
-                      onClick={() => handleSort('totalSpent')}
-                    >
-                      Tổng chi tiêu{getSortIcon('totalSpent')}
-                    </TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                    <TableHead className="text-right">Thao tác</TableHead>
-                  </TableRow>
-                </TableHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto rounded-xl">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-blue-50">
+                      <TableHead className="text-sm">Mã KH</TableHead>
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("name")}
+                      >
+                        <div className="flex items-center">
+                          Tên khách hàng
+                          {getSortIcon("name")}
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-sm">Giới tính</TableHead>
+                      <TableHead className="text-sm">Ngày sinh</TableHead>
+                      <TableHead className="text-sm">Liên hệ</TableHead>
+                      <TableHead className="text-sm">Địa chỉ</TableHead>
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("orders")}
+                      >
+                        <div className="flex items-center">
+                          Đơn hàng
+                          {getSortIcon("orders")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("totalSpent")}
+                      >
+                        <div className="flex items-center">
+                          Tổng chi tiêu
+                          {getSortIcon("totalSpent")}
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-sm">Trạng thái</TableHead>
+                      <TableHead className="text-sm text-right">Thao tác</TableHead>
+                    </TableRow>
+                  </TableHeader>
                 <TableBody>
                   {filteredCustomers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-slate-500">
+                      <TableCell
+                        colSpan={9}
+                        className="text-center py-8 text-slate-500"
+                      >
                         Không tìm thấy khách hàng nào
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredCustomers.map((customer) => (
                       <TableRow key={customer.id}>
-                        <TableCell className="text-slate-900">{customer.code}</TableCell>
-                        <TableCell className="text-slate-900">{customer.name}</TableCell>
-                        <TableCell className="text-slate-600">{customer.gender}</TableCell>
-                        <TableCell className="text-slate-600">{customer.birthday}</TableCell>
-                        <TableCell className="text-slate-600">{customer.phone}</TableCell>
+                        <TableCell className="text-slate-900">
+                          {customer.code}
+                        </TableCell>
+                        <TableCell className="text-slate-900">
+                          {customer.name}
+                        </TableCell>
+                        <TableCell className="text-slate-600">
+                          {customer.gender}
+                        </TableCell>
+                        <TableCell className="text-slate-600">
+                          {customer.birthday}
+                        </TableCell>
+                        <TableCell className="text-slate-600">
+                          {customer.phone}
+                        </TableCell>
                         <TableCell className="text-slate-600">
                           <div className="flex flex-col gap-0.5">
                             <span>{customer.city}</span>
                             {customer.address && (
-                              <span className="text-xs text-slate-500">{customer.address}</span>
+                              <span className="text-xs text-slate-500">
+                                {customer.address}
+                              </span>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-slate-600">{customer.orders}</TableCell>
+                        <TableCell className="text-slate-600">
+                          {customer.orders}
+                        </TableCell>
                         <TableCell className="text-slate-900">
                           {formatCurrency(customer.totalSpent)}
                         </TableCell>
@@ -585,10 +675,22 @@ export function Customers() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleToggleStatus(customer.id)}
-                              className={customer.status === 'active' ? 'text-red-600 hover:text-red-700 hover:bg-red-50' : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'}
-                              title={customer.status === 'active' ? 'Vô hiệu hóa' : 'Kích hoạt'}
+                              className={
+                                customer.status === "active"
+                                  ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                              }
+                              title={
+                                customer.status === "active"
+                                  ? "Vô hiệu hóa"
+                                  : "Kích hoạt"
+                              }
                             >
-                              {customer.status === 'active' ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
+                              {customer.status === "active" ? (
+                                <PowerOff className="w-4 h-4" />
+                              ) : (
+                                <Power className="w-4 h-4" />
+                              )}
                             </Button>
                           </div>
                         </TableCell>
@@ -597,6 +699,7 @@ export function Customers() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </div>

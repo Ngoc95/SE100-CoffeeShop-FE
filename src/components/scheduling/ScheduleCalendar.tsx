@@ -393,7 +393,7 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
         <div className="flex-1 overflow-auto p-6">
           <Card className="border-amber-200">
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto rounded-xl">
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b-2 border-amber-200">

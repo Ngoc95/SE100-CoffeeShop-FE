@@ -568,7 +568,7 @@ export function TimekeepingBoard({
                   // Delay để cho phép click vào dropdown item
                   setTimeout(() => setSearchDropdownOpen(false), 200);
                 }}
-                className="flex-1 min-w-[120px] outline-none bg-transparent text-sm relative z-10 px-4"
+                className="flex-1 min-w-[120px] outline-none bg-transparent text-sm relative z-10 px-4 focus:outline-none"
                 onClick={(e) => e.stopPropagation()}
               />
               {/* Chevron down icon */}
@@ -884,7 +884,7 @@ export function TimekeepingBoard({
       >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Chấm công</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Chấm công</DialogTitle>
           </DialogHeader>
 
           {selectedTimekeeping && (
@@ -1028,7 +1028,7 @@ export function TimekeepingBoard({
                   >
                     <div className="space-y-3">
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="working" id="working" />
+                        <RadioGroupItem value="working" id="working" className="border-slate-300" />
                         <Label
                           htmlFor="working"
                           className="cursor-pointer font-normal"
@@ -1040,6 +1040,7 @@ export function TimekeepingBoard({
                         <RadioGroupItem
                           value="approved-leave"
                           id="approved-leave"
+                          className="border-slate-300"
                         />
                         <div className="flex items-center gap-2">
                           <Label
@@ -1055,6 +1056,7 @@ export function TimekeepingBoard({
                         <RadioGroupItem
                           value="unapproved-leave"
                           id="unapproved-leave"
+                          className="border-slate-300"
                         />
                         <div className="flex items-center gap-2">
                           <Label
@@ -1213,7 +1215,7 @@ export function TimekeepingBoard({
                                 }
                               }}
                             >
-                              <SelectTrigger className="w-32">
+                              <SelectTrigger className="w-32 bg-white border-slate-300 shadow-none">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent className="max-h-[200px]">
@@ -1272,7 +1274,7 @@ export function TimekeepingBoard({
                               <Input
                                 type="number"
                                 value={calculatedOvertimeBeforeHours}
-                                className="w-16 h-8"
+                                className="w-16 h-8 bg-white border-slate-300 shadow-none"
                                 min="0"
                                 disabled={true}
                                 readOnly
@@ -1283,7 +1285,7 @@ export function TimekeepingBoard({
                               <Input
                                 type="number"
                                 value={calculatedOvertimeBeforeMins}
-                                className="w-16 h-8"
+                                className="w-16 h-8 bg-white border-slate-300 shadow-none"
                                 min="0"
                                 max="59"
                                 disabled={true}
@@ -1311,7 +1313,7 @@ export function TimekeepingBoard({
                               <Input
                                 type="number"
                                 value={calculatedLateHours}
-                                className="w-16 h-8"
+                                className="w-16 h-8 bg-white border-slate-300 shadow-none"
                                 min="0"
                                 disabled={true}
                                 readOnly
@@ -1322,7 +1324,7 @@ export function TimekeepingBoard({
                               <Input
                                 type="number"
                                 value={calculatedLateMins}
-                                className="w-16 h-8"
+                                className="w-16 h-8 bg-white border-slate-300 shadow-none"
                                 min="0"
                                 max="59"
                                 disabled={true}
@@ -1413,7 +1415,7 @@ export function TimekeepingBoard({
                                 }
                               }}
                             >
-                              <SelectTrigger className="w-32">
+                              <SelectTrigger className="w-32 bg-white border-slate-300 shadow-none">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent className="max-h-[200px]">
@@ -1472,7 +1474,7 @@ export function TimekeepingBoard({
                               <Input
                                 type="number"
                                 value={calculatedOvertimeAfterHours}
-                                className="w-16 h-8"
+                                className="w-16 h-8 bg-white border-slate-300 shadow-none"
                                 min="0"
                                 disabled={true}
                                 readOnly
@@ -1483,7 +1485,7 @@ export function TimekeepingBoard({
                               <Input
                                 type="number"
                                 value={calculatedOvertimeAfterMins}
-                                className="w-16 h-8"
+                                className="w-16 h-8 bg-white border-slate-300 shadow-none"
                                 min="0"
                                 max="59"
                                 disabled={true}
@@ -1511,7 +1513,7 @@ export function TimekeepingBoard({
                               <Input
                                 type="number"
                                 value={calculatedEarlyHours}
-                                className="w-16 h-8"
+                                className="w-16 h-8 bg-white border-slate-300 shadow-none"
                                 min="0"
                                 disabled={true}
                                 readOnly
@@ -1522,7 +1524,7 @@ export function TimekeepingBoard({
                               <Input
                                 type="number"
                                 value={calculatedEarlyMins}
-                                className="w-16 h-8"
+                                className="w-16 h-8 bg-white border-slate-300 shadow-none"
                                 min="0"
                                 max="59"
                                 disabled={true}
@@ -1548,7 +1550,7 @@ export function TimekeepingBoard({
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="Nhập ghi chú..."
-                  className="w-full"
+                  className="w-full bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
               </div>
             </div>

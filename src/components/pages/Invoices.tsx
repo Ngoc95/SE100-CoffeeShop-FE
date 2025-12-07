@@ -1,9 +1,22 @@
 import { useState } from 'react';
-import { Search, FileText, Eye, Download, ChevronDown, ChevronUp, Receipt, CreditCard } from 'lucide-react';
+import { Search, FileText, Eye, Download, ChevronDown, ChevronUp, Receipt, CreditCard, Calendar as CalendarIcon, ArrowUp, ArrowDown } from 'lucide-react';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
 import { Separator } from '../ui/separator';
 import { Button } from '../ui/button';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Calendar } from '../ui/calendar';
+import { format } from 'date-fns';
+import { vi } from 'date-fns/locale';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../ui/table';
 
 interface InvoiceItem {
   id: number;
@@ -35,10 +48,19 @@ interface Invoice {
 
 export function Invoices() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDateRange, setSelectedDateRange] = useState('today');
+  const [dateRangeType, setDateRangeType] = useState<'preset' | 'custom'>('preset');
+  const [presetTimeRange, setPresetTimeRange] = useState('today');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['completed', 'cancelled']);
   const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<string[]>(['cash', 'transfer', 'momo']);
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<number | null>(null);
+  
+  // Sort states
+  type SortField = "code" | "date" | "customer" | "items" | "total" | "paymentMethod" | "status" | null;
+  type SortOrder = "asc" | "desc" | "none";
+  const [sortField, setSortField] = useState<SortField>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("none");
 
   // Mock data
   const invoices: Invoice[] = [
@@ -157,13 +179,80 @@ export function Invoices() {
     }
   };
 
-  const filteredInvoices = invoices.filter(invoice => {
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortOrder === "asc") {
+        setSortOrder("desc");
+      } else if (sortOrder === "desc") {
+        setSortOrder("none");
+        setSortField(null);
+      } else {
+        setSortField(field);
+        setSortOrder("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field || sortOrder === "none") {
+      return null;
+    }
+    if (sortOrder === "asc") {
+      return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
+    }
+    return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
+  };
+
+  let filteredInvoices = invoices.filter(invoice => {
     const matchesSearch = invoice.code.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          invoice.customer.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(invoice.status);
     const matchesPayment = selectedPaymentMethods.length === 0 || selectedPaymentMethods.includes(invoice.paymentMethod);
     return matchesSearch && matchesStatus && matchesPayment;
   });
+
+  // Apply sorting
+  if (sortField && sortOrder !== "none") {
+    filteredInvoices = [...filteredInvoices].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      if (sortField === "code") {
+        aValue = a.code;
+        bValue = b.code;
+      } else if (sortField === "date") {
+        aValue = new Date(a.date.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1')).getTime();
+        bValue = new Date(b.date.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1')).getTime();
+      } else if (sortField === "customer") {
+        aValue = a.customer;
+        bValue = b.customer;
+      } else if (sortField === "items") {
+        aValue = a.items;
+        bValue = b.items;
+      } else if (sortField === "total") {
+        aValue = a.total;
+        bValue = b.total;
+      } else if (sortField === "paymentMethod") {
+        aValue = getPaymentMethodLabel(a.paymentMethod);
+        bValue = getPaymentMethodLabel(b.paymentMethod);
+      } else if (sortField === "status") {
+        aValue = a.status;
+        bValue = b.status;
+      }
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        const comparison = aValue.localeCompare(bValue, "vi");
+        return sortOrder === "asc" ? comparison : -comparison;
+      }
+
+      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
 
   const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + inv.total, 0);
   const completedCount = invoices.filter(inv => inv.status === 'completed').length;
@@ -178,20 +267,189 @@ export function Invoices() {
       {/* Left Sidebar - Filters */}
       <aside className="w-64 bg-white border-r border-slate-200 p-4 overflow-y-auto hidden lg:block">
         <div className="space-y-6">
-          {/* Date Range - Keep as dropdown for now */}
+          {/* Date Range - Similar to Finance.tsx */}
           <div>
             <h3 className="text-sm text-slate-900 mb-3">Thời gian</h3>
-            <select
-              value={selectedDateRange}
-              onChange={(e) => setSelectedDateRange(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="today">Hôm nay</option>
-              <option value="yesterday">Hôm qua</option>
-              <option value="week">Tuần này</option>
-              <option value="month">Tháng này</option>
-              <option value="custom">Tùy chỉnh</option>
-            </select>
+            <RadioGroup value={dateRangeType} onValueChange={(value) => setDateRangeType(value as 'preset' | 'custom')}>
+              {/* Preset Time Ranges */}
+              <div className="flex items-center space-x-2 mb-3">
+                <RadioGroupItem value="preset" id="date-preset" className="border-slate-300" />
+                <div className="flex-1">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-between text-left text-sm bg-white border-slate-300"
+                        onClick={() => setDateRangeType('preset')}
+                      >
+                        <span>
+                          {presetTimeRange === 'today' && 'Hôm nay'}
+                          {presetTimeRange === 'yesterday' && 'Hôm qua'}
+                          {presetTimeRange === 'this-week' && 'Tuần này'}
+                          {presetTimeRange === 'last-week' && 'Tuần trước'}
+                          {presetTimeRange === 'last-7-days' && '7 ngày qua'}
+                          {presetTimeRange === 'this-month' && 'Tháng này'}
+                          {presetTimeRange === 'last-month' && 'Tháng trước'}
+                          {presetTimeRange === 'this-month-lunar' && 'Tháng này (âm lịch)'}
+                          {presetTimeRange === 'last-month-lunar' && 'Tháng trước (âm lịch)'}
+                          {presetTimeRange === 'last-30-days' && '30 ngày qua'}
+                          {presetTimeRange === 'this-quarter' && 'Quý này'}
+                          {presetTimeRange === 'last-quarter' && 'Quý trước'}
+                          {presetTimeRange === 'this-year' && 'Năm nay'}
+                          {presetTimeRange === 'last-year' && 'Năm trước'}
+                          {presetTimeRange === 'this-year-lunar' && 'Năm nay (âm lịch)'}
+                          {presetTimeRange === 'last-year-lunar' && 'Năm trước (âm lịch)'}
+                        </span>
+                        <ChevronDown className="h-4 w-4 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[600px] p-4" align="start">
+                      <div className="grid grid-cols-3 gap-6">
+                        {/* Column 1: Theo ngày và tuần */}
+                        <div>
+                          <h4 className="text-sm text-slate-700 mb-3">Theo ngày và tuần</h4>
+                          <div className="space-y-2">
+                            {[
+                              { value: 'today', label: 'Hôm nay' },
+                              { value: 'yesterday', label: 'Hôm qua' },
+                              { value: 'this-week', label: 'Tuần này' },
+                              { value: 'last-week', label: 'Tuần trước' },
+                              { value: 'last-7-days', label: '7 ngày qua' },
+                            ].map((option) => (
+                              <button
+                                key={option.value}
+                                onClick={() => {
+                                  setPresetTimeRange(option.value);
+                                  setDateRangeType('preset');
+                                }}
+                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                                  presetTimeRange === option.value
+                                    ? 'bg-blue-600 text-white'
+                                    : 'text-blue-600 hover:bg-blue-50'
+                                }`}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Column 2: Theo tháng và quý */}
+                        <div>
+                          <h4 className="text-sm text-slate-700 mb-3">Theo tháng và quý</h4>
+                          <div className="space-y-2">
+                            {[
+                              { value: 'this-month', label: 'Tháng này' },
+                              { value: 'last-month', label: 'Tháng trước' },
+                              { value: 'this-month-lunar', label: 'Tháng này (âm lịch)' },
+                              { value: 'last-month-lunar', label: 'Tháng trước (âm lịch)' },
+                              { value: 'last-30-days', label: '30 ngày qua' },
+                              { value: 'this-quarter', label: 'Quý này' },
+                              { value: 'last-quarter', label: 'Quý trước' },
+                            ].map((option) => (
+                              <button
+                                key={option.value}
+                                onClick={() => {
+                                  setPresetTimeRange(option.value);
+                                  setDateRangeType('preset');
+                                }}
+                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                                  presetTimeRange === option.value
+                                    ? 'bg-blue-600 text-white'
+                                    : 'text-blue-600 hover:bg-blue-50'
+                                }`}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Column 3: Theo năm */}
+                        <div>
+                          <h4 className="text-sm text-slate-700 mb-3">Theo năm</h4>
+                          <div className="space-y-2">
+                            {[
+                              { value: 'this-year', label: 'Năm nay' },
+                              { value: 'last-year', label: 'Năm trước' },
+                              { value: 'this-year-lunar', label: 'Năm nay (âm lịch)' },
+                              { value: 'last-year-lunar', label: 'Năm trước (âm lịch)' },
+                            ].map((option) => (
+                              <button
+                                key={option.value}
+                                onClick={() => {
+                                  setPresetTimeRange(option.value);
+                                  setDateRangeType('preset');
+                                }}
+                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                                  presetTimeRange === option.value
+                                    ? 'bg-blue-600 text-white'
+                                    : 'text-blue-600 hover:bg-blue-50'
+                                }`}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              {/* Custom Date Range */}
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="custom" id="date-custom" className="border-slate-300" />
+                <div className="flex-1">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left text-sm bg-white border-slate-300"
+                        onClick={() => setDateRangeType('custom')}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dateFrom && dateTo
+                          ? `${format(dateFrom, 'dd/MM', { locale: vi })} - ${format(dateTo, 'dd/MM/yyyy', { locale: vi })}`
+                          : 'Lựa chọn khác'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-4" align="start">
+                      <div className="flex gap-4">
+                        <div>
+                          <Label className="text-xs text-slate-600 mb-2 block">Từ ngày</Label>
+                          <Calendar
+                            mode="single"
+                            selected={dateFrom}
+                            onSelect={(date) => {
+                              if (date) {
+                                setDateFrom(date);
+                                setDateRangeType('custom');
+                              }
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-slate-600 mb-2 block">Đến ngày</Label>
+                          <Calendar
+                            mode="single"
+                            selected={dateTo}
+                            onSelect={(date) => {
+                              if (date) {
+                                setDateTo(date);
+                                setDateRangeType('custom');
+                              }
+                            }}
+                            disabled={(date) => dateFrom ? date < dateFrom : false}
+                          />
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            </RadioGroup>
           </div>
 
           <Separator />
@@ -273,59 +531,115 @@ export function Invoices() {
 
         {/* Search Bar */}
         <div className="mb-4">
-          <div className="relative max-w-md">
+          <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               placeholder="Tìm theo mã hóa đơn hoặc khách hàng..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm bg-white shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
         </div>
 
         {/* Table */}
         <div className="bg-white rounded-lg border border-slate-200 flex-1 overflow-hidden flex flex-col">
-          <div className="overflow-x-auto flex-1">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600 w-12"></th>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">Mã HĐ</th>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">Ngày giờ</th>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">Khách hàng</th>
-                  <th className="px-4 py-3 text-center text-xs text-slate-600">Số mặt hàng</th>
-                  <th className="px-4 py-3 text-right text-xs text-slate-600">Tổng tiền</th>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">PT thanh toán</th>
-                  <th className="px-4 py-3 text-center text-xs text-slate-600">Trạng thái</th>
-                  <th className="px-4 py-3 text-center text-xs text-slate-600">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+          <div className="overflow-x-auto flex-1 rounded-xl">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-blue-50">
+                  <TableHead className="w-12 text-sm"></TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("code")}
+                  >
+                    <div className="flex items-center">
+                      Mã HĐ
+                      {getSortIcon("code")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("date")}
+                  >
+                    <div className="flex items-center">
+                      Ngày giờ
+                      {getSortIcon("date")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("customer")}
+                  >
+                    <div className="flex items-center">
+                      Khách hàng
+                      {getSortIcon("customer")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("items")}
+                  >
+                    <div className="flex items-center justify-center">
+                      Số mặt hàng
+                      {getSortIcon("items")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm text-right cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("total")}
+                  >
+                    <div className="flex items-center justify-end">
+                      Tổng tiền
+                      {getSortIcon("total")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("paymentMethod")}
+                  >
+                    <div className="flex items-center">
+                      PT thanh toán
+                      {getSortIcon("paymentMethod")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("status")}
+                  >
+                    <div className="flex items-center justify-center">
+                      Trạng thái
+                      {getSortIcon("status")}
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-sm text-center">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {filteredInvoices.map((invoice) => (
                   <>
-                    <tr 
+                    <TableRow 
                       key={invoice.id} 
-                      className="hover:bg-slate-50 cursor-pointer"
+                      className="hover:bg-blue-50/50 cursor-pointer"
                       onClick={() => toggleExpand(invoice.id)}
                     >
-                      <td className="px-4 py-3 text-center">
+                      <TableCell className="text-sm text-center">
                         {expandedInvoiceId === invoice.id ? (
                           <ChevronUp className="w-4 h-4 text-slate-600" />
                         ) : (
                           <ChevronDown className="w-4 h-4 text-slate-600" />
                         )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-blue-600">{invoice.code}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{invoice.date}</td>
-                      <td className="px-4 py-3 text-sm text-slate-900">{invoice.customer}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600 text-center">{invoice.items}</td>
-                      <td className="px-4 py-3 text-sm text-slate-900 text-right">
+                      </TableCell>
+                      <TableCell className="text-sm text-blue-600">{invoice.code}</TableCell>
+                      <TableCell className="text-sm text-slate-700">{invoice.date}</TableCell>
+                      <TableCell className="text-sm text-slate-900">{invoice.customer}</TableCell>
+                      <TableCell className="text-sm text-slate-700 text-center">{invoice.items}</TableCell>
+                      <TableCell className="text-sm text-slate-900 text-right">
                         {invoice.total.toLocaleString('vi-VN')}đ
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{getPaymentMethodLabel(invoice.paymentMethod)}</td>
-                      <td className="px-4 py-3 text-center">
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700">{getPaymentMethodLabel(invoice.paymentMethod)}</TableCell>
+                      <TableCell className="text-sm text-center">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
                           invoice.status === 'completed' 
                             ? 'bg-green-50 text-green-700' 
@@ -333,8 +647,8 @@ export function Invoices() {
                         }`}>
                           {invoice.status === 'completed' ? 'Hoàn thành' : 'Đã hủy'}
                         </span>
-                      </td>
-                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      </TableCell>
+                      <TableCell className="text-sm text-center" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-2">
                           <button className="text-blue-600 hover:text-blue-700 p-1">
                             <Eye className="w-4 h-4" />
@@ -343,13 +657,13 @@ export function Invoices() {
                             <Download className="w-4 h-4" />
                           </button>
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                     
                     {/* Expanded Detail Row */}
                     {expandedInvoiceId === invoice.id && (
-                      <tr>
-                        <td colSpan={9} className="px-4 py-4 bg-slate-50">
+                      <TableRow>
+                        <TableCell colSpan={9} className="px-4 py-4 bg-slate-50">
                           <div className="bg-white rounded-lg border border-slate-200 p-6">
                             {/* Invoice Info Grid */}
                             <div className="grid grid-cols-2 gap-x-8 gap-y-3 mb-6">
@@ -439,13 +753,13 @@ export function Invoices() {
                               </table>
                             </div>
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     )}
                   </>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
 
           {/* Footer */}

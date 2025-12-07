@@ -1,8 +1,23 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, ChevronDown } from 'lucide-react';
-import svgPaths from '../imports/svg-uemarp4dxh';
 import { Button } from './ui/button';
 import { Promotion, PromotionType } from './pages/Promotions';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from './ui/dialog';
+import { Label } from './ui/label';
+import { Input } from './ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
 import {
   Popover,
   PopoverContent,
@@ -145,72 +160,64 @@ export function PromotionFormDialog({
     onSubmit(formData);
   };
 
-  if (!open) return null;
-
   const showMaxDiscountValue = formData.type === 'percentage' || formData.type === 'amount';
   const showPromotionValue = formData.type === 'percentage' || formData.type === 'amount' || formData.type === 'fixed-price';
   const showFreeItems = formData.type === 'free-item';
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl text-slate-900">
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle className="text-lg font-semibold">
             {editingPromotion ? 'Chỉnh sửa khuyến mại' : 'Thêm khuyến mại mới'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+          </DialogTitle>
+        </DialogHeader>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-6">
-            {/* Basic Information */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Basic Information */}
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
-                <label className="block text-sm text-slate-700 mb-1.5">
+                <Label>
                   Tên khuyến mại <span className="text-red-500">*</span>
-                </label>
-                <input
+                </Label>
+                <Input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-slate-700 mb-1.5">
+                <Label>
                   Loại khuyến mại <span className="text-red-500">*</span>
-                </label>
-                <select
+                </Label>
+                <Select
                   value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as PromotionType })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
+                  onValueChange={(value) => setFormData({ ...formData, type: value as PromotionType })}
                 >
-                  <option value="percentage">Theo phần trăm</option>
-                  <option value="amount">Theo số tiền</option>
-                  <option value="fixed-price">Đồng giá</option>
-                  <option value="free-item">Tặng món</option>
-                </select>
+                  <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentage">Theo phần trăm</SelectItem>
+                    <SelectItem value="amount">Theo số tiền</SelectItem>
+                    <SelectItem value="fixed-price">Đồng giá</SelectItem>
+                    <SelectItem value="free-item">Tặng món</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
-                <label className="block text-sm text-slate-700 mb-1.5">
+                <Label>
                   Giá trị hóa đơn tối thiểu <span className="text-red-500">*</span>
-                </label>
-                <input
+                </Label>
+                <Input
                   type="number"
                   value={formData.minOrderValue}
                   onChange={(e) => setFormData({ ...formData, minOrderValue: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   required
                   min="0"
                 />
@@ -218,14 +225,14 @@ export function PromotionFormDialog({
 
               {showPromotionValue && (
                 <div>
-                  <label className="block text-sm text-slate-700 mb-1.5">
+                  <Label>
                     Giá trị khuyến mại <span className="text-red-500">*</span>
-                  </label>
-                  <input
+                  </Label>
+                  <Input
                     type="number"
                     value={formData.promotionValue || ''}
                     onChange={(e) => setFormData({ ...formData, promotionValue: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                     required
                     min="0"
                     placeholder={formData.type === 'percentage' ? 'Phần trăm (%)' : 'Số tiền (VNĐ)'}
@@ -235,14 +242,12 @@ export function PromotionFormDialog({
 
               {showMaxDiscountValue && (
                 <div>
-                  <label className="block text-sm text-slate-700 mb-1.5">
-                    Giá trị giảm giá tối đa
-                  </label>
-                  <input
+                  <Label>Giá trị giảm giá tối đa</Label>
+                  <Input
                     type="number"
                     value={formData.maxDiscountValue || ''}
                     onChange={(e) => setFormData({ ...formData, maxDiscountValue: e.target.value ? Number(e.target.value) : undefined })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                     min="0"
                     placeholder="Số tiền (VNĐ)"
                   />
@@ -250,93 +255,94 @@ export function PromotionFormDialog({
               )}
 
               <div>
-                <label className="block text-sm text-slate-700 mb-1.5">
+                <Label>
                   Ngày bắt đầu <span className="text-red-500">*</span>
-                </label>
-                <input
+                </Label>
+                <Input
                   type="text"
                   value={formData.startDate}
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   placeholder="DD/MM/YYYY"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-slate-700 mb-1.5">
+                <Label>
                   Thời gian bắt đầu <span className="text-red-500">*</span>
-                </label>
-                <input
+                </Label>
+                <Input
                   type="text"
                   value={formData.startTime}
                   onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   placeholder="HH:MM"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-slate-700 mb-1.5">
+                <Label>
                   Ngày kết thúc <span className="text-red-500">*</span>
-                </label>
-                <input
+                </Label>
+                <Input
                   type="text"
                   value={formData.endDate}
                   onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   placeholder="DD/MM/YYYY"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-slate-700 mb-1.5">
+                <Label>
                   Thời gian kết thúc <span className="text-red-500">*</span>
-                </label>
-                <input
+                </Label>
+                <Input
                   type="text"
                   value={formData.endTime}
                   onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   placeholder="HH:MM"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-slate-700 mb-1.5">
+                <Label>
                   Trạng thái <span className="text-red-500">*</span>
-                </label>
-                <select
+                </Label>
+                <Select
                   value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' | 'inactive' })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
+                  onValueChange={(value) => setFormData({ ...formData, status: value as 'active' | 'inactive' })}
                 >
-                  <option value="active">Hoạt động</option>
-                  <option value="inactive">Không hoạt động</option>
-                </select>
+                  <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Hoạt động</SelectItem>
+                    <SelectItem value="inactive">Không hoạt động</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
             {/* Free Items - Only for free-item type */}
             {showFreeItems && (
               <div>
-                <label className="block text-sm text-slate-700 mb-2">
-                  Danh sách mặt hàng được tặng
-                </label>
+                <Label className="mb-2 block">Danh sách mặt hàng được tặng</Label>
                 <div className="space-y-2">
                   {/* Selected Free Items List */}
                   {formData.freeItems && formData.freeItems.length > 0 && (
-                    <div className="border border-slate-200 rounded-md p-2 space-y-1 max-h-48 overflow-y-auto">
+                    <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-48 overflow-y-auto">
                       {formData.freeItems.map((item) => (
                         <div key={item.id} className="flex items-center justify-between gap-3 bg-slate-50 px-3 py-2 rounded text-sm">
                           <span className="flex-1">{item.name}</span>
                           <div className="flex items-center gap-2">
                             <label className="text-xs text-slate-600">Số lượng:</label>
-                            <input
+                            <Input
                               type="number"
                               value={item.quantity || 1}
                               onChange={(e) => {
@@ -348,7 +354,7 @@ export function PromotionFormDialog({
                                   )
                                 });
                               }}
-                              className="w-16 px-2 py-1 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              className="w-16 h-8 px-2 py-1 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                               min="1"
                             />
                           </div>
@@ -370,7 +376,7 @@ export function PromotionFormDialog({
                   {/* Add Free Item Dropdown */}
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button type="button" variant="outline" className="w-full justify-start text-slate-600">
+                      <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
                         <Plus className="w-4 h-4 mr-2" />
                         Thêm mặt hàng tặng
                       </Button>
@@ -408,17 +414,15 @@ export function PromotionFormDialog({
 
             {/* Applicable Scope */}
             <div className="space-y-4 pt-4 border-t">
-              <h3 className="text-sm text-slate-900">Phạm vi áp dụng</h3>
+              <h3 className="text-sm font-semibold text-slate-900">Phạm vi áp dụng</h3>
               
               {/* Applicable Items */}
               <div>
-                <label className="block text-sm text-slate-700 mb-2">
-                  Danh sách mặt hàng được áp dụng
-                </label>
+                <Label className="mb-2 block">Danh sách mặt hàng được áp dụng</Label>
                 <div className="space-y-2">
                   {/* Selected Items List */}
                   {formData.applicableItems && formData.applicableItems.length > 0 && (
-                    <div className="border border-slate-200 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
+                    <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
                       {formData.applicableItems.map((item) => (
                         <div key={item.id} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
                           <span>{item.name}</span>
@@ -440,7 +444,7 @@ export function PromotionFormDialog({
                   {/* Add Item Dropdown */}
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button type="button" variant="outline" className="w-full justify-start text-slate-600">
+                      <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
                         <Plus className="w-4 h-4 mr-2" />
                         Thêm mặt hàng
                       </Button>
@@ -478,12 +482,10 @@ export function PromotionFormDialog({
               <div className="grid grid-cols-2 gap-4">
                 {/* Applicable Categories */}
                 <div>
-                  <label className="block text-sm text-slate-700 mb-2">
-                    Danh sách danh mục được áp dụng
-                  </label>
+                  <Label className="mb-2 block">Danh sách danh mục được áp dụng</Label>
                   <div className="space-y-2">
                     {formData.applicableCategories && formData.applicableCategories.length > 0 && (
-                      <div className="border border-slate-200 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
+                      <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
                         {formData.applicableCategories.map((cat) => (
                           <div key={cat.id} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
                             <span>{cat.name}</span>
@@ -504,7 +506,7 @@ export function PromotionFormDialog({
                     
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button type="button" variant="outline" className="w-full justify-start text-slate-600">
+                        <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
                           <Plus className="w-4 h-4 mr-2" />
                           Thêm danh mục
                         </Button>
@@ -541,12 +543,10 @@ export function PromotionFormDialog({
 
                 {/* Applicable Combos */}
                 <div>
-                  <label className="block text-sm text-slate-700 mb-2">
-                    Danh sách combo được áp dụng
-                  </label>
+                  <Label className="mb-2 block">Danh sách combo được áp dụng</Label>
                   <div className="space-y-2">
                     {formData.applicableCombos && formData.applicableCombos.length > 0 && (
-                      <div className="border border-slate-200 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
+                      <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
                         {formData.applicableCombos.map((combo) => (
                           <div key={combo.id} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
                             <span>{combo.name}</span>
@@ -567,7 +567,7 @@ export function PromotionFormDialog({
                     
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button type="button" variant="outline" className="w-full justify-start text-slate-600">
+                        <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
                           <Plus className="w-4 h-4 mr-2" />
                           Thêm combo
                         </Button>
@@ -604,12 +604,10 @@ export function PromotionFormDialog({
 
                 {/* Applicable Customer Groups */}
                 <div>
-                  <label className="block text-sm text-slate-700 mb-2">
-                    Danh sách nhóm khách hàng được áp dụng
-                  </label>
+                  <Label className="mb-2 block">Danh sách nhóm khách hàng được áp dụng</Label>
                   <div className="space-y-2">
                     {formData.applicableCustomerGroups && formData.applicableCustomerGroups.length > 0 && (
-                      <div className="border border-slate-200 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
+                      <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
                         {formData.applicableCustomerGroups.map((group) => (
                           <div key={group.id} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
                             <span>{group.name}</span>
@@ -630,7 +628,7 @@ export function PromotionFormDialog({
                     
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button type="button" variant="outline" className="w-full justify-start text-slate-600">
+                        <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
                           <Plus className="w-4 h-4 mr-2" />
                           Thêm nhóm khách hàng
                         </Button>
@@ -667,12 +665,10 @@ export function PromotionFormDialog({
 
                 {/* Applicable Customers */}
                 <div>
-                  <label className="block text-sm text-slate-700 mb-2">
-                    Danh sách khách hàng được áp dụng
-                  </label>
+                  <Label className="mb-2 block">Danh sách khách hàng được áp dụng</Label>
                   <div className="space-y-2">
                     {formData.applicableCustomers && formData.applicableCustomers.length > 0 && (
-                      <div className="border border-slate-200 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
+                      <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
                         {formData.applicableCustomers.map((customer) => (
                           <div key={customer.id} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
                             <span>{customer.name}</span>
@@ -693,7 +689,7 @@ export function PromotionFormDialog({
                     
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button type="button" variant="outline" className="w-full justify-start text-slate-600">
+                        <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
                           <Plus className="w-4 h-4 mr-2" />
                           Thêm khách hàng
                         </Button>
@@ -729,27 +725,21 @@ export function PromotionFormDialog({
                 </div>
               </div>
             </div>
-          </div>
         </form>
 
-        {/* Footer */}
-        <div className="flex justify-end gap-3 p-6 border-t bg-slate-50">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-slate-700 hover:text-slate-900 transition-colors"
-          >
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
             Hủy
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
             onClick={handleSubmit}
-            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+            className="bg-blue-600 hover:bg-blue-700"
           >
             {editingPromotion ? 'Cập nhật' : 'Thêm khuyến mại'}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

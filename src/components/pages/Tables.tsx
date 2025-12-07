@@ -9,6 +9,8 @@ import {
   X,
   Power,
   PowerOff,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -58,8 +60,8 @@ export function Tables() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedArea, setSelectedArea] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
-  const [sortBy, setSortBy] = useState<"name" | "area" | "seats">("name");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [sortBy, setSortBy] = useState<"name" | "area" | "seats" | null>(null);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc" | "none">("none");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [quickAreaDialogOpen, setQuickAreaDialogOpen] = useState(false);
   const [editAreaDialogOpen, setEditAreaDialogOpen] = useState(false);
@@ -114,6 +116,8 @@ export function Tables() {
       return matchesSearch && matchesArea && matchesStatus;
     })
     .sort((a, b) => {
+      if (sortBy === null || sortOrder === "none") return 0;
+      
       let comparison = 0;
       if (sortBy === "name") {
         comparison = a.name.localeCompare(b.name, "vi");
@@ -129,7 +133,16 @@ export function Tables() {
 
   const handleSort = (field: "name" | "area" | "seats") => {
     if (sortBy === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+      // Cycle through: asc -> desc -> none -> asc
+      if (sortOrder === "asc") {
+        setSortOrder("desc");
+      } else if (sortOrder === "desc") {
+        setSortOrder("none");
+        setSortBy(null);
+      } else {
+        setSortBy(field);
+        setSortOrder("asc");
+      }
     } else {
       setSortBy(field);
       setSortOrder("asc");
@@ -138,7 +151,12 @@ export function Tables() {
 
   const getSortIcon = (field: "name" | "area" | "seats") => {
     if (sortBy !== field) return null;
-    return sortOrder === "asc" ? " ↑" : " ↓";
+    if (sortOrder === "asc") {
+      return <ArrowUp className="w-4 h-4 inline-block ml-1" />;
+    } else if (sortOrder === "desc") {
+      return <ArrowDown className="w-4 h-4 inline-block ml-1" />;
+    }
+    return null;
   };
 
   const handleSubmit = () => {
@@ -272,7 +290,7 @@ export function Tables() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Select value={selectedArea} onValueChange={setSelectedArea}>
-                    <SelectTrigger className="flex-1">
+                    <SelectTrigger className="flex-1 bg-white border-slate-300 shadow-none">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -314,7 +332,11 @@ export function Tables() {
                   className="space-y-2"
                 >
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="all" id="status-all" />
+                    <RadioGroupItem
+                      value="all"
+                      id="status-all"
+                      className="border-slate-300"
+                    />
                     <Label
                       htmlFor="status-all"
                       className="text-xs text-slate-700 cursor-pointer font-normal"
@@ -323,7 +345,11 @@ export function Tables() {
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="active" id="status-active" />
+                    <RadioGroupItem
+                      value="active"
+                      id="status-active"
+                      className="border-slate-300"
+                    />
                     <Label
                       htmlFor="status-active"
                       className="text-xs text-slate-700 cursor-pointer font-normal"
@@ -332,7 +358,11 @@ export function Tables() {
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="inactive" id="status-inactive" />
+                    <RadioGroupItem
+                      value="inactive"
+                      id="status-inactive"
+                      className="border-slate-300"
+                    />
                     <Label
                       htmlFor="status-inactive"
                       className="text-xs text-slate-700 cursor-pointer font-normal"
@@ -418,6 +448,7 @@ export function Tables() {
                         onChange={(e) =>
                           setFormData({ ...formData, name: e.target.value })
                         }
+                        className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                       />
                     </div>
 
@@ -430,7 +461,7 @@ export function Tables() {
                             setFormData({ ...formData, area: value })
                           }
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="bg-white border-slate-300 shadow-none">
                             <SelectValue placeholder="Chọn khu vực" />
                           </SelectTrigger>
                           <SelectContent>
@@ -467,6 +498,7 @@ export function Tables() {
                                       handleAddArea();
                                     }
                                   }}
+                                  className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                                 />
                               </div>
                             </div>
@@ -493,6 +525,7 @@ export function Tables() {
                           setFormData({ ...formData, seats: e.target.value })
                         }
                         min="1"
+                        className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                       />
                     </div>
                   </div>
@@ -521,7 +554,7 @@ export function Tables() {
               placeholder="Tìm kiếm bàn..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
         </div>
@@ -534,96 +567,107 @@ export function Tables() {
                 Danh sách bàn ({filteredTables.length})
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto rounded-xl">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-blue-50">
                     <TableHead
-                      className="cursor-pointer hover:bg-slate-50"
+                      className="cursor-pointer hover:bg-blue-100 transition-colors"
                       onClick={() => handleSort("name")}
                     >
-                      Tên bàn{getSortIcon("name")}
+                      <div className="flex items-center">
+                        Tên bàn
+                        {getSortIcon("name")}
+                      </div>
                     </TableHead>
                     <TableHead
-                      className="cursor-pointer hover:bg-slate-50"
+                      className="cursor-pointer hover:bg-blue-100 transition-colors"
                       onClick={() => handleSort("area")}
                     >
-                      Khu vực{getSortIcon("area")}
+                      <div className="flex items-center">
+                        Khu vực
+                        {getSortIcon("area")}
+                      </div>
                     </TableHead>
                     <TableHead
-                      className="cursor-pointer hover:bg-slate-50"
+                      className="cursor-pointer hover:bg-blue-100 transition-colors"
                       onClick={() => handleSort("seats")}
                     >
-                      Số ghế{getSortIcon("seats")}
+                      <div className="flex items-center">
+                        Số ghế
+                        {getSortIcon("seats")}
+                      </div>
                     </TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                    <TableHead className="text-right">Thao tác</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredTables.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={5}
-                        className="text-center py-8 text-slate-500"
-                      >
-                        Không tìm thấy bàn nào
-                      </TableCell>
+                      <TableHead className="text-sm">Trạng thái</TableHead>
+                      <TableHead className="text-sm text-right">Thao tác</TableHead>
                     </TableRow>
-                  ) : (
-                    filteredTables.map((table) => (
-                      <TableRow key={table.id}>
-                        <TableCell className="text-slate-900">
-                          {table.name}
-                        </TableCell>
-                        <TableCell className="text-slate-600">
-                          {areas.find((a) => a.id === table.area)?.name ||
-                            table.area}
-                        </TableCell>
-                        <TableCell className="text-slate-600">
-                          {table.seats} chỗ
-                        </TableCell>
-                        <TableCell>{getStatusBadge(table.status)}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEdit(table)}
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(table.id)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleToggleStatus(table.id)}
-                              className={
-                                table.status === "active"
-                                  ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                              }
-                            >
-                              {table.status === "active" ? (
-                                <PowerOff className="w-4 h-4" />
-                              ) : (
-                                <Power className="w-4 h-4" />
-                              )}
-                            </Button>
-                          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredTables.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={5}
+                          className="text-center py-8 text-slate-500"
+                        >
+                          Không tìm thấy bàn nào
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      filteredTables.map((table) => (
+                        <TableRow key={table.id}>
+                          <TableCell className="text-sm text-slate-900">
+                            {table.name}
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-700">
+                            {areas.find((a) => a.id === table.area)?.name ||
+                              table.area}
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-700">
+                            {table.seats} chỗ
+                          </TableCell>
+                          <TableCell className="text-sm">{getStatusBadge(table.status)}</TableCell>
+                          <TableCell className="text-sm text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEdit(table)}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(table.id)}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleStatus(table.id)}
+                                className={
+                                  table.status === "active"
+                                    ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                }
+                              >
+                                {table.status === "active" ? (
+                                  <PowerOff className="w-4 h-4" />
+                                ) : (
+                                  <Power className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -651,6 +695,7 @@ export function Tables() {
                 placeholder="VD: Tầng 3, Sân vườn..."
                 value={editAreaName}
                 onChange={(e) => setEditAreaName(e.target.value)}
+                className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
           </div>
@@ -746,6 +791,7 @@ export function Tables() {
                     handleAddArea();
                   }
                 }}
+                className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
           </div>

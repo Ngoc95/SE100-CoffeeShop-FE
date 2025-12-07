@@ -1341,7 +1341,7 @@ export function POSOrdering() {
               placeholder="Tìm món..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
         </div>
@@ -1853,7 +1853,7 @@ export function POSOrdering() {
                       handleApplyPromoCode();
                     }
                   }}
-                  className="h-7 text-xs flex-1"
+                  className="h-7 text-xs flex-1 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
                 <Button
                   onClick={() => handleApplyPromoCode()}
@@ -2154,7 +2154,7 @@ export function POSOrdering() {
                 placeholder="Ví dụ: Ít đường, nhiều đá..."
                 value={noteText}
                 onChange={(e) => setNoteText(e.target.value)}
-                className="mt-2"
+                className="mt-2 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
           </div>
@@ -2800,14 +2800,14 @@ export function POSOrdering() {
                 placeholder="Ví dụ: Trà đào mix phúc bồn tử"
                 value={newItemName}
                 onChange={(e) => setNewItemName(e.target.value)}
-                className="mt-2"
+                className="mt-2 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
 
             <div>
               <Label htmlFor="item-category">Danh mục đề xuất <span className="text-red-500">*</span></Label>
               <Select value={newItemCategory} onValueChange={setNewItemCategory}>
-                <SelectTrigger className="mt-2">
+                <SelectTrigger className="mt-2 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2">
                   <SelectValue placeholder="Chọn danh mục..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -2826,7 +2826,7 @@ export function POSOrdering() {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="h-8"
+                  className="h-8 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   onClick={() => setAddIngredientDialogOpen(true)}
                 >
                   <Plus className="w-3 h-3 mr-1" />
@@ -2883,7 +2883,7 @@ export function POSOrdering() {
                 <Upload className="w-4 h-4" />
                 Ảnh minh họa (tuỳ chọn)
               </Label>
-              <Button variant="outline" size="sm" className="mt-2 w-full">
+              <Button variant="outline" size="sm" className="mt-2 w-full bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2">
                 <Upload className="w-4 h-4 mr-2" />
                 Tải ảnh lên
               </Button>
@@ -2897,7 +2897,7 @@ export function POSOrdering() {
                 placeholder="Ví dụ: Khách yêu cầu đặc biệt..."
                 value={newItemNotes}
                 onChange={(e) => setNewItemNotes(e.target.value)}
-                className="mt-2"
+                className="mt-2 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
           </div>
@@ -2942,7 +2942,7 @@ export function POSOrdering() {
                   placeholder="Nhập tên nguyên liệu..."
                   value={ingredientSearchQuery}
                   onChange={(e) => setIngredientSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
               </div>
             </div>
@@ -2970,7 +2970,7 @@ export function POSOrdering() {
                         <Input
                           type="number"
                           placeholder="SL"
-                          className="w-20 h-8"
+                          className="w-20 h-8 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                           id={`qty-${ingredient.id}`}
                         />
                         <Button

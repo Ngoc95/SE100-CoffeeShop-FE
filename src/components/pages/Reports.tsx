@@ -1123,32 +1123,32 @@ export function Reports() {
                 <h3 className="text-sm text-slate-900 mb-3">Mối quan tâm</h3>
                 <RadioGroup value={eodConcern} onValueChange={(value) => setEodConcern(value as ConcernType)}>
                   <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="sales" id="concern-sales" />
+                    <RadioGroupItem value="sales" id="concern-sales" className="border-slate-300" />
                     <Label htmlFor="concern-sales" className="text-sm text-slate-700 cursor-pointer">
                       Bán hàng
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="cashflow" id="concern-cashflow" />
+                    <RadioGroupItem value="cashflow" id="concern-cashflow" className="border-slate-300" />
                     <Label htmlFor="concern-cashflow" className="text-sm text-slate-700 cursor-pointer">
                       Thu chi
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="products" id="concern-products" />
+                    <RadioGroupItem value="products" id="concern-products" className="border-slate-300" />
                     <Label htmlFor="concern-products" className="text-sm text-slate-700 cursor-pointer">
                       Hàng hóa
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="cancellations" id="concern-cancellations" />
+                    <RadioGroupItem value="cancellations" id="concern-cancellations" className="border-slate-300" />
                     <Label htmlFor="concern-cancellations" className="text-sm text-slate-700 cursor-pointer">
                       Hủy món
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="summary" id="concern-summary" />
-                    <Label htmlFor="concern-summary" className="text-sm text-slate-700 cursor-pointer">
+                    <RadioGroupItem value="summary" id="concern-summary" className="border-slate-300" />
+                      <Label htmlFor="concern-summary" className="text-sm text-slate-700 cursor-pointer">
                       Tổng hợp
                     </Label>
                   </div>
@@ -1163,13 +1163,13 @@ export function Reports() {
                 <RadioGroup value={dateRangeType} onValueChange={(value) => setDateRangeType(value as 'preset' | 'custom')}>
                   {/* Preset Time Ranges */}
                   <div className="flex items-center space-x-2 mb-3">
-                    <RadioGroupItem value="preset" id="date-preset" />
+                    <RadioGroupItem value="preset" id="date-preset" className="border-slate-300" />
                     <div className="flex-1">
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className="w-full justify-between text-left text-sm"
+                            className="w-full justify-between text-left text-sm bg-white border-slate-300"
                             onClick={() => setDateRangeType('preset')}
                           >
                             <span>
@@ -1290,13 +1290,13 @@ export function Reports() {
 
                   {/* Custom Date Range */}
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="custom" id="date-custom" />
+                    <RadioGroupItem value="custom" id="date-custom" className="border-slate-300" />
                     <div className="flex-1">
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className="w-full justify-start text-left text-sm"
+                            className="w-full justify-start text-left text-sm bg-white border-slate-300"
                             onClick={() => setDateRangeType('custom')}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
@@ -1354,7 +1354,7 @@ export function Reports() {
                       placeholder="Theo tên, mã hàng"
                       value={productSearch}
                       onChange={(e) => setProductSearch(e.target.value)}
-                      className="text-sm"
+                      className="text-sm bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                     />
                   </div>
 
@@ -1365,7 +1365,7 @@ export function Reports() {
                     <h3 className="text-sm text-slate-900 mb-3">Chọn loại hàng</h3>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <button className="w-full text-left border border-slate-300 rounded-lg px-3 py-2 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-auto min-h-[40px]">
+                        <button className="w-full text-left border border-slate-300 rounded-lg px-3 py-2 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-auto min-h-[40px]">
                           <div className="flex flex-wrap gap-1.5 items-center">
                             {selectedProductCategories.length > 0 ? (
                               selectedProductCategories.map((item) => (
@@ -1422,7 +1422,7 @@ export function Reports() {
                       placeholder="Theo mã, tên, điện thoại"
                       value={customerSearch}
                       onChange={(e) => setCustomerSearch(e.target.value)}
-                      className="text-sm"
+                      className="text-sm bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                     />
                   </div>
 
@@ -1435,7 +1435,7 @@ export function Reports() {
                       placeholder="Theo tên, mã hàng"
                       value={productSearch}
                       onChange={(e) => setProductSearch(e.target.value)}
-                      className="text-sm"
+                      className="text-sm bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                     />
                   </div>
 
@@ -1446,7 +1446,7 @@ export function Reports() {
                     <h3 className="text-sm text-slate-900 mb-3">Nhân viên hủy</h3>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <button className="w-full text-left border border-slate-300 rounded-lg px-3 py-2 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-auto min-h-[40px]">
+                        <button className="w-full text-left border border-slate-300 rounded-lg px-3 py-2 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-auto min-h-[40px]">
                           <div className="flex flex-wrap gap-1.5 items-center">
                             {selectedCancelers.length > 0 ? (
                               selectedCancelers.map((item) => (
@@ -1501,7 +1501,7 @@ export function Reports() {
                     <h3 className="text-sm text-slate-900 mb-3">Người nhận đơn</h3>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <button className="w-full text-left border border-slate-300 rounded-lg px-3 py-2 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-auto min-h-[40px]">
+                        <button className="w-full text-left border border-slate-300 rounded-lg px-3 py-2 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-auto min-h-[40px]">
                           <div className="flex flex-wrap gap-1.5 items-center">
                             {selectedReceivers.length > 0 ? (
                               selectedReceivers.map((item) => (
@@ -1569,7 +1569,7 @@ export function Reports() {
                       placeholder="Theo mã, tên, điện thoại"
                       value={customerSearch}
                       onChange={(e) => setCustomerSearch(e.target.value)}
-                      className="text-sm"
+                      className="text-sm bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                     />
                   </div>
 
@@ -1695,7 +1695,7 @@ export function Reports() {
                     placeholder="Tìm theo tên, mã, SĐT..."
                     value={customerSearchQuery}
                     onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                    className="pl-9"
+                    className="pl-9 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   />
                 </div>
               </div>
@@ -1735,13 +1735,13 @@ export function Reports() {
                 <h3 className="text-sm text-slate-900 mb-3">Mối quan tâm</h3>
                 <RadioGroup value={supplierConcern} onValueChange={(value) => setSupplierConcern(value as 'sales' | 'debt')}>
                   <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="sales" id="supplier-concern-sales" />
+                    <RadioGroupItem value="sales" id="supplier-concern-sales" className="border-slate-300" />
                     <Label htmlFor="supplier-concern-sales" className="text-sm text-slate-700 cursor-pointer">
                       Nhập hàng
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="debt" id="supplier-concern-debt" />
+                    <RadioGroupItem value="debt" id="supplier-concern-debt" className="border-slate-300" />
                     <Label htmlFor="supplier-concern-debt" className="text-sm text-slate-700 cursor-pointer">
                       Công nợ
                     </Label>
@@ -1773,7 +1773,7 @@ export function Reports() {
                     placeholder="Theo mã, tên, điện thoại"
                     value={supplierSearchQuery}
                     onChange={(e) => setSupplierSearchQuery(e.target.value)}
-                    className="pl-9"
+                    className="pl-9 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   />
                 </div>
               </div>
@@ -1824,37 +1824,37 @@ export function Reports() {
                   }
                 }}>
                   <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="time" id="sales-concern-time" />
+                    <RadioGroupItem value="time" id="sales-concern-time" className="border-slate-300" />
                     <Label htmlFor="sales-concern-time" className="text-sm text-slate-700 cursor-pointer">
                       Thời gian
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="profit" id="sales-concern-profit" />
+                    <RadioGroupItem value="profit" id="sales-concern-profit" className="border-slate-300" />
                     <Label htmlFor="sales-concern-profit" className="text-sm text-slate-700 cursor-pointer">
                       Lợi nhuận
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="discount" id="sales-concern-discount" />
+                    <RadioGroupItem value="discount" id="sales-concern-discount" className="border-slate-300" />
                     <Label htmlFor="sales-concern-discount" className="text-sm text-slate-700 cursor-pointer">
                       Giảm giá HĐ
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="return" id="sales-concern-return" />
+                    <RadioGroupItem value="return" id="sales-concern-return" className="border-slate-300" />
                     <Label htmlFor="sales-concern-return" className="text-sm text-slate-700 cursor-pointer">
                       Trả hàng
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="table" id="sales-concern-table" />
+                    <RadioGroupItem value="table" id="sales-concern-table" className="border-slate-300" />
                     <Label htmlFor="sales-concern-table" className="text-sm text-slate-700 cursor-pointer">
                       Phòng/Bàn
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="category" id="sales-concern-category" />
+                    <RadioGroupItem value="category" id="sales-concern-category" className="border-slate-300" />
                     <Label htmlFor="sales-concern-category" className="text-sm text-slate-700 cursor-pointer">
                       Danh mục hàng hóa
                     </Label>
@@ -1882,7 +1882,7 @@ export function Reports() {
                 <h3 className="text-sm text-slate-900 mb-3">Phòng / Bàn</h3>
                 <div className="space-y-3">
                   <Select value={salesSelectedArea} onValueChange={setSalesSelectedArea}>
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="w-full bg-white border border-slate-300 shadow-none">
                       <SelectValue placeholder="Chọn khu vực" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1895,7 +1895,7 @@ export function Reports() {
 
                   <Popover open={tableSearchOpen} onOpenChange={setTableSearchOpen}>
                     <PopoverTrigger asChild>
-                      <button className="flex w-full items-center justify-between gap-2 rounded-md border border-input bg-input-background px-3 py-2 text-sm h-9 whitespace-nowrap transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50">
+                      <button className="flex w-full items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm h-9 whitespace-nowrap transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-blue-500/50 focus-visible:border-blue-500 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50">
                         <span className={salesSelectedTable ? '' : 'text-muted-foreground'}>
                           {salesSelectedTable === 'all' 
                             ? 'Tất cả phòng/bàn'
@@ -1911,7 +1911,7 @@ export function Reports() {
                     </PopoverTrigger>
                     <PopoverContent className="w-[var(--radix-select-trigger-width)] p-0" align="start">
                       <Command>
-                        <CommandInput placeholder="Tìm phòng/bàn..." />
+                        <CommandInput placeholder="Tìm phòng/bàn..." className="bg-white border border-slate-300 focus:border-blue-500 focus:ring-blue-500 focus:ring-2" />
                         <CommandList>
                           <CommandEmpty>Không tìm thấy.</CommandEmpty>
                           <CommandGroup className="max-h-64 overflow-auto">
@@ -2010,25 +2010,25 @@ export function Reports() {
                 <h3 className="text-sm text-slate-900 mb-3">Mối quan tâm</h3>
                 <RadioGroup value={productsConcern} onValueChange={(value) => setProductsConcern(value as typeof productsConcern)}>
                   <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="sales" id="products-concern-sales" />
+                    <RadioGroupItem value="sales" id="products-concern-sales" className="border-slate-300" />
                     <Label htmlFor="products-concern-sales" className="text-sm text-slate-700 cursor-pointer">
                       Bán hàng
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="profit" id="products-concern-profit" />
+                    <RadioGroupItem value="profit" id="products-concern-profit" className="border-slate-300" />
                     <Label htmlFor="products-concern-profit" className="text-sm text-slate-700 cursor-pointer">
                       Lợi nhuận
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="import-export" id="products-concern-import-export" />
+                    <RadioGroupItem value="import-export" id="products-concern-import-export" className="border-slate-300" />
                     <Label htmlFor="products-concern-import-export" className="text-sm text-slate-700 cursor-pointer">
                       Xuất nhập tồn
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="write-off" id="products-concern-write-off" />
+                    <RadioGroupItem value="write-off" id="products-concern-write-off" className="border-slate-300" />
                     <Label htmlFor="products-concern-write-off" className="text-sm text-slate-700 cursor-pointer">
                       Xuất hủy
                     </Label>
@@ -2044,13 +2044,13 @@ export function Reports() {
                 <RadioGroup value={productsDateRangeType} onValueChange={(value) => setProductsDateRangeType(value as 'preset' | 'custom')}>
                   {/* Preset Time Ranges */}
                   <div className="flex items-center space-x-2 mb-3">
-                    <RadioGroupItem value="preset" id="products-date-preset" />
+                    <RadioGroupItem value="preset" id="products-date-preset" className="border-slate-300" />
                     <div className="flex-1">
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className="w-full justify-between text-left text-sm"
+                            className="w-full justify-between text-left text-sm bg-white border-slate-300"
                             onClick={() => setProductsDateRangeType('preset')}
                           >
                             <span>
@@ -2171,13 +2171,13 @@ export function Reports() {
 
                   {/* Custom Date Range */}
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="custom" id="products-date-custom" />
+                    <RadioGroupItem value="custom" id="products-date-custom" className="border-slate-300" />
                     <div className="flex-1">
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className="w-full justify-start text-left text-sm"
+                            className="w-full justify-start text-left text-sm bg-white border-slate-300"
                             onClick={() => setProductsDateRangeType('custom')}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
@@ -2234,7 +2234,7 @@ export function Reports() {
                     placeholder="Theo tên, mã hàng"
                     value={productsSearchQuery}
                     onChange={(e) => setProductsSearchQuery(e.target.value)}
-                    className="pl-9"
+                    className="pl-9 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   />
                 </div>
               </div>
@@ -2303,8 +2303,8 @@ export function Reports() {
                 <h3 className="text-sm text-slate-900 mb-3">Danh mục hàng hóa</h3>
                 <Popover open={productCategorySearchOpen} onOpenChange={setProductCategorySearchOpen}>
                   <PopoverTrigger asChild>
-                    <button className="flex w-full items-center justify-between gap-2 rounded-md border border-input bg-input-background px-3 py-2 text-sm h-9 whitespace-nowrap transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50">
-                      <span className={productsCategory ? '' : 'text-muted-foreground'}>
+                    <button className="flex w-full items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm h-9 whitespace-nowrap transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-blue-500/50 focus-visible:border-blue-500 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50">
+                      <span className={productsCategory ? '' : 'text-slate-500'}>
                         {productsCategory === 'all'
                           ? 'Tất cả'
                           : productCategories.find(cat => cat.id === productsCategory)?.name || 'Chọn danh mục'}
@@ -2314,7 +2314,7 @@ export function Reports() {
                   </PopoverTrigger>
                   <PopoverContent className="w-[var(--radix-select-trigger-width)] p-0" align="start">
                     <Command>
-                      <CommandInput placeholder="Tìm danh mục..." />
+                      <CommandInput placeholder="Tìm danh mục..." className="bg-white border border-slate-300 focus:border-blue-500 focus:ring-blue-500 focus:ring-2" />
                       <CommandList>
                         <CommandEmpty>Không tìm thấy.</CommandEmpty>
                         <CommandGroup className="max-h-64 overflow-auto">
@@ -2430,13 +2430,13 @@ export function Reports() {
                     <RadioGroup value={financeDateRangeType} onValueChange={(value) => setFinanceDateRangeType(value as 'preset' | 'custom')}>
                       {/* Preset Time Ranges */}
                       <div className="flex items-center space-x-2 mb-3">
-                        <RadioGroupItem value="preset" id="finance-date-preset" />
+                        <RadioGroupItem value="preset" id="finance-date-preset" className="border-slate-300" />
                         <div className="flex-1">
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button
                                 variant="outline"
-                                className="w-full justify-between text-left text-sm"
+                                className="w-full justify-between text-left text-sm bg-white border-slate-300"
                                 onClick={() => setFinanceDateRangeType('preset')}
                               >
                                 <span>
@@ -2510,13 +2510,13 @@ export function Reports() {
 
                       {/* Custom Date Range */}
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="custom" id="finance-date-custom" />
+                        <RadioGroupItem value="custom" id="finance-date-custom" className="border-slate-300" />
                         <div className="flex-1">
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button
                                 variant="outline"
-                                className="w-full justify-start text-left text-sm"
+                                className="w-full justify-start text-left text-sm bg-white border-slate-300"
                                 onClick={() => setFinanceDateRangeType('custom')}
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
@@ -2571,13 +2571,13 @@ export function Reports() {
                     <h3 className="text-sm text-slate-900 mb-3">Mối quan tâm</h3>
                     <RadioGroup value={employeeConcern} onValueChange={(value) => setEmployeeConcern(value as 'profit' | 'sales-by-employee')}>
                       <div className="flex items-center space-x-2 mb-2">
-                        <RadioGroupItem value="profit" id="employee-concern-profit" />
+                        <RadioGroupItem value="profit" id="employee-concern-profit" className="border-slate-300" />
                         <Label htmlFor="employee-concern-profit" className="text-sm text-slate-700 cursor-pointer">
                           Lợi nhuận
                         </Label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="sales-by-employee" id="employee-concern-sales" />
+                        <RadioGroupItem value="sales-by-employee" id="employee-concern-sales" className="border-slate-300" />
                         <Label htmlFor="employee-concern-sales" className="text-sm text-slate-700 cursor-pointer">
                           Hàng bán theo nhân viên
                         </Label>
@@ -2593,13 +2593,13 @@ export function Reports() {
                     <RadioGroup value={employeeDateRangeType} onValueChange={(value) => setEmployeeDateRangeType(value as 'preset' | 'custom')}>
                       {/* Preset Time Ranges */}
                       <div className="flex items-center space-x-2 mb-3">
-                        <RadioGroupItem value="preset" id="employee-date-preset" />
+                        <RadioGroupItem value="preset" id="employee-date-preset" className="border-slate-300" />
                         <div className="flex-1">
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button
                                 variant="outline"
-                                className="w-full justify-between text-left text-sm"
+                                className="w-full justify-between text-left text-sm bg-white border-slate-300"
                                 onClick={() => setEmployeeDateRangeType('preset')}
                               >
                                 <span>
@@ -2720,13 +2720,13 @@ export function Reports() {
 
                       {/* Custom Date Range */}
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="custom" id="employee-date-custom" />
+                        <RadioGroupItem value="custom" id="employee-date-custom" className="border-slate-300" />
                         <div className="flex-1">
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button
                                 variant="outline"
-                                className="w-full justify-start text-left text-sm"
+                                className="w-full justify-start text-left text-sm bg-white border-slate-300"
                                 onClick={() => setEmployeeDateRangeType('custom')}
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
@@ -2845,11 +2845,11 @@ export function Reports() {
                       placeholder="Tìm khách hàng..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9"
+                      className="pl-9 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                     />
                   </div>
                   <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-white border-slate-300 shadow-none">
                       <SelectValue placeholder="Nhân viên" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2860,7 +2860,7 @@ export function Reports() {
                     </SelectContent>
                   </Select>
                   <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-white border-slate-300 shadow-none">
                       <SelectValue placeholder="Phương thức TT" />
                     </SelectTrigger>
                     <SelectContent>

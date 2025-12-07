@@ -639,7 +639,7 @@ export function PromotionPopup({
                       setShowCustomerSearch(true);
                     }}
                     onFocus={() => setShowCustomerSearch(true)}
-                    className="pl-10"
+                    className="pl-10 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   />
                 </div>
 
@@ -765,7 +765,7 @@ export function PromotionPopup({
                     setValidationState('idle');
                   }}
                   onFocus={() => setShowAutocomplete(true)}
-                  className="uppercase"
+                  className="bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
                 
                 {/* Autocomplete suggestions */}

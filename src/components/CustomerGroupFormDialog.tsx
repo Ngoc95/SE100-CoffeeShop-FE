@@ -1,7 +1,22 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
-import svgPaths from '../imports/svg-uemarp4dxh';
 import { Button } from './ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from './ui/dialog';
+import { Label } from './ui/label';
+import { Input } from './ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
 
 interface Customer {
   id: string;
@@ -93,101 +108,84 @@ export function CustomerGroupFormDialog({
        customer.code.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white border border-[rgba(0,0,0,0.1)] border-solid rounded-[10px] shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] w-[600px] relative max-h-[90vh] flex flex-col">
-        {/* Title */}
-        <div className="pt-6 px-6">
-          <p className="font-['Arimo:Regular',sans-serif] font-normal leading-[18px] text-[18px] text-neutral-950">
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-[600px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle className="text-lg font-semibold">
             {editingGroup ? 'Chỉnh sửa nhóm khách hàng' : 'Thêm nhóm khách hàng mới'}
-          </p>
-        </div>
+          </DialogTitle>
+        </DialogHeader>
 
-        {/* Close Button */}
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 opacity-70 hover:opacity-100 w-4 h-4 flex items-center justify-center"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 12 12">
-            <path d={svgPaths.p31ac93c0} stroke="#0A0A0A" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.33333" />
-            <path d={svgPaths.p1c3aed40} stroke="#0A0A0A" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.33333" />
-          </svg>
-        </button>
-
-        {/* Form Fields */}
-        <div className="px-6 pt-[34px] pb-6 flex flex-col gap-4 overflow-y-auto flex-1">
+        <div className="space-y-4">
           {/* Tên nhóm */}
-          <div className="flex flex-col gap-[3px]">
-            <label className="font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950">
-              Tên nhóm khách hàng
-            </label>
-            <input
+          <div>
+            <Label>Tên nhóm khách hàng</Label>
+            <Input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="VD: Khách hàng VIP"
-              className="bg-white border border-[rgba(0,0,0,0.1)] border-solid rounded-md h-10 px-3 font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
 
           {/* Trạng thái */}
-          <div className="flex flex-col gap-[3px]">
-            <label className="font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950">
-              Trạng thái
-            </label>
-            <select
+          <div>
+            <Label>Trạng thái</Label>
+            <Select
               value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' | 'inactive' })}
-              className="bg-white border border-[rgba(0,0,0,0.1)] border-solid rounded-md h-10 px-3 font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onValueChange={(value) => setFormData({ ...formData, status: value as 'active' | 'inactive' })}
             >
-              <option value="active">Hoạt động</option>
-              <option value="inactive">Không hoạt động</option>
-            </select>
+              <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Hoạt động</SelectItem>
+                <SelectItem value="inactive">Không hoạt động</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Customer List Section */}
-          <div className="flex flex-col gap-[3px]">
-            <label className="font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950">
-              Danh sách khách hàng ({formData.customers.length})
-            </label>
+          <div>
+            <Label>Danh sách khách hàng ({formData.customers.length})</Label>
             
             {/* Add Customer Section */}
-            <div className="relative">
+            <div className="relative mt-1.5">
               {!showAddCustomerDropdown ? (
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full justify-start gap-2 h-10"
+                  className="w-full justify-start gap-2 h-10 bg-white border-slate-300"
                   onClick={() => setShowAddCustomerDropdown(true)}
                 >
                   <Plus className="w-4 h-4" />
                   Thêm khách hàng vào nhóm
                 </Button>
               ) : (
-                <div className="border border-[rgba(0,0,0,0.1)] rounded-md">
-                  <input
+                <div className="border border-slate-300 rounded-md">
+                  <Input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Tìm kiếm khách hàng..."
-                    className="w-full h-10 px-3 font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950 focus:outline-none"
+                    className="h-10 bg-white border-0 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2 rounded-b-none"
                     autoFocus
                   />
                   {filteredAvailableCustomers.length > 0 && (
-                    <div className="max-h-40 overflow-y-auto border-t border-[rgba(0,0,0,0.1)]">
+                    <div className="max-h-40 overflow-y-auto border-t border-slate-300">
                       {filteredAvailableCustomers.slice(0, 5).map((customer) => (
                         <button
                           key={customer.id}
                           type="button"
                           onClick={() => handleAddCustomer(customer)}
-                          className="w-full text-left px-3 py-2 hover:bg-slate-50 border-b border-[rgba(0,0,0,0.05)] last:border-0"
+                          className="w-full text-left px-3 py-2 hover:bg-slate-50 border-b border-slate-200 last:border-0 text-sm"
                         >
-                          <div className="font-['Arimo:Regular',sans-serif] font-normal text-[14px] text-neutral-950">
+                          <div className="text-slate-900 font-medium">
                             {customer.name}
                           </div>
-                          <div className="font-['Arimo:Regular',sans-serif] font-normal text-[12px] text-slate-500">
+                          <div className="text-xs text-slate-500">
                             {customer.code} • {customer.phone}
                           </div>
                         </button>
@@ -200,17 +198,17 @@ export function CustomerGroupFormDialog({
 
             {/* Customer List */}
             {formData.customers.length > 0 && (
-              <div className="mt-2 border border-[rgba(0,0,0,0.1)] rounded-md divide-y divide-[rgba(0,0,0,0.05)] max-h-60 overflow-y-auto">
+              <div className="mt-2 border border-slate-300 rounded-md divide-y divide-slate-200 max-h-60 overflow-y-auto">
                 {formData.customers.map((customer) => (
                   <div
                     key={customer.id}
                     className="flex items-center justify-between px-3 py-2 hover:bg-slate-50"
                   >
                     <div>
-                      <div className="font-['Arimo:Regular',sans-serif] font-normal text-[14px] text-neutral-950">
+                      <div className="text-sm text-slate-900 font-medium">
                         {customer.name}
                       </div>
-                      <div className="font-['Arimo:Regular',sans-serif] font-normal text-[12px] text-slate-500">
+                      <div className="text-xs text-slate-500">
                         {customer.code} • {customer.phone}
                       </div>
                     </div>
@@ -228,23 +226,19 @@ export function CustomerGroupFormDialog({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 pt-0 pb-6 flex justify-end gap-[9px] border-t border-[rgba(0,0,0,0.05)] pt-4">
-          <button
-            onClick={onClose}
-            className="font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950 px-4 h-9 bg-white border border-[rgba(0,0,0,0.1)] border-solid rounded-md hover:bg-slate-50 transition-colors"
-          >
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
             Hủy
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleSubmit}
             disabled={!formData.name}
-            className="font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-white px-4 h-9 bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-blue-600 hover:bg-blue-700"
           >
             {editingGroup ? 'Cập nhật' : 'Thêm nhóm'}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -13,6 +13,8 @@ import {
   Upload,
   Download,
   Printer,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -56,8 +58,8 @@ export function Suppliers() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedCity, setSelectedCity] = useState("all");
-  const [sortBy, setSortBy] = useState<"name" | "debt">("name");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [sortBy, setSortBy] = useState<"name" | "debt" | null>(null);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc" | "none">("none");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
 
@@ -133,22 +135,24 @@ export function Suppliers() {
   const categories = Array.from(new Set(suppliers.map((s) => s.category)));
   const cities = Array.from(new Set(suppliers.map((s) => s.city)));
 
-  const filteredSuppliers = suppliers
-    .filter((supplier) => {
-      const matchesSearch =
-        supplier.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        supplier.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        supplier.phone.includes(searchQuery) ||
-        supplier.contact.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory =
-        selectedCategory === "all" || supplier.category === selectedCategory;
-      const matchesStatus =
-        selectedStatus === "all" || supplier.status === selectedStatus;
-      const matchesCity =
-        selectedCity === "all" || supplier.city === selectedCity;
-      return matchesSearch && matchesCategory && matchesStatus && matchesCity;
-    })
-    .sort((a, b) => {
+  let filteredSuppliers = suppliers.filter((supplier) => {
+    const matchesSearch =
+      supplier.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      supplier.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      supplier.phone.includes(searchQuery) ||
+      supplier.contact.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory =
+      selectedCategory === "all" || supplier.category === selectedCategory;
+    const matchesStatus =
+      selectedStatus === "all" || supplier.status === selectedStatus;
+    const matchesCity =
+      selectedCity === "all" || supplier.city === selectedCity;
+    return matchesSearch && matchesCategory && matchesStatus && matchesCity;
+  });
+
+  // Apply sorting
+  if (sortBy && sortOrder !== "none") {
+    filteredSuppliers = [...filteredSuppliers].sort((a, b) => {
       let aValue: string | number = "";
       let bValue: string | number = "";
 
@@ -170,10 +174,20 @@ export function Suppliers() {
         ? (aValue as number) - (bValue as number)
         : (bValue as number) - (aValue as number);
     });
+  }
 
   const handleSort = (column: "name" | "debt") => {
     if (sortBy === column) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+      // Cycle through: asc -> desc -> none -> asc
+      if (sortOrder === "asc") {
+        setSortOrder("desc");
+      } else if (sortOrder === "desc") {
+        setSortOrder("none");
+        setSortBy(null);
+      } else {
+        setSortBy(column);
+        setSortOrder("asc");
+      }
     } else {
       setSortBy(column);
       setSortOrder("asc");
@@ -181,9 +195,11 @@ export function Suppliers() {
   };
 
   const getSortIcon = (column: "name" | "debt") => {
-    if (sortBy !== column)
-      return <ArrowUpDown className="w-3 h-3 ml-1 inline opacity-30" />;
-    return sortOrder === "asc" ? " ↑" : " ↓";
+    if (sortBy !== column || sortOrder === "none") return null;
+    if (sortOrder === "asc") {
+      return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
+    }
+    return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
   };
 
   const handleAddSupplier = (formData: Omit<Supplier, "id" | "code">) => {
@@ -270,7 +286,7 @@ export function Suppliers() {
                   value={selectedCategory}
                   onValueChange={setSelectedCategory}
                 >
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="mt-1 bg-white border-slate-300 shadow-none">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -289,7 +305,7 @@ export function Suppliers() {
                   Tỉnh / Thành phố
                 </Label>
                 <Select value={selectedCity} onValueChange={setSelectedCity}>
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="mt-1 bg-white border-slate-300 shadow-none">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -309,11 +325,11 @@ export function Suppliers() {
                   value={selectedStatus}
                   onValueChange={setSelectedStatus}
                 >
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="mt-1 bg-white border-slate-300 shadow-none">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Tất c trạng thái</SelectItem>
+                    <SelectItem value="all">Tất cả trạng thái</SelectItem>
                     <SelectItem value="active">Hoạt động</SelectItem>
                     <SelectItem value="inactive">Không hoạt động</SelectItem>
                   </SelectContent>
@@ -421,7 +437,7 @@ export function Suppliers() {
               placeholder="Tìm kiếm theo tên, mã, số điện thoại..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
         </div>
@@ -434,30 +450,37 @@ export function Suppliers() {
                 Danh sách nhà cung cấp ({filteredSuppliers.length})
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mã NCC</TableHead>
-                    <TableHead
-                      className="cursor-pointer hover:bg-slate-50"
-                      onClick={() => handleSort("name")}
-                    >
-                      Tên NCC{getSortIcon("name")}
-                    </TableHead>
-                    <TableHead>Danh mục</TableHead>
-                    <TableHead>Địa chỉ</TableHead>
-                    <TableHead>Liên hệ</TableHead>
-                    <TableHead
-                      className="cursor-pointer hover:bg-slate-50"
-                      onClick={() => handleSort("debt")}
-                    >
-                      Công nợ{getSortIcon("debt")}
-                    </TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                    <TableHead className="text-right">Thao tác</TableHead>
-                  </TableRow>
-                </TableHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto rounded-xl">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-blue-50">
+                      <TableHead className="text-sm">Mã NCC</TableHead>
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("name")}
+                      >
+                        <div className="flex items-center">
+                          Tên NCC
+                          {getSortIcon("name")}
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-sm">Danh mục</TableHead>
+                      <TableHead className="text-sm">Địa chỉ</TableHead>
+                      <TableHead className="text-sm">Liên hệ</TableHead>
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("debt")}
+                      >
+                        <div className="flex items-center">
+                          Công nợ
+                          {getSortIcon("debt")}
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-sm">Trạng thái</TableHead>
+                      <TableHead className="text-sm text-right">Thao tác</TableHead>
+                    </TableRow>
+                  </TableHeader>
                 <TableBody>
                   {filteredSuppliers.length === 0 ? (
                     <TableRow>
@@ -471,18 +494,18 @@ export function Suppliers() {
                   ) : (
                     filteredSuppliers.map((supplier) => (
                       <TableRow key={supplier.id}>
-                        <TableCell className="text-slate-900">
+                        <TableCell className="text-sm text-slate-900">
                           {supplier.code}
                         </TableCell>
-                        <TableCell className="text-slate-900">
+                        <TableCell className="text-sm text-slate-900">
                           {supplier.name}
                         </TableCell>
-                        <TableCell className="text-slate-600">
+                        <TableCell className="text-sm text-slate-700">
                           <Badge variant="outline" className="bg-slate-50">
                             {supplier.category}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-slate-600">
+                        <TableCell className="text-sm text-slate-700">
                           <div className="flex flex-col gap-0.5">
                             <span>{supplier.city}</span>
                             <span className="text-xs text-slate-500">
@@ -490,7 +513,7 @@ export function Suppliers() {
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-slate-600">
+                        <TableCell className="text-sm text-slate-700">
                           <div className="flex flex-col gap-0.5">
                             <span>{supplier.contact}</span>
                             <span className="text-xs text-slate-500">
@@ -498,7 +521,7 @@ export function Suppliers() {
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-slate-900">
+                        <TableCell className="text-sm text-slate-900">
                           <span
                             className={
                               supplier.debt > 0
@@ -509,7 +532,7 @@ export function Suppliers() {
                             {formatCurrency(supplier.debt)}
                           </span>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-sm">
                           <Badge
                             variant={
                               supplier.status === "active"
@@ -527,7 +550,7 @@ export function Suppliers() {
                               : "Không hoạt động"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-sm text-right">
                           <div className="flex items-center justify-end gap-2">
                             <Button
                               variant="ghost"
@@ -573,6 +596,7 @@ export function Suppliers() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </div>

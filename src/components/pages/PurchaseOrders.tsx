@@ -55,6 +55,14 @@ import {
 import { Calendar } from "../ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Textarea } from "../ui/textarea";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../ui/table";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { toast } from "sonner@2.0.3";
@@ -155,7 +163,7 @@ export function PurchaseOrders() {
   const [sortColumn, setSortColumn] = useState<keyof PurchaseOrder | null>(
     null
   );
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | "none">("none");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showAddItemDialog, setShowAddItemDialog] = useState(false);
@@ -494,12 +502,14 @@ export function PurchaseOrders() {
   // Sort handler
   const handleSort = (column: keyof PurchaseOrder) => {
     if (sortColumn === column) {
-      // Same column: cycle through asc -> desc -> no sort
+      // Cycle through: asc -> desc -> none -> asc
       if (sortDirection === "asc") {
         setSortDirection("desc");
       } else if (sortDirection === "desc") {
-        // Reset to no sort
+        setSortDirection("none");
         setSortColumn(null);
+      } else {
+        setSortColumn(column);
         setSortDirection("asc");
       }
     } else {
@@ -511,8 +521,8 @@ export function PurchaseOrders() {
 
   // Get sort icon for column header
   const getSortIcon = (column: keyof PurchaseOrder) => {
-    if (sortColumn !== column) {
-      return <ArrowUpDown className="w-4 h-4 ml-1 inline opacity-30" />;
+    if (sortColumn !== column || sortDirection === "none") {
+      return null;
     }
     if (sortDirection === "asc") {
       return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
@@ -557,7 +567,7 @@ export function PurchaseOrders() {
 
   // Apply sorting
   const sortedOrders = [...filteredOrders];
-  if (sortColumn) {
+  if (sortColumn && sortDirection !== "none") {
     sortedOrders.sort((a, b) => {
       let aValue: any = a[sortColumn];
       let bValue: any = b[sortColumn];
@@ -1117,13 +1127,13 @@ export function PurchaseOrders() {
             >
               {/* Preset Time Ranges */}
               <div className="flex items-center space-x-2 mb-3">
-                <RadioGroupItem value="preset" id="date-preset" />
+                <RadioGroupItem value="preset" id="date-preset" className="border-slate-300" />
                 <div className="flex-1">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="w-full justify-between text-left text-sm"
+                        className="w-full justify-between text-left text-sm bg-white border-slate-300"
                         onClick={() => setDateRangeType("preset")}
                       >
                         <span>
@@ -1266,13 +1276,17 @@ export function PurchaseOrders() {
 
               {/* Custom Date Range */}
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="custom" id="date-custom" />
+                <RadioGroupItem
+                  value="custom"
+                  id="date-custom"
+                  className="border-slate-300"
+                />
                 <div className="flex-1">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="w-full justify-start text-left text-sm"
+                        className="w-full justify-start text-left text-sm bg-white border-slate-300"
                         onClick={() => setDateRangeType("custom")}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
@@ -1449,111 +1463,111 @@ export function PurchaseOrders() {
 
         {/* Search Bar */}
         <div className="mb-4">
-          <div className="relative max-w-md">
+          <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               placeholder="Tìm theo mã phiếu hoặc nhà cung cấp..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-none focus:outline-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
         </div>
 
         {/* Table */}
         <div className="bg-white rounded-lg border border-slate-200">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th
-                    className="px-4 py-3 text-left text-xs text-slate-600 cursor-pointer hover:bg-slate-100 select-none"
+          <div className="overflow-x-auto rounded-xl">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-blue-50">
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
                     onClick={() => handleSort("code")}
                   >
                     <div className="flex items-center">
                       Mã phiếu
                       {getSortIcon("code")}
                     </div>
-                  </th>
-                  <th
-                    className="px-4 py-3 text-left text-xs text-slate-600 cursor-pointer hover:bg-slate-100 select-none"
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
                     onClick={() => handleSort("date")}
                   >
                     <div className="flex items-center">
                       Ngày giờ
                       {getSortIcon("date")}
                     </div>
-                  </th>
-                  <th
-                    className="px-4 py-3 text-left text-xs text-slate-600 cursor-pointer hover:bg-slate-100 select-none"
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
                     onClick={() => handleSort("supplier")}
                   >
                     <div className="flex items-center">
                       Nhà cung cấp
                       {getSortIcon("supplier")}
                     </div>
-                  </th>
-                  <th
-                    className="px-4 py-3 text-center text-xs text-slate-600 cursor-pointer hover:bg-slate-100 select-none"
+                  </TableHead>
+                  <TableHead
+                    className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
                     onClick={() => handleSort("items")}
                   >
                     <div className="flex items-center justify-center">
                       Số mặt hàng
                       {getSortIcon("items")}
                     </div>
-                  </th>
-                  <th
-                    className="px-4 py-3 text-right text-xs text-slate-600 cursor-pointer hover:bg-slate-100 select-none"
+                  </TableHead>
+                  <TableHead
+                    className="text-sm text-right cursor-pointer hover:bg-blue-100 transition-colors"
                     onClick={() => handleSort("totalAmount")}
                   >
                     <div className="flex items-center justify-end">
                       Tổng giá trị
                       {getSortIcon("totalAmount")}
                     </div>
-                  </th>
-                  <th
-                    className="px-4 py-3 text-left text-xs text-slate-600 cursor-pointer hover:bg-slate-100 select-none"
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
                     onClick={() => handleSort("staff")}
                   >
                     <div className="flex items-center">
                       Nhân viên
                       {getSortIcon("staff")}
                     </div>
-                  </th>
-                  <th
-                    className="px-4 py-3 text-right text-xs text-slate-600 cursor-pointer hover:bg-slate-100 select-none"
+                  </TableHead>
+                  <TableHead
+                    className="text-sm text-right cursor-pointer hover:bg-blue-100 transition-colors"
                     onClick={() => handleSort("paidAmount")}
                   >
                     <div className="flex items-center justify-end">
                       Đã trả NCC
                       {getSortIcon("paidAmount")}
                     </div>
-                  </th>
-                  <th
-                    className="px-4 py-3 text-center text-xs text-slate-600 cursor-pointer hover:bg-slate-100 select-none"
+                  </TableHead>
+                  <TableHead
+                    className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
                     onClick={() => handleSort("status")}
                   >
                     <div className="flex items-center justify-center">
                       Trạng thái
                       {getSortIcon("status")}
                     </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {sortedOrders.map((order, index) => (
                   <>
-                    <tr
+                    <TableRow
                       key={order.id}
-                      className="hover:bg-slate-50 cursor-pointer"
+                      className="hover:bg-blue-50/50 cursor-pointer"
                       onClick={() =>
                         setExpandedRow(
                           expandedRow === order.id ? null : order.id
                         )
                       }
                     >
-                      <td className="px-4 py-3 text-sm">
+                      <TableCell className="text-sm">
                         <div className="flex items-center gap-2">
                           {expandedRow === order.id ? (
                             <ChevronDown className="w-4 h-4 text-slate-400" />
@@ -1562,26 +1576,26 @@ export function PurchaseOrders() {
                           )}
                           <span className="text-blue-600">{order.code}</span>
                         </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-600">
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700">
                         {order.date}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-900">
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-900">
                         {order.supplier}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-600 text-center">
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700 text-center">
                         {order.items}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-900 text-right">
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-900 text-right">
                         {order.totalAmount.toLocaleString("vi-VN")}đ
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-600">
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700">
                         {order.staff}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-900 text-right">
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-900 text-right">
                         {order.paidAmount.toLocaleString("vi-VN")}đ
-                      </td>
-                      <td className="px-4 py-3 text-center">
+                      </TableCell>
+                      <TableCell className="text-sm text-center">
                         <span
                           className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
                             order.status === "completed"
@@ -1597,12 +1611,12 @@ export function PurchaseOrders() {
                             ? "Phiếu tạm"
                             : "Đã hủy"}
                         </span>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                     {/* Expanded Row */}
                     {expandedRow === order.id && order.details && (
-                      <tr>
-                        <td colSpan={8} className="bg-slate-50 px-4 py-4">
+                      <TableRow>
+                        <TableCell colSpan={8} className="bg-slate-50 px-4 py-4">
                           <Tabs defaultValue="info" className="w-full">
                             <TabsList>
                               <TabsTrigger value="info">Thông tin</TabsTrigger>
@@ -1664,7 +1678,7 @@ export function PurchaseOrders() {
                                           [order.id]: e.target.value,
                                         });
                                       }}
-                                      className="text-sm"
+                                      className="text-sm bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                                     />
                                   </div>
                                   <div>
@@ -2136,13 +2150,13 @@ export function PurchaseOrders() {
                               })()}
                             </TabsContent>
                           </Tabs>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     )}
                   </>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
 
           {/* Footer */}
@@ -2167,7 +2181,7 @@ export function PurchaseOrders() {
           }}
         >
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-lg font-semibold">
               {editingOrderId !== null
                 ? "Chỉnh sửa phiếu nhập hàng"
                 : "Thêm phiếu nhập hàng vào kho"}
@@ -2182,7 +2196,7 @@ export function PurchaseOrders() {
                 <Input
                   value={formData.code}
                   disabled
-                  className="bg-slate-100"
+                  className="bg-slate-100 border-slate-300 shadow-none"
                 />
               </div>
               <div className="space-y-2">
@@ -2193,7 +2207,7 @@ export function PurchaseOrders() {
                     setFormData({ ...formData, supplier: value })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white border-slate-300 shadow-none">
                     <SelectValue placeholder="Chọn nhà cung cấp" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2212,7 +2226,7 @@ export function PurchaseOrders() {
                     onChange={(e) =>
                       setFormData({ ...formData, date: e.target.value })
                     }
-                    className="bg-white pr-10"
+                    className="bg-white border-slate-300 shadow-none pr-10 focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   />
                 </div>
               </div>
@@ -2221,7 +2235,7 @@ export function PurchaseOrders() {
                 <Input
                   value={formData.staff}
                   disabled
-                  className="bg-slate-100"
+                  className="bg-slate-100 border-slate-300 shadow-none"
                   placeholder="Nhân viên nhập"
                 />
               </div>
@@ -2340,7 +2354,7 @@ export function PurchaseOrders() {
                                       e.target.value
                                     )
                                   }
-                                  className="text-sm h-8 w-full"
+                                  className="text-sm h-8 w-full bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                                 />
                               </td>
                               <td
@@ -2370,7 +2384,7 @@ export function PurchaseOrders() {
                                       e.target.select();
                                     }
                                   }}
-                                  className="text-sm h-8 text-center w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  className="text-sm h-8 text-center w-full bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   min="0"
                                 />
                               </td>
@@ -2384,7 +2398,7 @@ export function PurchaseOrders() {
                                       e.target.value
                                     )
                                   }
-                                  className="text-sm h-8 w-full"
+                                  className="text-sm h-8 w-full bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                                 />
                               </td>
                               <td className="px-2 py-2">
@@ -2409,7 +2423,7 @@ export function PurchaseOrders() {
                                       parseFormattedNumber(inputValue);
                                     handleChangeItem("unitPrice", parsed);
                                   }}
-                                  className="text-sm h-8 text-right w-full [appearance:textfield]"
+                                  className="text-sm h-8 text-right w-full bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2 [appearance:textfield]"
                                   placeholder="0"
                                 />
                               </td>
@@ -2435,7 +2449,7 @@ export function PurchaseOrders() {
                                       parseFormattedNumber(inputValue);
                                     handleChangeItem("discount", parsed);
                                   }}
-                                  className="text-sm h-8 text-right w-full [appearance:textfield]"
+                                  className="text-sm h-8 text-right w-full bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2 [appearance:textfield]"
                                   placeholder="0"
                                 />
                               </td>
@@ -2477,7 +2491,7 @@ export function PurchaseOrders() {
                 <Input
                   value={totalValue.toLocaleString("vi-VN") + "đ"}
                   disabled
-                  className="bg-slate-100 text-right font-semibold"
+                  className="bg-slate-100 border-slate-300 shadow-none text-right font-semibold"
                 />
               </div>
               <div className="space-y-2">
@@ -2508,7 +2522,7 @@ export function PurchaseOrders() {
                     });
                   }}
                   placeholder="0"
-                  className="text-right [appearance:textfield]"
+                  className="text-right bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2 [appearance:textfield]"
                 />
                 <p className="text-xs text-slate-500">
                   Tối đa: {totalValue.toLocaleString("vi-VN")}đ
@@ -2542,13 +2556,21 @@ export function PurchaseOrders() {
                   }
                 >
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="cash" id="payment-cash" />
+                    <RadioGroupItem
+                      value="cash"
+                      id="payment-cash"
+                      className="border-slate-300"
+                    />
                     <Label htmlFor="payment-cash" className="cursor-pointer">
                       Tiền mặt
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="transfer" id="payment-transfer" />
+                    <RadioGroupItem
+                      value="transfer"
+                      id="payment-transfer"
+                      className="border-slate-300"
+                    />
                     <Label
                       htmlFor="payment-transfer"
                       className="cursor-pointer"
@@ -2570,7 +2592,7 @@ export function PurchaseOrders() {
                         <Button
                           variant="outline"
                           role="combobox"
-                          className="w-full justify-between"
+                          className="w-full justify-between bg-white border-slate-300"
                         >
                           {formData.bankName || "Chọn ngân hàng"}
                           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -2620,6 +2642,7 @@ export function PurchaseOrders() {
                       }
                       placeholder="Nhập số tài khoản"
                       disabled={!formData.bankId}
+                      className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                     />
                   </div>
                 </div>
@@ -2627,7 +2650,7 @@ export function PurchaseOrders() {
             </div>
 
             {/* Ghi chú */}
-            <div className="space-y-2">
+            <div className="space-y-2 py-1">
               <Label>Ghi chú</Label>
               <Textarea
                 value={formData.note}
@@ -2635,7 +2658,7 @@ export function PurchaseOrders() {
                   setFormData({ ...formData, note: e.target.value })
                 }
                 placeholder="Nhập ghi chú về phiếu nhập..."
-                className="min-h-[80px]"
+                className="min-h-[80px] bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
           </div>
@@ -2881,7 +2904,7 @@ export function PurchaseOrders() {
       <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Import phiếu nhập từ Excel</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Import phiếu nhập từ Excel</DialogTitle>
           </DialogHeader>
 
           <div className="py-6">
@@ -2983,7 +3006,7 @@ export function PurchaseOrders() {
                   placeholder="Tìm kiếm hàng hóa..."
                   value={itemSearchQuery}
                   onChange={(e) => setItemSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-none focus:outline-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
               </div>
               <Button

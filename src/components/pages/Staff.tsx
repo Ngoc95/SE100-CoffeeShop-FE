@@ -11,6 +11,8 @@ import {
   Info,
   Power,
   PowerOff,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
@@ -97,7 +99,7 @@ interface StaffMember {
 }
 
 type SortField = "staffCode" | "fullName" | "joinDate" | "position" | null;
-type SortOrder = "asc" | "desc";
+type SortOrder = "asc" | "desc" | "none";
 
 export function Staff() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -106,7 +108,7 @@ export function Staff() {
   const [filterPosition, setFilterPosition] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [sortField, setSortField] = useState<SortField>(null);
-  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("none");
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
 
   // State for coefficient input popover
@@ -349,20 +351,6 @@ export function Staff() {
     "Vũng Tàu": ["Phường 1", "Phường 2", "Phường Thắng Tam"],
   };
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortOrder("asc");
-    }
-  };
-
-  const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return null;
-    return sortOrder === "asc" ? " ↑" : " ↓";
-  };
-
   // Format number with VNĐ comma separator
   const formatVNCurrency = (value: string | number): string => {
     const numValue =
@@ -413,7 +401,7 @@ export function Staff() {
                 value={value}
                 readOnly
                 placeholder={placeholder}
-                className="h-8 cursor-pointer pointer-events-none"
+                className="h-8 cursor-pointer pointer-events-none bg-white border-slate-300 shadow-none"
               />
             </button>
           </PopoverTrigger>
@@ -442,7 +430,7 @@ export function Staff() {
                     }
                   }}
                   placeholder="100"
-                  className="flex-1 h-8 text-sm"
+                  className="flex-1 h-8 text-sm bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
@@ -491,7 +479,7 @@ export function Staff() {
 
   // Apply filters
   let filteredStaff = staffMembers.filter((staff) => {
-    const matchesSearch = 
+    const matchesSearch =
       staff.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       staff.staffCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
       staff.phone.includes(searchQuery) ||
@@ -505,8 +493,36 @@ export function Staff() {
     return matchesSearch && matchesPosition && matchesStatus;
   });
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Cycle through: asc -> desc -> none -> asc
+      if (sortOrder === "asc") {
+        setSortOrder("desc");
+      } else if (sortOrder === "desc") {
+        setSortOrder("none");
+        setSortField(null);
+      } else {
+        setSortField(field);
+        setSortOrder("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field || sortOrder === "none") {
+      return null;
+    }
+    if (sortOrder === "asc") {
+      return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
+    }
+    return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
+  };
+
   // Apply sorting
-  if (sortField) {
+  if (sortField && sortOrder !== "none") {
     filteredStaff = [...filteredStaff].sort((a, b) => {
       let aValue: any = a[sortField];
       let bValue: any = b[sortField];
@@ -514,6 +530,14 @@ export function Staff() {
       if (sortField === "joinDate") {
         aValue = new Date(a.joinDate).getTime();
         bValue = new Date(b.joinDate).getTime();
+      } else if (sortField === "position") {
+        aValue = a.positionLabel;
+        bValue = b.positionLabel;
+      }
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        const comparison = aValue.localeCompare(bValue, "vi");
+        return sortOrder === "asc" ? comparison : -comparison;
       }
 
       if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
@@ -659,7 +683,7 @@ export function Staff() {
     };
 
     setStaffMembers([...staffMembers, newStaff]);
-    
+
     // Show success message with account info if created
     if (accountData.username) {
       toast.success(
@@ -668,7 +692,7 @@ export function Staff() {
     } else {
       toast.success("Đã thêm nhân viên mới thành công");
     }
-    
+
     setAddDialogOpen(false);
     resetForm();
   };
@@ -819,7 +843,7 @@ export function Staff() {
                   value={filterPosition}
                   onValueChange={(value) => setFilterPosition(value)}
                 >
-                  <SelectTrigger className="mt-1.5">
+                  <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
                     <SelectValue placeholder="Chọn vị trí" />
                   </SelectTrigger>
                   <SelectContent>
@@ -844,16 +868,24 @@ export function Staff() {
                   className="space-y-2"
                 >
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="all" id="status-all" />
+                    <RadioGroupItem
+                      value="all"
+                      id="status-all"
+                      className="border-slate-300"
+                    />
                     <Label
                       htmlFor="status-all"
                       className="text-xs text-slate-700 cursor-pointer font-normal"
                     >
                       Tất cả
                     </Label>
-              </div>
+                  </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="active" id="status-active" />
+                    <RadioGroupItem
+                      value="active"
+                      id="status-active"
+                      className="border-slate-300"
+                    />
                     <Label
                       htmlFor="status-active"
                       className="text-xs text-slate-700 cursor-pointer font-normal"
@@ -862,7 +894,11 @@ export function Staff() {
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="inactive" id="status-inactive" />
+                    <RadioGroupItem
+                      value="inactive"
+                      id="status-inactive"
+                      className="border-slate-300"
+                    />
                     <Label
                       htmlFor="status-inactive"
                       className="text-xs text-slate-700 cursor-pointer font-normal"
@@ -930,9 +966,9 @@ export function Staff() {
                 style={{ maxWidth: "60rem" }}
               >
                 <DialogHeader>
-                  <DialogTitle>Thêm nhân viên mới</DialogTitle>
+                  <DialogTitle className="text-lg font-semibold">Thêm nhân viên mới</DialogTitle>
                 </DialogHeader>
-                
+
                 <Tabs defaultValue="info" className="w-full">
                   <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="info">Thông tin</TabsTrigger>
@@ -954,8 +990,8 @@ export function Staff() {
                             <Label>
                               Họ và tên <span className="text-red-500">*</span>
                             </Label>
-                            <Input 
-                              placeholder="VD: Nguyễn Văn A" 
+                            <Input
+                              placeholder="VD: Nguyễn Văn A"
                               value={formData.fullName}
                               onChange={(e) =>
                                 setFormData({
@@ -963,7 +999,7 @@ export function Staff() {
                                   fullName: e.target.value,
                                 })
                               }
-                              className="mt-1.5"
+                              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                             />
                           </div>
                           <div>
@@ -971,8 +1007,8 @@ export function Staff() {
                               Số điện thoại{" "}
                               <span className="text-red-500">*</span>
                             </Label>
-                            <Input 
-                              placeholder="VD: 0901234567" 
+                            <Input
+                              placeholder="VD: 0901234567"
                               value={formData.phone}
                               onChange={(e) =>
                                 setFormData({
@@ -980,15 +1016,15 @@ export function Staff() {
                                   phone: e.target.value,
                                 })
                               }
-                              className="mt-1.5"
+                              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                             />
                           </div>
                           <div>
                             <Label>
                               Số CCCD <span className="text-red-500">*</span>
                             </Label>
-                            <Input 
-                              placeholder="VD: 001234567890" 
+                            <Input
+                              placeholder="VD: 001234567890"
                               value={formData.idCard}
                               onChange={(e) =>
                                 setFormData({
@@ -996,7 +1032,7 @@ export function Staff() {
                                   idCard: e.target.value,
                                 })
                               }
-                              className="mt-1.5"
+                              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                             />
                           </div>
                           <div>
@@ -1009,7 +1045,7 @@ export function Staff() {
                                 setFormData({ ...formData, gender: value })
                               }
                             >
-                              <SelectTrigger className="mt-1.5">
+                              <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
                                 <SelectValue placeholder="Chọn giới tính" />
                               </SelectTrigger>
                               <SelectContent>
@@ -1022,8 +1058,8 @@ export function Staff() {
                             <Label>
                               Ngày sinh <span className="text-red-500">*</span>
                             </Label>
-                            <Input 
-                              type="date" 
+                            <Input
+                              type="date"
                               value={formData.birthDate}
                               onChange={(e) =>
                                 setFormData({
@@ -1031,7 +1067,7 @@ export function Staff() {
                                   birthDate: e.target.value,
                                 })
                               }
-                              className="mt-1.5"
+                              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                             />
                           </div>
                         </div>
@@ -1053,7 +1089,7 @@ export function Staff() {
                                 setFormData({ ...formData, position: value })
                               }
                             >
-                              <SelectTrigger className="mt-1.5">
+                              <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
                                 <SelectValue placeholder="Chọn vị trí" />
                               </SelectTrigger>
                               <SelectContent>
@@ -1070,8 +1106,8 @@ export function Staff() {
                               Ngày vào làm{" "}
                               <span className="text-red-500">*</span>
                             </Label>
-                            <Input 
-                              type="date" 
+                            <Input
+                              type="date"
                               value={formData.joinDate}
                               onChange={(e) =>
                                 setFormData({
@@ -1079,7 +1115,7 @@ export function Staff() {
                                   joinDate: e.target.value,
                                 })
                               }
-                              className="mt-1.5"
+                              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                             />
                           </div>
                         </div>
@@ -1135,8 +1171,8 @@ export function Staff() {
                               Địa chỉ cụ thể{" "}
                               <span className="text-red-500">*</span>
                             </Label>
-                            <Input 
-                              placeholder="VD: Số nhà, tên đường..." 
+                            <Input
+                              placeholder="VD: Số nhà, tên đường..."
                               value={formData.addressDetail}
                               onChange={(e) =>
                                 setFormData({
@@ -1144,7 +1180,7 @@ export function Staff() {
                                   addressDetail: e.target.value,
                                 })
                               }
-                              className="mt-1.5"
+                              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                             />
                           </div>
                         </div>
@@ -1181,7 +1217,7 @@ export function Staff() {
                                     });
                                   }}
                                 >
-                                  <SelectTrigger className="w-64">
+                                  <SelectTrigger className="w-64 bg-white border-slate-300 shadow-none">
                                     <SelectValue placeholder="Chọn loại lương" />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1193,7 +1229,7 @@ export function Staff() {
                                     </SelectItem>
                                   </SelectContent>
                                 </Select>
-                      </div>
+                              </div>
                             </div>
                           </div>
 
@@ -1229,7 +1265,7 @@ export function Staff() {
                                         });
                                       }
                                     }}
-                                    className="w-48"
+                                    className="w-48 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                                   />
                                   <span className="text-sm text-slate-600 whitespace-nowrap">
                                     {salarySettings.salaryType === "shift"
@@ -1346,7 +1382,7 @@ export function Staff() {
                                                   });
                                                 }}
                                               >
-                                                <SelectTrigger className="h-8">
+                                                <SelectTrigger className="h-8 bg-white border-slate-300 shadow-none">
                                                   <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -1394,7 +1430,7 @@ export function Staff() {
                                                   });
                                                 }
                                               }}
-                                              className="h-8"
+                                              className="h-8 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                                             />
                                           </TableCell>
                                           <TableCell>
@@ -1712,8 +1748,8 @@ export function Staff() {
                         <div className="grid grid-cols-2 gap-4">
                           <div className="col-span-2">
                             <Label>Tên đăng nhập</Label>
-                            <Input 
-                              placeholder="VD: nguyenvana" 
+                            <Input
+                              placeholder="VD: nguyenvana"
                               value={accountData.username}
                               onChange={(e) =>
                                 setAccountData({
@@ -1721,14 +1757,14 @@ export function Staff() {
                                   username: e.target.value,
                                 })
                               }
-                              className="mt-1.5"
+                              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                             />
                           </div>
                           <div>
                             <Label>Mật khẩu</Label>
-                            <Input 
-                              type="password" 
-                              placeholder="Tối thiểu 6 ký tự" 
+                            <Input
+                              type="password"
+                              placeholder="Tối thiểu 6 ký tự"
                               value={accountData.password}
                               onChange={(e) =>
                                 setAccountData({
@@ -1736,14 +1772,14 @@ export function Staff() {
                                   password: e.target.value,
                                 })
                               }
-                              className="mt-1.5"
+                              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                             />
                           </div>
                           <div>
                             <Label>Xác nhận mật khẩu</Label>
-                            <Input 
-                              type="password" 
-                              placeholder="Nhập lại mật khẩu" 
+                            <Input
+                              type="password"
+                              placeholder="Nhập lại mật khẩu"
                               value={accountData.confirmPassword}
                               onChange={(e) =>
                                 setAccountData({
@@ -1751,7 +1787,7 @@ export function Staff() {
                                   confirmPassword: e.target.value,
                                 })
                               }
-                              className="mt-1.5"
+                              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                             />
                           </div>
                         </div>
@@ -1771,7 +1807,7 @@ export function Staff() {
                                 setAccountData({ ...accountData, role: value })
                               }
                             >
-                              <SelectTrigger className="mt-1.5">
+                              <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
                                 <SelectValue placeholder="Chọn vai trò" />
                               </SelectTrigger>
                               <SelectContent>
@@ -1803,7 +1839,7 @@ export function Staff() {
                   >
                     Hủy
                   </Button>
-                  <Button 
+                  <Button
                     className="bg-blue-600 hover:bg-blue-700"
                     onClick={handleSubmit}
                   >
@@ -1822,7 +1858,7 @@ export function Staff() {
               placeholder="Tìm kiếm theo tên, mã nhân viên, SĐT, CCCD..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
         </div>
@@ -1831,39 +1867,52 @@ export function Staff() {
         <div className="flex-1 overflow-auto p-6">
           <Card className="border-blue-200">
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-blue-50">
-                    <TableHead 
-                      className="w-24 cursor-pointer hover:bg-blue-100"
-                      onClick={() => handleSort("staffCode")}
-                    >
-                      Mã NV{getSortIcon("staffCode")}
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-blue-100"
-                      onClick={() => handleSort("fullName")}
-                    >
-                      Tên nhân viên{getSortIcon("fullName")}
-                    </TableHead>
-                    <TableHead className="w-32">SĐT</TableHead>
-                    <TableHead className="w-36">CCCD</TableHead>
-                    <TableHead 
-                      className="w-32 cursor-pointer hover:bg-blue-100"
-                      onClick={() => handleSort("joinDate")}
-                    >
-                      Ngày vào làm{getSortIcon("joinDate")}
-                    </TableHead>
-                    <TableHead 
-                      className="w-28 cursor-pointer hover:bg-blue-100"
-                      onClick={() => handleSort("position")}
-                    >
-                      Vị trí{getSortIcon("position")}
-                    </TableHead>
-                    <TableHead className="w-28">Trạng thái</TableHead>
-                    <TableHead className="w-24 text-center">Thao tác</TableHead>
-                  </TableRow>
-                </TableHeader>
+              <div className="overflow-x-auto rounded-xl">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-blue-50">
+                      <TableHead
+                        className="w-24 text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("staffCode")}
+                      >
+                        <div className="flex items-center">
+                          Mã NV
+                          {getSortIcon("staffCode")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("fullName")}
+                      >
+                        <div className="flex items-center">
+                          Tên nhân viên
+                          {getSortIcon("fullName")}
+                        </div>
+                      </TableHead>
+                      <TableHead className="w-32 text-sm">SĐT</TableHead>
+                      <TableHead className="w-36 text-sm">CCCD</TableHead>
+                      <TableHead
+                        className="w-32 text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("joinDate")}
+                      >
+                        <div className="flex items-center">
+                          Ngày vào làm
+                          {getSortIcon("joinDate")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="w-28 text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("position")}
+                      >
+                        <div className="flex items-center">
+                          Vị trí
+                          {getSortIcon("position")}
+                        </div>
+                      </TableHead>
+                      <TableHead className="w-28 text-sm">Trạng thái</TableHead>
+                      <TableHead className="w-24 text-sm text-center">Thao tác</TableHead>
+                    </TableRow>
+                  </TableHeader>
                 <TableBody>
                   {filteredStaff.length === 0 ? (
                     <TableRow>
@@ -1877,18 +1926,18 @@ export function Staff() {
                   ) : (
                     filteredStaff.map((staff) => (
                       <TableRow key={staff.id} className="hover:bg-blue-50/50">
-                        <TableCell className="text-blue-600">
+                        <TableCell className="text-sm text-blue-600">
                           {staff.staffCode}
                         </TableCell>
-                        <TableCell>{staff.fullName}</TableCell>
-                        <TableCell>{staff.phone}</TableCell>
-                        <TableCell>{staff.idCard}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-sm text-slate-900">{staff.fullName}</TableCell>
+                        <TableCell className="text-sm text-slate-700">{staff.phone}</TableCell>
+                        <TableCell className="text-sm text-slate-700">{staff.idCard}</TableCell>
+                        <TableCell className="text-sm text-slate-700">
                           {new Date(staff.joinDate).toLocaleDateString("vi-VN")}
                         </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant="outline" 
+                        <TableCell className="text-sm">
+                          <Badge
+                            variant="outline"
                             className={
                               staff.position === "manager"
                                 ? "border-purple-300 text-purple-700"
@@ -1902,26 +1951,26 @@ export function Staff() {
                             {staff.positionLabel}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-sm">
                           {staff.status === "active" ? (
                             <Badge className="bg-emerald-500">Đang làm</Badge>
                           ) : (
                             <Badge variant="secondary">Nghỉ việc</Badge>
                           )}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-sm">
                           <div className="flex gap-1 justify-center">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               className="h-8 w-8 p-0"
                               onClick={() => handleEdit(staff)}
                             >
                               <Pencil className="w-4 h-4" />
                             </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                               onClick={() => handleDelete(staff)}
                             >
@@ -1948,8 +1997,9 @@ export function Staff() {
                       </TableRow>
                     ))
                   )}
-                </TableBody>
-              </Table>
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -1962,9 +2012,9 @@ export function Staff() {
           style={{ maxWidth: "60rem" }}
         >
           <DialogHeader>
-            <DialogTitle>Chỉnh sửa thông tin nhân viên</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Chỉnh sửa thông tin nhân viên</DialogTitle>
           </DialogHeader>
-          
+
           <Tabs defaultValue="info" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="info">Thông tin</TabsTrigger>
@@ -1984,39 +2034,39 @@ export function Staff() {
                       <Label>
                         Họ và tên <span className="text-red-500">*</span>
                       </Label>
-                      <Input 
-                        placeholder="VD: Nguyễn Văn A" 
+                      <Input
+                        placeholder="VD: Nguyễn Văn A"
                         value={formData.fullName}
                         onChange={(e) =>
                           setFormData({ ...formData, fullName: e.target.value })
                         }
-                        className="mt-1.5"
+                        className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                       />
                     </div>
                     <div>
                       <Label>
                         Số điện thoại <span className="text-red-500">*</span>
                       </Label>
-                      <Input 
-                        placeholder="VD: 0901234567" 
+                      <Input
+                        placeholder="VD: 0901234567"
                         value={formData.phone}
                         onChange={(e) =>
                           setFormData({ ...formData, phone: e.target.value })
                         }
-                        className="mt-1.5"
+                        className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                       />
                     </div>
                     <div>
                       <Label>
                         Số CCCD <span className="text-red-500">*</span>
                       </Label>
-                      <Input 
-                        placeholder="VD: 001234567890" 
+                      <Input
+                        placeholder="VD: 001234567890"
                         value={formData.idCard}
                         onChange={(e) =>
                           setFormData({ ...formData, idCard: e.target.value })
                         }
-                        className="mt-1.5"
+                        className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                       />
                     </div>
                     <div>
@@ -2029,7 +2079,7 @@ export function Staff() {
                           setFormData({ ...formData, gender: value })
                         }
                       >
-                        <SelectTrigger className="mt-1.5">
+                        <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
                           <SelectValue placeholder="Chọn giới tính" />
                         </SelectTrigger>
                         <SelectContent>
@@ -2042,8 +2092,8 @@ export function Staff() {
                       <Label>
                         Ngày sinh <span className="text-red-500">*</span>
                       </Label>
-                      <Input 
-                        type="date" 
+                      <Input
+                        type="date"
                         value={formData.birthDate}
                         onChange={(e) =>
                           setFormData({
@@ -2051,7 +2101,7 @@ export function Staff() {
                             birthDate: e.target.value,
                           })
                         }
-                        className="mt-1.5"
+                        className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                       />
                     </div>
                   </div>
@@ -2073,7 +2123,7 @@ export function Staff() {
                           setFormData({ ...formData, position: value })
                         }
                       >
-                        <SelectTrigger className="mt-1.5">
+                        <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
                           <SelectValue placeholder="Chọn vị trí" />
                         </SelectTrigger>
                         <SelectContent>
@@ -2089,13 +2139,13 @@ export function Staff() {
                       <Label>
                         Ngày vào làm <span className="text-red-500">*</span>
                       </Label>
-                      <Input 
-                        type="date" 
+                      <Input
+                        type="date"
                         value={formData.joinDate}
                         onChange={(e) =>
                           setFormData({ ...formData, joinDate: e.target.value })
                         }
-                        className="mt-1.5"
+                        className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                       />
                     </div>
                     <div className="col-span-2">
@@ -2103,14 +2153,14 @@ export function Staff() {
                         Lương cơ bản (VNĐ){" "}
                         <span className="text-red-500">*</span>
                       </Label>
-                      <Input 
-                        type="number" 
-                        placeholder="0" 
+                      <Input
+                        type="number"
+                        placeholder="0"
                         value={formData.salary}
                         onChange={(e) =>
                           setFormData({ ...formData, salary: e.target.value })
                         }
-                        className="mt-1.5"
+                        className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                       />
                     </div>
                   </div>
@@ -2157,8 +2207,8 @@ export function Staff() {
                       <Label>
                         Địa chỉ cụ thể <span className="text-red-500">*</span>
                       </Label>
-                      <Input 
-                        placeholder="VD: Số nhà, tên đường..." 
+                      <Input
+                        placeholder="VD: Số nhà, tên đường..."
                         value={formData.addressDetail}
                         onChange={(e) =>
                           setFormData({
@@ -2166,7 +2216,7 @@ export function Staff() {
                             addressDetail: e.target.value,
                           })
                         }
-                        className="mt-1.5"
+                        className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                       />
                     </div>
                   </div>
@@ -2208,7 +2258,7 @@ export function Staff() {
                               });
                             }}
                           >
-                            <SelectTrigger className="w-64">
+                            <SelectTrigger className="w-64 bg-white border-slate-300 shadow-none">
                               <SelectValue placeholder="Chọn loại lương" />
                             </SelectTrigger>
                             <SelectContent>
@@ -2252,7 +2302,7 @@ export function Staff() {
                                   });
                                 }
                               }}
-                              className="w-48"
+                              className="w-48 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                             />
                             <span className="text-sm text-slate-600 whitespace-nowrap">
                               {salarySettings.salaryType === "shift"
@@ -2356,7 +2406,7 @@ export function Staff() {
                                             });
                                           }}
                                         >
-                                          <SelectTrigger className="h-8">
+                                          <SelectTrigger className="h-8 bg-white border-slate-300 shadow-none">
                                             <SelectValue />
                                           </SelectTrigger>
                                           <SelectContent>
@@ -2401,7 +2451,7 @@ export function Staff() {
                                             });
                                           }
                                         }}
-                                        className="h-8"
+                                        className="h-8 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                                       />
                                     </TableCell>
                                     <TableCell>
@@ -2690,8 +2740,8 @@ export function Staff() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
                       <Label>Tên đăng nhập</Label>
-                      <Input 
-                        placeholder="VD: nguyenvana" 
+                      <Input
+                        placeholder="VD: nguyenvana"
                         value={accountData.username}
                         onChange={(e) =>
                           setAccountData({
@@ -2699,14 +2749,14 @@ export function Staff() {
                             username: e.target.value,
                           })
                         }
-                        className="mt-1.5"
+                        className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                       />
                     </div>
                     <div>
                       <Label>Mật khẩu mới</Label>
-                      <Input 
-                        type="password" 
-                        placeholder="Tối thiểu 6 ký tự" 
+                      <Input
+                        type="password"
+                        placeholder="Tối thiểu 6 ký tự"
                         value={accountData.password}
                         onChange={(e) =>
                           setAccountData({
@@ -2714,14 +2764,14 @@ export function Staff() {
                             password: e.target.value,
                           })
                         }
-                        className="mt-1.5"
+                        className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                       />
                     </div>
                     <div>
                       <Label>Xác nhận mật khẩu</Label>
-                      <Input 
-                        type="password" 
-                        placeholder="Nhập lại mật khẩu" 
+                      <Input
+                        type="password"
+                        placeholder="Nhập lại mật khẩu"
                         value={accountData.confirmPassword}
                         onChange={(e) =>
                           setAccountData({
@@ -2729,7 +2779,7 @@ export function Staff() {
                             confirmPassword: e.target.value,
                           })
                         }
-                        className="mt-1.5"
+                        className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                       />
                     </div>
                   </div>
@@ -2747,7 +2797,7 @@ export function Staff() {
                           setAccountData({ ...accountData, role: value })
                         }
                       >
-                        <SelectTrigger className="mt-1.5">
+                        <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
                           <SelectValue placeholder="Chọn vai trò" />
                         </SelectTrigger>
                         <SelectContent>
@@ -2784,7 +2834,7 @@ export function Staff() {
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
               Hủy
             </Button>
-            <Button 
+            <Button
               className="bg-blue-600 hover:bg-blue-700"
               onClick={handleUpdate}
             >

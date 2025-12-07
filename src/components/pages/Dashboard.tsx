@@ -223,7 +223,7 @@ export function Dashboard() {
               </CardTitle>
             </div>
             <Select value={salesTimeRange} onValueChange={(value) => setSalesTimeRange(value as TimeRange)}>
-              <SelectTrigger className="w-32 h-8 text-xs">
+              <SelectTrigger className="w-32 h-8 text-xs bg-white border border-slate-300 shadow-none">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -328,7 +328,7 @@ export function Dashboard() {
               <span className="ml-2 text-blue-600">○ 33</span>
             </CardTitle>
             <Select value={customersTimeRange} onValueChange={(value) => setCustomersTimeRange(value as TimeRange)}>
-              <SelectTrigger className="w-32 h-8 text-xs">
+              <SelectTrigger className="w-32 h-8 text-xs bg-white border border-slate-300 shadow-none">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -391,7 +391,7 @@ export function Dashboard() {
             </CardTitle>
             <div className="flex gap-2">
               <Select value={topProductsFilter} onValueChange={(value) => setTopProductsFilter(value as TopProductsFilter)}>
-                <SelectTrigger className="w-40 h-8 text-xs">
+                <SelectTrigger className="w-40 h-8 text-xs bg-white border border-slate-300 shadow-none">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -400,7 +400,7 @@ export function Dashboard() {
                 </SelectContent>
               </Select>
               <Select value={topProductsTimeRange} onValueChange={(value) => setTopProductsTimeRange(value as TimeRange)}>
-                <SelectTrigger className="w-32 h-8 text-xs">
+                <SelectTrigger className="w-32 h-8 text-xs bg-white border border-slate-300 shadow-none">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
