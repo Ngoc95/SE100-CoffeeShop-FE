@@ -10,6 +10,7 @@ import {
   Lightbulb,
   ArrowUp,
   ArrowDown,
+  FileSpreadsheet,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
@@ -32,6 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
+import { StockCheckImportDialog } from "../StockCheckImportDialog";
 import { useAuth } from "../../contexts/AuthContext";
 
 interface StockItem {
@@ -166,152 +168,152 @@ const availableItems: Array<{
   unit: string;
   stock: number;
 }> = [
-  {
-    code: "NL001",
-    name: "Cà phê hạt Arabica",
-    category: "coffee",
-    unit: "kg",
-    stock: 50,
-  },
-  {
-    code: "NL002",
-    name: "Cà phê hạt Robusta",
-    category: "coffee",
-    unit: "kg",
-    stock: 45,
-  },
-  {
-    code: "NL003",
-    name: "Cà phê phin",
-    category: "coffee",
-    unit: "gói",
-    stock: 100,
-  },
-  {
-    code: "NL004",
-    name: "Sữa tươi",
-    category: "dairy",
-    unit: "lít",
-    stock: 30,
-  },
-  {
-    code: "NL005",
-    name: "Sữa đặc có đường",
-    category: "dairy",
-    unit: "lon",
-    stock: 50,
-  },
-  { code: "NL006", name: "Kem tươi", category: "dairy", unit: "ml", stock: 20 },
-  {
-    code: "NL007",
-    name: "Đường trắng",
-    category: "syrup",
-    unit: "kg",
-    stock: 25,
-  },
-  {
-    code: "NL008",
-    name: "Siro vani",
-    category: "syrup",
-    unit: "chai",
-    stock: 15,
-  },
-  {
-    code: "NL009",
-    name: "Siro caramel",
-    category: "syrup",
-    unit: "chai",
-    stock: 12,
-  },
-  {
-    code: "NL010",
-    name: "Trà Ô long",
-    category: "tea",
-    unit: "gói",
-    stock: 40,
-  },
-  { code: "NL011", name: "Trà đen", category: "tea", unit: "gói", stock: 35 },
-  { code: "NL012", name: "Trà xanh", category: "tea", unit: "gói", stock: 30 },
-  {
-    code: "NL013",
-    name: "Trà sữa bột",
-    category: "milk-tea",
-    unit: "gói",
-    stock: 60,
-  },
-  {
-    code: "NL014",
-    name: "Trân châu đen",
-    category: "milk-tea",
-    unit: "kg",
-    stock: 10,
-  },
-  {
-    code: "NL015",
-    name: "Bánh croissant",
-    category: "pastries",
-    unit: "cái",
-    stock: 25,
-  },
-  {
-    code: "NL016",
-    name: "Bánh tiramisu",
-    category: "pastries",
-    unit: "cái",
-    stock: 15,
-  },
-  {
-    code: "NL017",
-    name: "Coca Cola",
-    category: "bottled-beverages",
-    unit: "chai",
-    stock: 48,
-  },
-  {
-    code: "NL018",
-    name: "Pepsi",
-    category: "bottled-beverages",
-    unit: "chai",
-    stock: 42,
-  },
-  {
-    code: "NL019",
-    name: "Nguyên liệu pha chế A",
-    category: "brewing-ingredients",
-    unit: "gói",
-    stock: 20,
-  },
-  {
-    code: "NL020",
-    name: "Nguyên liệu pha chế B",
-    category: "brewing-ingredients",
-    unit: "gói",
-    stock: 18,
-  },
-  { code: "NL021", name: "Dâu tây", category: "fruit", unit: "kg", stock: 8 },
-  { code: "NL022", name: "Xoài", category: "fruit", unit: "kg", stock: 12 },
-  {
-    code: "NL023",
-    name: "Ly nhựa size M",
-    category: "packaging",
-    unit: "cái",
-    stock: 500,
-  },
-  {
-    code: "NL024",
-    name: "Ly nhựa size L",
-    category: "packaging",
-    unit: "cái",
-    stock: 400,
-  },
-  {
-    code: "NL025",
-    name: "Ống hút",
-    category: "packaging",
-    unit: "cái",
-    stock: 1000,
-  },
-];
+    {
+      code: "NL001",
+      name: "Cà phê hạt Arabica",
+      category: "coffee",
+      unit: "kg",
+      stock: 50,
+    },
+    {
+      code: "NL002",
+      name: "Cà phê hạt Robusta",
+      category: "coffee",
+      unit: "kg",
+      stock: 45,
+    },
+    {
+      code: "NL003",
+      name: "Cà phê phin",
+      category: "coffee",
+      unit: "gói",
+      stock: 100,
+    },
+    {
+      code: "NL004",
+      name: "Sữa tươi",
+      category: "dairy",
+      unit: "lít",
+      stock: 30,
+    },
+    {
+      code: "NL005",
+      name: "Sữa đặc có đường",
+      category: "dairy",
+      unit: "lon",
+      stock: 50,
+    },
+    { code: "NL006", name: "Kem tươi", category: "dairy", unit: "ml", stock: 20 },
+    {
+      code: "NL007",
+      name: "Đường trắng",
+      category: "syrup",
+      unit: "kg",
+      stock: 25,
+    },
+    {
+      code: "NL008",
+      name: "Siro vani",
+      category: "syrup",
+      unit: "chai",
+      stock: 15,
+    },
+    {
+      code: "NL009",
+      name: "Siro caramel",
+      category: "syrup",
+      unit: "chai",
+      stock: 12,
+    },
+    {
+      code: "NL010",
+      name: "Trà Ô long",
+      category: "tea",
+      unit: "gói",
+      stock: 40,
+    },
+    { code: "NL011", name: "Trà đen", category: "tea", unit: "gói", stock: 35 },
+    { code: "NL012", name: "Trà xanh", category: "tea", unit: "gói", stock: 30 },
+    {
+      code: "NL013",
+      name: "Trà sữa bột",
+      category: "milk-tea",
+      unit: "gói",
+      stock: 60,
+    },
+    {
+      code: "NL014",
+      name: "Trân châu đen",
+      category: "milk-tea",
+      unit: "kg",
+      stock: 10,
+    },
+    {
+      code: "NL015",
+      name: "Bánh croissant",
+      category: "pastries",
+      unit: "cái",
+      stock: 25,
+    },
+    {
+      code: "NL016",
+      name: "Bánh tiramisu",
+      category: "pastries",
+      unit: "cái",
+      stock: 15,
+    },
+    {
+      code: "NL017",
+      name: "Coca Cola",
+      category: "bottled-beverages",
+      unit: "chai",
+      stock: 48,
+    },
+    {
+      code: "NL018",
+      name: "Pepsi",
+      category: "bottled-beverages",
+      unit: "chai",
+      stock: 42,
+    },
+    {
+      code: "NL019",
+      name: "Nguyên liệu pha chế A",
+      category: "brewing-ingredients",
+      unit: "gói",
+      stock: 20,
+    },
+    {
+      code: "NL020",
+      name: "Nguyên liệu pha chế B",
+      category: "brewing-ingredients",
+      unit: "gói",
+      stock: 18,
+    },
+    { code: "NL021", name: "Dâu tây", category: "fruit", unit: "kg", stock: 8 },
+    { code: "NL022", name: "Xoài", category: "fruit", unit: "kg", stock: 12 },
+    {
+      code: "NL023",
+      name: "Ly nhựa size M",
+      category: "packaging",
+      unit: "cái",
+      stock: 500,
+    },
+    {
+      code: "NL024",
+      name: "Ly nhựa size L",
+      category: "packaging",
+      unit: "cái",
+      stock: 400,
+    },
+    {
+      code: "NL025",
+      name: "Ống hút",
+      category: "packaging",
+      unit: "cái",
+      stock: 1000,
+    },
+  ];
 
 export function StockCheck() {
   const { user } = useAuth();
@@ -341,6 +343,7 @@ export function StockCheck() {
   const [selectedItemCodes, setSelectedItemCodes] = useState<string[]>([]);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("none");
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   // Ẩn nút X mặc định của DialogContent
   useEffect(() => {
@@ -521,12 +524,12 @@ export function StockCheck() {
       rows.map((row, i) =>
         i === index
           ? {
-              ...row,
-              [field]:
-                field === "systemQty" || field === "realQty"
-                  ? Number(value) || 0
-                  : value,
-            }
+            ...row,
+            [field]:
+              field === "systemQty" || field === "realQty"
+                ? Number(value) || 0
+                : value,
+          }
           : row
       )
     );
@@ -759,9 +762,13 @@ export function StockCheck() {
               <Plus className="w-4 h-4 mr-2" />
               Tạo phiếu kiểm kho
             </Button>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white px-5">
-              <Upload className="w-4 h-4 mr-2" />
-              Nhập phiếu kiểm kho
+            <Button
+              variant="outline"
+              className="px-5"
+              onClick={() => setImportDialogOpen(true)}
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Import Excel
             </Button>
           </div>
         </div>
@@ -1012,8 +1019,8 @@ export function StockCheck() {
                                           diff === 0
                                             ? "text-slate-500"
                                             : diff > 0
-                                            ? "text-emerald-600"
-                                            : "text-red-600";
+                                              ? "text-emerald-600"
+                                              : "text-red-600";
                                         return (
                                           <TableRow key={item.code}>
                                             <TableCell className="text-sm text-slate-600">
@@ -1212,8 +1219,8 @@ export function StockCheck() {
                           diff === 0
                             ? "text-slate-500"
                             : diff > 0
-                            ? "text-emerald-600"
-                            : "text-red-600";
+                              ? "text-emerald-600"
+                              : "text-red-600";
                         return (
                           <TableRow key={index}>
                             <TableCell className="text-sm">
@@ -1421,11 +1428,10 @@ export function StockCheck() {
                       key={cat.id}
                       type="button"
                       onClick={() => setSelectedCategoryFilter(cat.id)}
-                      className={`px-3 py-1.5 text-sm border border-slate-200 rounded-lg transition-colors ${
-                        isActive
-                          ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
-                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                      }`}
+                      className={`px-3 py-1.5 text-sm border border-slate-200 rounded-lg transition-colors ${isActive
+                        ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                        }`}
                     >
                       {cat.name}
                     </button>
@@ -1555,6 +1561,11 @@ export function StockCheck() {
           </DialogContent>
         </Dialog>
       </div>
+
+      <StockCheckImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+      />
     </div>
   );
 }
