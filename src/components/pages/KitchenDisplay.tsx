@@ -9,7 +9,7 @@ import {
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -36,12 +36,11 @@ interface KitchenItem {
 
 export function KitchenDisplay() {
   // Out of stock modal states
-  const [outOfStockModalOpen, setOutOfStockModalOpen] =
-    useState(false);
-  const [selectedItemForStock, setSelectedItemForStock] =
-    useState<string | null>(null);
-  const [selectedIngredients, setSelectedIngredients] =
-    useState<string[]>([]);
+  const [outOfStockModalOpen, setOutOfStockModalOpen] = useState(false);
+  const [selectedItemForStock, setSelectedItemForStock] = useState<
+    string | null
+  >(null);
+  const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const [otherReason, setOtherReason] = useState("");
 
   const availableIngredients = [
@@ -134,12 +133,19 @@ export function KitchenDisplay() {
       timestamp: new Date(Date.now() - 2 * 60000),
       outOfStock: false,
     },
+    {
+      id: "9",
+      itemName: "Matcha latte",
+      totalQuantity: 2,
+      completedQuantity: 0,
+      table: "Bàn 4",
+      timestamp: new Date(Date.now() - 2 * 60000),
+      outOfStock: false,
+    },
   ]);
 
   const getElapsedTime = (timestamp: Date) => {
-    const minutes = Math.floor(
-      (Date.now() - timestamp.getTime()) / 60000,
-    );
+    const minutes = Math.floor((Date.now() - timestamp.getTime()) / 60000);
     return minutes;
   };
 
@@ -147,8 +153,7 @@ export function KitchenDisplay() {
     setItems((prev) =>
       prev.map((item) => {
         if (item.id !== itemId) return item;
-        if (item.completedQuantity >= item.totalQuantity)
-          return item;
+        if (item.completedQuantity >= item.totalQuantity) return item;
 
         const newCompleted = item.completedQuantity + 1;
 
@@ -158,14 +163,12 @@ export function KitchenDisplay() {
             `${item.itemName} hoàn thành tất cả ${item.totalQuantity} ly`,
             {
               icon: <Bell className="w-4 h-4" />,
-            },
+            }
           );
 
           // Remove item after 1 second
           setTimeout(() => {
-            setItems((prev) =>
-              prev.filter((i) => i.id !== itemId),
-            );
+            setItems((prev) => prev.filter((i) => i.id !== itemId));
           }, 1000);
         }
 
@@ -173,7 +176,7 @@ export function KitchenDisplay() {
           ...item,
           completedQuantity: newCompleted,
         };
-      }),
+      })
     );
   };
 
@@ -181,28 +184,25 @@ export function KitchenDisplay() {
     setItems((prev) =>
       prev.map((item) => {
         if (item.id !== itemId) return item;
-        if (item.completedQuantity >= item.totalQuantity)
-          return item;
+        if (item.completedQuantity >= item.totalQuantity) return item;
 
         toast.success(
           `${item.itemName} hoàn thành tất cả ${item.totalQuantity} ly`,
           {
             icon: <Bell className="w-4 h-4" />,
-          },
+          }
         );
 
         // Remove item after 1 second
         setTimeout(() => {
-          setItems((prev) =>
-            prev.filter((i) => i.id !== itemId),
-          );
+          setItems((prev) => prev.filter((i) => i.id !== itemId));
         }, 1000);
 
         return {
           ...item,
           completedQuantity: item.totalQuantity,
         };
-      }),
+      })
     );
   };
 
@@ -214,13 +214,8 @@ export function KitchenDisplay() {
   };
 
   const handleOutOfStockSubmit = () => {
-    if (
-      selectedIngredients.length === 0 &&
-      !otherReason.trim()
-    ) {
-      toast.error(
-        "Vui lòng chọn nguyên liệu hoặc ghi chú lý do",
-      );
+    if (selectedIngredients.length === 0 && !otherReason.trim()) {
+      toast.error("Vui lòng chọn nguyên liệu hoặc ghi chú lý do");
       return;
     }
 
@@ -240,7 +235,7 @@ export function KitchenDisplay() {
           outOfStockReason: reasonText,
           outOfStockIngredients: selectedIngredients,
         };
-      }),
+      })
     );
 
     toast.error(`Đã báo hết nguyên liệu: ${reasonText}`);
@@ -258,7 +253,7 @@ export function KitchenDisplay() {
           outOfStockReason: undefined,
           outOfStockIngredients: undefined,
         };
-      }),
+      })
     );
 
     toast.success("Đã bổ sung nguyên liệu, tiếp tục làm món");
@@ -268,30 +263,24 @@ export function KitchenDisplay() {
     setSelectedIngredients((prev) =>
       prev.includes(ingredient)
         ? prev.filter((i) => i !== ingredient)
-        : [...prev, ingredient],
+        : [...prev, ingredient]
     );
   };
 
   // Separate items into two columns
-  const pendingItems = items.filter(
-    (item) => item.completedQuantity === 0,
-  );
+  const pendingItems = items.filter((item) => item.completedQuantity === 0);
   const inProgressItems = items.filter(
     (item) =>
-      item.completedQuantity > 0 &&
-      item.completedQuantity < item.totalQuantity,
+      item.completedQuantity > 0 && item.completedQuantity < item.totalQuantity
   );
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
       {/* Header */}
       <div className="bg-white border-b shadow-sm px-4 lg:px-6 py-3">
-        <h2 className="text-blue-900 mb-1">
-          Màn hình pha chế - Theo món
-        </h2>
+        <h2 className="text-blue-900 mb-1">Màn hình pha chế - Theo món</h2>
         <p className="text-xs text-slate-600">
-          {pendingItems.length} món chờ •{" "}
-          {inProgressItems.length} món đang làm
+          {pendingItems.length} món chờ • {inProgressItems.length} món đang làm
         </p>
       </div>
 
@@ -314,9 +303,7 @@ export function KitchenDisplay() {
                 </div>
               ) : (
                 pendingItems.map((item) => {
-                  const elapsedMinutes = getElapsedTime(
-                    item.timestamp,
-                  );
+                  const elapsedMinutes = getElapsedTime(item.timestamp);
 
                   return (
                     <Card
@@ -328,8 +315,7 @@ export function KitchenDisplay() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
                             <h4 className="text-sm text-slate-900">
-                              {item.totalQuantity}x{" "}
-                              {item.itemName}
+                              {item.totalQuantity}x {item.itemName}
                             </h4>
                             {item.outOfStock && (
                               <Badge className="bg-yellow-500 text-white text-xs h-5">
@@ -349,12 +335,11 @@ export function KitchenDisplay() {
                               Ghi chú: {item.notes}
                             </p>
                           )}
-                          {item.outOfStock &&
-                            item.outOfStockReason && (
-                              <p className="text-xs text-yellow-700 mt-1">
-                                Thiếu: {item.outOfStockReason}
-                              </p>
-                            )}
+                          {item.outOfStock && item.outOfStockReason && (
+                            <p className="text-xs text-yellow-700 mt-1">
+                              Thiếu: {item.outOfStockReason}
+                            </p>
+                          )}
                         </div>
 
                         {/* Right: Action Buttons */}
@@ -364,11 +349,7 @@ export function KitchenDisplay() {
                               size="sm"
                               variant="outline"
                               className="h-8 px-3 text-xs bg-green-50 border-green-300 text-green-700 hover:bg-green-100"
-                              onClick={() =>
-                                markIngredientsRestocked(
-                                  item.id,
-                                )
-                              }
+                              onClick={() => markIngredientsRestocked(item.id)}
                             >
                               Đã bổ sung
                             </Button>
@@ -377,18 +358,14 @@ export function KitchenDisplay() {
                               <Button
                                 size="sm"
                                 className="h-9 w-9 rounded-full p-0 bg-blue-600 hover:bg-blue-700"
-                                onClick={() =>
-                                  advanceOneUnit(item.id)
-                                }
+                                onClick={() => advanceOneUnit(item.id)}
                               >
                                 <ChevronRight className="w-4 h-4" />
                               </Button>
                               <Button
                                 size="sm"
                                 className="h-9 w-9 rounded-full p-0 bg-blue-600 hover:bg-blue-700"
-                                onClick={() =>
-                                  advanceAllUnits(item.id)
-                                }
+                                onClick={() => advanceAllUnits(item.id)}
                               >
                                 <ChevronsRight className="w-4 h-4" />
                               </Button>
@@ -398,9 +375,7 @@ export function KitchenDisplay() {
                             size="sm"
                             variant="ghost"
                             className="h-8 w-8 p-0 text-slate-400 hover:text-red-600"
-                            onClick={() =>
-                              openOutOfStockModal(item.id)
-                            }
+                            onClick={() => openOutOfStockModal(item.id)}
                           >
                             <AlertCircle className="w-4 h-4" />
                           </Button>
@@ -417,26 +392,20 @@ export function KitchenDisplay() {
           <div className="flex flex-col h-full bg-slate-50">
             <div className="px-4 lg:px-6 py-2.5 border-b bg-white flex-shrink-0">
               <h3 className="text-slate-900">
-                Đã xong / Chờ cung ứng ({inProgressItems.length}
-                )
+                Đã xong / Chờ cung ứng ({inProgressItems.length})
               </h3>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-2 min-h-0">
+            <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-2 min-h-0 max-h-[calc(100vh-150px)]">
               {inProgressItems.length === 0 ? (
                 <div className="text-center py-16 text-slate-400">
                   <Clock className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">
-                    Chưa có món đang làm
-                  </p>
+                  <p className="text-sm">Chưa có món đang làm</p>
                 </div>
               ) : (
                 inProgressItems.map((item) => {
-                  const elapsedMinutes = getElapsedTime(
-                    item.timestamp,
-                  );
-                  const remaining =
-                    item.totalQuantity - item.completedQuantity;
+                  const elapsedMinutes = getElapsedTime(item.timestamp);
+                  const remaining = item.totalQuantity - item.completedQuantity;
 
                   return (
                     <Card
@@ -448,8 +417,7 @@ export function KitchenDisplay() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
                             <h4 className="text-sm text-slate-900">
-                              {item.totalQuantity}x{" "}
-                              {item.itemName}
+                              {item.totalQuantity}x {item.itemName}
                             </h4>
                             <Badge className="bg-green-600 text-white text-xs h-5">
                               Đã làm {item.completedQuantity}/
@@ -464,8 +432,7 @@ export function KitchenDisplay() {
                             </span>
                           </div>
                           <p className="text-xs text-blue-700 mt-1">
-                            Chờ làm {remaining}/
-                            {item.totalQuantity}
+                            Chờ làm {remaining}/{item.totalQuantity}
                           </p>
                           {item.notes && (
                             <p className="text-xs text-slate-500 mt-1">
@@ -479,18 +446,14 @@ export function KitchenDisplay() {
                           <Button
                             size="sm"
                             className="h-9 w-9 rounded-full p-0 bg-blue-600 hover:bg-blue-700"
-                            onClick={() =>
-                              advanceOneUnit(item.id)
-                            }
+                            onClick={() => advanceOneUnit(item.id)}
                           >
                             <ChevronRight className="w-4 h-4" />
                           </Button>
                           <Button
                             size="sm"
                             className="h-9 w-9 rounded-full p-0 bg-blue-600 hover:bg-blue-700"
-                            onClick={() =>
-                              advanceAllUnits(item.id)
-                            }
+                            onClick={() => advanceAllUnits(item.id)}
                           >
                             <ChevronsRight className="w-4 h-4" />
                           </Button>
@@ -506,10 +469,7 @@ export function KitchenDisplay() {
       </div>
 
       {/* Out of Stock Modal */}
-      <Dialog
-        open={outOfStockModalOpen}
-        onOpenChange={setOutOfStockModalOpen}
-      >
+      <Dialog open={outOfStockModalOpen} onOpenChange={setOutOfStockModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Báo hết nguyên liệu</DialogTitle>
@@ -517,23 +477,14 @@ export function KitchenDisplay() {
 
           <div className="space-y-4 py-4">
             <div>
-              <Label className="mb-3 block">
-                Chọn nguyên liệu hết hàng:
-              </Label>
+              <Label className="mb-3 block">Chọn nguyên liệu hết hàng:</Label>
               <div className="grid grid-cols-2 gap-2">
                 {availableIngredients.map((ingredient) => (
-                  <div
-                    key={ingredient}
-                    className="flex items-center space-x-2"
-                  >
+                  <div key={ingredient} className="flex items-center space-x-2">
                     <Checkbox
                       id={ingredient}
-                      checked={selectedIngredients.includes(
-                        ingredient,
-                      )}
-                      onCheckedChange={() =>
-                        toggleIngredient(ingredient)
-                      }
+                      checked={selectedIngredients.includes(ingredient)}
+                      onCheckedChange={() => toggleIngredient(ingredient)}
                     />
                     <label
                       htmlFor={ingredient}
@@ -547,10 +498,7 @@ export function KitchenDisplay() {
             </div>
 
             <div>
-              <Label
-                htmlFor="other-reason"
-                className="mb-2 block"
-              >
+              <Label htmlFor="other-reason" className="mb-2 block">
                 Hoặc ghi chú lý do khác:
               </Label>
               <Textarea
