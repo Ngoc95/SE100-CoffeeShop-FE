@@ -57,7 +57,7 @@ import { ImportExcelDialog } from "../ImportExcelDialog";
 
 // Type definitions
 type ItemType = "ready-made" | "composite" | "ingredient";
-type SortField = "name" | "currentStock" | "totalValue" | "expiryDate" | "category" | "batches" | "status" | "ingredients" | "avgUnitCost" | "supplier";
+type SortField = "name" | "currentStock" | "totalValue" | "expiryDate" | "category" | "unit" | "batches" | "status" | "productStatus" | "ingredients" | "avgUnitCost" | "supplier" | "sellingPrice";
 type SortOrder = "asc" | "desc" | "none";
 
 interface BatchInfo {
@@ -86,7 +86,8 @@ interface InventoryItem {
   unit: string;
   minStock: number;
   maxStock: number;
-  status: "good" | "low" | "expiring" | "critical";
+  status: "good" | "low" | "expiring" | "expired" | "critical";
+  productStatus?: "selling" | "paused" | "not_running" | "hot";
   imageUrl?: string; // Image URL for the item
 
   // For ready-made & ingredients
@@ -98,6 +99,7 @@ interface InventoryItem {
   // Calculated fields
   totalValue: number;
   avgUnitCost: number;
+  sellingPrice?: number;
 }
 
 export function Inventory() {
@@ -110,11 +112,18 @@ export function Inventory() {
     "composite",
     "ingredient",
   ]);
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([
+  const [selectedStockStatuses, setSelectedStockStatuses] = useState<string[]>([
     "good",
     "low",
     "expiring",
+    "expired",
     "critical",
+  ]);
+  const [selectedProductStatuses, setSelectedProductStatuses] = useState<string[]>([
+    "selling",
+    "paused",
+    "not_running",
+    "hot",
   ]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [addItemType, setAddItemType] = useState<ItemType>("ready-made");
@@ -131,6 +140,17 @@ export function Inventory() {
   const [ingredientSearchQuery, setIngredientSearchQuery] = useState("");
   const [newItemImage, setNewItemImage] = useState<string>("");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [editValues, setEditValues] = useState({
+    name: "",
+    category: "",
+    unit: "",
+    minStock: 0,
+    maxStock: 0,
+    sellingPrice: undefined as number | undefined,
+  });
 
   // Mock data
   const inventoryItems: InventoryItem[] = [
@@ -167,6 +187,7 @@ export function Inventory() {
       ],
       totalValue: 567000,
       avgUnitCost: 11813,
+      sellingPrice: 15000,
     },
     {
       id: "rm2",
@@ -192,6 +213,7 @@ export function Inventory() {
       ],
       totalValue: 200000,
       avgUnitCost: 25000,
+      sellingPrice: 20000,
     },
 
     // Composite items
@@ -232,6 +254,7 @@ export function Inventory() {
       ],
       totalValue: 0,
       avgUnitCost: 12120,
+      sellingPrice: 35000,
     },
     {
       id: "cp2",
@@ -277,6 +300,7 @@ export function Inventory() {
       ],
       totalValue: 0,
       avgUnitCost: 10280,
+      sellingPrice: 30000,
     },
 
     // Ingredients
@@ -298,6 +322,7 @@ export function Inventory() {
           quantity: 10,
           unitCost: 350000,
           entryDate: "2025-01-05",
+          expiryDate: "2025-06-15",
           supplier: "Trung Nguyên",
         },
         {
@@ -305,11 +330,13 @@ export function Inventory() {
           quantity: 5,
           unitCost: 360000,
           entryDate: "2025-01-15",
+          expiryDate: "2025-06-20",
           supplier: "Trung Nguyên",
         },
       ],
       totalValue: 5300000,
       avgUnitCost: 353333,
+      sellingPrice: 420000,
     },
     {
       id: "ing2",
@@ -343,6 +370,7 @@ export function Inventory() {
       ],
       totalValue: 333500,
       avgUnitCost: 27792,
+      sellingPrice: 35000,
     },
     {
       id: "ing3",
@@ -362,11 +390,13 @@ export function Inventory() {
           quantity: 3,
           unitCost: 22000,
           entryDate: "2025-01-10",
+          expiryDate: "2025-12-31",
           supplier: "Biên Hòa",
         },
       ],
       totalValue: 66000,
       avgUnitCost: 22000,
+      sellingPrice: 30000,
     },
     {
       id: "ing4",
@@ -392,6 +422,7 @@ export function Inventory() {
       ],
       totalValue: 680000,
       avgUnitCost: 85000,
+      sellingPrice: 110000,
     },
     {
       id: "ing5",
@@ -411,6 +442,7 @@ export function Inventory() {
           quantity: 15,
           unitCost: 280000,
           entryDate: "2025-01-08",
+          expiryDate: "2025-06-30",
           supplier: "Phúc Long",
         },
         {
@@ -418,11 +450,13 @@ export function Inventory() {
           quantity: 10,
           unitCost: 275000,
           entryDate: "2025-01-16",
+          expiryDate: "2025-07-15",
           supplier: "Phúc Long",
         },
       ],
       totalValue: 6950000,
       avgUnitCost: 278000,
+      sellingPrice: 350000,
     },
     {
       id: "ing6",
@@ -442,11 +476,13 @@ export function Inventory() {
           quantity: 150,
           unitCost: 1200,
           entryDate: "2025-01-12",
+          expiryDate: "2025-12-31",
           supplier: "Bao bì Minh Anh",
         },
       ],
       totalValue: 180000,
       avgUnitCost: 1200,
+      sellingPrice: 2500,
     },
   ];
 
@@ -497,8 +533,16 @@ export function Inventory() {
     );
   };
 
-  const toggleStatus = (status: string) => {
-    setSelectedStatuses((prev) =>
+  const toggleStockStatus = (status: string) => {
+    setSelectedStockStatuses((prev) =>
+      prev.includes(status)
+        ? prev.filter((s) => s !== status)
+        : [...prev, status]
+    );
+  };
+
+  const toggleProductStatus = (status: string) => {
+    setSelectedProductStatuses((prev) =>
       prev.includes(status)
         ? prev.filter((s) => s !== status)
         : [...prev, status]
@@ -508,13 +552,29 @@ export function Inventory() {
   const getStatusBadge = (status: InventoryItem["status"]) => {
     switch (status) {
       case "good":
-        return <Badge className="bg-emerald-500">Đủ</Badge>;
+        return <Badge className="bg-emerald-500">Đủ hàng</Badge>;
       case "low":
-        return <Badge className="bg-amber-500">Sắp hết</Badge>;
+        return <Badge className="bg-amber-500">Sắp hết hàng</Badge>;
       case "expiring":
         return <Badge className="bg-orange-500">Gần hết hạn</Badge>;
+      case "expired":
+        return <Badge className="bg-red-700">Hết hạn</Badge>;
       case "critical":
-        return <Badge className="bg-red-500">Thiếu</Badge>;
+        return <Badge className="bg-red-500">Hết hàng</Badge>;
+    }
+  };
+
+  const getProductStatusBadge = (status?: InventoryItem["productStatus"]) => {
+    const s = status || "selling";
+    switch (s) {
+      case "selling":
+        return <Badge className="bg-blue-600">Đang bán</Badge>;
+      case "paused":
+        return <Badge className="bg-slate-400">Tạm ngưng</Badge>;
+      case "not_running":
+        return <Badge className="bg-slate-600">Không chạy</Badge>;
+      case "hot":
+        return <Badge className="bg-indigo-600">Bán chạy</Badge>;
     }
   };
 
@@ -524,6 +584,16 @@ export function Inventory() {
       (new Date(expiryDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000)
     );
     return days;
+  };
+
+  const getSampleExpiryDate = () => {
+    const days = 45;
+    return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+  };
+
+  const getSampleSellingPrice = (item: InventoryItem) => {
+    const base = item.batches?.[0]?.unitCost || 10000;
+    return Math.round(base * 1.25);
   };
 
   const getEarliestExpiryFromBatches = (batches?: BatchInfo[]) => {
@@ -550,16 +620,27 @@ export function Inventory() {
     }
   };
 
-  let filteredItems = inventoryItems.filter((item) => {
+  const [items, setItems] = useState<InventoryItem[]>(inventoryItems);
+
+  let filteredItems = items.filter((item) => {
     const matchesCategory =
       selectedCategories.includes("all") ||
       selectedCategories.includes(item.category);
     const matchesSearch = item.name
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
-    const matchesStatus = selectedStatuses.includes(item.status);
+    const matchesStockStatus = selectedStockStatuses.includes(item.status);
+    const matchesProductStatus = selectedProductStatuses.includes(
+      item.productStatus || "selling"
+    );
     const matchesType = selectedTypes.includes(item.type);
-    return matchesCategory && matchesSearch && matchesStatus && matchesType;
+    return (
+      matchesCategory &&
+      matchesSearch &&
+      matchesStockStatus &&
+      matchesProductStatus &&
+      matchesType
+    );
   });
 
   // Apply sorting
@@ -585,6 +666,10 @@ export function Inventory() {
         const statusOrder = { good: 0, low: 1, expiring: 2, critical: 3 };
         aValue = statusOrder[a.status] ?? 0;
         bValue = statusOrder[b.status] ?? 0;
+      } else if (sortField === "productStatus") {
+        const pOrder = { selling: 0, paused: 1, not_running: 2, hot: 3 } as Record<string, number>;
+        aValue = pOrder[a.productStatus || "selling"] ?? 0;
+        bValue = pOrder[b.productStatus || "selling"] ?? 0;
       } else if (sortField === "ingredients") {
         aValue = a.ingredients?.length || 0;
         bValue = b.ingredients?.length || 0;
@@ -596,6 +681,9 @@ export function Inventory() {
         const bSupplier = b.batches?.[0]?.supplier || "";
         aValue = aSupplier;
         bValue = bSupplier;
+      } else if (sortField === "sellingPrice") {
+        aValue = a.sellingPrice || 0;
+        bValue = b.sellingPrice || 0;
       } else {
         aValue = a[sortField as keyof InventoryItem];
         bValue = b[sortField as keyof InventoryItem];
@@ -612,14 +700,14 @@ export function Inventory() {
     });
   }
 
-  const totalValue = inventoryItems.reduce(
+  const totalValue = items.reduce(
     (sum, item) => sum + item.totalValue,
     0
   );
-  const lowStockCount = inventoryItems.filter(
+  const lowStockCount = items.filter(
     (item) => item.status === "low" || item.status === "critical"
   ).length;
-  const expiringCount = inventoryItems.filter(
+  const expiringCount = items.filter(
     (item) => item.status === "expiring"
   ).length;
 
@@ -660,23 +748,49 @@ export function Inventory() {
           <Separator />
 
           <div>
-            <h3 className="text-sm text-slate-900 mb-3">Trạng thái</h3>
+            <h3 className="text-sm text-slate-900 mb-3">Trạng thái tồn kho</h3>
             <div className="space-y-2">
               {[
                 { id: "good", label: "Đủ hàng", color: "bg-emerald-500" },
-                { id: "low", label: "Sắp hết", color: "bg-amber-500" },
-                {
-                  id: "expiring",
-                  label: "Gần hết hạn",
-                  color: "bg-orange-500",
-                },
-                { id: "critical", label: "Thiếu hàng", color: "bg-red-500" },
+                { id: "low", label: "Sắp hết hàng", color: "bg-amber-500" },
+                { id: "critical", label: "Hết hàng", color: "bg-red-500" },
+                { id: "expiring", label: "Gần hết hạn", color: "bg-orange-500" },
+                { id: "expired", label: "Hết hạn", color: "bg-red-700" },
               ].map((status) => (
                 <div key={status.id} className="flex items-center space-x-2">
                   <Checkbox
                     id={status.id}
-                    checked={selectedStatuses.includes(status.id)}
-                    onCheckedChange={() => toggleStatus(status.id)}
+                    checked={selectedStockStatuses.includes(status.id)}
+                    onCheckedChange={() => toggleStockStatus(status.id)}
+                  />
+                  <Label
+                    htmlFor={status.id}
+                    className="text-sm text-slate-700 cursor-pointer flex items-center gap-2"
+                  >
+                    <div className={`w-2 h-2 rounded-full ${status.color}`} />
+                    {status.label}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
+          <div>
+            <h3 className="text-sm text-slate-900 mb-3">Trạng thái mặt hàng</h3>
+            <div className="space-y-2">
+              {[
+                { id: "selling", label: "Đang bán", color: "bg-blue-700" },
+                { id: "hot", label: "Bán chạy", color: "bg-blue-600" },
+                { id: "not_running", label: "Không chạy", color: "bg-blue-500" },
+                { id: "paused", label: "Tạm ngưng", color: "bg-blue-300" },
+              ].map((status) => (
+                <div key={status.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={status.id}
+                    checked={selectedProductStatuses.includes(status.id)}
+                    onCheckedChange={() => toggleProductStatus(status.id)}
                   />
                   <Label
                     htmlFor={status.id}
@@ -1108,7 +1222,7 @@ export function Inventory() {
               <div>
                 <Label className="mb-2 block">Chọn nguyên liệu</Label>
                 <div className="border rounded-lg max-h-[300px] overflow-y-auto">
-                  {inventoryItems
+                  {items
                     .filter(
                       (item) =>
                         item.type === "ingredient" &&
@@ -1241,6 +1355,169 @@ export function Inventory() {
           </DialogContent>
         </Dialog>
 
+        <Dialog
+          open={editDialogOpen}
+          onOpenChange={(open) => {
+            setEditDialogOpen(open);
+            if (!open) setEditingItem(null);
+          }}
+        >
+          <DialogContent className="max-w-3xl" aria-describedby={undefined}>
+            <DialogHeader>
+              <DialogTitle>Chỉnh sửa mặt hàng</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Tên mặt hàng</Label>
+                  <Input
+                    value={editValues.name}
+                    onChange={(e) =>
+                      setEditValues((v) => ({ ...v, name: e.target.value }))
+                    }
+                    placeholder="Nhập tên"
+                    className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                  />
+                </div>
+                <div>
+                  <Label>Danh mục</Label>
+                  <Select
+                    value={editValues.category}
+                    onValueChange={(val) =>
+                      setEditValues((v) => ({ ...v, category: val }))
+                    }
+                  >
+                    <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories
+                        .filter((c) => c.id !== "all")
+                        .map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Đơn vị</Label>
+                  <Select
+                    value={editValues.unit}
+                    onValueChange={(val) =>
+                      setEditValues((v) => ({ ...v, unit: val }))
+                    }
+                  >
+                    <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="kg">Kilogram (kg)</SelectItem>
+                      <SelectItem value="g">Gram (g)</SelectItem>
+                      <SelectItem value="l">Lít (L)</SelectItem>
+                      <SelectItem value="ml">Mililit (ml)</SelectItem>
+                      <SelectItem value="box">Hộp</SelectItem>
+                      <SelectItem value="bottle">Chai</SelectItem>
+                      <SelectItem value="piece">Cái</SelectItem>
+                      <SelectItem value="cup">Ly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Giá bán</Label>
+                  <Input
+                    type="number"
+                    value={editValues.sellingPrice ?? ""}
+                    onChange={(e) =>
+                      setEditValues((v) => ({
+                        ...v,
+                        sellingPrice:
+                          e.target.value === "" ? undefined : Number(e.target.value),
+                      }))
+                    }
+                    placeholder="0"
+                    className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Tồn kho tối thiểu</Label>
+                  <Input
+                    type="number"
+                    value={editValues.minStock}
+                    onChange={(e) =>
+                      setEditValues((v) => ({
+                        ...v,
+                        minStock: Number(e.target.value || 0),
+                      }))
+                    }
+                    placeholder="0"
+                    className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                  />
+                </div>
+                <div>
+                  <Label>Tồn kho tối đa</Label>
+                  <Input
+                    type="number"
+                    value={editValues.maxStock}
+                    onChange={(e) =>
+                      setEditValues((v) => ({
+                        ...v,
+                        maxStock: Number(e.target.value || 0),
+                      }))
+                    }
+                    placeholder="0"
+                    className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-lg">
+                <p className="text-xs text-slate-600">
+                  <span className="text-red-500">*</span> Trường bắt buộc
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+                Hủy
+              </Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  if (!editingItem) return;
+                  setItems((prev) =>
+                    prev.map((it) =>
+                      it.id === editingItem.id
+                        ? {
+                            ...it,
+                            name: editValues.name,
+                            category: editValues.category,
+                            unit: editValues.unit,
+                            minStock: editValues.minStock,
+                            maxStock: editValues.maxStock,
+                            sellingPrice: editValues.sellingPrice,
+                          }
+                        : it
+                    )
+                  );
+                  setEditDialogOpen(false);
+                }}
+              >
+                Lưu
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="border-blue-200">
@@ -1349,24 +1626,33 @@ export function Inventory() {
                             {getSortIcon("name")}
                           </div>
                         </TableHead>
-                        <TableHead
-                          className="cursor-pointer hover:bg-blue-100 transition-colors"
-                          onClick={() => handleSort("category")}
-                        >
-                          <div className="flex items-center">
-                            Danh mục
-                            {getSortIcon("category")}
-                          </div>
-                        </TableHead>
-                        <TableHead
-                          className="cursor-pointer hover:bg-blue-100 transition-colors"
-                          onClick={() => handleSort("batches")}
-                        >
-                          <div className="flex items-center">
-                            Lô hàng
-                            {getSortIcon("batches")}
-                          </div>
-                        </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("category")}
+                      >
+                        <div className="flex items-center">
+                          Danh mục
+                          {getSortIcon("category")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("unit")}
+                      >
+                        <div className="flex items-center">
+                          Đơn vị tính
+                          {getSortIcon("unit")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("batches")}
+                      >
+                        <div className="flex items-center">
+                          Lô hàng
+                          {getSortIcon("batches")}
+                        </div>
+                      </TableHead>
                         <TableHead
                           className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("currentStock")}
@@ -1378,31 +1664,41 @@ export function Inventory() {
                         </TableHead>
                         <TableHead
                           className="cursor-pointer hover:bg-blue-100 transition-colors"
+                          onClick={() => handleSort("productStatus")}
+                        >
+                          <div className="flex items-center">
+                            Trạng thái mặt hàng
+                            {getSortIcon("productStatus")}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("status")}
                         >
                           <div className="flex items-center">
-                            Trạng thái
+                            Trạng thái tồn kho
                             {getSortIcon("status")}
                           </div>
                         </TableHead>
-                        <TableHead
-                          className="cursor-pointer hover:bg-blue-100 transition-colors"
-                          onClick={() => handleSort("expiryDate")}
-                        >
-                          <div className="flex items-center">
-                            HSD gần nhất
-                            {getSortIcon("expiryDate")}
-                          </div>
-                        </TableHead>
-                        <TableHead
-                          className="cursor-pointer hover:bg-blue-100 transition-colors"
-                          onClick={() => handleSort("totalValue")}
-                        >
-                          <div className="flex items-center">
-                            Giá trị
-                            {getSortIcon("totalValue")}
-                          </div>
-                        </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("expiryDate")}
+                      >
+                        <div className="flex items-center">
+                          HSD gần nhất
+                          {getSortIcon("expiryDate")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => handleSort("sellingPrice")}
+                      >
+                        <div className="flex items-center">
+                          Giá bán
+                          {getSortIcon("sellingPrice")}
+                        </div>
+                      </TableHead>
+                      
                         <TableHead className="text-right">Thao tác</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1447,6 +1743,7 @@ export function Inventory() {
                                     ?.name
                                 }
                               </TableCell>
+                              <TableCell className="text-sm text-slate-600">{item.unit}</TableCell>
                               <TableCell className="text-sm text-slate-600">
                                 {item.batches?.length || 0} lô
                               </TableCell>
@@ -1464,40 +1761,59 @@ export function Inventory() {
                                 </div>
                               </TableCell>
                               <TableCell className="text-sm">
+                                {getProductStatusBadge(item.productStatus)}
+                              </TableCell>
+                              <TableCell className="text-sm">
                                 {getStatusBadge(item.status)}
                               </TableCell>
                               <TableCell className="text-sm">
-                                {earliestExpiry ? (
-                                  <div>
-                                    <p className="text-slate-900">
-                                      {new Date(
-                                        earliestExpiry
-                                      ).toLocaleDateString("vi-VN")}
-                                    </p>
-                                    <p
-                                      className={`text-xs ${
-                                        getDaysUntilExpiry(earliestExpiry)! < 7
-                                          ? "text-red-600"
-                                          : "text-slate-500"
-                                      }`}
-                                    >
-                                      Còn {getDaysUntilExpiry(earliestExpiry)}{" "}
-                                      ngày
-                                    </p>
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-400">—</span>
-                                )}
+                                {(() => {
+                                  const exp = earliestExpiry || getSampleExpiryDate();
+                                  const days = getDaysUntilExpiry(exp)!;
+                                  return (
+                                    <div>
+                                      <p className="text-slate-900">
+                                        {new Date(exp).toLocaleDateString("vi-VN")}
+                                      </p>
+                                      <p
+                                        className={`text-xs ${
+                                          days < 7 ? "text-red-600" : "text-slate-500"
+                                        }`}
+                                      >
+                                        Còn {days} ngày
+                                      </p>
+                                    </div>
+                                  );
+                                })()}
                               </TableCell>
-                              <TableCell className="text-sm text-blue-900">
-                                {item.totalValue.toLocaleString()}₫
+                              <TableCell className="text-sm text-slate-900">
+                                {(
+                                  item.sellingPrice ?? getSampleSellingPrice(item)
+                                ).toLocaleString()}
+                                ₫
                               </TableCell>
+                              
                               <TableCell
                                 className="text-sm text-right"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingItem(item);
+                                      setEditValues({
+                                        name: item.name,
+                                        category: item.category,
+                                        unit: item.unit,
+                                        minStock: item.minStock,
+                                        maxStock: item.maxStock,
+                                        sellingPrice: item.sellingPrice,
+                                      });
+                                      setEditDialogOpen(true);
+                                    }}
+                                  >
                                     <Pencil className="w-4 h-4" />
                                   </Button>
                                   <Button variant="ghost" size="sm">
@@ -1510,7 +1826,7 @@ export function Inventory() {
                             {/* Expanded Row */}
                             {isExpanded && (
                               <TableRow className="bg-blue-50/30">
-                                <TableCell colSpan={10} className="p-0">
+                                <TableCell colSpan={12} className="p-0">
                                   <div className="p-6 animate-in slide-in-from-top-2">
                                     {/* Image and Info Section */}
                                     <div className="flex gap-6 mb-6">
@@ -1613,36 +1929,24 @@ export function Inventory() {
                                                 ₫
                                               </TableCell>
                                               <TableCell className="text-sm">
-                                                {batch.expiryDate ? (
-                                                  <div>
-                                                    <p className="text-slate-900">
-                                                      {new Date(
-                                                        batch.expiryDate
-                                                      ).toLocaleDateString(
-                                                        "vi-VN"
-                                                      )}
-                                                    </p>
-                                                    <p
-                                                      className={`text-xs ${
-                                                        getDaysUntilExpiry(
-                                                          batch.expiryDate
-                                                        )! < 7
-                                                          ? "text-red-600"
-                                                          : "text-slate-500"
-                                                      }`}
-                                                    >
-                                                      Còn{" "}
-                                                      {getDaysUntilExpiry(
-                                                        batch.expiryDate
-                                                      )}{" "}
-                                                      ngày
-                                                    </p>
-                                                  </div>
-                                                ) : (
-                                                  <span className="text-slate-400">
-                                                    —
-                                                  </span>
-                                                )}
+                                                {(() => {
+                                                  const exp = batch.expiryDate || getSampleExpiryDate();
+                                                  const days = getDaysUntilExpiry(exp)!;
+                                                  return (
+                                                    <div>
+                                                      <p className="text-slate-900">
+                                                        {new Date(exp).toLocaleDateString("vi-VN")}
+                                                      </p>
+                                                      <p
+                                                        className={`text-xs ${
+                                                          days < 7 ? "text-red-600" : "text-slate-500"
+                                                        }`}
+                                                      >
+                                                        Còn {days} ngày
+                                                      </p>
+                                                    </div>
+                                                  );
+                                                })()}
                                               </TableCell>
                                               <TableCell className="text-sm text-slate-600">
                                                 {batch.supplier}
@@ -1692,34 +1996,70 @@ export function Inventory() {
                             {getSortIcon("name")}
                           </div>
                         </TableHead>
-                        <TableHead
-                          className="cursor-pointer hover:bg-purple-100 transition-colors"
-                          onClick={() => handleSort("category")}
-                        >
-                          <div className="flex items-center">
-                            Danh mục
-                            {getSortIcon("category")}
-                          </div>
-                        </TableHead>
-                        <TableHead
-                          className="cursor-pointer hover:bg-purple-100 transition-colors"
-                          onClick={() => handleSort("ingredients")}
-                        >
-                          <div className="flex items-center">
-                            Số nguyên liệu
-                            {getSortIcon("ingredients")}
-                          </div>
-                        </TableHead>
-                        <TableHead
-                          className="cursor-pointer hover:bg-purple-100 transition-colors"
-                          onClick={() => handleSort("avgUnitCost")}
-                        >
-                          <div className="flex items-center">
-                            Giá vốn ước tính
-                            {getSortIcon("avgUnitCost")}
-                          </div>
-                        </TableHead>
-                        <TableHead className="text-right">Thao tác</TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-purple-100 transition-colors"
+                        onClick={() => handleSort("category")}
+                      >
+                        <div className="flex items-center">
+                          Danh mục
+                          {getSortIcon("category")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-purple-100 transition-colors"
+                        onClick={() => handleSort("unit")}
+                      >
+                        <div className="flex items-center">
+                          Đơn vị tính
+                          {getSortIcon("unit")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-purple-100 transition-colors"
+                        onClick={() => handleSort("ingredients")}
+                      >
+                        <div className="flex items-center">
+                          Số nguyên liệu
+                          {getSortIcon("ingredients")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-purple-100 transition-colors"
+                        onClick={() => handleSort("avgUnitCost")}
+                      >
+                        <div className="flex items-center">
+                          Giá vốn ước tính
+                          {getSortIcon("avgUnitCost")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-purple-100 transition-colors"
+                        onClick={() => handleSort("productStatus")}
+                      >
+                        <div className="flex items-center">
+                          Trạng thái mặt hàng
+                          {getSortIcon("productStatus")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-purple-100 transition-colors"
+                        onClick={() => handleSort("status")}
+                      >
+                        <div className="flex items-center">
+                          Trạng thái tồn kho
+                          {getSortIcon("status")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-purple-100 transition-colors"
+                        onClick={() => handleSort("sellingPrice")}
+                      >
+                        <div className="flex items-center">
+                          Giá bán
+                          {getSortIcon("sellingPrice")}
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-right">Thao tác</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1759,18 +2099,43 @@ export function Inventory() {
                                     ?.name
                                 }
                               </TableCell>
+                              <TableCell className="text-sm text-slate-700">{item.unit}</TableCell>
                               <TableCell className="text-sm text-slate-700">
                                 {item.ingredients?.length || 0} nguyên liệu
                               </TableCell>
                               <TableCell className="text-sm text-purple-900">
                                 {item.avgUnitCost.toLocaleString()}₫
                               </TableCell>
+                              <TableCell className="text-sm">
+                                {getProductStatusBadge(item.productStatus)}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {getStatusBadge(item.status)}
+                              </TableCell>
+                              <TableCell className="text-sm text-slate-900">
+                                {item.sellingPrice ? `${item.sellingPrice.toLocaleString()}₫` : "—"}
+                              </TableCell>
                               <TableCell
                                 className="text-sm text-right"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingItem(item);
+                                      setEditValues({
+                                        name: item.name,
+                                        category: item.category,
+                                        unit: item.unit,
+                                        minStock: item.minStock,
+                                        maxStock: item.maxStock,
+                                        sellingPrice: item.sellingPrice,
+                                      });
+                                      setEditDialogOpen(true);
+                                    }}
+                                  >
                                     <Pencil className="w-4 h-4" />
                                   </Button>
                                   <Button variant="ghost" size="sm">
@@ -1783,7 +2148,7 @@ export function Inventory() {
                             {/* Expanded Row */}
                             {isExpanded && (
                               <TableRow className="bg-purple-50/30">
-                                <TableCell colSpan={7} className="p-0">
+                                <TableCell colSpan={11} className="p-0">
                                   <div className="p-6 animate-in slide-in-from-top-2">
                                     {/* Image and Info Section */}
                                     <div className="flex gap-6 mb-6">
@@ -1933,24 +2298,33 @@ export function Inventory() {
                             {getSortIcon("name")}
                           </div>
                         </TableHead>
-                        <TableHead
-                          className="cursor-pointer hover:bg-green-100 transition-colors"
-                          onClick={() => handleSort("category")}
-                        >
-                          <div className="flex items-center">
-                            Danh mục
-                            {getSortIcon("category")}
-                          </div>
-                        </TableHead>
-                        <TableHead
-                          className="cursor-pointer hover:bg-green-100 transition-colors"
-                          onClick={() => handleSort("batches")}
-                        >
-                          <div className="flex items-center">
-                            Lô hàng
-                            {getSortIcon("batches")}
-                          </div>
-                        </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-green-100 transition-colors"
+                        onClick={() => handleSort("category")}
+                      >
+                        <div className="flex items-center">
+                          Danh mục
+                          {getSortIcon("category")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-green-100 transition-colors"
+                        onClick={() => handleSort("unit")}
+                      >
+                        <div className="flex items-center">
+                          Đơn vị tính
+                          {getSortIcon("unit")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-green-100 transition-colors"
+                        onClick={() => handleSort("batches")}
+                      >
+                        <div className="flex items-center">
+                          Lô hàng
+                          {getSortIcon("batches")}
+                        </div>
+                      </TableHead>
                         <TableHead
                           className="cursor-pointer hover:bg-green-100 transition-colors"
                           onClick={() => handleSort("currentStock")}
@@ -1962,10 +2336,19 @@ export function Inventory() {
                         </TableHead>
                         <TableHead
                           className="cursor-pointer hover:bg-green-100 transition-colors"
+                          onClick={() => handleSort("productStatus")}
+                        >
+                          <div className="flex items-center">
+                            Trạng thái mặt hàng
+                            {getSortIcon("productStatus")}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-green-100 transition-colors"
                           onClick={() => handleSort("status")}
                         >
                           <div className="flex items-center">
-                            Trạng thái
+                            Trạng thái tồn kho
                             {getSortIcon("status")}
                           </div>
                         </TableHead>
@@ -1978,24 +2361,25 @@ export function Inventory() {
                             {getSortIcon("expiryDate")}
                           </div>
                         </TableHead>
-                        <TableHead
-                          className="cursor-pointer hover:bg-green-100 transition-colors"
-                          onClick={() => handleSort("supplier")}
-                        >
-                          <div className="flex items-center">
-                            Nhà cung cấp
-                            {getSortIcon("supplier")}
-                          </div>
-                        </TableHead>
-                        <TableHead
-                          className="cursor-pointer hover:bg-green-100 transition-colors"
-                          onClick={() => handleSort("totalValue")}
-                        >
-                          <div className="flex items-center">
-                            Giá trị
-                            {getSortIcon("totalValue")}
-                          </div>
-                        </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-green-100 transition-colors"
+                        onClick={() => handleSort("supplier")}
+                      >
+                        <div className="flex items-center">
+                          Nhà cung cấp
+                          {getSortIcon("supplier")}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-green-100 transition-colors"
+                        onClick={() => handleSort("sellingPrice")}
+                      >
+                        <div className="flex items-center">
+                          Giá bán
+                          {getSortIcon("sellingPrice")}
+                        </div>
+                      </TableHead>
+                      
                         <TableHead className="text-right">Thao tác</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -2042,6 +2426,7 @@ export function Inventory() {
                                     ?.name
                                 }
                               </TableCell>
+                              <TableCell className="text-sm text-slate-600">{item.unit}</TableCell>
                               <TableCell className="text-sm text-slate-600">
                                 {item.batches?.length || 0} lô
                               </TableCell>
@@ -2057,6 +2442,9 @@ export function Inventory() {
                                     className="h-1 mt-1"
                                   />
                                 </div>
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {getProductStatusBadge(item.productStatus)}
                               </TableCell>
                               <TableCell className="text-sm">
                                 {getStatusBadge(item.status)}
@@ -2087,15 +2475,31 @@ export function Inventory() {
                               <TableCell className="text-sm text-slate-700">
                                 {primarySupplier}
                               </TableCell>
-                              <TableCell className="text-sm text-green-900">
-                                {item.totalValue.toLocaleString()}₫
+                              <TableCell className="text-sm text-slate-900">
+                                {item.sellingPrice ? `${item.sellingPrice.toLocaleString()}₫` : "—"}
                               </TableCell>
+                              
                               <TableCell
                                 className="text-sm text-right"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingItem(item);
+                                      setEditValues({
+                                        name: item.name,
+                                        category: item.category,
+                                        unit: item.unit,
+                                        minStock: item.minStock,
+                                        maxStock: item.maxStock,
+                                        sellingPrice: item.sellingPrice,
+                                      });
+                                      setEditDialogOpen(true);
+                                    }}
+                                  >
                                     <Pencil className="w-4 h-4" />
                                   </Button>
                                   <Button variant="ghost" size="sm">
@@ -2108,7 +2512,7 @@ export function Inventory() {
                             {/* Expanded Row */}
                             {isExpanded && (
                               <TableRow className="bg-green-50/30">
-                                <TableCell colSpan={11} className="p-0">
+                                <TableCell colSpan={13} className="p-0">
                                   <div className="p-6 animate-in slide-in-from-top-2">
                                     {/* Image and Info Section */}
                                     <div className="flex gap-6 mb-6">

@@ -487,7 +487,7 @@ export function NewItemRequests() {
           {/* Header */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
-              <h1 className="text-amber-950">Yêu cầu món mới</h1>
+              <h1 className="text-blue-900">Yêu cầu món mới</h1>
               <p className="text-neutral-600 mt-1">Duyệt các món mới được đề xuất từ nhân viên bán hàng</p>
             </div>
           </div>

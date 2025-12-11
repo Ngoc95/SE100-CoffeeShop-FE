@@ -941,38 +941,40 @@ export function Finance() {
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-6">
-          <h1 className="text-amber-950 mb-6">
-            {activeTab === 'cash' && 'Sổ quỹ tiền mặt'}
-            {activeTab === 'bank' && 'Sổ quỹ ngân hàng'}
-            {activeTab === 'total' && 'Tổng quỹ'}
-          </h1>
-
-          {/* Action Buttons */}
-          <div className="flex justify-end items-center gap-2 mb-6">
-            {activeTab !== 'total' && (
-              <>
-                <Button 
-                  size="sm"
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                  onClick={handleOpenReceiptDialog}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Lập phiếu thu
-                </Button>
-                <Button 
-                  size="sm"
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                  onClick={handleOpenPaymentDialog}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Lập phiếu chi
-                </Button>
-              </>
-            )}
-            <Button variant="outline" size="sm">
-              <Download className="w-4 h-4 mr-2" />
-              Xuất file
-            </Button>
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-amber-950">
+                {activeTab === 'cash' && 'Sổ quỹ tiền mặt'}
+                {activeTab === 'bank' && 'Sổ quỹ ngân hàng'}
+                {activeTab === 'total' && 'Tổng quỹ'}
+              </h1>
+            </div>
+            <div className="flex items-center gap-2">
+              {activeTab !== 'total' && (
+                <>
+                  <Button 
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={handleOpenReceiptDialog}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Lập phiếu thu
+                  </Button>
+                  <Button 
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={handleOpenPaymentDialog}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Lập phiếu chi
+                  </Button>
+                </>
+              )}
+              <Button variant="outline" size="sm">
+                <Download className="w-4 h-4 mr-2" />
+                Xuất file
+              </Button>
+            </div>
           </div>
 
           {/* Stats Cards */}
