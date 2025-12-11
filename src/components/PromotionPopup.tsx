@@ -684,7 +684,10 @@ export function PromotionPopup({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-h-[90vh] overflow-y-auto"
+        style={{ width: "70vw", maxWidth: "1600px" }}
+      >
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2">
@@ -925,7 +928,7 @@ export function PromotionPopup({
           {/* Section: Suggested Promotions */}
           <div className="space-y-3">
             <Label>Mã khuyến mãi gợi ý</Label>
-            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+            <div className="flex flex-wrap gap-3 max-h-80 overflow-y-auto pr-1">
               {availablePromotions
                 .filter((p) => p.isActive && !p.isCombo)
                 .map((promo) => {
@@ -938,7 +941,7 @@ export function PromotionPopup({
                   return (
                     <Card
                       key={promo.code}
-                      className={`p-3 cursor-pointer transition-all ${
+                      className={`p-3 cursor-pointer transition-all min-w-[280px] flex-shrink-0 ${
                         isSelected
                           ? "border-2 border-blue-500 bg-blue-50"
                           : applicable
@@ -1060,12 +1063,12 @@ export function PromotionPopup({
           </div>
 
           {/* NEW Section: Combo Promotions */}
-          <div className="space-y-3">
+          {/* <div className="space-y-3">
             <Label className="flex items-center gap-2">
               <ShoppingBag className="w-4 h-4 text-orange-600" />
               Khuyến mãi Combo khả dụng
             </Label>
-            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+            <div className="flex flex-wrap gap-3 max-h-80 overflow-y-auto pr-1">
               {availablePromotions
                 .filter((p) => p.isActive && p.isCombo)
                 .map((promo) => {
@@ -1080,7 +1083,7 @@ export function PromotionPopup({
                   return (
                     <Card
                       key={promo.code}
-                      className={`p-3 transition-all ${
+                      className={`p-3 transition-all min-w-[320px] flex-shrink-0 ${
                         isSelected
                           ? "border-2 border-blue-500 bg-blue-50"
                           : applicable && comboStatus.eligible
@@ -1089,7 +1092,6 @@ export function PromotionPopup({
                       }`}
                     >
                       <div className="space-y-2">
-                        {/* Header */}
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -1120,7 +1122,6 @@ export function PromotionPopup({
                             </p>
                           </div>
 
-                          {/* Status indicator */}
                           {isSelected && (
                             <div className="flex-shrink-0">
                               <CheckCircle2 className="w-5 h-5 text-blue-600" />
@@ -1128,7 +1129,6 @@ export function PromotionPopup({
                           )}
                         </div>
 
-                        {/* Combo Condition Block */}
                         {promo.comboCondition && (
                           <div className="bg-slate-100 rounded p-2.5 space-y-1.5">
                             <div className="text-xs text-slate-600 mb-1.5">
@@ -1161,7 +1161,6 @@ export function PromotionPopup({
                           </div>
                         )}
 
-                        {/* Eligibility Status */}
                         {comboStatus.eligible ? (
                           <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded p-2">
                             <Badge className="bg-green-100 text-green-700 border-green-300 text-xs">
@@ -1191,7 +1190,6 @@ export function PromotionPopup({
                           </div>
                         )}
 
-                        {/* Additional Conditions */}
                         <div className="space-y-0.5">
                           {promo.minOrderValue && (
                             <p className="text-xs text-slate-500">
@@ -1225,7 +1223,6 @@ export function PromotionPopup({
                           )}
                         </div>
 
-                        {/* Customer eligibility indicator */}
                         {selectedCustomer &&
                           promo.customerSpecific &&
                           applicable &&
@@ -1246,7 +1243,6 @@ export function PromotionPopup({
                             </div>
                           )}
 
-                        {/* Expandable: Items Breakdown */}
                         {comboStatus.matchedItems.length > 0 && (
                           <div>
                             <button
@@ -1335,7 +1331,6 @@ export function PromotionPopup({
                           </div>
                         )}
 
-                        {/* Apply Button or Not Applicable Warning */}
                         {comboStatus.eligible && applicable ? (
                           <Button
                             variant={isSelected ? "outline" : "default"}
@@ -1372,9 +1367,8 @@ export function PromotionPopup({
                   );
                 })}
             </div>
-          </div>
+          </div> */}
 
-          {/* Section: Discount Preview */}
           {(selectedPromo || pointsToUse > 0) && (
             <div className="bg-slate-50 rounded-lg p-4 space-y-2 border border-slate-200">
               <h4 className="text-sm text-slate-700 mb-3">
@@ -1458,7 +1452,6 @@ export function PromotionPopup({
             </div>
           )}
 
-          {/* Section: Reward Points */}
           {selectedCustomer && customerPoints > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
