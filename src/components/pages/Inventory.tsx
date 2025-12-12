@@ -17,7 +17,7 @@ import {
   Layers,
   Box,
   X,
-  FileSpreadsheet,
+  Upload,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
@@ -846,19 +846,18 @@ export function Inventory() {
             <Button
               variant="outline"
               onClick={() => setImportDialogOpen(true)}
-              className="gap-2"
             >
-              <FileSpreadsheet className="w-4 h-4" />
-              Import Excel
+              <Upload className="w-4 h-4 mr-2" />
+              Nhập file
             </Button>
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-blue-600 hover:bg-blue-700">
                   <Plus className="w-4 h-4 mr-2" />
-                  Thêm mới
+                  Thêm hàng hóa
                 </Button>
               </DialogTrigger>
-              <DialogContent className="!max-w-[1200px] w-full max-h-[90vh] flex flex-col" aria-describedby={undefined}>
+              <DialogContent className="min-w-[1100px] max-w-[1300px] w-[100vw] max-h-[90vh] flex flex-col" aria-describedby={undefined}>
                 <DialogHeader>
                   <DialogTitle>Thêm mặt hàng mới</DialogTitle>
                 </DialogHeader>
