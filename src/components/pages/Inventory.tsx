@@ -150,6 +150,8 @@ export function Inventory() {
     minStock: 0,
     maxStock: 0,
     sellingPrice: undefined as number | undefined,
+    productStatus: undefined as string | undefined, // Add productStatus
+    ingredients: [] as CompositeIngredient[], // Add ingredients
   });
 
   // Mock data
@@ -856,12 +858,12 @@ export function Inventory() {
                   Thêm mới
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-3xl" aria-describedby={undefined}>
+              <DialogContent className="!max-w-[1200px] w-full max-h-[90vh] flex flex-col" aria-describedby={undefined}>
                 <DialogHeader>
                   <DialogTitle>Thêm mặt hàng mới</DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-6">
+                <div className="space-y-6 flex-1 overflow-y-auto overflow-x-hidden px-1">
                   {/* Item Type Selection */}
                   <div>
                     <Label>
@@ -910,13 +912,12 @@ export function Inventory() {
                       <div className="flex gap-2 mt-1.5">
                         <Input
                           placeholder="Tự động tạo"
-                          value={`${
-                            addItemType === "ready-made"
-                              ? "RM"
-                              : addItemType === "composite"
+                          value={`${addItemType === "ready-made"
+                            ? "RM"
+                            : addItemType === "composite"
                               ? "CP"
                               : "IG"
-                          }${Math.floor(100 + Math.random() * 900)}`}
+                            }${Math.floor(100 + Math.random() * 900)}`}
                           disabled
                           className="bg-slate-50 border-slate-300"
                         />
@@ -928,19 +929,18 @@ export function Inventory() {
                         {addItemType === "composite"
                           ? "hàng hóa"
                           : addItemType === "ready-made"
-                          ? "hàng hóa"
-                          : "nguyên liệu"}{" "}
+                            ? "hàng hóa"
+                            : "nguyên liệu"}{" "}
                         <span className="text-red-500">*</span>
                       </Label>
                       <Input
                         className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                        placeholder={`VD: ${
-                          addItemType === "composite"
-                            ? "Cà phê Latte"
-                            : addItemType === "ready-made"
+                        placeholder={`VD: ${addItemType === "composite"
+                          ? "Cà phê Latte"
+                          : addItemType === "ready-made"
                             ? "Coca Cola"
                             : "Cà phê hạt Arabica"
-                        }`}
+                          }`}
                       />
                     </div>
                   </div>
@@ -1043,8 +1043,8 @@ export function Inventory() {
                       {addItemType === "composite"
                         ? "hàng hóa"
                         : addItemType === "ready-made"
-                        ? "hàng hóa"
-                        : "nguyên liệu"}{" "}
+                          ? "hàng hóa"
+                          : "nguyên liệu"}{" "}
                       (tùy chọn)
                     </p>
                   </div>
@@ -1131,8 +1131,8 @@ export function Inventory() {
                     {addItemType === "composite"
                       ? "Thêm hàng hóa"
                       : addItemType === "ready-made"
-                      ? "Thêm hàng hóa"
-                      : "Thêm nguyên liệu"}
+                        ? "Thêm hàng hóa"
+                        : "Thêm nguyên liệu"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -1260,16 +1260,32 @@ export function Inventory() {
                               );
 
                               if (quantity > 0) {
-                                setSelectedIngredients((prev) => [
-                                  ...prev,
-                                  {
-                                    ingredientId: ingredient.id,
-                                    ingredientName: ingredient.name,
-                                    unit: ingredient.unit,
-                                    quantity: quantity,
-                                    unitCost: ingredient.avgUnitCost,
-                                  },
-                                ]);
+                                if (editDialogOpen) {
+                                  setEditValues((prev) => ({
+                                    ...prev,
+                                    ingredients: [
+                                      ...prev.ingredients,
+                                      {
+                                        ingredientId: ingredient.id,
+                                        ingredientName: ingredient.name,
+                                        unit: ingredient.unit,
+                                        quantity: quantity,
+                                        unitCost: ingredient.avgUnitCost,
+                                      },
+                                    ],
+                                  }));
+                                } else {
+                                  setSelectedIngredients((prev) => [
+                                    ...prev,
+                                    {
+                                      ingredientId: ingredient.id,
+                                      ingredientName: ingredient.name,
+                                      unit: ingredient.unit,
+                                      quantity: quantity,
+                                      unitCost: ingredient.avgUnitCost,
+                                    },
+                                  ]);
+                                }
                                 qtyInput.value = "";
                               }
                             }}
@@ -1362,12 +1378,12 @@ export function Inventory() {
             if (!open) setEditingItem(null);
           }}
         >
-          <DialogContent className="max-w-3xl" aria-describedby={undefined}>
+          <DialogContent className="!max-w-[1200px] w-full max-h-[90vh] flex flex-col" aria-describedby={undefined}>
             <DialogHeader>
               <DialogTitle>Chỉnh sửa mặt hàng</DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-6">
+            <div className="space-y-6 overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Tên mặt hàng</Label>
@@ -1381,7 +1397,37 @@ export function Inventory() {
                   />
                 </div>
                 <div>
-                  <Label>Danh mục</Label>
+                  <Label>Trạng thái</Label>
+                  <Select
+                    value={editValues.productStatus || "selling"}
+                    onValueChange={(val) =>
+                      setEditValues((v) => ({ ...v, productStatus: val }))
+                    }
+                  >
+                    <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="selling">Đang bán</SelectItem>
+                      <SelectItem value="paused">Tạm ngưng</SelectItem>
+                      <SelectItem value="not_running">Không chạy</SelectItem>
+                      <SelectItem value="hot">Bán chạy</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between">
+                    <Label>Danh mục</Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 text-blue-600 hover:text-blue-700"
+                      onClick={() => setAddCategoryDialogOpen(true)}
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Thêm
+                    </Button>
+                  </div>
                   <Select
                     value={editValues.category}
                     onValueChange={(val) =>
@@ -1402,11 +1448,19 @@ export function Inventory() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Đơn vị</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Đơn vị</Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 text-blue-600 hover:text-blue-700"
+                      onClick={() => setAddUnitDialogOpen(true)}
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Thêm
+                    </Button>
+                  </div>
                   <Select
                     value={editValues.unit}
                     onValueChange={(val) =>
@@ -1427,22 +1481,6 @@ export function Inventory() {
                       <SelectItem value="cup">Ly</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div>
-                  <Label>Giá bán</Label>
-                  <Input
-                    type="number"
-                    value={editValues.sellingPrice ?? ""}
-                    onChange={(e) =>
-                      setEditValues((v) => ({
-                        ...v,
-                        sellingPrice:
-                          e.target.value === "" ? undefined : Number(e.target.value),
-                      }))
-                    }
-                    placeholder="0"
-                    className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                  />
                 </div>
               </div>
 
@@ -1479,6 +1517,72 @@ export function Inventory() {
                 </div>
               </div>
 
+              {/* Ingredient Editing for Composite Items */}
+              {editingItem?.type === "composite" && (
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-sm">Công thức nguyên liệu</Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      onClick={() => setAddIngredientDialogOpen(true)}
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Thêm nguyên liệu
+                    </Button>
+                  </div>
+                  {editValues.ingredients.length === 0 ? (
+                    <p className="text-xs text-slate-500">
+                      Chưa có nguyên liệu nào.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-purple-100">
+                            <TableHead className="w-12">STT</TableHead>
+                            <TableHead>Mã</TableHead>
+                            <TableHead>Tên nguyên liệu</TableHead>
+                            <TableHead>Đơn vị</TableHead>
+                            <TableHead>Số lượng</TableHead>
+                            <TableHead className="w-12"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {editValues.ingredients.map((ing, index) => (
+                            <TableRow key={index}>
+                              <TableCell>{index + 1}</TableCell>
+                              <TableCell>{ing.ingredientId}</TableCell>
+                              <TableCell>{ing.ingredientName}</TableCell>
+                              <TableCell>{ing.unit}</TableCell>
+                              <TableCell>{ing.quantity}</TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0"
+                                  onClick={() => {
+                                    setEditValues((prev) => ({
+                                      ...prev,
+                                      ingredients: prev.ingredients.filter(
+                                        (_, i) => i !== index
+                                      ),
+                                    }));
+                                  }}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="bg-slate-50 p-3 rounded-lg">
                 <p className="text-xs text-slate-600">
                   <span className="text-red-500">*</span> Trường bắt buộc
@@ -1487,7 +1591,10 @@ export function Inventory() {
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setEditDialogOpen(false)}
+              >
                 Hủy
               </Button>
               <Button
@@ -1498,14 +1605,16 @@ export function Inventory() {
                     prev.map((it) =>
                       it.id === editingItem.id
                         ? {
-                            ...it,
-                            name: editValues.name,
-                            category: editValues.category,
-                            unit: editValues.unit,
-                            minStock: editValues.minStock,
-                            maxStock: editValues.maxStock,
-                            sellingPrice: editValues.sellingPrice,
-                          }
+                          ...it,
+                          name: editValues.name,
+                          category: editValues.category,
+                          unit: editValues.unit,
+                          minStock: editValues.minStock,
+                          maxStock: editValues.maxStock,
+                          sellingPrice: editValues.sellingPrice,
+                          productStatus: editValues.productStatus as any,
+                          ingredients: editValues.ingredients,
+                        }
                         : it
                     )
                   );
@@ -1626,33 +1735,33 @@ export function Inventory() {
                             {getSortIcon("name")}
                           </div>
                         </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-blue-100 transition-colors"
-                        onClick={() => handleSort("category")}
-                      >
-                        <div className="flex items-center">
-                          Danh mục
-                          {getSortIcon("category")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-blue-100 transition-colors"
-                        onClick={() => handleSort("unit")}
-                      >
-                        <div className="flex items-center">
-                          Đơn vị tính
-                          {getSortIcon("unit")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-blue-100 transition-colors"
-                        onClick={() => handleSort("batches")}
-                      >
-                        <div className="flex items-center">
-                          Lô hàng
-                          {getSortIcon("batches")}
-                        </div>
-                      </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
+                          onClick={() => handleSort("category")}
+                        >
+                          <div className="flex items-center">
+                            Danh mục
+                            {getSortIcon("category")}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
+                          onClick={() => handleSort("unit")}
+                        >
+                          <div className="flex items-center">
+                            Đơn vị tính
+                            {getSortIcon("unit")}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
+                          onClick={() => handleSort("batches")}
+                        >
+                          <div className="flex items-center">
+                            Lô hàng
+                            {getSortIcon("batches")}
+                          </div>
+                        </TableHead>
                         <TableHead
                           className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("currentStock")}
@@ -1680,25 +1789,25 @@ export function Inventory() {
                             {getSortIcon("status")}
                           </div>
                         </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-blue-100 transition-colors"
-                        onClick={() => handleSort("expiryDate")}
-                      >
-                        <div className="flex items-center">
-                          HSD gần nhất
-                          {getSortIcon("expiryDate")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-blue-100 transition-colors"
-                        onClick={() => handleSort("sellingPrice")}
-                      >
-                        <div className="flex items-center">
-                          Giá bán
-                          {getSortIcon("sellingPrice")}
-                        </div>
-                      </TableHead>
-                      
+                        <TableHead
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
+                          onClick={() => handleSort("expiryDate")}
+                        >
+                          <div className="flex items-center">
+                            HSD gần nhất
+                            {getSortIcon("expiryDate")}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
+                          onClick={() => handleSort("sellingPrice")}
+                        >
+                          <div className="flex items-center">
+                            Giá bán
+                            {getSortIcon("sellingPrice")}
+                          </div>
+                        </TableHead>
+
                         <TableHead className="text-right">Thao tác</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1776,9 +1885,8 @@ export function Inventory() {
                                         {new Date(exp).toLocaleDateString("vi-VN")}
                                       </p>
                                       <p
-                                        className={`text-xs ${
-                                          days < 7 ? "text-red-600" : "text-slate-500"
-                                        }`}
+                                        className={`text-xs ${days < 7 ? "text-red-600" : "text-slate-500"
+                                          }`}
                                       >
                                         Còn {days} ngày
                                       </p>
@@ -1792,7 +1900,7 @@ export function Inventory() {
                                 ).toLocaleString()}
                                 ₫
                               </TableCell>
-                              
+
                               <TableCell
                                 className="text-sm text-right"
                                 onClick={(e) => e.stopPropagation()}
@@ -1810,6 +1918,8 @@ export function Inventory() {
                                         minStock: item.minStock,
                                         maxStock: item.maxStock,
                                         sellingPrice: item.sellingPrice,
+                                        productStatus: item.productStatus,
+                                        ingredients: item.ingredients || [],
                                       });
                                       setEditDialogOpen(true);
                                     }}
@@ -1938,9 +2048,8 @@ export function Inventory() {
                                                         {new Date(exp).toLocaleDateString("vi-VN")}
                                                       </p>
                                                       <p
-                                                        className={`text-xs ${
-                                                          days < 7 ? "text-red-600" : "text-slate-500"
-                                                        }`}
+                                                        className={`text-xs ${days < 7 ? "text-red-600" : "text-slate-500"
+                                                          }`}
                                                       >
                                                         Còn {days} ngày
                                                       </p>
@@ -1996,70 +2105,70 @@ export function Inventory() {
                             {getSortIcon("name")}
                           </div>
                         </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-purple-100 transition-colors"
-                        onClick={() => handleSort("category")}
-                      >
-                        <div className="flex items-center">
-                          Danh mục
-                          {getSortIcon("category")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-purple-100 transition-colors"
-                        onClick={() => handleSort("unit")}
-                      >
-                        <div className="flex items-center">
-                          Đơn vị tính
-                          {getSortIcon("unit")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-purple-100 transition-colors"
-                        onClick={() => handleSort("ingredients")}
-                      >
-                        <div className="flex items-center">
-                          Số nguyên liệu
-                          {getSortIcon("ingredients")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-purple-100 transition-colors"
-                        onClick={() => handleSort("avgUnitCost")}
-                      >
-                        <div className="flex items-center">
-                          Giá vốn ước tính
-                          {getSortIcon("avgUnitCost")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-purple-100 transition-colors"
-                        onClick={() => handleSort("productStatus")}
-                      >
-                        <div className="flex items-center">
-                          Trạng thái mặt hàng
-                          {getSortIcon("productStatus")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-purple-100 transition-colors"
-                        onClick={() => handleSort("status")}
-                      >
-                        <div className="flex items-center">
-                          Trạng thái tồn kho
-                          {getSortIcon("status")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-purple-100 transition-colors"
-                        onClick={() => handleSort("sellingPrice")}
-                      >
-                        <div className="flex items-center">
-                          Giá bán
-                          {getSortIcon("sellingPrice")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="text-right">Thao tác</TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-purple-100 transition-colors"
+                          onClick={() => handleSort("category")}
+                        >
+                          <div className="flex items-center">
+                            Danh mục
+                            {getSortIcon("category")}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-purple-100 transition-colors"
+                          onClick={() => handleSort("unit")}
+                        >
+                          <div className="flex items-center">
+                            Đơn vị tính
+                            {getSortIcon("unit")}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-purple-100 transition-colors"
+                          onClick={() => handleSort("ingredients")}
+                        >
+                          <div className="flex items-center">
+                            Số nguyên liệu
+                            {getSortIcon("ingredients")}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-purple-100 transition-colors"
+                          onClick={() => handleSort("avgUnitCost")}
+                        >
+                          <div className="flex items-center">
+                            Giá vốn ước tính
+                            {getSortIcon("avgUnitCost")}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-purple-100 transition-colors"
+                          onClick={() => handleSort("productStatus")}
+                        >
+                          <div className="flex items-center">
+                            Trạng thái mặt hàng
+                            {getSortIcon("productStatus")}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-purple-100 transition-colors"
+                          onClick={() => handleSort("status")}
+                        >
+                          <div className="flex items-center">
+                            Trạng thái tồn kho
+                            {getSortIcon("status")}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-purple-100 transition-colors"
+                          onClick={() => handleSort("sellingPrice")}
+                        >
+                          <div className="flex items-center">
+                            Giá bán
+                            {getSortIcon("sellingPrice")}
+                          </div>
+                        </TableHead>
+                        <TableHead className="text-right">Thao tác</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -2132,6 +2241,8 @@ export function Inventory() {
                                         minStock: item.minStock,
                                         maxStock: item.maxStock,
                                         sellingPrice: item.sellingPrice,
+                                        productStatus: item.productStatus,
+                                        ingredients: item.ingredients || [],
                                       });
                                       setEditDialogOpen(true);
                                     }}
@@ -2298,33 +2409,33 @@ export function Inventory() {
                             {getSortIcon("name")}
                           </div>
                         </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-green-100 transition-colors"
-                        onClick={() => handleSort("category")}
-                      >
-                        <div className="flex items-center">
-                          Danh mục
-                          {getSortIcon("category")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-green-100 transition-colors"
-                        onClick={() => handleSort("unit")}
-                      >
-                        <div className="flex items-center">
-                          Đơn vị tính
-                          {getSortIcon("unit")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-green-100 transition-colors"
-                        onClick={() => handleSort("batches")}
-                      >
-                        <div className="flex items-center">
-                          Lô hàng
-                          {getSortIcon("batches")}
-                        </div>
-                      </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-green-100 transition-colors"
+                          onClick={() => handleSort("category")}
+                        >
+                          <div className="flex items-center">
+                            Danh mục
+                            {getSortIcon("category")}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-green-100 transition-colors"
+                          onClick={() => handleSort("unit")}
+                        >
+                          <div className="flex items-center">
+                            Đơn vị tính
+                            {getSortIcon("unit")}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-green-100 transition-colors"
+                          onClick={() => handleSort("batches")}
+                        >
+                          <div className="flex items-center">
+                            Lô hàng
+                            {getSortIcon("batches")}
+                          </div>
+                        </TableHead>
                         <TableHead
                           className="cursor-pointer hover:bg-green-100 transition-colors"
                           onClick={() => handleSort("currentStock")}
@@ -2361,25 +2472,25 @@ export function Inventory() {
                             {getSortIcon("expiryDate")}
                           </div>
                         </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-green-100 transition-colors"
-                        onClick={() => handleSort("supplier")}
-                      >
-                        <div className="flex items-center">
-                          Nhà cung cấp
-                          {getSortIcon("supplier")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-green-100 transition-colors"
-                        onClick={() => handleSort("sellingPrice")}
-                      >
-                        <div className="flex items-center">
-                          Giá bán
-                          {getSortIcon("sellingPrice")}
-                        </div>
-                      </TableHead>
-                      
+                        <TableHead
+                          className="cursor-pointer hover:bg-green-100 transition-colors"
+                          onClick={() => handleSort("supplier")}
+                        >
+                          <div className="flex items-center">
+                            Nhà cung cấp
+                            {getSortIcon("supplier")}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-green-100 transition-colors"
+                          onClick={() => handleSort("sellingPrice")}
+                        >
+                          <div className="flex items-center">
+                            Giá bán
+                            {getSortIcon("sellingPrice")}
+                          </div>
+                        </TableHead>
+
                         <TableHead className="text-right">Thao tác</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -2458,11 +2569,10 @@ export function Inventory() {
                                       ).toLocaleDateString("vi-VN")}
                                     </p>
                                     <p
-                                      className={`text-xs ${
-                                        getDaysUntilExpiry(earliestExpiry)! < 7
-                                          ? "text-red-600"
-                                          : "text-slate-500"
-                                      }`}
+                                      className={`text-xs ${getDaysUntilExpiry(earliestExpiry)! < 7
+                                        ? "text-red-600"
+                                        : "text-slate-500"
+                                        }`}
                                     >
                                       Còn {getDaysUntilExpiry(earliestExpiry)}{" "}
                                       ngày
@@ -2478,7 +2588,7 @@ export function Inventory() {
                               <TableCell className="text-sm text-slate-900">
                                 {item.sellingPrice ? `${item.sellingPrice.toLocaleString()}₫` : "—"}
                               </TableCell>
-                              
+
                               <TableCell
                                 className="text-sm text-right"
                                 onClick={(e) => e.stopPropagation()}
@@ -2496,6 +2606,8 @@ export function Inventory() {
                                         minStock: item.minStock,
                                         maxStock: item.maxStock,
                                         sellingPrice: item.sellingPrice,
+                                        productStatus: item.productStatus,
+                                        ingredients: item.ingredients || [],
                                       });
                                       setEditDialogOpen(true);
                                     }}
@@ -2625,13 +2737,12 @@ export function Inventory() {
                                                       )}
                                                     </p>
                                                     <p
-                                                      className={`text-xs ${
-                                                        getDaysUntilExpiry(
-                                                          batch.expiryDate
-                                                        )! < 7
-                                                          ? "text-red-600"
-                                                          : "text-slate-500"
-                                                      }`}
+                                                      className={`text-xs ${getDaysUntilExpiry(
+                                                        batch.expiryDate
+                                                      )! < 7
+                                                        ? "text-red-600"
+                                                        : "text-slate-500"
+                                                        }`}
                                                     >
                                                       Còn{" "}
                                                       {getDaysUntilExpiry(
