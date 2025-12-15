@@ -446,7 +446,7 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-blue-50">
+              <TableRow className="bg-blue-100">
                 <TableHead className="w-32 text-sm">Mã</TableHead>
                 <TableHead className="text-sm">Tên</TableHead>
                 <TableHead className="text-sm">Kỳ hạn trả</TableHead>

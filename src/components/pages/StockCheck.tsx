@@ -790,6 +790,8 @@ export function StockCheck() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-blue-50">
+                    <TableHead className="w-12 text-sm text-center"></TableHead>
+                    <TableHead className="w-16 text-sm text-center">STT</TableHead>
                     <TableHead
                       className="w-20 cursor-pointer hover:bg-blue-100 transition-colors"
                       onClick={() => handleSort("code")}
@@ -865,7 +867,7 @@ export function StockCheck() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredSessions.map((session) => {
+                  {filteredSessions.map((session, index) => {
                     const items = sessionItems[session.id] || [];
                     const totalItems = items.length;
                     const matched = items.filter(
@@ -892,17 +894,20 @@ export function StockCheck() {
                             )
                           }
                         >
+                          <TableCell className="text-sm">
+                            <span className="inline-flex h-4 w-4 items-center justify-center">
+                              {isExpanded ? (
+                                <ChevronDown className="w-4 h-4 text-slate-600" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4 text-slate-600" />
+                              )}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-600 text-center">
+                            {index + 1}
+                          </TableCell>
                           <TableCell className="text-sm text-blue-700 font-medium">
-                            <div className="flex items-center gap-2">
-                              <span className="inline-flex h-4 w-4 items-center justify-center">
-                                {isExpanded ? (
-                                  <ChevronDown className="w-3 h-3 text-slate-500" />
-                                ) : (
-                                  <ChevronRight className="w-3 h-3 text-slate-400" />
-                                )}
-                              </span>
-                              {session.id}
-                            </div>
+                            {session.id}
                           </TableCell>
                           <TableCell className="text-sm text-slate-700">
                             {session.date}

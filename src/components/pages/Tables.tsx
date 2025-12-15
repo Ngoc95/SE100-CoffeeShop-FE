@@ -568,6 +568,7 @@ export function Tables() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-blue-100">
+                    <TableHead className="w-16 text-sm text-center">STT</TableHead>
                     <TableHead
                       className="cursor-pointer hover:bg-blue-100 transition-colors"
                       onClick={() => handleSort("name")}
@@ -603,15 +604,18 @@ export function Tables() {
                     {filteredTables.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={5}
+                          colSpan={6}
                           className="text-center py-8 text-slate-500"
                         >
                           Không tìm thấy bàn nào
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredTables.map((table) => (
+                      filteredTables.map((table, index) => (
                         <TableRow key={table.id}>
+                          <TableCell className="text-sm text-slate-600 text-center">
+                            {index + 1}
+                          </TableCell>
                           <TableCell className="text-sm text-slate-900">
                             {table.name}
                           </TableCell>

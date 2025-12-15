@@ -429,7 +429,7 @@ export function CustomerGroups() {
                         <Badge
                           key={customerId}
                           variant="secondary"
-                          className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 hover:bg-blue-100 font-normal"
+                          className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 hover:bg-blue-100 font-normal"
                         >
                           {customer.name}
                           <button
@@ -559,7 +559,8 @@ export function CustomerGroups() {
               <div className="overflow-x-auto rounded-xl">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-blue-50">
+                    <TableRow className="bg-blue-100">
+                      <TableHead className="w-16 text-sm text-center">STT</TableHead>
                       <TableHead
                         className="cursor-pointer hover:bg-blue-100 transition-colors"
                         onClick={() => handleSort("code")}
@@ -603,15 +604,18 @@ export function CustomerGroups() {
                   {filteredGroups.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={5}
+                        colSpan={6}
                         className="text-center py-8 text-slate-500"
                       >
                         Không tìm thấy nhóm khách hàng nào
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredGroups.map((group) => (
+                    filteredGroups.map((group, index) => (
                       <TableRow key={group.id}>
+                        <TableCell className="text-sm text-slate-600 text-center">
+                          {index + 1}
+                        </TableCell>
                         <TableCell className="text-sm text-slate-900">
                           {group.code}
                         </TableCell>
@@ -645,7 +649,7 @@ export function CustomerGroups() {
                               variant="ghost"
                               size="sm"
                               onClick={() => openEditDialog(group)}
-                              className="hover:bg-blue-50"
+                              className="hover:bg-blue-100"
                             >
                               <Pencil className="w-4 h-4" />
                             </Button>

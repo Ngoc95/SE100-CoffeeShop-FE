@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import {
   Table,
   TableBody,
@@ -390,20 +391,54 @@ export function Promotions() {
               </div>
 
               <div>
-                <Label className="text-xs text-slate-600">Trạng thái</Label>
-                <Select
+                <Label className="text-xs text-slate-600 mb-2 block">
+                  Trạng thái
+                </Label>
+                <RadioGroup
                   value={selectedStatus}
                   onValueChange={setSelectedStatus}
+                  className="space-y-2"
                 >
-                  <SelectTrigger className="mt-1 bg-white border-slate-300 shadow-none">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                    <SelectItem value="active">Hoạt động</SelectItem>
-                    <SelectItem value="inactive">Không hoạt động</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem
+                      value="all"
+                      id="promotion-status-all"
+                      className="border-slate-300"
+                    />
+                    <Label
+                      htmlFor="promotion-status-all"
+                      className="text-l text-slate-700 cursor-pointer font-normal"
+                    >
+                      Tất cả trạng thái
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem
+                      value="active"
+                      id="promotion-status-active"
+                      className="border-slate-300"
+                    />
+                    <Label
+                      htmlFor="promotion-status-active"
+                      className="text-l text-slate-700 cursor-pointer font-normal"
+                    >
+                      Hoạt động
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem
+                      value="inactive"
+                      id="promotion-status-inactive"
+                      className="border-slate-300"
+                    />
+                    <Label
+                      htmlFor="promotion-status-inactive"
+                      className="text-l text-slate-700 cursor-pointer font-normal"
+                    >
+                      Không hoạt động
+                    </Label>
+                  </div>
+                </RadioGroup>
               </div>
             </div>
           </div>
@@ -513,7 +548,8 @@ export function Promotions() {
               <div className="overflow-x-auto rounded-xl">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-blue-50">
+                    <TableRow className="bg-blue-100">
+                      <TableHead className="w-16 text-sm text-center">STT</TableHead>
                       <TableHead
                         className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
                         onClick={() => handleSort("code")}
@@ -604,15 +640,18 @@ export function Promotions() {
                   {filteredPromotions.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={12}
+                        colSpan={13}
                         className="text-center py-8 text-slate-500"
                       >
                         Không tìm thấy khuyến mại nào
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredPromotions.map((promo) => (
+                    filteredPromotions.map((promo, index) => (
                       <TableRow key={promo.id}>
+                        <TableCell className="text-sm text-slate-600 text-center">
+                          {index + 1}
+                        </TableCell>
                         <TableCell className="text-sm text-slate-900">
                           {promo.code}
                         </TableCell>
@@ -669,7 +708,7 @@ export function Promotions() {
                               variant="ghost"
                               size="sm"
                               onClick={() => openEditDialog(promo)}
-                              className="hover:bg-blue-50"
+                              className="hover:bg-blue-100"
                             >
                               <Pencil className="w-4 h-4" />
                             </Button>

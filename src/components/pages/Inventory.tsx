@@ -12,7 +12,7 @@ import {
   ArrowUp,
   ArrowDown,
   ChevronDown,
-  ChevronUp,
+  ChevronRight,
   ShoppingBag,
   Layers,
   Box,
@@ -770,7 +770,6 @@ export function Inventory() {
                     htmlFor={status.id}
                     className="text-sm text-slate-700 cursor-pointer flex items-center gap-2"
                   >
-                    <div className={`w-2 h-2 rounded-full ${status.color}`} />
                     {status.label}
                   </Label>
                 </div>
@@ -786,7 +785,7 @@ export function Inventory() {
               {[
                 { id: "selling", label: "Đang bán", color: "bg-blue-700" },
                 { id: "hot", label: "Bán chạy", color: "bg-blue-600" },
-                { id: "not_running", label: "Không chạy", color: "bg-blue-500" },
+                { id: "not_running", label: "Không chạy", color: "bg-blue-1000" },
                 { id: "paused", label: "Tạm ngưng", color: "bg-blue-300" },
               ].map((status) => (
                 <div key={status.id} className="flex items-center space-x-2">
@@ -799,7 +798,6 @@ export function Inventory() {
                     htmlFor={status.id}
                     className="text-sm text-slate-700 cursor-pointer flex items-center gap-2"
                   >
-                    <div className={`w-2 h-2 rounded-full ${status.color}`} />
                     {status.label}
                   </Label>
                 </div>
@@ -1297,7 +1295,7 @@ export function Inventory() {
                         return (
                           <TableRow
                             key={ingredient.id}
-                            className={isSelected ? "bg-blue-50" : ""}
+                            className={isSelected ? "bg-blue-100" : ""}
                             onClick={() => {
                               setIngredientsToAdd((prev: string[]) =>
                                 prev.includes(ingredient.id)
@@ -1823,7 +1821,7 @@ export function Inventory() {
                 <div className="overflow-x-auto rounded-xl">
                   <Table>
                     <TableHeader >
-                      <TableRow className="bg-blue-50">
+                      <TableRow className="bg-blue-100">
                         <TableHead className="w-10"></TableHead>
                         <TableHead className="w-16">STT</TableHead>
                         <TableHead
@@ -1922,14 +1920,14 @@ export function Inventory() {
                           <Fragment key={item.id}>
                             {/* Main Row */}
                             <TableRow
-                              className="cursor-pointer hover:bg-blue-50/50 transition-colors"
+                              className="cursor-pointer hover:bg-blue-100/50 transition-colors"
                               onClick={() => toggleExpand(item.id)}
                             >
                               <TableCell>
                                 {isExpanded ? (
-                                  <ChevronUp className="w-4 h-4 text-blue-600" />
+                                  <ChevronDown className="w-4 h-4 text-slate-600" />
                                 ) : (
-                                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                                  <ChevronRight className="w-4 h-4 text-slate-600" />
                                 )}
                               </TableCell>
                               <TableCell className="text-sm text-slate-600">
@@ -2035,7 +2033,7 @@ export function Inventory() {
 
                             {/* Expanded Row */}
                             {isExpanded && (
-                              <TableRow className="bg-blue-50/30">
+                              <TableRow className="bg-blue-100/30">
                                 <TableCell colSpan={12} className="p-0">
                                   <div className="p-6 animate-in slide-in-from-top-2">
                                     {/* Image and Info Section */}
@@ -2193,11 +2191,11 @@ export function Inventory() {
                 <div className="overflow-x-auto rounded-xl">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-purple-50">
+                      <TableRow className="bg-blue-100">
                         <TableHead className="w-10"></TableHead>
                         <TableHead className="w-16">STT</TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-purple-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("name")}
                         >
                           <div className="flex items-center">
@@ -2206,7 +2204,7 @@ export function Inventory() {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-purple-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("category")}
                         >
                           <div className="flex items-center">
@@ -2215,7 +2213,7 @@ export function Inventory() {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-purple-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("unit")}
                         >
                           <div className="flex items-center">
@@ -2224,7 +2222,7 @@ export function Inventory() {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-purple-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("ingredients")}
                         >
                           <div className="flex items-center">
@@ -2233,7 +2231,7 @@ export function Inventory() {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-purple-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("avgUnitCost")}
                         >
                           <div className="flex items-center">
@@ -2242,7 +2240,7 @@ export function Inventory() {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-purple-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("productStatus")}
                         >
                           <div className="flex items-center">
@@ -2251,7 +2249,7 @@ export function Inventory() {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-purple-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("status")}
                         >
                           <div className="flex items-center">
@@ -2260,7 +2258,7 @@ export function Inventory() {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-purple-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("sellingPrice")}
                         >
                           <div className="flex items-center">
@@ -2284,9 +2282,9 @@ export function Inventory() {
                             >
                               <TableCell>
                                 {isExpanded ? (
-                                  <ChevronUp className="w-4 h-4 text-purple-600" />
+                                  <ChevronDown className="w-4 h-4 text-slate-600" />
                                 ) : (
-                                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                                  <ChevronRight className="w-4 h-4 text-slate-600" />
                                 )}
                               </TableCell>
                               <TableCell className="text-sm text-slate-600">
@@ -2358,7 +2356,7 @@ export function Inventory() {
 
                             {/* Expanded Row */}
                             {isExpanded && (
-                              <TableRow className="bg-purple-50/30">
+                              <TableRow className="bg-blue-50/30">
                                 <TableCell colSpan={11} className="p-0">
                                   <div className="p-6 animate-in slide-in-from-top-2">
                                     {/* Image and Info Section */}
@@ -2434,7 +2432,7 @@ export function Inventory() {
                                     <div className="border rounded-lg overflow-hidden bg-white">
                                       <Table>
                                         <TableHeader>
-                                          <TableRow className="bg-purple-100">
+                                          <TableRow className="bg-blue-100">
                                             <TableHead>Mã NVL</TableHead>
                                             <TableHead>
                                               Tên nguyên liệu
@@ -2497,11 +2495,11 @@ export function Inventory() {
                 <div className="overflow-x-auto rounded-xl">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-green-50">
+                      <TableRow className="bg-blue-100">
                         <TableHead className="w-10"></TableHead>
                         <TableHead className="w-16">STT</TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-green-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("name")}
                         >
                           <div className="flex items-center">
@@ -2510,7 +2508,7 @@ export function Inventory() {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-green-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("category")}
                         >
                           <div className="flex items-center">
@@ -2519,7 +2517,7 @@ export function Inventory() {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-green-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("unit")}
                         >
                           <div className="flex items-center">
@@ -2528,7 +2526,7 @@ export function Inventory() {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-green-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("batches")}
                         >
                           <div className="flex items-center">
@@ -2537,7 +2535,7 @@ export function Inventory() {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-green-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("currentStock")}
                         >
                           <div className="flex items-center">
@@ -2546,7 +2544,7 @@ export function Inventory() {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-green-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("productStatus")}
                         >
                           <div className="flex items-center">
@@ -2555,7 +2553,7 @@ export function Inventory() {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-green-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("status")}
                         >
                           <div className="flex items-center">
@@ -2564,7 +2562,7 @@ export function Inventory() {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-green-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("expiryDate")}
                         >
                           <div className="flex items-center">
@@ -2573,7 +2571,7 @@ export function Inventory() {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-green-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("supplier")}
                         >
                           <div className="flex items-center">
@@ -2582,7 +2580,7 @@ export function Inventory() {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="cursor-pointer hover:bg-green-100 transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("sellingPrice")}
                         >
                           <div className="flex items-center">
@@ -2607,14 +2605,14 @@ export function Inventory() {
                           <Fragment key={item.id}>
                             {/* Main Row */}
                             <TableRow
-                              className="cursor-pointer hover:bg-green-50/50 transition-colors"
+                              className="cursor-pointer hover:bg-blue-50/50 transition-colors"
                               onClick={() => toggleExpand(item.id)}
                             >
                               <TableCell>
                                 {isExpanded ? (
-                                  <ChevronUp className="w-4 h-4 text-green-600" />
+                                  <ChevronDown className="w-4 h-4 text-slate-600" />
                                 ) : (
-                                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                                  <ChevronRight className="w-4 h-4 text-slate-600" />
                                 )}
                               </TableCell>
                               <TableCell className="text-sm text-slate-600">
@@ -2798,7 +2796,7 @@ export function Inventory() {
                                     <div className="border rounded-lg overflow-hidden bg-white">
                                       <Table>
                                         <TableHeader>
-                                          <TableRow className="bg-green-100">
+                                          <TableRow className="bg-blue-100">
                                             <TableHead>Mã lô</TableHead>
                                             <TableHead>Ngày nhập</TableHead>
                                             <TableHead>Số lượng</TableHead>

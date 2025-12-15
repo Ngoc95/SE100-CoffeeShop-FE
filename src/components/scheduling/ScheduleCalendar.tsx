@@ -429,13 +429,13 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
 
         {/* Calendar Content */}
         <div className="flex-1 overflow-auto p-6">
-          <Card className="border-amber-200">
+          <Card className="border-blue-200">
             <CardContent className="p-0">
               <div className="overflow-x-auto rounded-xl">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="border-b-2 border-amber-200">
-                      <th className="text-left p-3 text-sm text-neutral-700 bg-amber-50 sticky left-0 z-10">
+                    <tr className="border-b-2 border-blue-200">
+                      <th className="text-left p-3 text-sm text-neutral-700 bg-blue-50 sticky left-0 z-10">
                         <div>Nhân viên</div>
                         <div className="text-xs text-neutral-500 mt-1">
                           {filteredStaff.length} người
@@ -448,7 +448,7 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
                         return (
                           <th 
                             key={day} 
-                            className={`p-3 text-center bg-amber-50 min-w-[120px] ${
+                            className={`p-3 text-center bg-blue-50 min-w-[120px] ${
                               isToday ? 'bg-blue-100 border-2 border-blue-500' : ''
                             }`}
                           >
@@ -464,7 +464,7 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
                         </th>
                         );
                       })}
-                      <th className="p-3 text-right bg-amber-50 text-sm text-black-700 min-w-[120px]">
+                      <th className="p-3 text-right bg-blue-50 text-sm text-black-700 min-w-[120px]">
                         Lương dự kiến
                       </th>
                     </tr>

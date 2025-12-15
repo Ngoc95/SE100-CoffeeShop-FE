@@ -1816,6 +1816,7 @@ export function Staff({
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-blue-100">
+                      <TableHead className="w-16 text-sm text-center">STT</TableHead>
                       <TableHead
                         className="w-24 text-sm cursor-pointer hover:bg-blue-100 transition-colors"
                         onClick={() => handleSort("staffCode")}
@@ -1862,15 +1863,18 @@ export function Staff({
                   {filteredStaff.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={8}
+                        colSpan={9}
                         className="text-center text-slate-500 py-8"
                       >
                         Không tìm thấy nhân viên nào
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredStaff.map((staff) => (
+                    filteredStaff.map((staff, index) => (
                       <TableRow key={staff.id} className="hover:bg-blue-100/50">
+                        <TableCell className="text-sm text-slate-600 text-center">
+                          {index + 1}
+                        </TableCell>
                         <TableCell className="text-sm text-blue-600">
                           {staff.staffCode}
                         </TableCell>

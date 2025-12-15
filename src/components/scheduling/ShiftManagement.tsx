@@ -361,7 +361,7 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
             <TableBody>
               {sortedShifts.map((shift, index) => (
               <TableRow key={shift.id}>
-                <TableCell className="text-sm font-medium text-blue-600">
+                <TableCell className="text-sm font-medium">
                   {index + 1}
                 </TableCell>
                 <TableCell className="text-sm text-slate-900">{shift.name}</TableCell>

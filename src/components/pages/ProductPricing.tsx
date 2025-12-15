@@ -463,7 +463,8 @@ export function ProductPricing() {
           <div className="overflow-x-auto flex-1 rounded-xl">
             <Table>
               <TableHeader>
-                <TableRow className="bg-blue-50">
+                <TableRow className="bg-blue-100">
+                  <TableHead className="w-16 text-sm text-center">STT</TableHead>
                   <TableHead
                     className="cursor-pointer hover:bg-blue-100 transition-colors"
                     onClick={() => handleSort("code")}
@@ -549,12 +550,15 @@ export function ProductPricing() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => {
+                {filteredProducts.map((product, index) => {
                   const margin = ((product.sellingPrice - product.costPrice) / product.sellingPrice * 100).toFixed(0);
                   const categoryLabel = categories.find(c => c.id === product.category)?.name || product.category;
                   
                   return (
                     <TableRow key={product.id} className="hover:bg-slate-50">
+                      <TableCell className="text-sm text-slate-600 text-center">
+                        {index + 1}
+                      </TableCell>
                       <TableCell className="text-sm text-slate-700">{product.code}</TableCell>
                       <TableCell className="text-sm text-slate-900">{product.name}</TableCell>
                       <TableCell className="text-sm text-slate-700">{categoryLabel}</TableCell>
