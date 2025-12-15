@@ -24,8 +24,8 @@ import { Textarea } from "../ui/textarea";
 interface KitchenItem {
   id: string;
   itemName: string;
-  totalQuantity: number;
-  completedQuantity: number;
+  totalQuantity: number; //sl còn chờ bếp làm ch xong
+  completedQuantity: number; //sl đã làm xong
   table: string;
   timestamp: Date;
   notes?: string;
@@ -150,59 +150,47 @@ export function KitchenDisplay() {
   };
 
   const advanceOneUnit = (itemId: string) => {
+    const item = items.find((i) => i.id === itemId);
+    if (!item || item.totalQuantity <= 0) return;
+
+    const newTotalQty = item.totalQuantity - 1;
+
     setItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== itemId) return item;
-        if (item.completedQuantity >= item.totalQuantity) return item;
-
-        const newCompleted = item.completedQuantity + 1;
-
-        // If all units completed, show toast and remove item after delay
-        if (newCompleted === item.totalQuantity) {
-          toast.success(
-            `${item.itemName} hoàn thành tất cả ${item.totalQuantity} ly`,
-            {
-              icon: <Bell className="w-4 h-4" />,
+      prev.map((i) =>
+        i.id === itemId
+          ? {
+              ...i,
+              totalQuantity: newTotalQty,
+              completedQuantity: item.completedQuantity + 1,
             }
-          );
-
-          // Remove item after 1 second
-          setTimeout(() => {
-            setItems((prev) => prev.filter((i) => i.id !== itemId));
-          }, 1000);
-        }
-
-        return {
-          ...item,
-          completedQuantity: newCompleted,
-        };
-      })
+          : i
+      )
     );
+
+    toast.success(`Hoàn thành 1 ly ${item.itemName} (Còn ${newTotalQty} ly)`);
   };
 
   const advanceAllUnits = (itemId: string) => {
+    const item = items.find((i) => i.id === itemId);
+    if (!item || item.totalQuantity <= 0) return;
+
     setItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== itemId) return item;
-        if (item.completedQuantity >= item.totalQuantity) return item;
+      prev.map((i) =>
+        i.id === itemId
+          ? {
+              ...i,
+              totalQuantity: 0,
+              completedQuantity: item.completedQuantity + item.totalQuantity,
+            }
+          : i
+      )
+    );
 
-        toast.success(
-          `${item.itemName} hoàn thành tất cả ${item.totalQuantity} ly`,
-          {
-            icon: <Bell className="w-4 h-4" />,
-          }
-        );
-
-        // Remove item after 1 second
-        setTimeout(() => {
-          setItems((prev) => prev.filter((i) => i.id !== itemId));
-        }, 1000);
-
-        return {
-          ...item,
-          completedQuantity: item.totalQuantity,
-        };
-      })
+    toast.success(
+      `${item.itemName} hoàn thành tất cả ${item.totalQuantity} ly`,
+      {
+        icon: <Bell className="w-4 h-4" />,
+      }
     );
   };
 
@@ -268,11 +256,8 @@ export function KitchenDisplay() {
   };
 
   // Separate items into two columns
-  const pendingItems = items.filter((item) => item.completedQuantity === 0);
-  const inProgressItems = items.filter(
-    (item) =>
-      item.completedQuantity > 0 && item.completedQuantity < item.totalQuantity
-  );
+  const pendingItems = items.filter((item) => item.totalQuantity > 0);
+  const inProgressItems = items.filter((item) => item.completedQuantity > 0);
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
@@ -314,16 +299,16 @@ export function KitchenDisplay() {
                         {/* Left: Item Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
-                            <h4 className="text-sm text-slate-900">
+                            <h2 className="font-semibold text-slate-900">
                               {item.totalQuantity}x {item.itemName}
-                            </h4>
+                            </h2>
                             {item.outOfStock && (
                               <Badge className="bg-yellow-500 text-white text-xs h-5">
                                 Hết nguyên liệu
                               </Badge>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 text-xs text-slate-600">
+                          <div className="flex items-center gap-3 text-slate-700">
                             <span>{item.table}</span>
                             <span className="flex items-center gap-1">
                               <Clock className="w-3 h-3" />
@@ -405,7 +390,8 @@ export function KitchenDisplay() {
               ) : (
                 inProgressItems.map((item) => {
                   const elapsedMinutes = getElapsedTime(item.timestamp);
-                  const remaining = item.totalQuantity - item.completedQuantity;
+                  const totalItems =
+                    item.completedQuantity + item.totalQuantity;
 
                   return (
                     <Card
@@ -416,24 +402,25 @@ export function KitchenDisplay() {
                         {/* Left: Item Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
-                            <h4 className="text-sm text-slate-900">
-                              {item.totalQuantity}x {item.itemName}
-                            </h4>
+                            <h2 className="text-slate-900 font-semibold">
+                              {item.completedQuantity}x {item.itemName}
+                            </h2>
                             <Badge className="bg-green-600 text-white text-xs h-5">
-                              Đã làm {item.completedQuantity}/
-                              {item.totalQuantity}
+                              Đã làm {item.completedQuantity}/{totalItems}
                             </Badge>
                           </div>
-                          <div className="flex items-center gap-3 text-xs text-slate-600">
+                          <div className="flex items-center gap-3 text-slate-700">
                             <span>{item.table}</span>
                             <span className="flex items-center gap-1">
                               <Clock className="w-3 h-3" />
                               {elapsedMinutes} phút
                             </span>
                           </div>
-                          <p className="text-xs text-blue-700 mt-1">
-                            Chờ làm {remaining}/{item.totalQuantity}
-                          </p>
+                          {item.totalQuantity > 0 && (
+                            <p className="text-xs text-amber-700 mt-1">
+                              Chờ làm thêm {item.totalQuantity}/{totalItems}
+                            </p>
+                          )}
                           {item.notes && (
                             <p className="text-xs text-slate-500 mt-1">
                               Ghi chú: {item.notes}
