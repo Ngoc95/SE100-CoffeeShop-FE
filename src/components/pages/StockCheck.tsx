@@ -10,7 +10,6 @@ import {
   Lightbulb,
   ArrowUp,
   ArrowDown,
-  FileSpreadsheet,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
@@ -756,20 +755,20 @@ export function StockCheck() {
           </div>
           <div className="flex items-center gap-2">
             <Button
+              variant="outline"
+              onClick={() => setImportDialogOpen(true)}
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Nhập file
+            </Button>
+            <Button
               className="bg-blue-600 hover:bg-blue-700 text-white px-5"
               onClick={handleOpenCreateDialog}
             >
               <Plus className="w-4 h-4 mr-2" />
               Tạo phiếu kiểm kho
             </Button>
-            <Button
-              variant="outline"
-              className="px-5"
-              onClick={() => setImportDialogOpen(true)}
-            >
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-              Import Excel
-            </Button>
+
           </div>
         </div>
 
