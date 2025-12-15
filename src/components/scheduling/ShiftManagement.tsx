@@ -317,7 +317,7 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
         <div className="overflow-x-auto rounded-xl">
           <Table>
             <TableHeader>
-              <TableRow className="bg-blue-50">
+              <TableRow className="bg-blue-100">
                 <TableHead className="w-16 text-sm">STT</TableHead>
                 <TableHead
                   className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"

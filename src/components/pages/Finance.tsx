@@ -497,7 +497,7 @@ export function Finance() {
           <button
             onClick={() => setActiveTab('cash')}
             className={`w-full text-left px-3 py-2 rounded mb-1 text-sm ${
-              activeTab === 'cash' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+              activeTab === 'cash' ? 'bg-blue-100 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
             }`}
           >
             Tiền mặt
@@ -505,7 +505,7 @@ export function Finance() {
           <button
             onClick={() => setActiveTab('bank')}
             className={`w-full text-left px-3 py-2 rounded mb-1 text-sm ${
-              activeTab === 'bank' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+              activeTab === 'bank' ? 'bg-blue-100 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
             }`}
           >
             Ngân hàng
@@ -513,7 +513,7 @@ export function Finance() {
           <button
             onClick={() => setActiveTab('total')}
             className={`w-full text-left px-3 py-2 rounded text-sm ${
-              activeTab === 'total' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+              activeTab === 'total' ? 'bg-blue-100 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
             }`}
           >
             Tổng quỹ
@@ -630,7 +630,7 @@ export function Finance() {
                                 className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
                                   presetTimeRange === option.value
                                     ? 'bg-blue-600 text-white'
-                                    : 'text-blue-600 hover:bg-blue-50'
+                                    : 'text-blue-600 hover:bg-blue-100'
                                 }`}
                               >
                                 {option.label}
@@ -661,7 +661,7 @@ export function Finance() {
                                 className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
                                   presetTimeRange === option.value
                                     ? 'bg-blue-600 text-white'
-                                    : 'text-blue-600 hover:bg-blue-50'
+                                    : 'text-blue-600 hover:bg-blue-100'
                                 }`}
                               >
                                 {option.label}
@@ -689,7 +689,7 @@ export function Finance() {
                                 className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
                                   presetTimeRange === option.value
                                     ? 'bg-blue-600 text-white'
-                                    : 'text-blue-600 hover:bg-blue-50'
+                                    : 'text-blue-600 hover:bg-blue-100'
                                 }`}
                               >
                                 {option.label}
@@ -807,7 +807,7 @@ export function Finance() {
                   return (
                     <div
                       key={creatorId}
-                      className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs"
+                      className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs"
                     >
                       {creator?.name}
                       <button
@@ -892,7 +892,7 @@ export function Finance() {
                 {selectedCategories.map((categoryName) => (
                   <div
                     key={categoryName}
-                    className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs"
+                    className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs"
                   >
                     {categoryName}
                     <button
@@ -1019,7 +1019,7 @@ export function Finance() {
               <div className="overflow-x-auto rounded-xl">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-blue-50">
+                    <TableRow className="bg-blue-100">
                       <TableHead
                         className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
                         onClick={() => handleSort("id")}
@@ -1070,7 +1070,7 @@ export function Finance() {
                   <TableBody>
                     {filteredTransactions.length > 0 ? (
                       filteredTransactions.map((transaction) => (
-                        <TableRow key={transaction.id} className="hover:bg-blue-50/50">
+                        <TableRow key={transaction.id} className="hover:bg-blue-100/50">
                           <TableCell className="text-sm text-blue-600">{transaction.id}</TableCell>
                           <TableCell className="text-sm text-slate-700">{transaction.time}</TableCell>
                           <TableCell className="text-sm text-slate-700">
@@ -1696,6 +1696,7 @@ export function Finance() {
               Hủy
             </Button>
             <Button 
+              className="bg-blue-600 hover:bg-blue-700 text-white"
               onClick={handleAddPerson}
               disabled={!newPersonName || !newPersonPhone}
             >

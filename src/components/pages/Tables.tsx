@@ -268,10 +268,6 @@ export function Tables() {
       <div className="w-64 bg-white border-r p-6 overflow-auto">
         <div className="space-y-6">
           <div>
-            <h3 className="text-sm text-slate-700 mb-3 flex items-center gap-2">
-              <Filter className="w-4 h-4" />
-              Bộ lọc
-            </h3>
             <div className="space-y-4">
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -339,7 +335,7 @@ export function Tables() {
                     />
                     <Label
                       htmlFor="status-all"
-                      className="text-xs text-slate-700 cursor-pointer font-normal"
+                      className="text-l text-slate-700 cursor-pointer font-normal"
                     >
                       Tất cả trạng thái
                     </Label>
@@ -352,7 +348,7 @@ export function Tables() {
                     />
                     <Label
                       htmlFor="status-active"
-                      className="text-xs text-slate-700 cursor-pointer font-normal"
+                      className="text-l text-slate-700 cursor-pointer font-normal"
                     >
                       Hoạt động
                     </Label>
@@ -365,7 +361,7 @@ export function Tables() {
                     />
                     <Label
                       htmlFor="status-inactive"
-                      className="text-xs text-slate-700 cursor-pointer font-normal"
+                      className="text-l text-slate-700 cursor-pointer font-normal"
                     >
                       Không hoạt động
                     </Label>
@@ -571,7 +567,7 @@ export function Tables() {
               <div className="overflow-x-auto rounded-xl">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-blue-50">
+                    <TableRow className="bg-blue-100">
                     <TableHead
                       className="cursor-pointer hover:bg-blue-100 transition-colors"
                       onClick={() => handleSort("name")}

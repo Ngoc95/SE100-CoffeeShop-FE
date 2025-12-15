@@ -16,10 +16,57 @@ export interface StaffMember {
     ward: string;
     detail: string;
   };
+  salarySettings?: {
+    salaryType: "shift" | "fixed";
+    salaryAmount: string;
+    advancedSetup: boolean;
+    overtimeEnabled: boolean;
+    shifts: Array<{
+      id: string;
+      name: string;
+      salaryPerShift: string;
+      saturdayCoeff: string;
+      sundayCoeff: string;
+      dayOffCoeff: string;
+      holidayCoeff: string;
+    }>;
+    overtimeCoeffs: {
+      weekday: string;
+      saturday: string;
+      sunday: string;
+      dayOff: string;
+      holiday: string;
+    };
+  };
+  account?: {
+    username: string;
+  };
 }
 
-// Danh sách nhân viên (không bao gồm quản lý)
+// Danh sách nhân viên đầy đủ
 export const staffMembers: StaffMember[] = [
+  {
+    id: "1",
+    staffCode: "NV001",
+    fullName: "Nguyễn Văn A",
+    phone: "0901234567",
+    idCard: "001234567890",
+    gender: "male",
+    birthDate: "1990-01-01",
+    position: "manager",
+    positionLabel: "Quản lý",
+    joinDate: "2023-01-15",
+    salary: 0,
+    status: "active",
+    address: {
+      city: "TP. Hồ Chí Minh",
+      ward: "Phường Bến Nghé",
+      detail: "123 Nguyễn Huệ",
+    },
+    account: {
+      username: "nguyenvana",
+    },
+  },
   {
     id: "2",
     staffCode: "NV002",
@@ -31,12 +78,48 @@ export const staffMembers: StaffMember[] = [
     position: "barista",
     positionLabel: "Pha chế",
     joinDate: "2023-03-20",
-    salary: 8000000,
+    salary: 0,
+    salarySettings: {
+      salaryType: "shift",
+      salaryAmount: "200000",
+      advancedSetup: true,
+      overtimeEnabled: true,
+      shifts: [
+        {
+          id: "1",
+          name: "Ca sáng",
+          salaryPerShift: "200000",
+          saturdayCoeff: "150%",
+          sundayCoeff: "200%",
+          dayOffCoeff: "100%",
+          holidayCoeff: "300%",
+        },
+        {
+          id: "2",
+          name: "Ca chiều",
+          salaryPerShift: "200000",
+          saturdayCoeff: "150%",
+          sundayCoeff: "200%",
+          dayOffCoeff: "100%",
+          holidayCoeff: "300%",
+        },
+      ],
+      overtimeCoeffs: {
+        weekday: "150%",
+        saturday: "200%",
+        sunday: "200%",
+        dayOff: "150%",
+        holiday: "300%",
+      },
+    },
     status: "active",
     address: {
       city: "TP. Hồ Chí Minh",
       ward: "Phường 1, Quận 3",
       detail: "456 Võ Văn Tần",
+    },
+    account: {
+      username: "tranthib",
     },
   },
   {
@@ -50,12 +133,48 @@ export const staffMembers: StaffMember[] = [
     position: "cashier",
     positionLabel: "Thu ngân",
     joinDate: "2023-05-10",
-    salary: 7000000,
+    salary: 0,
+    salarySettings: {
+      salaryType: "shift",
+      salaryAmount: "180000",
+      advancedSetup: true,
+      overtimeEnabled: true,
+      shifts: [
+        {
+          id: "1",
+          name: "Ca sáng",
+          salaryPerShift: "180000",
+          saturdayCoeff: "150%",
+          sundayCoeff: "200%",
+          dayOffCoeff: "100%",
+          holidayCoeff: "250%",
+        },
+        {
+          id: "2",
+          name: "Ca chiều",
+          salaryPerShift: "180000",
+          saturdayCoeff: "150%",
+          sundayCoeff: "200%",
+          dayOffCoeff: "100%",
+          holidayCoeff: "250%",
+        },
+      ],
+      overtimeCoeffs: {
+        weekday: "150%",
+        saturday: "200%",
+        sunday: "200%",
+        dayOff: "150%",
+        holiday: "250%",
+      },
+    },
     status: "active",
     address: {
       city: "TP. Hồ Chí Minh",
       ward: "Phường 5, Quận 5",
       detail: "789 Trần Hưng Đạo",
+    },
+    account: {
+      username: "levanc",
     },
   },
   {
@@ -69,12 +188,48 @@ export const staffMembers: StaffMember[] = [
     position: "server",
     positionLabel: "Phục vụ",
     joinDate: "2023-07-01",
-    salary: 6500000,
+    salary: 0,
+    salarySettings: {
+      salaryType: "shift",
+      salaryAmount: "150000",
+      advancedSetup: true,
+      overtimeEnabled: false,
+      shifts: [
+        {
+          id: "1",
+          name: "Ca sáng",
+          salaryPerShift: "150000",
+          saturdayCoeff: "150%",
+          sundayCoeff: "200%",
+          dayOffCoeff: "100%",
+          holidayCoeff: "200%",
+        },
+        {
+          id: "2",
+          name: "Ca chiều",
+          salaryPerShift: "150000",
+          saturdayCoeff: "150%",
+          sundayCoeff: "200%",
+          dayOffCoeff: "100%",
+          holidayCoeff: "200%",
+        },
+      ],
+      overtimeCoeffs: {
+        weekday: "150%",
+        saturday: "150%",
+        sunday: "150%",
+        dayOff: "150%",
+        holiday: "200%",
+      },
+    },
     status: "active",
     address: {
       city: "TP. Hồ Chí Minh",
       ward: "Phường Tân Phú, Quận 7",
       detail: "321 Nguyễn Văn Linh",
+    },
+    account: {
+      username: "phamthid",
     },
   },
   {
@@ -88,12 +243,48 @@ export const staffMembers: StaffMember[] = [
     position: "barista",
     positionLabel: "Pha chế",
     joinDate: "2023-02-14",
-    salary: 8000000,
-    status: "active",
+    salary: 0,
+    salarySettings: {
+      salaryType: "shift",
+      salaryAmount: "180000",
+      advancedSetup: true,
+      overtimeEnabled: true,
+      shifts: [
+        {
+          id: "1",
+          name: "Ca sáng",
+          salaryPerShift: "180000",
+          saturdayCoeff: "150%",
+          sundayCoeff: "200%",
+          dayOffCoeff: "100%",
+          holidayCoeff: "250%",
+        },
+        {
+          id: "2",
+          name: "Ca chiều",
+          salaryPerShift: "180000",
+          saturdayCoeff: "150%",
+          sundayCoeff: "200%",
+          dayOffCoeff: "100%",
+          holidayCoeff: "250%",
+        },
+      ],
+      overtimeCoeffs: {
+        weekday: "150%",
+        saturday: "200%",
+        sunday: "200%",
+        dayOff: "150%",
+        holiday: "250%",
+      },
+    },
+    status: "inactive",
     address: {
       city: "Hà Nội",
       ward: "Phường Cầu Dền, Hai Bà Trưng",
       detail: "555 Bà Triệu",
+    },
+    account: {
+      username: "hoangvane",
     },
   },
 ];
