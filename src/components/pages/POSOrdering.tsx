@@ -33,6 +33,8 @@ import {
   Settings,
   Percent,
   Tag,
+  ChevronRight,
+  ChevronsRight,
 } from "lucide-react";
 import { Card, CardContent } from "../ui/card";
 import { Input } from "../ui/input";
@@ -179,7 +181,22 @@ interface NewItemRequest {
   ingredients?: CompositeIngredient[];
 }
 
-export function POSOrdering() {
+interface ReadyItem {
+  id: string;
+  itemName: string;
+  totalQuantity: number;
+  completedQuantity: number;
+  servedQuantity: number; // Track how many already served to customers
+  table: string;
+  timestamp: Date;
+  notes?: string;
+}
+
+interface POSOrderingProps {
+  userRole?: "waiter" | "cashier";
+}
+
+export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -312,6 +329,38 @@ export function POSOrdering() {
   const [pendingItemToAdd, setPendingItemToAdd] = useState<
     (typeof products)[0] | null
   >(null);
+
+  // Ready items from kitchen (waiter monitoring)
+  const [readyItems, setReadyItems] = useState<ReadyItem[]>([
+    {
+      id: "r1",
+      itemName: "Cà phê sữa đá",
+      totalQuantity: 0,
+      completedQuantity: 3,
+      servedQuantity: 3,
+      table: "Bàn 2",
+      timestamp: new Date(Date.now() - 5 * 60000),
+    },
+    {
+      id: "r2",
+      itemName: "Trà đào cam sả",
+      totalQuantity: 1,
+      completedQuantity: 1,
+      servedQuantity: 1,
+      table: "Bàn 7",
+      timestamp: new Date(Date.now() - 3 * 60000),
+      notes: "Extra trân châu",
+    },
+    {
+      id: "r3",
+      itemName: "Cappuccino",
+      totalQuantity: 0,
+      completedQuantity: 1,
+      servedQuantity: 1,
+      table: "Bàn 4",
+      timestamp: new Date(Date.now() - 1 * 60000),
+    },
+  ]);
 
   // Mock inventory ingredients for adding to formula
   const inventoryIngredients: InventoryIngredient[] = [
@@ -1844,11 +1893,41 @@ export function POSOrdering() {
     }
   };
 
+  // Ready items advance functions (for waiter tab)
+  // servedQuantity decreases when serving (completedQuantity stays fixed for display)
+  const advanceReadyItemOneUnit = (itemId: string) => {
+    setReadyItems((prev) =>
+      prev.map((item) => {
+        if (item.id === itemId && item.servedQuantity > 0) {
+          return {
+            ...item,
+            servedQuantity: item.servedQuantity - 1,
+          };
+        }
+        return item;
+      })
+    );
+  };
+
+  const advanceReadyItemAllUnits = (itemId: string) => {
+    setReadyItems((prev) =>
+      prev.map((item) => {
+        if (item.id === itemId && item.servedQuantity > 0) {
+          return {
+            ...item,
+            servedQuantity: 0,
+          };
+        }
+        return item;
+      })
+    );
+  };
+
   return (
     <div className="h-full flex flex-col lg:flex-row bg-slate-50">
       {/* Left Panel - Products & Tables */}
       <div className="flex-1 flex flex-col overflow-hidden bg-white">
-        <div className="p-4 lg:p-6 border-b bg-slate-50">
+        <div className="p-4 lg:p-2 border-b bg-slate-50">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-blue-900">Menu & Bàn</h2>
@@ -1877,14 +1956,13 @@ export function POSOrdering() {
               </Button>
             </div>
           </div>
-
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
             <Input
               placeholder="Tìm món..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              className="pl-10 bg-white border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
@@ -1893,7 +1971,7 @@ export function POSOrdering() {
           defaultValue="tables"
           className="flex-1 flex flex-col overflow-hidden"
         >
-          <TabsList className="mx-4 lg:mx-6 mt-4 bg-blue-100">
+          <TabsList className="mx-4 lg:mx-6 mt-2 bg-blue-100">
             <TabsTrigger
               value="tables"
               className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
@@ -1913,6 +1991,15 @@ export function POSOrdering() {
               <PackageCheck className="w-4 h-4 mr-1" />
               Combo
             </TabsTrigger>
+            {userRole === "waiter" && (
+              <TabsTrigger
+                value="ready"
+                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+              >
+                <Bell className="w-4 h-4 mr-1" />
+                Chờ cung ứng ({readyItems.length})
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="tables" className="flex-1 overflow-auto m-0">
@@ -2316,6 +2403,111 @@ export function POSOrdering() {
               )}
             </div>
           </TabsContent>
+
+          {userRole === "waiter" && (
+            <TabsContent value="ready" className="flex-1 overflow-auto m-0">
+              <div className="p-4 lg:p-6">
+                <div className="space-y-3">
+                  {readyItems.filter(
+                    (item) =>
+                      item.completedQuantity > 0 && item.servedQuantity > 0
+                  ).length === 0 ? (
+                    <div className="text-center py-12">
+                      <CheckCircle2 className="w-12 h-12 text-green-300 mx-auto mb-3" />
+                      <p className="text-slate-500">
+                        Không có món nào chờ cung ứng
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Tất cả đơn hàng đã được cung ứng
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {readyItems
+                        .filter(
+                          (item) =>
+                            item.completedQuantity > 0 &&
+                            item.servedQuantity > 0
+                        )
+                        .map((item) => {
+                          const totalItems =
+                            item.totalQuantity + item.completedQuantity;
+                          const elapsedMinutes = Math.floor(
+                            (Date.now() - item.timestamp.getTime()) / 60000
+                          );
+                          return (
+                            <Card
+                              key={item.id}
+                              className="shadow-sm border-green-200 bg-green-50"
+                            >
+                              <div className="pt-2 p-4 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <h2 className="text-slate-900 font-semibold">
+                                    {item.servedQuantity}x {item.itemName}
+                                  </h2>
+                                  <div className="flex gap-1 flex-shrink-0">
+                                    {item.servedQuantity > 0 && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 w-8 p-0"
+                                        onClick={() =>
+                                          advanceReadyItemOneUnit(item.id)
+                                        }
+                                      >
+                                        <ChevronRight className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                    {item.servedQuantity > 0 && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 w-8 p-0"
+                                        onClick={() =>
+                                          advanceReadyItemAllUnits(item.id)
+                                        }
+                                      >
+                                        <ChevronsRight className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                  <span className="text-slate-700">
+                                    {item.table}
+                                  </span>
+                                  <span className="flex items-center gap-1 text-slate-700">
+                                    <Clock className="w-3 h-3" />
+                                    {elapsedMinutes} phút
+                                  </span>
+                                </div>
+                                <Badge className="bg-green-600 text-white text-xs h-5 w-fit">
+                                  Đã làm {item.completedQuantity}/{totalItems}
+                                </Badge>
+
+                                {item.totalQuantity > 0 && (
+                                  <p className="text-xs text-amber-700">
+                                    Chờ làm thêm {item.totalQuantity}/
+                                    {totalItems}
+                                  </p>
+                                )}
+
+                                {item.notes && (
+                                  <p className="text-xs text-slate-600 mt-2">
+                                    Ghi chú: {item.notes}
+                                  </p>
+                                )}
+                              </div>
+                            </Card>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 
