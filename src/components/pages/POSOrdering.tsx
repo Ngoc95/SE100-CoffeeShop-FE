@@ -33,6 +33,8 @@ import {
   Settings,
   Percent,
   Tag,
+  ChevronRight,
+  ChevronsRight,
 } from "lucide-react";
 import { Card, CardContent } from "../ui/card";
 import { Input } from "../ui/input";
@@ -84,8 +86,17 @@ import { ComboSelectionPopup } from "../ComboSelectionPopup";
 import { ComboSuggestionBanner } from "../ComboSuggestionBanner";
 import { ComboDetectionPopup } from "../ComboDetectionPopup";
 import { CartItemDisplay } from "../CartItemDisplay";
+import { CustomerAutocomplete } from "../CustomerAutocomplete";
 import { combos, type Combo } from "../../data/combos";
 import { autoComboPromotions } from "../../data/combos";
+import { IngredientSelectionDialog } from "../IngredientSelectionDialog";
+
+interface Customer {
+  id: string;
+  name: string;
+  code: string;
+  phone?: string;
+}
 
 interface CartItem {
   id: string;
@@ -151,6 +162,7 @@ interface CompositeIngredient {
 interface InventoryIngredient {
   id: string;
   name: string;
+  category: string;
   unit: string;
   avgUnitCost: number;
 }
@@ -169,7 +181,22 @@ interface NewItemRequest {
   ingredients?: CompositeIngredient[];
 }
 
-export function POSOrdering() {
+interface ReadyItem {
+  id: string;
+  itemName: string;
+  totalQuantity: number;
+  completedQuantity: number;
+  servedQuantity: number; // Track how many already served to customers
+  table: string;
+  timestamp: Date;
+  notes?: string;
+}
+
+interface POSOrderingProps {
+  userRole?: "waiter" | "cashier";
+}
+
+export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -178,6 +205,30 @@ export function POSOrdering() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [selectedArea, setSelectedArea] = useState("all");
   const [selectedTableStatus, setSelectedTableStatus] = useState("all");
+
+  // Customer data
+  const [customers] = useState<Customer[]>([
+    { id: "1", name: "Nguyễn Văn Hải", code: "KH000001", phone: "0912345678" },
+    {
+      id: "2",
+      name: "Anh Giang - Kim Mã",
+      code: "KH000005",
+      phone: "0987654321",
+    },
+    {
+      id: "3",
+      name: "Anh Hoàng - Sài Gòn",
+      code: "KH000004",
+      phone: "0912345679",
+    },
+    { id: "4", name: "Tuấn - Hà Nội", code: "KH000003", phone: "0987654322" },
+    { id: "5", name: "Phạm Thu Hương", code: "KH000002", phone: "0912345680" },
+  ]);
+
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
+    null
+  );
+  const [customerSearchCode, setCustomerSearchCode] = useState("");
 
   // Bank accounts state
   const [bankAccounts, setBankAccounts] = useState<
@@ -245,7 +296,6 @@ export function POSOrdering() {
   const [newItemDescription, setNewItemDescription] = useState("");
   const [newItemNotes, setNewItemNotes] = useState("");
   const [addIngredientDialogOpen, setAddIngredientDialogOpen] = useState(false);
-  const [ingredientSearchQuery, setIngredientSearchQuery] = useState("");
   const [selectedIngredients, setSelectedIngredients] = useState<
     CompositeIngredient[]
   >([]);
@@ -280,18 +330,110 @@ export function POSOrdering() {
     (typeof products)[0] | null
   >(null);
 
+  // Ready items from kitchen (waiter monitoring)
+  const [readyItems, setReadyItems] = useState<ReadyItem[]>([
+    {
+      id: "r1",
+      itemName: "Cà phê sữa đá",
+      totalQuantity: 0,
+      completedQuantity: 3,
+      servedQuantity: 3,
+      table: "Bàn 2",
+      timestamp: new Date(Date.now() - 5 * 60000),
+    },
+    {
+      id: "r2",
+      itemName: "Trà đào cam sả",
+      totalQuantity: 1,
+      completedQuantity: 1,
+      servedQuantity: 1,
+      table: "Bàn 7",
+      timestamp: new Date(Date.now() - 3 * 60000),
+      notes: "Extra trân châu",
+    },
+    {
+      id: "r3",
+      itemName: "Cappuccino",
+      totalQuantity: 0,
+      completedQuantity: 1,
+      servedQuantity: 1,
+      table: "Bàn 4",
+      timestamp: new Date(Date.now() - 1 * 60000),
+    },
+  ]);
+
   // Mock inventory ingredients for adding to formula
   const inventoryIngredients: InventoryIngredient[] = [
-    { id: "ing1", name: "Cà phê hạt Arabica", unit: "g", avgUnitCost: 350 },
-    { id: "ing2", name: "Sữa tươi", unit: "ml", avgUnitCost: 28 },
-    { id: "ing3", name: "Đường trắng", unit: "g", avgUnitCost: 22 },
-    { id: "ing4", name: "Kem tươi", unit: "ml", avgUnitCost: 85 },
-    { id: "ing5", name: "Trà Ô Long", unit: "g", avgUnitCost: 280 },
-    { id: "ing6", name: "Đào tươi", unit: "g", avgUnitCost: 50 },
-    { id: "ing7", name: "Trân châu đen", unit: "g", avgUnitCost: 35 },
-    { id: "ing8", name: "Siro vani", unit: "ml", avgUnitCost: 45 },
-    { id: "ing9", name: "Đá viên", unit: "g", avgUnitCost: 2 },
-    { id: "ing10", name: "Chocolate bột", unit: "g", avgUnitCost: 120 },
+    {
+      id: "ing1",
+      name: "Cà phê hạt Arabica",
+      category: "coffee",
+      unit: "g",
+      avgUnitCost: 350,
+    },
+    {
+      id: "ing2",
+      name: "Sữa tươi",
+      category: "dairy",
+      unit: "ml",
+      avgUnitCost: 28,
+    },
+    {
+      id: "ing3",
+      name: "Đường trắng",
+      category: "syrup",
+      unit: "g",
+      avgUnitCost: 22,
+    },
+    {
+      id: "ing4",
+      name: "Kem tươi",
+      category: "dairy",
+      unit: "ml",
+      avgUnitCost: 85,
+    },
+    {
+      id: "ing5",
+      name: "Trà Ô Long",
+      category: "tea",
+      unit: "g",
+      avgUnitCost: 280,
+    },
+    {
+      id: "ing6",
+      name: "Đào tươi",
+      category: "fruit",
+      unit: "g",
+      avgUnitCost: 50,
+    },
+    {
+      id: "ing7",
+      name: "Trân châu đen",
+      category: "brewing-ingredients",
+      unit: "g",
+      avgUnitCost: 35,
+    },
+    {
+      id: "ing8",
+      name: "Siro vani",
+      category: "syrup",
+      unit: "ml",
+      avgUnitCost: 45,
+    },
+    {
+      id: "ing9",
+      name: "Đá viên",
+      category: "brewing-ingredients",
+      unit: "g",
+      avgUnitCost: 2,
+    },
+    {
+      id: "ing10",
+      name: "Chocolate bột",
+      category: "brewing-ingredients",
+      unit: "g",
+      avgUnitCost: 120,
+    },
   ];
 
   const [newItemRequests, setNewItemRequests] = useState<NewItemRequest[]>([
@@ -1751,11 +1893,41 @@ export function POSOrdering() {
     }
   };
 
+  // Ready items advance functions (for waiter tab)
+  // servedQuantity decreases when serving (completedQuantity stays fixed for display)
+  const advanceReadyItemOneUnit = (itemId: string) => {
+    setReadyItems((prev) =>
+      prev.map((item) => {
+        if (item.id === itemId && item.servedQuantity > 0) {
+          return {
+            ...item,
+            servedQuantity: item.servedQuantity - 1,
+          };
+        }
+        return item;
+      })
+    );
+  };
+
+  const advanceReadyItemAllUnits = (itemId: string) => {
+    setReadyItems((prev) =>
+      prev.map((item) => {
+        if (item.id === itemId && item.servedQuantity > 0) {
+          return {
+            ...item,
+            servedQuantity: 0,
+          };
+        }
+        return item;
+      })
+    );
+  };
+
   return (
     <div className="h-full flex flex-col lg:flex-row bg-slate-50">
       {/* Left Panel - Products & Tables */}
       <div className="flex-1 flex flex-col overflow-hidden bg-white">
-        <div className="p-4 lg:p-6 border-b bg-slate-50">
+        <div className="p-4 lg:p-2 border-b bg-slate-50">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-blue-900">Menu & Bàn</h2>
@@ -1784,14 +1956,13 @@ export function POSOrdering() {
               </Button>
             </div>
           </div>
-
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
             <Input
               placeholder="Tìm món..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              className="pl-10 bg-white border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
@@ -1800,7 +1971,7 @@ export function POSOrdering() {
           defaultValue="tables"
           className="flex-1 flex flex-col overflow-hidden"
         >
-          <TabsList className="mx-4 lg:mx-6 mt-4 bg-blue-100">
+          <TabsList className="mx-4 lg:mx-6 mt-2 bg-blue-100">
             <TabsTrigger
               value="tables"
               className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
@@ -1820,6 +1991,15 @@ export function POSOrdering() {
               <PackageCheck className="w-4 h-4 mr-1" />
               Combo
             </TabsTrigger>
+            {userRole === "waiter" && (
+              <TabsTrigger
+                value="ready"
+                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+              >
+                <Bell className="w-4 h-4 mr-1" />
+                Chờ cung ứng ({readyItems.length})
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="tables" className="flex-1 overflow-auto m-0">
@@ -2054,7 +2234,7 @@ export function POSOrdering() {
                   viewMode === "grid"
                     ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
                     : "grid-cols-1"
-                } gap-4`}
+                } gap-2`}
               >
                 {filteredProducts.map((product) => {
                   const isOutOfStock = isProductOutOfStock(product);
@@ -2068,15 +2248,15 @@ export function POSOrdering() {
                       }`}
                       onClick={() => !isOutOfStock && addToCart(product)}
                     >
-                      <CardContent className="p-4">
-                        <div className="text-4xl mb-2 text-center">
+                      <CardContent className="p-2">
+                        <div className="text-3xl mb-1 text-center">
                           {product.image}
                         </div>
-                        <h3 className="text-sm text-slate-900 mb-1">
+                        <h3 className="text-xs text-slate-900 mb-0.5 line-clamp-2">
                           {product.name}
                         </h3>
                         <p
-                          className={`${
+                          className={`text-xs font-semibold ${
                             isOutOfStock ? "text-gray-500" : "text-blue-700"
                           }`}
                         >
@@ -2085,13 +2265,13 @@ export function POSOrdering() {
                         {isOutOfStock && (
                           <Badge
                             variant="outline"
-                            className="absolute top-2 right-2 bg-red-100 text-red-700 border-red-300 text-xs"
+                            className="absolute top-1 right-1 bg-red-100 text-red-700 border-red-300 text-[10px]"
                           >
                             Tạm ngưng
                           </Badge>
                         )}
                         {!isOutOfStock && (product as any).isNew && (
-                          <Badge className="absolute top-2 right-2 bg-green-500 text-white text-xs">
+                          <Badge className="absolute top-1 right-1 bg-green-500 text-white text-[10px]">
                             Mới
                           </Badge>
                         )}
@@ -2223,11 +2403,116 @@ export function POSOrdering() {
               )}
             </div>
           </TabsContent>
+
+          {userRole === "waiter" && (
+            <TabsContent value="ready" className="flex-1 overflow-auto m-0">
+              <div className="p-4 lg:p-6">
+                <div className="space-y-3">
+                  {readyItems.filter(
+                    (item) =>
+                      item.completedQuantity > 0 && item.servedQuantity > 0
+                  ).length === 0 ? (
+                    <div className="text-center py-12">
+                      <CheckCircle2 className="w-12 h-12 text-green-300 mx-auto mb-3" />
+                      <p className="text-slate-500">
+                        Không có món nào chờ cung ứng
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Tất cả đơn hàng đã được cung ứng
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {readyItems
+                        .filter(
+                          (item) =>
+                            item.completedQuantity > 0 &&
+                            item.servedQuantity > 0
+                        )
+                        .map((item) => {
+                          const totalItems =
+                            item.totalQuantity + item.completedQuantity;
+                          const elapsedMinutes = Math.floor(
+                            (Date.now() - item.timestamp.getTime()) / 60000
+                          );
+                          return (
+                            <Card
+                              key={item.id}
+                              className="shadow-sm border-green-200 bg-green-50"
+                            >
+                              <div className="pt-2 p-4 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <h2 className="text-slate-900 font-semibold">
+                                    {item.servedQuantity}x {item.itemName}
+                                  </h2>
+                                  <div className="flex gap-1 flex-shrink-0">
+                                    {item.servedQuantity > 0 && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 w-8 p-0"
+                                        onClick={() =>
+                                          advanceReadyItemOneUnit(item.id)
+                                        }
+                                      >
+                                        <ChevronRight className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                    {item.servedQuantity > 0 && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 w-8 p-0"
+                                        onClick={() =>
+                                          advanceReadyItemAllUnits(item.id)
+                                        }
+                                      >
+                                        <ChevronsRight className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                  <span className="text-slate-700">
+                                    {item.table}
+                                  </span>
+                                  <span className="flex items-center gap-1 text-slate-700">
+                                    <Clock className="w-3 h-3" />
+                                    {elapsedMinutes} phút
+                                  </span>
+                                </div>
+                                <Badge className="bg-green-600 text-white text-xs h-5 w-fit">
+                                  Đã làm {item.completedQuantity}/{totalItems}
+                                </Badge>
+
+                                {item.totalQuantity > 0 && (
+                                  <p className="text-xs text-amber-700">
+                                    Chờ làm thêm {item.totalQuantity}/
+                                    {totalItems}
+                                  </p>
+                                )}
+
+                                {item.notes && (
+                                  <p className="text-xs text-slate-600 mt-2">
+                                    Ghi chú: {item.notes}
+                                  </p>
+                                )}
+                              </div>
+                            </Card>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 
       {/* Right Panel - Cart */}
-      <div className="lg:w-[28rem] border-l bg-white flex flex-col max-h-[50vh] lg:max-h-full shadow-lg hidden lg:flex">
+      <div className="lg:flex-1 lg:max-w-6xl border-l bg-white flex flex-col max-h-[50vh] lg:max-h-full shadow-lg hidden lg:flex">
         <div className="p-3 border-b bg-gradient-to-r from-blue-50 to-blue-100">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
@@ -2281,47 +2566,66 @@ export function POSOrdering() {
                 </span>
               </div>
 
-              {/* Order Actions */}
-              {selectedTable.status === "occupied" && (
-                <div className="flex gap-1 flex-wrap">
+              {/* Order Actions & Customer Autocomplete - Same Row */}
+              <div className="flex gap-2 items-end">
+                {/* Order Actions */}
+                <div className="flex gap-1 pt-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-[10px] h-6 px-2"
+                    className="h-6 px-1.5 p-0"
+                    title="Chuyển bàn"
                     onClick={() => setMoveTableOpen(true)}
                   >
-                    <ArrowLeftRight className="w-3 h-3 mr-0.5" />
-                    Chuyển bàn
+                    <ArrowLeftRight className="w-3 h-3" />
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-[10px] h-6 px-2"
+                    className="h-6 px-1.5 p-0"
+                    title="Gộp bàn"
                     onClick={() => setMergeTableOpen(true)}
                   >
-                    <GitMerge className="w-3 h-3 mr-0.5" />
-                    Gộp bàn
+                    <GitMerge className="w-3 h-3" />
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-[10px] h-6 px-2"
+                    className="h-6 px-1.5 p-0"
+                    title="Tách đơn"
                     onClick={() => setSplitOrderOpen(true)}
                   >
-                    <FileText className="w-3 h-3 mr-0.5" />
-                    Tách đơn
+                    <FileText className="w-3 h-3" />
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-[10px] h-6 px-2"
+                    className="h-6 px-1.5 p-0"
+                    title="Lịch sử"
                     onClick={() => setOrderHistoryOpen(true)}
                   >
-                    <History className="w-3 h-3 mr-0.5" />
-                    Lịch sử
+                    <History className="w-3 h-3" />
                   </Button>
                 </div>
-              )}
+
+                {/* Customer Autocomplete */}
+                <div className="flex-1">
+                  <CustomerAutocomplete
+                    customers={customers}
+                    value={customerSearchCode}
+                    onChange={(code, customer) => {
+                      setCustomerSearchCode(code);
+                      if (customer) {
+                        setSelectedCustomer(customer);
+                      }
+                    }}
+                    onAddNew={(newCustomer) => {
+                      setSelectedCustomer(newCustomer);
+                      setCustomerSearchCode(newCustomer.code);
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           ) : (
             <p className="text-xs text-slate-500">Chưa chọn bàn</p>
@@ -2368,36 +2672,7 @@ export function POSOrdering() {
         <div className="p-3 space-y-2 bg-gradient-to-r from-blue-50 to-blue-100">
           {/* Inline Promo Code Input */}
           {!appliedPromoCode && cart.length > 0 && (
-            <div className="space-y-1">
-              <div className="flex gap-1">
-                <Input
-                  placeholder="Nhập mã khách hàng..."
-                  value={promoCode}
-                  onChange={(e) => {
-                    setPromoCode(e.target.value.toUpperCase());
-                    setPromoError("");
-                  }}
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter") {
-                      handleApplyPromoCode();
-                    }
-                  }}
-                  className="h-7 text-xs flex-1 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                />
-                <Button
-                  onClick={() => handleApplyPromoCode()}
-                  size="sm"
-                  className="bg-blue-600 hover:bg-blue-700 h-7 px-3 text-xs"
-                >
-                  Áp dụng
-                </Button>
-              </div>
-              {promoError && (
-                <div className="flex items-center gap-1 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">
-                  <span>{promoError}</span>
-                </div>
-              )}
-            </div>
+            <div className="space-y-1"></div>
           )}
 
           <div className="space-y-1">
@@ -3663,118 +3938,31 @@ export function POSOrdering() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Ingredient Dialog */}
-      <Dialog
+      {/* Add Ingredient Dialog - Using new IngredientSelectionDialog */}
+      <IngredientSelectionDialog
         open={addIngredientDialogOpen}
         onOpenChange={setAddIngredientDialogOpen}
-      >
-        <DialogContent
-          className="max-w-2xl max-h-[80vh] overflow-y-auto"
-          aria-describedby={undefined}
-        >
-          <DialogHeader>
-            <DialogTitle>Thêm nguyên liệu vào công thức</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {/* Search Ingredient */}
-            <div>
-              <Label>Tìm kiếm nguyên liệu</Label>
-              <div className="relative mt-1.5">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <Input
-                  placeholder="Nhập tên nguyên liệu..."
-                  value={ingredientSearchQuery}
-                  onChange={(e) => setIngredientSearchQuery(e.target.value)}
-                  className="pl-10 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                />
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Available Ingredients List */}
-            <div>
-              <Label className="mb-2 block">Chọn nguyên liệu</Label>
-              <div className="border rounded-lg max-h-[300px] overflow-y-auto">
-                {inventoryIngredients
-                  .filter((ingredient) =>
-                    ingredient.name
-                      .toLowerCase()
-                      .includes(ingredientSearchQuery.toLowerCase())
-                  )
-                  .map((ingredient) => (
-                    <div
-                      key={ingredient.id}
-                      className="flex items-center justify-between p-3 hover:bg-slate-50 border-b last:border-b-0"
-                    >
-                      <div className="flex-1">
-                        <p className="text-sm">{ingredient.name}</p>
-                        <p className="text-xs text-slate-500">
-                          Mã: {ingredient.id} • Đơn vị: {ingredient.unit}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          placeholder="SL"
-                          className="w-20 h-8 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                          id={`qty-${ingredient.id}`}
-                        />
-                        <Button
-                          size="sm"
-                          className="h-8 bg-blue-600 hover:bg-blue-700"
-                          onClick={() => {
-                            const qtyInput = document.getElementById(
-                              `qty-${ingredient.id}`
-                            ) as HTMLInputElement;
-                            const quantity = parseFloat(qtyInput?.value || "0");
-
-                            if (quantity > 0) {
-                              setSelectedIngredients((prev) => [
-                                ...prev,
-                                {
-                                  ingredientId: ingredient.id,
-                                  ingredientName: ingredient.name,
-                                  unit: ingredient.unit,
-                                  quantity: quantity,
-                                  unitCost: ingredient.avgUnitCost,
-                                },
-                              ]);
-                              qtyInput.value = "";
-                              toast.success(`Đã thêm ${ingredient.name}`);
-                            } else {
-                              toast.error("Vui lòng nhập số lượng");
-                            }
-                          }}
-                        >
-                          <Plus className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-
-            <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-              <p className="text-xs text-yellow-700">
-                💡 Nhập số lượng và nhấn{" "}
-                <Plus className="w-3 h-3 inline mx-1" /> để thêm nguyên liệu vào
-                công thức
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setAddIngredientDialogOpen(false)}
-            >
-              Đóng
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        availableIngredients={inventoryIngredients.map((ing, idx) => ({
+          code: ing.id,
+          name: ing.name,
+          category: ing.category,
+          unit: ing.unit,
+          stock: 100 + idx * 10, // Mock stock value
+        }))}
+        onAddIngredients={(ingredients) => {
+          const newIngredients = ingredients.map((ing) => ({
+            ingredientId: ing.code,
+            ingredientName: ing.name,
+            unit: ing.unit,
+            quantity: ing.quantity,
+            unitCost:
+              inventoryIngredients.find((inv) => inv.id === ing.code)
+                ?.avgUnitCost || 0,
+          }));
+          setSelectedIngredients((prev) => [...prev, ...newIngredients]);
+          toast.success(`Đã thêm ${newIngredients.length} nguyên liệu`);
+        }}
+      />
 
       {/* Requests Drawer */}
       <Sheet open={requestsDrawerOpen} onOpenChange={setRequestsDrawerOpen}>

@@ -425,10 +425,6 @@ export function CartItemDisplay({
                   </span>
                 </div>
               )}
-
-            <p className="text-sm text-blue-700">
-              {item.price.toLocaleString()}₫
-            </p>
           </div>
 
           <Button
@@ -442,7 +438,7 @@ export function CartItemDisplay({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center">
             <Button
               variant="outline"
               size="sm"
@@ -461,8 +457,11 @@ export function CartItemDisplay({
               <Plus className="w-3 h-3" />
             </Button>
           </div>
+          <span className="text-sm text-blue-700">
+            {item.price.toLocaleString()}₫
+          </span>
           <span className="text-sm text-blue-900 font-medium">
-            {(item.price * item.quantity).toLocaleString()}₫
+            = {(item.price * item.quantity).toLocaleString()}₫
           </span>
           <Button
             variant="outline"
