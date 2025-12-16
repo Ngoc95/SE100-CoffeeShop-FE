@@ -27,6 +27,12 @@ import {
   TableRow,
 } from '../ui/table';
 
+interface SuggestedIngredient {
+  name: string;
+  quantity: number;
+  unit: string;
+}
+
 interface NewItemRequest {
   id: string;
   suggestedName: string;
@@ -37,7 +43,7 @@ interface NewItemRequest {
   status: 'pending' | 'approved' | 'rejected';
   suggestedCategory?: string;
   description?: string;
-  suggestedRecipe?: string;
+  suggestedRecipe?: SuggestedIngredient[];
   suggestedPrice?: number;
 }
 
@@ -60,7 +66,7 @@ export function NewItemRequests() {
   const [searchTerm, setSearchTerm] = useState('');
   const [successModalOpen, setSuccessModalOpen] = useState(false);
   const [createdItemName, setCreatedItemName] = useState('');
-  
+
   // Sort state
   type SortField = "name" | "staff" | "timestamp" | "note" | "status";
   type SortOrder = "asc" | "desc" | "none";
@@ -79,7 +85,13 @@ export function NewItemRequests() {
       status: 'pending',
       suggestedCategory: 'Trà',
       description: 'Trà đào kết hợp với phúc bồn tử tươi, vị chua ngọt đặc trưng',
-      suggestedRecipe: 'Trà 20g, đào 50g, phúc bồn tử 30g, đường 25g, đá 100g',
+      suggestedRecipe: [
+        { name: 'Trà', quantity: 20, unit: 'g' },
+        { name: 'Đào', quantity: 50, unit: 'g' },
+        { name: 'Phúc bồn tử', quantity: 30, unit: 'g' },
+        { name: 'Đường', quantity: 25, unit: 'g' },
+        { name: 'Đá', quantity: 100, unit: 'g' },
+      ],
       suggestedPrice: 45000,
     },
     {
@@ -92,7 +104,11 @@ export function NewItemRequests() {
       status: 'approved',
       suggestedCategory: 'Cà phê',
       description: 'Cà phê đen đậm đà với lớp kem trứng béo ngậy',
-      suggestedRecipe: 'Cà phê 25g, trứng gà 2 quả, sữa đặc 30ml',
+      suggestedRecipe: [
+        { name: 'Cà phê', quantity: 25, unit: 'g' },
+        { name: 'Trứng gà', quantity: 2, unit: 'quả' },
+        { name: 'Sữa đặc', quantity: 30, unit: 'ml' },
+      ],
       suggestedPrice: 38000,
     },
     {
@@ -105,7 +121,12 @@ export function NewItemRequests() {
       status: 'pending',
       suggestedCategory: 'Sinh tố',
       description: 'Sinh tố bơ kết hợp sầu riêng, đặc biệt và hấp dẫn',
-      suggestedRecipe: 'Bơ 100g, sầu riêng 50g, sữa tươi 200ml, đường 20g',
+      suggestedRecipe: [
+        { name: 'Bơ', quantity: 100, unit: 'g' },
+        { name: 'Sầu riêng', quantity: 50, unit: 'g' },
+        { name: 'Sữa tươi', quantity: 200, unit: 'ml' },
+        { name: 'Đường', quantity: 20, unit: 'g' },
+      ],
       suggestedPrice: 55000,
     },
     {
@@ -118,7 +139,11 @@ export function NewItemRequests() {
       status: 'rejected',
       suggestedCategory: 'Trà',
       description: 'Trà xanh matcha cao cấp kết hợp với sữa tươi',
-      suggestedRecipe: 'Bột matcha 15g, sữa tươi 250ml, đường 20g',
+      suggestedRecipe: [
+        { name: 'Bột matcha', quantity: 15, unit: 'g' },
+        { name: 'Sữa tươi', quantity: 250, unit: 'ml' },
+        { name: 'Đường', quantity: 20, unit: 'g' },
+      ],
       suggestedPrice: 42000,
     },
   ]);
@@ -140,8 +165,8 @@ export function NewItemRequests() {
   ]);
 
   const toggleStatus = (status: string) => {
-    setStatusFilter(prev => 
-      prev.includes(status) 
+    setStatusFilter(prev =>
+      prev.includes(status)
         ? prev.filter(s => s !== status)
         : [...prev, status]
     );
@@ -271,6 +296,21 @@ export function NewItemRequests() {
         description: selectedRequest.description || '',
         status: 'active',
       });
+
+      // Populate ingredients from suggested recipe
+      if (selectedRequest.suggestedRecipe) {
+        setIngredients(
+          selectedRequest.suggestedRecipe.map((ing, index) => ({
+            id: `auto-${Date.now()}-${index}`,
+            name: ing.name,
+            unit: ing.unit,
+            quantity: ing.quantity,
+            cost: 0 // Default cost
+          }))
+        );
+      } else {
+        setIngredients([]);
+      }
     }
     setSelectedView('create');
   };
@@ -291,10 +331,10 @@ export function NewItemRequests() {
       setRequests(requests.map(req =>
         req.id === selectedRequest.id ? { ...req, status: 'approved' as const } : req
       ));
-      
+
       // Set created item name for success modal
       setCreatedItemName(formData.name);
-      
+
       // Show success modal
       setSuccessModalOpen(true);
     }
@@ -346,7 +386,7 @@ export function NewItemRequests() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <Checkbox 
+                    <Checkbox
                       id="status-pending"
                       checked={statusFilter.includes('pending')}
                       onCheckedChange={() => toggleStatus('pending')}
@@ -360,7 +400,7 @@ export function NewItemRequests() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <Checkbox 
+                    <Checkbox
                       id="status-approved"
                       checked={statusFilter.includes('approved')}
                       onCheckedChange={() => toggleStatus('approved')}
@@ -374,7 +414,7 @@ export function NewItemRequests() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <Checkbox 
+                    <Checkbox
                       id="status-rejected"
                       checked={statusFilter.includes('rejected')}
                       onCheckedChange={() => toggleStatus('rejected')}
@@ -402,7 +442,7 @@ export function NewItemRequests() {
                 ].map((cat) => (
                   <div key={cat.id} className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <Checkbox 
+                      <Checkbox
                         id={cat.id}
                         checked={categoryFilter.includes(cat.id)}
                         onCheckedChange={() => toggleCategory(cat.id)}
@@ -430,7 +470,7 @@ export function NewItemRequests() {
                 ].map((staff) => (
                   <div key={staff.id} className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <Checkbox 
+                      <Checkbox
                         id={staff.id}
                         checked={staffFilter.includes(staff.id)}
                         onCheckedChange={() => toggleStaff(staff.id)}
@@ -450,9 +490,9 @@ export function NewItemRequests() {
             <div>
               <h3 className="text-sm text-slate-900 mb-3">Bộ lọc nhanh</h3>
               <div className="space-y-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="w-full justify-start text-xs"
                   onClick={() => {
                     setStatusFilter(['pending']);
@@ -463,9 +503,9 @@ export function NewItemRequests() {
                   <AlertCircle className="w-3 h-3 mr-2" />
                   Chờ xử lý ({pendingCount})
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="w-full justify-start text-xs"
                   onClick={() => {
                     setStatusFilter(['pending', 'approved', 'rejected']);
@@ -623,11 +663,11 @@ export function NewItemRequests() {
                     ) : (
                       filteredRequests.map((request, index) => {
                         const isExpanded = expandedRequestId === request.id;
-                        
+
                         return (
                           <Fragment key={request.id}>
                             {/* Main Row */}
-                            <TableRow 
+                            <TableRow
                               className="hover:bg-amber-50/50 cursor-pointer transition-colors"
                               onClick={() => setExpandedRequestId(isExpanded ? null : request.id)}
                             >
@@ -694,7 +734,7 @@ export function NewItemRequests() {
                                         <div className="flex items-center gap-2 mt-2">
                                           <Clock className="w-5 h-5 text-slate-400" />
                                           <p className="text-sm">
-                                            {request.timestamp.toLocaleDateString('vi-VN', { 
+                                            {request.timestamp.toLocaleDateString('vi-VN', {
                                               weekday: 'long',
                                               year: 'numeric',
                                               month: 'long',
@@ -722,7 +762,30 @@ export function NewItemRequests() {
 
                                     <div>
                                       <Label className="text-slate-500 text-xs">Công thức tạm thời</Label>
-                                      <p className="mt-2 p-3 bg-white rounded-lg whitespace-pre-wrap text-sm">{request.suggestedRecipe || 'Chưa có công thức'}</p>
+                                      {request.suggestedRecipe ? (
+                                        <div className="mt-2 text-sm bg-white rounded-lg border border-slate-200 overflow-hidden">
+                                          <table className="w-full text-left">
+                                            <thead className="bg-slate-50 text-xs text-slate-500 font-medium">
+                                              <tr>
+                                                <th className="px-3 py-2">Nguyên liệu</th>
+                                                <th className="px-3 py-2">Số lượng</th>
+                                                <th className="px-3 py-2">Đơn vị</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                              {request.suggestedRecipe.map((ing, idx) => (
+                                                <tr key={idx}>
+                                                  <td className="px-3 py-2">{ing.name}</td>
+                                                  <td className="px-3 py-2">{ing.quantity}</td>
+                                                  <td className="px-3 py-2">{ing.unit}</td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      ) : (
+                                        <p className="mt-2 p-3 bg-white rounded-lg text-sm italic text-slate-400">Chưa có công thức</p>
+                                      )}
                                     </div>
 
                                     <div>
@@ -786,64 +849,76 @@ export function NewItemRequests() {
 
         {/* Create Item Dialog */}
         <Dialog open={createItemDialogOpen} onOpenChange={setCreateItemDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+          <DialogContent className="min-w-[1100px] max-w-[1300px] w-[100vw] max-h-[90vh] flex flex-col" aria-describedby={undefined}>
             <DialogHeader>
               <DialogTitle>Thêm mặt hàng mới</DialogTitle>
             </DialogHeader>
-            
-            <div className="space-y-4">
+
+            <div className="space-y-6 flex-1 overflow-y-auto overflow-x-hidden px-1">
               {/* Loại mặt hàng */}
               <div>
-                <Label>Loại mặt hàng *</Label>
-                <Select value={formData.type || 'product'} onValueChange={(value) => setFormData({ ...formData, type: value })}>
-                  <SelectTrigger className="bg-white border-slate-300 shadow-none">
+                <Label>Loại mặt hàng <span className="text-red-500">*</span></Label>
+                <Select value={formData.type || 'composite'} onValueChange={(value) => setFormData({ ...formData, type: value })}>
+                  <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="product">
+                    <SelectItem value="composite">
                       <div className="flex items-center gap-2">
-                        <Package className="w-4 h-4" />
+                        <Package className="w-4 h-4 text-purple-600" />
                         Hàng hóa cấu thành
                       </div>
                     </SelectItem>
-                    <SelectItem value="combo">
+                    <SelectItem value="ready-made">
                       <div className="flex items-center gap-2">
-                        <Package className="w-4 h-4" />
-                        Hàng hóa combo
+                        <Package className="w-4 h-4 text-blue-600" />
+                        Hàng hóa bán sẵn
                       </div>
                     </SelectItem>
+                    {/* Add more types if needed to match Inventory exactly, but keeping relevant ones */}
                   </SelectContent>
                 </Select>
               </div>
 
+              <Separator />
+
               {/* Mã & Tên hàng hóa */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <Label>Mã hàng hóa *</Label>
-                  <Input
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    placeholder="Nhập mã hàng hóa"
-                    className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                  />
+                  <Label>Mã hàng hóa <span className="text-red-500">*</span></Label>
+                  <div className="flex gap-2 mt-1.5">
+                    <Input
+                      value={formData.code}
+                      onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                      placeholder="Tự động tạo"
+                      disabled
+                      className="bg-slate-50 border-slate-300"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label>Tên hàng hóa *</Label>
+                <div className="col-span-2">
+                  <Label>Tên hàng hóa <span className="text-red-500">*</span></Label>
                   <Input
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Nhập tên hàng hóa"
-                    className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                    placeholder="VD: Cà phê Latte"
+                    className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   />
                 </div>
               </div>
 
               {/* Danh mục & Đơn vị */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Danh mục *</Label>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Danh mục <span className="text-red-500">*</span></Label>
+                    <Button variant="ghost" size="sm" className="h-auto p-0 text-blue-600 hover:text-blue-700">
+                      <Plus className="w-3 h-3 mr-1" />
+                      Thêm danh mục
+                    </Button>
+                  </div>
                   <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                    <SelectTrigger className="bg-white border-slate-300 shadow-none">
+                    <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
                       <SelectValue placeholder="Chọn danh mục" />
                     </SelectTrigger>
                     <SelectContent>
@@ -851,31 +926,26 @@ export function NewItemRequests() {
                       <SelectItem value="Trà">Trà</SelectItem>
                       <SelectItem value="Sinh tố">Sinh tố</SelectItem>
                       <SelectItem value="Bánh ngọt">Bánh ngọt</SelectItem>
-                      <div className="px-2 py-1.5 border-t mt-1">
-                        <button className="text-purple-600 text-sm flex items-center gap-1 hover:underline">
-                          <Plus className="w-3 h-3" />
-                          Thêm danh mục
-                        </button>
-                      </div>
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div>
-                  <Label>Đơn vị *</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Đơn vị <span className="text-red-500">*</span></Label>
+                    <Button variant="ghost" size="sm" className="h-auto p-0 text-blue-600 hover:text-blue-700">
+                      <Plus className="w-3 h-3 mr-1" />
+                      Thêm đơn vị
+                    </Button>
+                  </div>
                   <Select value={formData.unit} onValueChange={(value) => setFormData({ ...formData, unit: value })}>
-                    <SelectTrigger className="bg-white border-slate-300 shadow-none">
-                      <SelectValue placeholder="Chọn đơn vị" />
+                    <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                      <SelectValue placeholder="Chọn" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="ly">Ly</SelectItem>
                       <SelectItem value="cái">Cái</SelectItem>
                       <SelectItem value="phần">Phần</SelectItem>
-                      <div className="px-2 py-1.5 border-t mt-1">
-                        <button className="text-purple-600 text-sm flex items-center gap-1 hover:underline">
-                          <Plus className="w-3 h-3" />
-                          Thêm đơn vị
-                        </button>
-                      </div>
                     </SelectContent>
                   </Select>
                 </div>
@@ -883,95 +953,114 @@ export function NewItemRequests() {
 
               {/* Hình ảnh */}
               <div>
-                <Label>Hình ảnh</Label>
+                <Label>Hình ảnh sản phẩm</Label>
                 <div className="mt-2 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-400 transition-colors cursor-pointer">
                   <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
                   <p className="text-sm text-gray-600">Kéo thả hoặc chọn ảnh</p>
                   <p className="text-xs text-gray-400 mt-1">PNG, JPG (tối đa 2MB)</p>
                 </div>
+                <p className="text-xs text-slate-500 mt-1.5">Tải lên hình ảnh cho hàng hóa (tùy chọn)</p>
               </div>
 
               {/* Công thức nguyên liệu */}
-              <div>
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              {formData.type === 'composite' && (
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
                   <div className="flex items-center justify-between mb-3">
-                    <Label className="text-purple-900">Công thức nguyên liệu</Label>
+                    <Label className="text-sm">Công thức nguyên liệu</Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      onClick={handleAddIngredient}
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Thêm nguyên liệu
+                    </Button>
                   </div>
-                  
-                  {ingredients.length > 0 && (
-                    <div className="space-y-2 mb-3">
-                      {ingredients.map((ingredient) => (
-                        <div key={ingredient.id} className="bg-white rounded p-3 flex items-center gap-3">
-                          <div className="flex-1 grid grid-cols-3 gap-2">
-                            <Select
-                              value={ingredient.name}
-                              onValueChange={(value) => handleIngredientChange(ingredient.id, 'name', value)}
-                            >
-                              <SelectTrigger className="h-9">
-                                <SelectValue placeholder="Nguyên liệu" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Cà phê phin">Cà phê phin</SelectItem>
-                                <SelectItem value="Trà">Trà</SelectItem>
-                                <SelectItem value="Sữa đặc">Sữa đặc</SelectItem>
-                                <SelectItem value="Đường">Đường</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <Input
-                              type="number"
-                              placeholder="Số lượng"
-                              value={ingredient.quantity}
-                              onChange={(e) => handleIngredientChange(ingredient.id, 'quantity', Number(e.target.value))}
-                              className="h-9 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                            />
-                            <Select
-                              value={ingredient.unit}
-                              onValueChange={(value) => handleIngredientChange(ingredient.id, 'unit', value)}
-                            >
-                              <SelectTrigger className="h-9 bg-white border-slate-300 shadow-none">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="g">g</SelectItem>
-                                <SelectItem value="ml">ml</SelectItem>
-                                <SelectItem value="kg">kg</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveIngredient(ingredient.id)}
-                            className="h-9 w-9 p-0"
-                          >
-                            <X className="w-4 h-4 text-red-500" />
-                          </Button>
-                        </div>
-                      ))}
+
+                  {ingredients.length === 0 ? (
+                    <p className="text-xs text-slate-500">Chưa có nguyên liệu nào.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-purple-100">
+                            <TableHead className="w-12">STT</TableHead>
+                            <TableHead>Tên nguyên liệu</TableHead>
+                            <TableHead className="w-32">Số lượng</TableHead>
+                            <TableHead className="w-32">Đơn vị</TableHead>
+                            <TableHead className="w-12"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {ingredients.map((ingredient, index) => (
+                            <TableRow key={ingredient.id}>
+                              <TableCell>{index + 1}</TableCell>
+                              <TableCell>
+                                <Input
+                                  placeholder="Tên nguyên liệu"
+                                  value={ingredient.name}
+                                  onChange={(e) => handleIngredientChange(ingredient.id, 'name', e.target.value)}
+                                  className="h-8 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-2"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  placeholder="0"
+                                  value={ingredient.quantity}
+                                  onChange={(e) => handleIngredientChange(ingredient.id, 'quantity', Number(e.target.value))}
+                                  className="h-8 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-2"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Select
+                                  value={ingredient.unit}
+                                  onValueChange={(value) => handleIngredientChange(ingredient.id, 'unit', value)}
+                                >
+                                  <SelectTrigger className="h-8 bg-white border-slate-300 shadow-none">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="g">g</SelectItem>
+                                    <SelectItem value="ml">ml</SelectItem>
+                                    <SelectItem value="kg">kg</SelectItem>
+                                    <SelectItem value="quả">quả</SelectItem>
+                                    <SelectItem value="hộp">hộp</SelectItem>
+                                    <SelectItem value="lon">lon</SelectItem>
+                                    <SelectItem value="bịch">bịch</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => handleRemoveIngredient(ingredient.id)}
+                                >
+                                  <X className="w-4 h-4 text-slate-500 hover:text-red-500" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
                   )}
-                  
-                  <Button 
-                    variant="outline" 
-                    onClick={handleAddIngredient}
-                    className="w-full border-purple-300 text-purple-700 hover:bg-purple-50"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Thêm nguyên liệu
-                  </Button>
                 </div>
-              </div>
+              )}
 
               {/* Giá bán */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Giá bán *</Label>
+                  <Label>Giá bán <span className="text-red-500">*</span></Label>
                   <Input
                     type="number"
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
                     placeholder="0"
-                    className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                    className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   />
                 </div>
                 <div>
@@ -980,13 +1069,19 @@ export function NewItemRequests() {
                     type="number"
                     value={totalCost}
                     disabled
-                    className="bg-slate-100 border-slate-300"
+                    className="mt-1.5 bg-slate-100 border-slate-300"
                   />
                 </div>
               </div>
+
+              <div className="bg-slate-50 p-3 rounded-lg">
+                <p className="text-xs text-slate-600">
+                  <span className="text-red-500">*</span> Trường bắt buộc
+                </p>
+              </div>
             </div>
 
-            <DialogFooter className="flex gap-3">
+            <DialogFooter className="mt-4">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -1034,8 +1129,8 @@ export function NewItemRequests() {
               </p>
             </div>
             <DialogFooter className="flex gap-2">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   setSuccessModalOpen(false);
                   setSelectedRequest(null);
@@ -1044,7 +1139,7 @@ export function NewItemRequests() {
               >
                 Về danh sách yêu cầu
               </Button>
-              <Button 
+              <Button
                 className="flex-1 bg-blue-600 hover:bg-blue-700"
                 onClick={() => {
                   setSuccessModalOpen(false);
@@ -1072,7 +1167,7 @@ export function NewItemRequests() {
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbLink 
+                <BreadcrumbLink
                   className="cursor-pointer hover:text-blue-600"
                   onClick={() => setSelectedView('list')}
                 >
@@ -1085,7 +1180,7 @@ export function NewItemRequests() {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-          
+
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-amber-950">Chi tiết yêu cầu món mới</h1>
@@ -1126,7 +1221,7 @@ export function NewItemRequests() {
                 <div className="flex items-center gap-2 mt-1">
                   <Clock className="w-5 h-5 text-slate-400" />
                   <p>
-                    {selectedRequest.timestamp.toLocaleDateString('vi-VN', { 
+                    {selectedRequest.timestamp.toLocaleDateString('vi-VN', {
                       weekday: 'long',
                       year: 'numeric',
                       month: 'long',
@@ -1209,7 +1304,7 @@ export function NewItemRequests() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbLink 
+                  <BreadcrumbLink
                     className="cursor-pointer hover:text-blue-600"
                     onClick={() => setSelectedView('list')}
                   >
@@ -1222,7 +1317,7 @@ export function NewItemRequests() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-            
+
             <div>
               <h1 className="text-amber-950">Tạo món mới (BM1)</h1>
               <p className="text-neutral-600 mt-1">Hoàn tất thông tin để thêm món vào thực đơn</p>
@@ -1493,8 +1588,8 @@ export function NewItemRequests() {
               </p>
             </div>
             <DialogFooter className="flex gap-2">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   setSuccessModalOpen(false);
                   setSelectedView('list');
@@ -1504,7 +1599,7 @@ export function NewItemRequests() {
               >
                 Về danh sách yêu cầu
               </Button>
-              <Button 
+              <Button
                 className="flex-1 bg-blue-600 hover:bg-blue-700"
                 onClick={() => {
                   setSuccessModalOpen(false);

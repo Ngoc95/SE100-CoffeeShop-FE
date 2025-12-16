@@ -1,4 +1,4 @@
-import { useState, Fragment } from "react";
+import { useState, Fragment, ChangeEvent } from "react";
 import {
   Search,
   Plus,
@@ -17,7 +17,7 @@ import {
   Layers,
   Box,
   X,
-  FileSpreadsheet,
+  Upload,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
@@ -139,6 +139,7 @@ export function Inventory() {
   >([]);
   const [ingredientSearchQuery, setIngredientSearchQuery] = useState("");
   const [newItemImage, setNewItemImage] = useState<string>("");
+  const [ingredientsToAdd, setIngredientsToAdd] = useState<string[]>([]);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -846,19 +847,18 @@ export function Inventory() {
             <Button
               variant="outline"
               onClick={() => setImportDialogOpen(true)}
-              className="gap-2"
             >
-              <FileSpreadsheet className="w-4 h-4" />
-              Import Excel
+              <Upload className="w-4 h-4 mr-2" />
+              Nhập file
             </Button>
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-blue-600 hover:bg-blue-700">
                   <Plus className="w-4 h-4 mr-2" />
-                  Thêm mới
+                  Thêm hàng hóa
                 </Button>
               </DialogTrigger>
-              <DialogContent className="!max-w-[1200px] w-full max-h-[90vh] flex flex-col" aria-describedby={undefined}>
+              <DialogContent className="min-w-[1100px] max-w-[1300px] w-[100vw] max-h-[90vh] flex flex-col" aria-describedby={undefined}>
                 <DialogHeader>
                   <DialogTitle>Thêm mặt hàng mới</DialogTitle>
                 </DialogHeader>
@@ -1082,20 +1082,37 @@ export function Inventory() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {selectedIngredients.map((ing, index) => (
+                              {selectedIngredients.map((ing: CompositeIngredient, index: number) => (
                                 <TableRow key={index}>
                                   <TableCell>{index + 1}</TableCell>
                                   <TableCell>{ing.ingredientId}</TableCell>
                                   <TableCell>{ing.ingredientName}</TableCell>
                                   <TableCell>{ing.unit}</TableCell>
-                                  <TableCell>{ing.quantity}</TableCell>
+                                  <TableCell>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      value={ing.quantity}
+                                      onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                                        const val = Number(e.target.value);
+                                        setSelectedIngredients((prev: CompositeIngredient[]) =>
+                                          prev.map((item: CompositeIngredient, idx: number) =>
+                                            idx === index
+                                              ? { ...item, quantity: val }
+                                              : item
+                                          )
+                                        );
+                                      }}
+                                      className="h-8 w-24 bg-white border-slate-300"
+                                    />
+                                  </TableCell>
                                   <TableCell>
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       className="h-6 w-6 p-0"
                                       onClick={() => {
-                                        setSelectedIngredients((prev) =>
+                                        setSelectedIngredients((prev: CompositeIngredient[]) =>
                                           prev.filter((_, i) => i !== index)
                                         );
                                       }}
@@ -1187,23 +1204,27 @@ export function Inventory() {
         </Dialog>
 
         {/* Add Ingredient Dialog */}
+        {/* Add Ingredient Dialog */}
         <Dialog
           open={addIngredientDialogOpen}
-          onOpenChange={setAddIngredientDialogOpen}
+          onOpenChange={(open: boolean) => {
+            setAddIngredientDialogOpen(open);
+            if (open) setIngredientsToAdd([]);
+          }}
         >
           <DialogContent
-            className="max-w-2xl max-h-[80vh] overflow-y-auto"
+            className="min-w-[1100px] max-w-[1400px] w-[100vw] max-h-[90vh] flex flex-col"
             aria-describedby={undefined}
           >
             <DialogHeader>
               <DialogTitle>Thêm nguyên liệu vào công thức</DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4">
+            <div className="space-y-4 flex-1 overflow-y-auto px-1">
               {/* Search Ingredient */}
               <div>
                 <Label>
-                  Tìm kiếm nguyên liệu <span className="text-red-500">*</span>
+                  Tìm kiếm nguyên liệu
                 </Label>
                 <div className="relative mt-1.5">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
@@ -1216,94 +1237,121 @@ export function Inventory() {
                 </div>
               </div>
 
-              <Separator />
-
               {/* Available Ingredients List */}
-              <div>
-                <Label className="mb-2 block">Chọn nguyên liệu</Label>
-                <div className="border rounded-lg max-h-[300px] overflow-y-auto">
-                  {items
-                    .filter(
-                      (item) =>
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50">
+                      <TableHead className="w-12 text-center">
+                        <Checkbox
+                          checked={
+                            ingredientsToAdd.length > 0 &&
+                            items
+                              .filter(
+                                (item: InventoryItem) =>
+                                  item.type === "ingredient" &&
+                                  item.name
+                                    .toLowerCase()
+                                    .includes(ingredientSearchQuery.toLowerCase())
+                              )
+                              .every((item: InventoryItem) => ingredientsToAdd.includes(item.id))
+                          }
+                          onCheckedChange={(checked: any) => {
+                            const filteredItems = items.filter(
+                              (item: InventoryItem) =>
+                                item.type === "ingredient" &&
+                                item.name
+                                  .toLowerCase()
+                                  .includes(ingredientSearchQuery.toLowerCase())
+                            );
+                            if (checked) {
+                              setIngredientsToAdd((prev: string[]) => [
+                                ...new Set([...prev, ...filteredItems.map((i: InventoryItem) => i.id)]),
+                              ]);
+                            } else {
+                              const idsToRemove = filteredItems.map((i: InventoryItem) => i.id);
+                              setIngredientsToAdd((prev: string[]) =>
+                                prev.filter((id: string) => !idsToRemove.includes(id))
+                              );
+                            }
+                          }}
+                        />
+                      </TableHead>
+                      <TableHead>Mã nguyên liệu</TableHead>
+                      <TableHead>Tên nguyên liệu</TableHead>
+                      <TableHead>Đơn vị</TableHead>
+                      <TableHead className="text-right">Giá vốn trung bình</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items
+                      .filter(
+                        (item: InventoryItem) =>
+                          item.type === "ingredient" &&
+                          item.name
+                            .toLowerCase()
+                            .includes(ingredientSearchQuery.toLowerCase())
+                      )
+                      .map((ingredient: InventoryItem) => {
+                        const isSelected = ingredientsToAdd.includes(ingredient.id);
+                        return (
+                          <TableRow
+                            key={ingredient.id}
+                            className={isSelected ? "bg-blue-50" : ""}
+                            onClick={() => {
+                              setIngredientsToAdd((prev: string[]) =>
+                                prev.includes(ingredient.id)
+                                  ? prev.filter((id) => id !== ingredient.id)
+                                  : [...prev, ingredient.id]
+                              );
+                            }}
+                          >
+                            <TableCell className="text-center">
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(checked: any) => {
+                                  // Handled by Row Click, but we need to stop propagation if clicked directly
+                                }}
+                                onClick={(e: any) => e.stopPropagation()} // Let the row click handle check logic, or just let checkbox change trigger it.
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">{ingredient.id}</TableCell>
+                            <TableCell>{ingredient.name}</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="font-normal">
+                                {ingredient.unit}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {ingredient.avgUnitCost.toLocaleString()} đ
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    {items.filter(
+                      (item: InventoryItem) =>
                         item.type === "ingredient" &&
                         item.name
                           .toLowerCase()
                           .includes(ingredientSearchQuery.toLowerCase())
-                    )
-                    .map((ingredient) => (
-                      <div
-                        key={ingredient.id}
-                        className="flex items-center justify-between p-3 hover:bg-slate-50 border-b last:border-b-0"
-                      >
-                        <div className="flex-1">
-                          <p className="text-sm">{ingredient.name}</p>
-                          <p className="text-xs text-slate-500">
-                            Mã: {ingredient.id} • Đơn vị: {ingredient.unit}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            placeholder="SL"
-                            className="w-20 h-8 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                            id={`qty-${ingredient.id}`}
-                          />
-                          <Button
-                            size="sm"
-                            className="h-8 bg-blue-600 hover:bg-blue-700"
-                            onClick={() => {
-                              const qtyInput = document.getElementById(
-                                `qty-${ingredient.id}`
-                              ) as HTMLInputElement;
-                              const quantity = parseFloat(
-                                qtyInput?.value || "0"
-                              );
-
-                              if (quantity > 0) {
-                                if (editDialogOpen) {
-                                  setEditValues((prev) => ({
-                                    ...prev,
-                                    ingredients: [
-                                      ...prev.ingredients,
-                                      {
-                                        ingredientId: ingredient.id,
-                                        ingredientName: ingredient.name,
-                                        unit: ingredient.unit,
-                                        quantity: quantity,
-                                        unitCost: ingredient.avgUnitCost,
-                                      },
-                                    ],
-                                  }));
-                                } else {
-                                  setSelectedIngredients((prev) => [
-                                    ...prev,
-                                    {
-                                      ingredientId: ingredient.id,
-                                      ingredientName: ingredient.name,
-                                      unit: ingredient.unit,
-                                      quantity: quantity,
-                                      unitCost: ingredient.avgUnitCost,
-                                    },
-                                  ]);
-                                }
-                                qtyInput.value = "";
-                              }
-                            }}
-                          >
-                            <Plus className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                </div>
+                    ).length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                            Không tìm thấy nguyên liệu nào
+                          </TableCell>
+                        </TableRow>
+                      )}
+                  </TableBody>
+                </Table>
               </div>
 
-              <div className="bg-slate-50 p-3 rounded-lg">
+              <div className="bg-slate-50 p-3 rounded-lg flex items-center justify-between">
                 <p className="text-xs text-slate-600">
-                  💡 Nhập số lượng và nhấn{" "}
-                  <Plus className="w-3 h-3 inline mx-1" /> để thêm nguyên liệu
-                  vào công thức
+                  <span className="font-medium">{ingredientsToAdd.length}</span> nguyên liệu đã chọn
                 </p>
+                <div className="text-xs text-slate-500">
+                  Click vào hàng để chọn
+                </div>
               </div>
             </div>
 
@@ -1312,7 +1360,40 @@ export function Inventory() {
                 variant="outline"
                 onClick={() => setAddIngredientDialogOpen(false)}
               >
-                Đóng
+                Hủy
+              </Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                disabled={ingredientsToAdd.length === 0}
+                onClick={() => {
+                  const selectedItems: InventoryItem[] = items.filter((i: InventoryItem) => ingredientsToAdd.includes(i.id));
+                  const newIngredients: CompositeIngredient[] = selectedItems.map((item: InventoryItem) => ({
+                    ingredientId: item.id,
+                    ingredientName: item.name,
+                    unit: item.unit,
+                    quantity: 0,
+                    unitCost: item.avgUnitCost
+                  }));
+
+                  if (editDialogOpen) {
+                    setEditValues((prev: any) => ({
+                      ...prev,
+                      ingredients: [
+                        ...prev.ingredients,
+                        ...newIngredients.filter((newIg: CompositeIngredient) => !prev.ingredients.some((ex: CompositeIngredient) => ex.ingredientId === newIg.ingredientId)) // Avoid duplicates if needed, or just allow them
+                      ]
+                    }));
+                  } else {
+                    setSelectedIngredients((prev: CompositeIngredient[]) => [
+                      ...prev,
+                      ...newIngredients.filter((newIg: CompositeIngredient) => !prev.some((ex: CompositeIngredient) => ex.ingredientId === newIg.ingredientId))
+                    ]);
+                  }
+                  setAddIngredientDialogOpen(false);
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Thêm {ingredientsToAdd.length} nguyên liệu
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1550,23 +1631,42 @@ export function Inventory() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {editValues.ingredients.map((ing, index) => (
+                          {editValues.ingredients.map((ing: CompositeIngredient, index: number) => (
                             <TableRow key={index}>
                               <TableCell>{index + 1}</TableCell>
                               <TableCell>{ing.ingredientId}</TableCell>
                               <TableCell>{ing.ingredientName}</TableCell>
                               <TableCell>{ing.unit}</TableCell>
-                              <TableCell>{ing.quantity}</TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={ing.quantity}
+                                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                                    const val = Number(e.target.value);
+                                    setEditValues((prev: any) => ({
+                                      ...prev,
+                                      ingredients: prev.ingredients.map(
+                                        (item: CompositeIngredient, idx: number) =>
+                                          idx === index
+                                            ? { ...item, quantity: val }
+                                            : item
+                                      ),
+                                    }));
+                                  }}
+                                  className="h-8 w-24 bg-white border-slate-300"
+                                />
+                              </TableCell>
                               <TableCell>
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="h-6 w-6 p-0"
                                   onClick={() => {
-                                    setEditValues((prev) => ({
+                                    setEditValues((prev: any) => ({
                                       ...prev,
                                       ingredients: prev.ingredients.filter(
-                                        (_, i) => i !== index
+                                        (_: any, i: number) => i !== index
                                       ),
                                     }));
                                   }}
