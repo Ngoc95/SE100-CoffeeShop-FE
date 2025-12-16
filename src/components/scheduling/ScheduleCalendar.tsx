@@ -36,9 +36,10 @@ interface ScheduleCalendarProps {
   shifts: Shift[];
   schedule?: Record<string, Record<string, string[]>>;
   setSchedule?: (schedule: Record<string, Record<string, string[]>>) => void;
+  staffList?: any[];
 }
 
-export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule, setSchedule: setPropsSchedule }: ScheduleCalendarProps) {
+export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule, setSchedule: setPropsSchedule, staffList }: ScheduleCalendarProps) {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [addShiftDialogOpen, setAddShiftDialogOpen] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{ staffId: string; day: string } | null>(null);
@@ -67,13 +68,17 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
       color: shiftColors[shift.id] || 'bg-blue-100 text-blue-800 border-blue-200',
     }));
 
-  // Chỉ lấy 4-5 nhân viên đầu tiên (không có quản lý)
-  const staff: StaffMember[] = staffMembers.slice(0, 4).map(s => ({
-    id: s.id,
-    name: s.fullName,
-    role: s.position,
-    positionLabel: s.positionLabel,
-  }));
+  // Chỉ lấy nhân viên không phải quản lý (manager)
+  const currentStaffList = staffList || staffMembers;
+  const staff: StaffMember[] = currentStaffList
+    .filter(s => s.position !== 'manager')
+    .slice(0, 4)
+    .map(s => ({
+      id: s.id,
+      name: s.fullName,
+      role: s.position,
+      positionLabel: s.positionLabel,
+    }));
 
   const daysOfWeek = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
   const roles = ['Pha chế', 'Thu ngân', 'Phục vụ'];
@@ -202,6 +207,43 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
   };
 
   const weekDates = getWeekDates();
+
+  const calculateEstimatedSalary = (staffId: string) => {
+    const staffMember = staffMembers.find((s) => s.id === staffId);
+    if (!staffMember) return 0;
+
+    const salarySettings = staffMember.salarySettings;
+    let totalSalary = 0;
+
+    daysOfWeek.forEach((day) => {
+      const shiftIds = schedule[staffId]?.[day] || [];
+      shiftIds.forEach((shiftId) => {
+        if (salarySettings && salarySettings.salaryType === "shift") {
+          const shiftSetting =
+            salarySettings.shifts.find((sh) => sh.id === shiftId) ||
+            salarySettings.shifts[0];
+          if (shiftSetting) {
+            const normalized = shiftSetting.salaryPerShift
+              .toString()
+              .replace(/[^\d]/g, "");
+            const perShift = Number(normalized) || 0;
+            totalSalary += perShift;
+          }
+        } else {
+          const basePerShift = staffMember.salary
+            ? Math.round(staffMember.salary / 26)
+            : 200000;
+          totalSalary += basePerShift;
+        }
+      });
+    });
+
+    return totalSalary;
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(amount);
+  };
   const formatWeekRange = () => {
     const start = weekDates[0];
     const end = weekDates[6];
@@ -233,10 +275,6 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
       <div className="w-64 bg-white border-r p-6 overflow-auto">
         <div className="space-y-6">
           <div>
-            <h3 className="text-sm text-slate-700 mb-3 flex items-center gap-2">
-              <Filter className="w-4 h-4" />
-              Bộ lọc
-            </h3>
             <div className="space-y-4">
               {/* Filter by Role */}
               <div>
@@ -391,13 +429,13 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
 
         {/* Calendar Content */}
         <div className="flex-1 overflow-auto p-6">
-          <Card className="border-amber-200">
+          <Card className="border-blue-200">
             <CardContent className="p-0">
               <div className="overflow-x-auto rounded-xl">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="border-b-2 border-amber-200">
-                      <th className="text-left p-3 text-sm text-neutral-700 bg-amber-50 sticky left-0 z-10">
+                    <tr className="border-b-2 border-blue-200">
+                      <th className="text-left p-3 text-sm text-neutral-700 bg-blue-50 sticky left-0 z-10">
                         <div>Nhân viên</div>
                         <div className="text-xs text-neutral-500 mt-1">
                           {filteredStaff.length} người
@@ -410,7 +448,7 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
                         return (
                           <th 
                             key={day} 
-                            className={`p-3 text-center bg-amber-50 min-w-[120px] ${
+                            className={`p-3 text-center bg-blue-50 min-w-[120px] ${
                               isToday ? 'bg-blue-100 border-2 border-blue-500' : ''
                             }`}
                           >
@@ -426,8 +464,8 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
                         </th>
                         );
                       })}
-                      <th className="p-3 text-center bg-amber-50 text-sm text-neutral-700">
-                        Tổng
+                      <th className="p-3 text-right bg-blue-50 text-sm text-black-700 min-w-[120px]">
+                        Lương dự kiến
                       </th>
                     </tr>
                   </thead>
@@ -472,10 +510,13 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
                             </div>
                           </td>
                         ))}
-                        <td className="p-3 text-center">
-                          <Badge variant="outline">
+                        <td className="p-3 text-right">
+                          <div className="font-medium text-black-900">
+                            {formatCurrency(calculateEstimatedSalary(person.id))}
+                          </div>
+                          <div className="text-xs text-neutral-500 mt-1">
                             {getTotalShiftsPerPerson(person.id)} ca
-                          </Badge>
+                          </div>
                         </td>
                       </tr>
                     ))}

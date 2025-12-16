@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, FileText, Eye, Download, ChevronDown, ChevronUp, Receipt, CreditCard, Calendar as CalendarIcon, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, FileText, Eye, Download, ChevronDown, ChevronRight, Receipt, CreditCard, Calendar as CalendarIcon, ArrowUp, ArrowDown } from 'lucide-react';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
 import { Separator } from '../ui/separator';
@@ -325,7 +325,7 @@ export function Invoices() {
                                 className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
                                   presetTimeRange === option.value
                                     ? 'bg-blue-600 text-white'
-                                    : 'text-blue-600 hover:bg-blue-50'
+                                    : 'text-blue-600 hover:bg-blue-100'
                                 }`}
                               >
                                 {option.label}
@@ -356,7 +356,7 @@ export function Invoices() {
                                 className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
                                   presetTimeRange === option.value
                                     ? 'bg-blue-600 text-white'
-                                    : 'text-blue-600 hover:bg-blue-50'
+                                    : 'text-blue-600 hover:bg-blue-100'
                                 }`}
                               >
                                 {option.label}
@@ -384,7 +384,7 @@ export function Invoices() {
                                 className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
                                   presetTimeRange === option.value
                                     ? 'bg-blue-600 text-white'
-                                    : 'text-blue-600 hover:bg-blue-50'
+                                    : 'text-blue-600 hover:bg-blue-100'
                                 }`}
                               >
                                 {option.label}
@@ -469,7 +469,6 @@ export function Invoices() {
                     onCheckedChange={() => toggleStatus(status.id)}
                   />
                   <Label htmlFor={status.id} className="text-sm text-slate-700 cursor-pointer flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${status.color}`} />
                     {status.label}
                   </Label>
                 </div>
@@ -544,12 +543,13 @@ export function Invoices() {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-lg border border-slate-200 flex-1 overflow-hidden flex flex-col">
+        <div className="bg-white rounded-xl border border-blue-200 flex-1 overflow-hidden flex flex-col">
           <div className="overflow-x-auto flex-1 rounded-xl">
             <Table>
               <TableHeader>
-                <TableRow className="bg-blue-50">
+                <TableRow className="bg-blue-100">
                   <TableHead className="w-12 text-sm"></TableHead>
+                  <TableHead className="w-16 text-sm text-center">STT</TableHead>
                   <TableHead
                     className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
                     onClick={() => handleSort("code")}
@@ -617,19 +617,22 @@ export function Invoices() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredInvoices.map((invoice) => (
+                {filteredInvoices.map((invoice, index) => (
                   <>
                     <TableRow 
                       key={invoice.id} 
-                      className="hover:bg-blue-50/50 cursor-pointer"
+                      className="hover:bg-blue-100/50 cursor-pointer"
                       onClick={() => toggleExpand(invoice.id)}
                     >
                       <TableCell className="text-sm text-center">
                         {expandedInvoiceId === invoice.id ? (
-                          <ChevronUp className="w-4 h-4 text-slate-600" />
-                        ) : (
                           <ChevronDown className="w-4 h-4 text-slate-600" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-slate-600" />
                         )}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-600 text-center">
+                        {index + 1}
                       </TableCell>
                       <TableCell className="text-sm text-blue-600">{invoice.code}</TableCell>
                       <TableCell className="text-sm text-slate-700">{invoice.date}</TableCell>

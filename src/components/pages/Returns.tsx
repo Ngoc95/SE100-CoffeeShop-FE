@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, RotateCcw, Eye, ChevronDown, ChevronUp, CheckCircle, Clock, XCircle, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, RotateCcw, Eye, ChevronDown, ChevronRight, CheckCircle, Clock, XCircle, ArrowUp, ArrowDown } from 'lucide-react';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
 import { Separator } from '../ui/separator';
@@ -247,7 +247,6 @@ export function Returns() {
                     onCheckedChange={() => toggleStatus(status.id)}
                   />
                   <Label htmlFor={status.id} className="text-sm text-slate-700 cursor-pointer flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${status.color}`} />
                     {status.label}
                   </Label>
                 </div>
@@ -317,11 +316,11 @@ export function Returns() {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-lg border border-slate-200 flex-1 overflow-hidden flex flex-col">
+        <div className="bg-white rounded-xl border border-blue-200 flex-1 overflow-hidden flex flex-col">
           <div className="overflow-x-auto flex-1 rounded-xl">
             <Table>
               <TableHeader>
-                <TableRow className="bg-blue-50">
+                <TableRow className="bg-blue-100">
                   <TableHead className="w-12 text-sm"></TableHead>
                   <TableHead className="w-16 text-sm text-center">STT</TableHead>
                   <TableHead
@@ -403,14 +402,14 @@ export function Returns() {
                   <>
                     <TableRow 
                       key={ret.id} 
-                      className="hover:bg-blue-50/50 cursor-pointer"
+                      className="hover:bg-blue-100/50 cursor-pointer"
                       onClick={() => toggleExpand(ret.id)}
                     >
                       <TableCell className="text-sm text-center">
                         {expandedReturnId === ret.id ? (
-                          <ChevronUp className="w-4 h-4 text-slate-600" />
-                        ) : (
                           <ChevronDown className="w-4 h-4 text-slate-600" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-slate-600" />
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-slate-700 text-center">{index + 1}</TableCell>

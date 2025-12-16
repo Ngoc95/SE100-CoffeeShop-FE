@@ -1,18 +1,10 @@
 import { useState } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Settings,
-  Calendar,
-  Clock,
-} from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import { Button } from "../ui/button";
+import { Settings, Calendar, Clock, Calculator } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { ShiftManagement } from "../scheduling/ShiftManagement";
 import { ScheduleCalendar } from "../scheduling/ScheduleCalendar";
 import { TimekeepingBoard } from "../scheduling/TimekeepingBoard";
+import { PayrollBoard } from "../scheduling/PayrollBoard";
 import { initialSchedule } from "../../data/staffData";
 
 interface Shift {
@@ -29,6 +21,9 @@ export function Scheduling() {
   const [activeTab, setActiveTab] = useState("shifts");
   const [schedule, setSchedule] =
     useState<Record<string, Record<string, string[]>>>(initialSchedule);
+  const [timekeepingData, setTimekeepingData] = useState<
+    Record<string, Record<string, Record<string, any>>>
+  >({});
   const [shifts, setShifts] = useState<Shift[]>([
     {
       id: "1",
@@ -71,7 +66,7 @@ export function Scheduling() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-3">
+        <TabsList className="grid w-full max-w-3xl grid-cols-4">
           <TabsTrigger value="shifts" className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
             Quản lý ca làm việc
@@ -83,6 +78,10 @@ export function Scheduling() {
           <TabsTrigger value="timekeeping" className="flex items-center gap-2">
             <Clock className="w-4 h-4" />
             Bảng chấm công
+          </TabsTrigger>
+          <TabsTrigger value="payroll" className="flex items-center gap-2">
+            <Calculator className="w-4 h-4" />
+            Bảng lương
           </TabsTrigger>
         </TabsList>
 
@@ -103,6 +102,15 @@ export function Scheduling() {
             shifts={shifts}
             schedule={schedule}
             setSchedule={setSchedule}
+            value={timekeepingData}
+            onChange={setTimekeepingData}
+          />
+        </TabsContent>
+
+        <TabsContent value="payroll" className="mt-6">
+          <PayrollBoard
+            shifts={shifts}
+            timekeepingData={timekeepingData}
           />
         </TabsContent>
       </Tabs>

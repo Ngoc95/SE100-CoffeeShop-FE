@@ -1,6 +1,7 @@
 import { useState } from "react";
 import * as React from "react";
 import {
+  ArrowLeftRight,
   Search,
   ChevronLeft,
   ChevronRight,
@@ -58,7 +59,7 @@ interface StaffMember {
   role: string;
 }
 
-interface TimekeepingEntry {
+export interface TimekeepingEntry {
   staffId: string;
   shiftId: string;
   date: string;
@@ -86,10 +87,15 @@ interface TimekeepingEntry {
   earlyMinutes?: number;
 }
 
-interface TimekeepingBoardProps {
+export interface TimekeepingBoardProps {
   shifts: Shift[];
   schedule?: Record<string, Record<string, string[]>>;
   setSchedule?: (schedule: Record<string, Record<string, string[]>>) => void;
+  staffList?: any[];
+  value?: Record<string, Record<string, Record<string, TimekeepingEntry>>>;
+  onChange?: (
+    data: Record<string, Record<string, Record<string, TimekeepingEntry>>>
+  ) => void;
 }
 
 // Generate time options from 00:00 to 23:45 with 15-minute intervals
@@ -108,17 +114,25 @@ const generateTimeOptions = () => {
 
 const timeOptions = generateTimeOptions();
 
-export function TimekeepingBoard({
-  shifts,
-  schedule: propsSchedule,
-  setSchedule: setPropsSchedule,
-}: TimekeepingBoardProps) {
+export function TimekeepingBoard(props: TimekeepingBoardProps) {
+  const { shifts, schedule: propsSchedule, setSchedule: setPropsSchedule, staffList, value, onChange } =
+    props;
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [timekeepingDialogOpen, setTimekeepingDialogOpen] = useState(false);
+  const [swapShiftDialogOpen, setSwapShiftDialogOpen] = useState(false);
+  const [swapShiftData, setSwapShiftData] = useState({
+    fromStaffId: "",
+    fromDate: new Date(),
+    fromShiftId: "",
+    toStaffId: "",
+    toDate: new Date(),
+    toShiftId: "",
+  });
+
   const [selectedTimekeeping, setSelectedTimekeeping] = useState<{
     staffId: string;
     shiftId: string;
@@ -149,13 +163,17 @@ export function TimekeepingBoard({
   const [earlyHours, setEarlyHours] = useState(0);
   const [earlyMinutes, setEarlyMinutes] = useState(0);
 
-  // Sử dụng staffMembers từ staffData và chỉ lấy 4-5 nhân viên đầu tiên
-  const staff: StaffMember[] = staffMembers.slice(0, 4).map((s) => ({
-    id: s.id,
-    name: s.fullName,
-    code: s.staffCode,
-    role: s.positionLabel,
-  }));
+  // Sử dụng staffMembers từ staffData và loại bỏ quản lý (manager)
+  const currentStaffList = staffList || staffMembers;
+  const staff: StaffMember[] = currentStaffList
+    .filter((s) => s.position !== "manager")
+    .slice(0, 4)
+    .map((s) => ({
+      id: s.id,
+      name: s.fullName,
+      code: s.staffCode,
+      role: s.positionLabel,
+    }));
 
   // Sử dụng schedule từ props hoặc initialSchedule
   const schedule = propsSchedule || initialSchedule;
@@ -177,9 +195,21 @@ export function TimekeepingBoard({
 
   const daysOfWeek = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
+  const normalizeToLocalDate = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  };
+
+  const formatDateInput = (date: Date) => {
+    const d = normalizeToLocalDate(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   const getWeekDates = () => {
-    const dates = [];
-    const monday = new Date(currentWeek);
+    const dates: Date[] = [];
+    const monday = normalizeToLocalDate(currentWeek);
     const day = monday.getDay();
     const diff = monday.getDate() - day + (day === 0 ? -6 : 1);
     monday.setDate(diff);
@@ -187,7 +217,7 @@ export function TimekeepingBoard({
     for (let i = 0; i < 7; i++) {
       const date = new Date(monday);
       date.setDate(monday.getDate() + i);
-      dates.push(date);
+      dates.push(normalizeToLocalDate(date));
     }
     return dates;
   };
@@ -201,6 +231,12 @@ export function TimekeepingBoard({
     }/${end.getFullYear()}`;
   };
 
+  const getDayLabelFromDate = (date: Date) => {
+    const dayIndex = normalizeToLocalDate(date).getDay();
+    const dayMap = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+    return dayMap[dayIndex] || "T2";
+  };
+
   const formatDate = (date: Date) => {
     return `${date.getDate().toString().padStart(2, "0")}/${(
       date.getMonth() + 1
@@ -212,7 +248,169 @@ export function TimekeepingBoard({
   // Chưa có ai chấm công hết
   const [timekeepingData, setTimekeepingData] = useState<
     Record<string, Record<string, Record<string, TimekeepingEntry>>>
-  >({});
+  >(value || {});
+
+  const handleSwapShift = () => {
+    if (
+      !swapShiftData.fromStaffId ||
+      !swapShiftData.fromShiftId ||
+      !swapShiftData.toStaffId ||
+      !swapShiftData.toShiftId
+    ) {
+      toast.error("Vui lòng nhập đầy đủ thông tin đổi ca");
+      return;
+    }
+
+    // Kiểm tra ca của nhân viên hiện tại: chỉ cho phép đổi nếu chưa chấm công/thiếu
+    const fromDateStr = formatDateInput(swapShiftData.fromDate);
+    const fromEntry = getTimekeepingEntry(
+      swapShiftData.fromStaffId,
+      swapShiftData.fromShiftId,
+      fromDateStr
+    );
+    
+    if (
+      fromEntry &&
+      fromEntry.status !== "not-checked" &&
+      fromEntry.status !== "missing"
+    ) {
+      toast.error("Không thể đổi ca đã được chấm công");
+      return;
+    }
+
+    // Kiểm tra ca của nhân viên muốn đổi
+    const toDateStr = formatDateInput(swapShiftData.toDate);
+    const toEntry = getTimekeepingEntry(
+      swapShiftData.toStaffId,
+      swapShiftData.toShiftId,
+      toDateStr
+    );
+
+    if (
+      toEntry &&
+      toEntry.status !== "not-checked" &&
+      toEntry.status !== "missing"
+    ) {
+      toast.error("Không thể đổi ca với ca đã được chấm công");
+      return;
+    }
+
+    if (setPropsSchedule && schedule) {
+      const fromStaffId = swapShiftData.fromStaffId;
+      const toStaffId = swapShiftData.toStaffId;
+      const fromShiftId = swapShiftData.fromShiftId;
+      const toShiftId = swapShiftData.toShiftId;
+
+      const fromDay = getDayLabelFromDate(swapShiftData.fromDate);
+      const toDay = getDayLabelFromDate(swapShiftData.toDate);
+
+      const originalFromDayShifts =
+        schedule[fromStaffId]?.[fromDay] || [];
+      const originalToDayShifts =
+        schedule[toStaffId]?.[toDay] || [];
+
+      if (!originalFromDayShifts.includes(fromShiftId)) {
+        toast.error("Ca gốc không tồn tại trong lịch làm việc");
+        return;
+      }
+
+      if (!originalToDayShifts.includes(toShiftId)) {
+        toast.error("Ca muốn đổi không tồn tại trong lịch làm việc");
+        return;
+      }
+
+      if (
+        fromStaffId === toStaffId &&
+        fromDay === toDay &&
+        fromShiftId === toShiftId
+      ) {
+        toast.error("Không thể đổi cùng một ca");
+        return;
+      }
+
+      if (fromStaffId !== toStaffId) {
+        if (schedule[fromStaffId]?.[toDay]?.includes(toShiftId)) {
+          toast.error("Bạn đã có ca này trong ngày muốn đổi");
+          return;
+        }
+
+        if (schedule[toStaffId]?.[fromDay]?.includes(fromShiftId)) {
+          toast.error("Nhân viên được chọn đã có ca này trong ngày ban đầu");
+          return;
+        }
+      }
+
+      const newSchedule: Record<string, Record<string, string[]>> = JSON.parse(
+        JSON.stringify(schedule)
+      );
+
+      if (!newSchedule[fromStaffId]) {
+        newSchedule[fromStaffId] = {};
+      }
+      if (!newSchedule[toStaffId]) {
+        newSchedule[toStaffId] = {};
+      }
+      if (!newSchedule[fromStaffId][fromDay]) {
+        newSchedule[fromStaffId][fromDay] = [];
+      }
+      if (!newSchedule[toStaffId][toDay]) {
+        newSchedule[toStaffId][toDay] = [];
+      }
+      if (!newSchedule[fromStaffId][toDay]) {
+        newSchedule[fromStaffId][toDay] = newSchedule[fromStaffId][toDay] || [];
+      }
+      if (!newSchedule[toStaffId][fromDay]) {
+        newSchedule[toStaffId][fromDay] = newSchedule[toStaffId][fromDay] || [];
+      }
+
+      newSchedule[fromStaffId][fromDay] = (
+        newSchedule[fromStaffId][fromDay] || []
+      ).filter((id: string) => id !== fromShiftId);
+
+      newSchedule[toStaffId][toDay] = (
+        newSchedule[toStaffId][toDay] || []
+      ).filter((id: string) => id !== toShiftId);
+
+      const targetFromDayShifts = [
+        ...(newSchedule[fromStaffId][toDay] || []),
+      ];
+      if (!targetFromDayShifts.includes(toShiftId)) {
+        targetFromDayShifts.push(toShiftId);
+      }
+      newSchedule[fromStaffId][toDay] = targetFromDayShifts;
+
+      const targetToDayShifts = [
+        ...(newSchedule[toStaffId][fromDay] || []),
+      ];
+      if (!targetToDayShifts.includes(fromShiftId)) {
+        targetToDayShifts.push(fromShiftId);
+      }
+      newSchedule[toStaffId][fromDay] = targetToDayShifts;
+
+      setPropsSchedule(newSchedule);
+      toast.success("Đã đổi ca thành công");
+    } else {
+      toast.success("Đã gửi yêu cầu đổi ca (Mock)");
+    }
+
+    setSwapShiftDialogOpen(false);
+    setTimekeepingDialogOpen(false);
+  };
+
+  const handleOpenSwapFromTimekeeping = () => {
+    if (!selectedTimekeeping) return;
+    const date = new Date(selectedTimekeeping.date);
+    setSwapShiftData((prev) => ({
+      ...prev,
+      fromStaffId: selectedTimekeeping.staffId,
+      fromDate: date,
+      fromShiftId: selectedTimekeeping.shiftId,
+      toStaffId: "",
+      toDate: date,
+      toShiftId: "",
+    }));
+    setSwapShiftDialogOpen(true);
+  };
 
   const getTimekeepingEntry = (
     staffId: string,
@@ -227,6 +425,7 @@ export function TimekeepingBoard({
     shiftId: string,
     date: string
   ) => {
+    console.log(date)
     setSelectedTimekeeping({ staffId, shiftId, date });
     const entry = getTimekeepingEntry(staffId, shiftId, date);
     const shift = shifts.find((s) => s.id === shiftId);
@@ -290,18 +489,24 @@ export function TimekeepingBoard({
         note,
       };
 
-      setTimekeepingData((prev) => ({
-        ...prev,
-        [selectedTimekeeping.staffId]: {
-          ...(prev[selectedTimekeeping.staffId] || {}),
-          [selectedTimekeeping.shiftId]: {
-            ...(prev[selectedTimekeeping.staffId]?.[
-              selectedTimekeeping.shiftId
-            ] || {}),
-            [selectedTimekeeping.date]: entry,
+      setTimekeepingData((prev) => {
+        const next = {
+          ...prev,
+          [selectedTimekeeping.staffId]: {
+            ...(prev[selectedTimekeeping.staffId] || {}),
+            [selectedTimekeeping.shiftId]: {
+              ...(prev[selectedTimekeeping.staffId]?.[
+                selectedTimekeeping.shiftId
+              ] || {}),
+              [selectedTimekeeping.date]: entry,
+            },
           },
-        },
-      }));
+        };
+        if (onChange) {
+          onChange(next);
+        }
+        return next;
+      });
 
       toast.success("Đã lưu chấm công");
       setTimekeepingDialogOpen(false);
@@ -327,18 +532,24 @@ export function TimekeepingBoard({
         note,
       };
 
-      setTimekeepingData((prev) => ({
-        ...prev,
-        [selectedTimekeeping.staffId]: {
-          ...(prev[selectedTimekeeping.staffId] || {}),
-          [selectedTimekeeping.shiftId]: {
-            ...(prev[selectedTimekeeping.staffId]?.[
-              selectedTimekeeping.shiftId
-            ] || {}),
-            [selectedTimekeeping.date]: entry,
+      setTimekeepingData((prev) => {
+        const next = {
+          ...prev,
+          [selectedTimekeeping.staffId]: {
+            ...(prev[selectedTimekeeping.staffId] || {}),
+            [selectedTimekeeping.shiftId]: {
+              ...(prev[selectedTimekeeping.staffId]?.[
+                selectedTimekeeping.shiftId
+              ] || {}),
+              [selectedTimekeeping.date]: entry,
+            },
           },
-        },
-      }));
+        };
+        if (onChange) {
+          onChange(next);
+        }
+        return next;
+      });
 
       toast.success("Đã lưu chấm công");
       setTimekeepingDialogOpen(false);
@@ -434,18 +645,24 @@ export function TimekeepingBoard({
         early && checkOutEnabled ? calculatedEarlyMinutes : undefined,
     };
 
-    setTimekeepingData((prev) => ({
-      ...prev,
-      [selectedTimekeeping.staffId]: {
-        ...(prev[selectedTimekeeping.staffId] || {}),
-        [selectedTimekeeping.shiftId]: {
-          ...(prev[selectedTimekeeping.staffId]?.[
-            selectedTimekeeping.shiftId
-          ] || {}),
-          [selectedTimekeeping.date]: entry,
+    setTimekeepingData((prev) => {
+      const next = {
+        ...prev,
+        [selectedTimekeeping.staffId]: {
+          ...(prev[selectedTimekeeping.staffId] || {}),
+          [selectedTimekeeping.shiftId]: {
+            ...(prev[selectedTimekeeping.staffId]?.[
+              selectedTimekeeping.shiftId
+            ] || {}),
+            [selectedTimekeeping.date]: entry,
+          },
         },
-      },
-    }));
+      };
+      if (onChange) {
+        onChange(next);
+      }
+      return next;
+    });
 
     toast.success("Đã lưu chấm công");
     setTimekeepingDialogOpen(false);
@@ -469,19 +686,19 @@ export function TimekeepingBoard({
   };
 
   const goToPreviousWeek = () => {
-    const newDate = new Date(currentWeek);
+    const newDate = normalizeToLocalDate(currentWeek);
     newDate.setDate(newDate.getDate() - 7);
     setCurrentWeek(newDate);
   };
 
   const goToNextWeek = () => {
-    const newDate = new Date(currentWeek);
+    const newDate = normalizeToLocalDate(currentWeek);
     newDate.setDate(newDate.getDate() + 7);
     setCurrentWeek(newDate);
   };
 
   const goToCurrentWeek = () => {
-    setCurrentWeek(new Date());
+    setCurrentWeek(normalizeToLocalDate(new Date()));
   };
 
   // Chỉ lấy các ca đang hoạt động
@@ -620,7 +837,6 @@ export function TimekeepingBoard({
             )}
           </div>
 
-          {/* Week Navigation - giống ScheduleCalendar */}
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={goToPreviousWeek}>
               <ChevronLeft className="w-4 h-4" />
@@ -718,9 +934,11 @@ export function TimekeepingBoard({
                     </div>
                   </td>
                   {daysOfWeek.map((day, dayIndex) => {
-                    const dateStr = weekDates[dayIndex]
-                      .toISOString()
-                      .split("T")[0];
+                    const date = weekDates[dayIndex];
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, "0");
+                    const dayOfMonth = String(date.getDate()).padStart(2, "0");
+                    const dateStr = `${year}-${month}-${dayOfMonth}`;
                     // Chỉ hiển thị nhân viên có lịch làm việc trong schedule
                     const staffWithSchedule = filteredStaff.filter((s) => {
                       if (
@@ -877,6 +1095,208 @@ export function TimekeepingBoard({
         </div>
       </div>
 
+      {/* Swap Shift Dialog */}
+      <Dialog
+        open={swapShiftDialogOpen}
+        onOpenChange={(open) => {
+          setSwapShiftDialogOpen(open);
+          if (!open) {
+            setSwapShiftData({
+              fromStaffId: "",
+              fromDate: new Date(),
+              fromShiftId: "",
+              toStaffId: "",
+              toDate: new Date(),
+              toShiftId: "",
+            });
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Đổi ca làm việc</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-[1fr,auto,1fr] gap-6 items-start py-4">
+            {/* From Staff */}
+            <div className="space-y-4">
+              <h3 className="font-medium text-slate-900 border-b pb-2">
+                Nhân viên hiện tại
+              </h3>
+
+              <div className="space-y-2">
+                <Label>Ngày làm việc</Label>
+                <div className="relative">
+                  <Input
+                    type="date"
+                    value={formatDateInput(swapShiftData.fromDate)}
+                    onChange={(e) => {
+                      const nextDate = new Date(e.target.value);
+                      setSwapShiftData((prev) => ({
+                        ...prev,
+                        fromDate: nextDate,
+                        fromShiftId: "",
+                      }));
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Nhân viên</Label>
+                <Input
+                  value={
+                    staff.find((s) => s.id === swapShiftData.fromStaffId)
+                      ?.name || ""
+                  }
+                  readOnly
+                  className="bg-slate-100"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Ca</Label>
+                <Select
+                  value={swapShiftData.fromShiftId}
+                  onValueChange={(value) =>
+                    setSwapShiftData((prev) => ({
+                      ...prev,
+                      fromShiftId: value,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn ca làm việc..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(() => {
+                      const day = getDayLabelFromDate(swapShiftData.fromDate);
+                      const staffShifts =
+                        schedule[swapShiftData.fromStaffId]?.[day] || [];
+                      const availableShifts = activeShifts.filter((shift) =>
+                        staffShifts.includes(shift.id)
+                      );
+                      return availableShifts.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name} ({s.startTime} - {s.endTime})
+                        </SelectItem>
+                      ));
+                    })()}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="flex flex-col items-center justify-center h-full pt-8">
+              <div className="w-px h-full bg-slate-200 min-h-[200px] border-l border-dashed border-slate-300"></div>
+            </div>
+
+            {/* To Staff */}
+            <div className="space-y-4">
+              <h3 className="font-medium text-slate-900 border-b pb-2">
+                Nhân viên muốn đổi
+              </h3>
+
+              <div className="space-y-2">
+                <Label>Ngày làm việc</Label>
+                <div className="relative">
+                  <Input
+                    type="date"
+                    value={formatDateInput(swapShiftData.toDate)}
+                    onChange={(e) => {
+                      const nextDate = new Date(e.target.value);
+                      setSwapShiftData((prev) => ({
+                        ...prev,
+                        toDate: nextDate,
+                        toStaffId: "",
+                        toShiftId: "",
+                      }));
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Nhân viên</Label>
+                <Select
+                  value={swapShiftData.toStaffId}
+                  onValueChange={(value) =>
+                    setSwapShiftData((prev) => ({
+                      ...prev,
+                      toStaffId: value,
+                      toShiftId: "",
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn nhân viên..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(() => {
+                      const day = getDayLabelFromDate(swapShiftData.toDate);
+                      const candidates = staff.filter((s) => {
+                        if (s.id === swapShiftData.fromStaffId) return false;
+                        const staffShifts = schedule[s.id]?.[day] || [];
+                        if (swapShiftData.toShiftId) {
+                          // Nếu đã chọn ca đích, chỉ hiện những nhân viên có ca đó
+                          return staffShifts.includes(swapShiftData.toShiftId);
+                        }
+                        // Nếu chưa chọn ca đích, cho phép chọn bất kỳ nhân viên nào
+                        // có ít nhất một ca trong ngày đó
+                        return staffShifts.length > 0;
+                      });
+                      return candidates.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}
+                        </SelectItem>
+                      ));
+                    })()}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Ca</Label>
+                <Select
+                  value={swapShiftData.toShiftId}
+                  onValueChange={(value) =>
+                    setSwapShiftData((prev) => ({
+                      ...prev,
+                      toShiftId: value,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn ca làm việc..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(() => {
+                      const day = getDayLabelFromDate(swapShiftData.toDate);
+                      const staffShifts =
+                        swapShiftData.toStaffId
+                          ? schedule[swapShiftData.toStaffId]?.[day] || []
+                          : [];
+                      const availableShifts = activeShifts.filter((shift) =>
+                        staffShifts.includes(shift.id)
+                      );
+                      return availableShifts.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name} ({s.startTime} - {s.endTime})
+                        </SelectItem>
+                      ));
+                    })()}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSwapShiftDialogOpen(false)}>Bỏ qua</Button>
+            <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleSwapShift}>Lưu</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Timekeeping Dialog */}
       <Dialog
         open={timekeepingDialogOpen}
@@ -889,7 +1309,6 @@ export function TimekeepingBoard({
 
           {selectedTimekeeping && (
             <div className="space-y-6">
-              {/* Staff Info */}
               <div className="flex items-center gap-4 pb-4 border-b">
                 <div className="flex items-center gap-2">
                   <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
@@ -961,18 +1380,29 @@ export function TimekeepingBoard({
                     const badge =
                       statusBadges[status] || statusBadges["not-checked"];
                     return (
-                      <Badge
-                        variant="outline"
-                        className={`ml-auto ${badge.color}`}
-                      >
-                        {badge.icon}
-                        {badge.label}
-                      </Badge>
+                      <div className="ml-auto flex items-center gap-3">
+                        <Badge variant="outline" className={`${badge.color}`}>
+                          {badge.icon}
+                          {badge.label}
+                        </Badge>
+                        {(!entry ||
+                          entry.status === "not-checked" ||
+                          entry.status === "missing") && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center gap-1"
+                            onClick={handleOpenSwapFromTimekeeping}
+                          >
+                            <ArrowLeftRight className="w-4 h-4" />
+                            Đổi ca
+                          </Button>
+                        )}
+                      </div>
                     );
                   })()}
               </div>
 
-              {/* Date and Shift Info */}
               <div className="grid grid-cols-2 gap-4 pb-4 border-b">
                 <div>
                   <Label className="text-xs text-slate-600 mb-1 block">
@@ -1049,7 +1479,6 @@ export function TimekeepingBoard({
                           >
                             Nghỉ có phép
                           </Label>
-                          <Info className="w-4 h-4 text-slate-400" />
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -1065,7 +1494,6 @@ export function TimekeepingBoard({
                           >
                             Nghỉ không phép
                           </Label>
-                          <Info className="w-4 h-4 text-slate-400" />
                         </div>
                       </div>
                     </div>

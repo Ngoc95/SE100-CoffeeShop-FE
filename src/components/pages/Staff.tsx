@@ -13,6 +13,9 @@ import {
   PowerOff,
   ArrowUp,
   ArrowDown,
+  Eye,
+  EyeOff,
+  Calendar,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
@@ -52,64 +55,72 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { SimpleSearchSelect } from "../SimpleSearchSelect";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
-
-interface StaffMember {
-  id: string;
-  staffCode: string;
-  fullName: string;
-  phone: string;
-  idCard: string;
-  gender: "male" | "female";
-  birthDate: string;
-  position: string;
-  positionLabel: string;
-  joinDate: string;
-  salary: number;
-  status: "active" | "inactive";
-  address: {
-    city: string;
-    ward: string;
-    detail: string;
-  };
-  salarySettings?: {
-    salaryType: "shift" | "fixed";
-    salaryAmount: string;
-    advancedSetup: boolean;
-    overtimeEnabled: boolean;
-    shifts: Array<{
-      id: string;
-      name: string;
-      salaryPerShift: string;
-      saturdayCoeff: string;
-      sundayCoeff: string;
-      dayOffCoeff: string;
-      holidayCoeff: string;
-    }>;
-    overtimeCoeffs: {
-      weekday: string;
-      saturday: string;
-      sunday: string;
-      dayOff: string;
-      holiday: string;
-    };
-  };
-}
+import { StaffMember, staffMembers as initialStaffMembers } from "../../data/staffData";
 
 type SortField = "staffCode" | "fullName" | "joinDate" | "position" | null;
 type SortOrder = "asc" | "desc" | "none";
 
-export function Staff() {
+const PasswordInput = ({
+  value,
+  onChange,
+  placeholder = "********",
+}: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+}) => {
+  const [showPassword, setShowPassword] = useState(false);
+
+  return (
+    <div className="relative">
+      <Input
+        type={showPassword ? "text" : "password"}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2 pr-10"
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-slate-500 hover:text-slate-700"
+        onClick={() => setShowPassword(!showPassword)}
+      >
+        {showPassword ? (
+          <EyeOff className="h-4 w-4" />
+        ) : (
+          <Eye className="h-4 w-4" />
+        )}
+      </Button>
+    </div>
+  );
+};
+
+export interface StaffProps {
+  staffList?: StaffMember[];
+  setStaffList?: (staff: StaffMember[]) => void;
+}
+
+export function Staff({ 
+  staffList: propsStaffList,
+  setStaffList: setPropsStaffList
+}: StaffProps = {}) {
+  const [activeTab, setActiveTab] = useState("staff-list");
   const [searchQuery, setSearchQuery] = useState("");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [viewDetailDialogOpen, setViewDetailDialogOpen] = useState(false);
   const [filterPosition, setFilterPosition] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("none");
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
+  const [viewingStaff, setViewingStaff] = useState<StaffMember | null>(null);
+  const [detailTab, setDetailTab] = useState("info");
 
   // State for coefficient input popover
   const [coeffPopover, setCoeffPopover] = useState<{
@@ -169,103 +180,9 @@ export function Staff() {
     },
   });
 
-  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([
-    {
-      id: "1",
-      staffCode: "NV001",
-      fullName: "Nguyễn Văn A",
-      phone: "0901234567",
-      idCard: "001234567890",
-      gender: "male",
-      birthDate: "1990-01-01",
-      position: "manager",
-      positionLabel: "Quản lý",
-      joinDate: "2023-01-15",
-      salary: 15000000,
-      status: "active",
-      address: {
-        city: "TP. Hồ Chí Minh",
-        ward: "Phường Bến Nghé",
-        detail: "123 Nguyễn Huệ",
-      },
-    },
-    {
-      id: "2",
-      staffCode: "NV002",
-      fullName: "Trần Thị B",
-      phone: "0912345678",
-      idCard: "001234567891",
-      gender: "female",
-      birthDate: "1992-02-02",
-      position: "barista",
-      positionLabel: "Pha chế",
-      joinDate: "2023-03-20",
-      salary: 8000000,
-      status: "active",
-      address: {
-        city: "TP. Hồ Chí Minh",
-        ward: "Phường 1, Quận 3",
-        detail: "456 Võ Văn Tần",
-      },
-    },
-    {
-      id: "3",
-      staffCode: "NV003",
-      fullName: "Lê Văn C",
-      phone: "0923456789",
-      idCard: "001234567892",
-      gender: "male",
-      birthDate: "1994-03-03",
-      position: "cashier",
-      positionLabel: "Thu ngân",
-      joinDate: "2023-05-10",
-      salary: 7000000,
-      status: "active",
-      address: {
-        city: "TP. Hồ Chí Minh",
-        ward: "Phường 5, Quận 5",
-        detail: "789 Trần Hưng Đạo",
-      },
-    },
-    {
-      id: "4",
-      staffCode: "NV004",
-      fullName: "Phạm Thị D",
-      phone: "0934567890",
-      idCard: "001234567893",
-      gender: "female",
-      birthDate: "1996-04-04",
-      position: "server",
-      positionLabel: "Phục vụ",
-      joinDate: "2023-07-01",
-      salary: 6500000,
-      status: "active",
-      address: {
-        city: "TP. Hồ Chí Minh",
-        ward: "Phường Tân Phú, Quận 7",
-        detail: "321 Nguyễn Văn Linh",
-      },
-    },
-    {
-      id: "5",
-      staffCode: "NV005",
-      fullName: "Hoàng Văn E",
-      phone: "0945678901",
-      idCard: "001234567894",
-      gender: "male",
-      birthDate: "1998-05-05",
-      position: "barista",
-      positionLabel: "Pha chế",
-      joinDate: "2023-02-14",
-      salary: 8000000,
-      status: "inactive",
-      address: {
-        city: "Hà Nội",
-        ward: "Phường Cầu Dền, Hai Bà Trưng",
-        detail: "555 Bà Triệu",
-      },
-    },
-  ]);
+  const [localStaffMembers, setLocalStaffMembers] = useState<StaffMember[]>(initialStaffMembers);
+  const staffMembers = propsStaffList || localStaffMembers;
+  const setStaffMembers = setPropsStaffList || setLocalStaffMembers;
 
   const positions = [
     { value: "manager", label: "Quản lý" },
@@ -376,11 +293,19 @@ export function Staff() {
       placeholder?: string;
     }) => {
       const [open, setOpen] = useState(false);
-      const [tempValue, setTempValue] = useState(value.replace("%", ""));
+      const isPercent = value.includes("%");
+      const [type, setType] = useState<"percent" | "currency">(
+        isPercent ? "percent" : "currency"
+      );
+      const [tempValue, setTempValue] = useState(
+        isPercent ? value.replace("%", "") : value
+      );
 
       // Update tempValue when value changes
       React.useEffect(() => {
-        setTempValue(value.replace("%", ""));
+        const isPct = value.includes("%");
+        setType(isPct ? "percent" : "currency");
+        setTempValue(isPct ? value.replace("%", "") : value);
       }, [value]);
 
       return (
@@ -392,13 +317,17 @@ export function Staff() {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                setTempValue(value.replace("%", ""));
+                const isPct = value.includes("%");
+                setType(isPct ? "percent" : "currency");
+                setTempValue(isPct ? value.replace("%", "") : value);
                 setOpen(true);
               }}
             >
               <Input
                 type="text"
-                value={value}
+                value={
+                  value.includes("%") ? value : formatVNCurrency(value)
+                }
                 readOnly
                 placeholder={placeholder}
                 className="h-8 cursor-pointer pointer-events-none bg-white border-slate-300 shadow-none"
@@ -406,7 +335,7 @@ export function Staff() {
             </button>
           </PopoverTrigger>
           <PopoverContent
-            className="w-48 p-2"
+            className="w-56 p-2"
             align="start"
             side="bottom"
             sideOffset={4}
@@ -418,23 +347,35 @@ export function Staff() {
               <div className="flex items-center gap-1">
                 <Input
                   type="text"
-                  value={tempValue}
+                  value={
+                    type === "currency"
+                      ? formatVNCurrency(tempValue)
+                      : tempValue
+                  }
                   onChange={(e) => {
-                    const val = e.target.value;
+                    const rawVal =
+                      type === "currency"
+                        ? parseVNCurrency(e.target.value)
+                        : e.target.value;
+
                     if (
-                      val === "" ||
-                      /^\d+$/.test(val) ||
-                      /^\d+\.\d+$/.test(val)
+                      rawVal === "" ||
+                      /^\d+$/.test(rawVal) ||
+                      (type === "percent" && /^\d+\.\d+$/.test(rawVal))
                     ) {
-                      setTempValue(val);
+                      setTempValue(rawVal);
                     }
                   }}
-                  placeholder="100"
+                  placeholder={type === "percent" ? "100" : "0"}
                   className="flex-1 h-8 text-sm bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
-                      onChange(tempValue ? `${tempValue}%` : "");
+                      onChange(
+                        type === "percent" && tempValue
+                          ? `${tempValue}%`
+                          : tempValue
+                      );
                       setOpen(false);
                     } else if (e.key === "Escape") {
                       setOpen(false);
@@ -442,11 +383,28 @@ export function Staff() {
                   }}
                 />
                 <Button
-                  variant="default"
+                  variant={type === "percent" ? "default" : "outline"}
                   size="sm"
-                  className="h-8 px-3 bg-blue-600 hover:bg-blue-700"
+                  className={`h-8 px-2 min-w-[3rem] ${
+                    type === "percent"
+                      ? "bg-blue-600 hover:bg-blue-700"
+                      : "text-slate-600"
+                  }`}
+                  onClick={() => setType("percent")}
                 >
                   %
+                </Button>
+                <Button
+                  variant={type === "currency" ? "default" : "outline"}
+                  size="sm"
+                  className={`h-8 px-2 min-w-[3rem] ${
+                    type === "currency"
+                      ? "bg-blue-600 hover:bg-blue-700"
+                      : "text-slate-600"
+                  }`}
+                  onClick={() => setType("currency")}
+                >
+                  VNĐ
                 </Button>
               </div>
               <div className="flex items-center gap-2">
@@ -463,7 +421,11 @@ export function Staff() {
                   size="sm"
                   className="flex-1 h-7 text-xs bg-blue-600 hover:bg-blue-700"
                   onClick={() => {
-                    onChange(tempValue ? `${tempValue}%` : "");
+                    onChange(
+                      type === "percent" && tempValue
+                        ? `${tempValue}%`
+                        : tempValue
+                    );
                     setOpen(false);
                   }}
                 >
@@ -616,29 +578,24 @@ export function Staff() {
       return;
     }
 
-    // Validate account info if filled
-    if (accountData.username || accountData.password) {
-      if (
-        !accountData.username ||
-        !accountData.password ||
-        !accountData.confirmPassword ||
-        !accountData.role
-      ) {
-        toast.error(
-          "Vui lòng điền đầy đủ thông tin tài khoản hoặc bỏ trống toàn bộ"
-        );
-        return;
-      }
+    // Validate account info (Mandatory for new staff)
+    if (
+      !accountData.username ||
+      !accountData.password ||
+      !accountData.confirmPassword
+    ) {
+      toast.error("Vui lòng điền đầy đủ thông tin tài khoản");
+      return;
+    }
 
-      if (accountData.password !== accountData.confirmPassword) {
-        toast.error("Mật khẩu xác nhận không khớp");
-        return;
-      }
+    if (accountData.password !== accountData.confirmPassword) {
+      toast.error("Mật khẩu xác nhận không khớp");
+      return;
+    }
 
-      if (accountData.password.length < 6) {
-        toast.error("Mật khẩu phải có ít nhất 6 ký tự");
-        return;
-      }
+    if (accountData.password.length < 6) {
+      toast.error("Mật khẩu phải có ít nhất 6 ký tự");
+      return;
     }
 
     // Calculate salary from settings
@@ -664,7 +621,7 @@ export function Staff() {
       fullName: formData.fullName,
       phone: formData.phone,
       idCard: formData.idCard,
-      gender: formData.gender,
+      gender: formData.gender as "male" | "female",
       birthDate: formData.birthDate,
       position: formData.position,
       positionLabel:
@@ -679,19 +636,22 @@ export function Staff() {
       },
       salarySettings: {
         ...salarySettings,
+        salaryType: salarySettings.salaryType as "shift" | "fixed",
+      },
+      account: {
+        username: accountData.username,
+        // In real app, we would hash this password
       },
     };
 
     setStaffMembers([...staffMembers, newStaff]);
 
     // Show success message with account info if created
-    if (accountData.username) {
-      toast.success(
-        `Đã thêm nhân viên mới và tạo tài khoản "${accountData.username}" thành công`
-      );
-    } else {
-      toast.success("Đã thêm nhân viên mới thành công");
-    }
+    setStaffMembers([...staffMembers, newStaff]);
+
+    toast.success(
+      `Đã thêm nhân viên mới và tạo tài khoản "${accountData.username}" thành công`
+    );
 
     setAddDialogOpen(false);
     resetForm();
@@ -743,8 +703,9 @@ export function Staff() {
       });
     }
     // Reset account data when editing
+    // Reset account data when editing but load existing username
     setAccountData({
-      username: "",
+      username: staff.account?.username || "",
       password: "",
       confirmPassword: "",
       role: "",
@@ -765,31 +726,52 @@ export function Staff() {
       return;
     }
 
-    const updatedStaff = staffMembers.map((staff) =>
-      staff.id === editingStaff.id
-        ? {
-            ...staff,
-            fullName: formData.fullName,
-            phone: formData.phone,
-            idCard: formData.idCard,
-            gender: formData.gender,
-            birthDate: formData.birthDate,
-            position: formData.position,
-            positionLabel:
-              positions.find((p) => p.value === formData.position)?.label || "",
-            joinDate: formData.joinDate,
-            salary: Number(formData.salary) || 0,
-            address: {
-              city: formData.city,
-              ward: formData.ward,
-              detail: formData.addressDetail,
-            },
-            salarySettings: {
-              ...salarySettings,
-            },
-          }
-        : staff
-    );
+    // Validate account changes if password is being updated
+    if (accountData.password || accountData.confirmPassword) {
+      if (accountData.password !== accountData.confirmPassword) {
+        toast.error("Mật khẩu xác nhận không khớp");
+        return;
+      }
+      if (accountData.password.length < 6) {
+        toast.error("Mật khẩu phải có ít nhất 6 ký tự");
+        return;
+      }
+    }
+
+    const updatedStaff = staffMembers.map((staff) => {
+      if (staff.id === editingStaff.id) {
+        // Construct new account object
+        const updatedAccount = {
+          username: accountData.username,
+          // Update password only if provided, else keep existing (mock logic)
+          // In real backend, we'd send new password only if changed
+        };
+
+        return {
+          ...staff,
+          fullName: formData.fullName,
+          phone: formData.phone,
+          idCard: formData.idCard,
+          gender: formData.gender as "male" | "female",
+          birthDate: formData.birthDate,
+          position: formData.position,
+          positionLabel:
+            positions.find((p) => p.value === formData.position)?.label || "",
+          joinDate: formData.joinDate,
+          salary: Number(formData.salary) || 0,
+          address: {
+            city: formData.city,
+            ward: formData.ward,
+            detail: formData.addressDetail,
+          },
+          salarySettings: {
+            ...salarySettings,
+          },
+          account: updatedAccount,
+        };
+      }
+      return staff;
+    });
 
     setStaffMembers(updatedStaff);
     toast.success("Đã cập nhật thông tin nhân viên");
@@ -829,10 +811,6 @@ export function Staff() {
       <div className="w-64 bg-white border-r p-6 overflow-auto">
         <div className="space-y-6">
           <div>
-            <h3 className="text-sm text-slate-700 mb-3 flex items-center gap-2">
-              <Filter className="w-4 h-4" />
-              Bộ lọc
-            </h3>
             <div className="space-y-4">
               {/* Filter by Position */}
               <div>
@@ -875,7 +853,7 @@ export function Staff() {
                     />
                     <Label
                       htmlFor="status-all"
-                      className="text-xs text-slate-700 cursor-pointer font-normal"
+                      className="text-l text-slate-700 cursor-pointer font-normal"
                     >
                       Tất cả
                     </Label>
@@ -888,7 +866,7 @@ export function Staff() {
                     />
                     <Label
                       htmlFor="status-active"
-                      className="text-xs text-slate-700 cursor-pointer font-normal"
+                      className="text-l text-slate-700 cursor-pointer font-normal"
                     >
                       Đang làm việc
                     </Label>
@@ -901,7 +879,7 @@ export function Staff() {
                     />
                     <Label
                       htmlFor="status-inactive"
-                      className="text-xs text-slate-700 cursor-pointer font-normal"
+                      className="text-l text-slate-700 cursor-pointer font-normal"
                     >
                       Nghỉ việc
                     </Label>
@@ -945,74 +923,75 @@ export function Staff() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="bg-white border-b p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-blue-900">Quản lý nhân viên</h1>
-              <p className="text-sm text-slate-600 mt-1">
-                Quản lý thông tin {filteredStaff.length} nhân viên
-              </p>
-            </div>
-            <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-blue-600 hover:bg-blue-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Thêm nhân viên
-                </Button>
-              </DialogTrigger>
-              <DialogContent
-                className="max-w-4xl max-h-[90vh] overflow-y-auto"
-                style={{ maxWidth: "60rem" }}
-              >
-                <DialogHeader>
-                  <DialogTitle className="text-lg font-semibold">Thêm nhân viên mới</DialogTitle>
-                </DialogHeader>
+          {/* Header */}
+          <div className="bg-white border-b p-6 pb-0">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h1 className="text-2xl font-bold text-blue-600">Quản lý nhân viên</h1>
+                <p className="text-sm text-slate-600 mt-1">
+                  Quản lý thông tin và thiết lập nhân viên
+                </p>
+              </div>
+              <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-blue-600 hover:bg-blue-700">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Thêm nhân viên
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent
+                      className="max-w-4xl max-h-[90vh] overflow-y-auto"
+                      style={{ maxWidth: "60rem" }}
+                    >
+                      <DialogHeader>
+                        <DialogTitle className="text-lg font-semibold">Thêm nhân viên mới</DialogTitle>
+                      </DialogHeader>
 
-                <Tabs defaultValue="info" className="w-full">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="info">Thông tin</TabsTrigger>
-                    <TabsTrigger value="salary">Thiết lập lương</TabsTrigger>
-                    <TabsTrigger value="account">
-                      Thông tin tài khoản
-                    </TabsTrigger>
-                  </TabsList>
+                      <Tabs defaultValue="info" className="w-full">
+                        <TabsList className="grid w-full grid-cols-3">
+                          <TabsTrigger value="info">Thông tin</TabsTrigger>
+                          <TabsTrigger value="salary">Thiết lập lương</TabsTrigger>
+                          <TabsTrigger value="account">
+                            Thông tin tài khoản
+                          </TabsTrigger>
+                        </TabsList>
 
-                  <TabsContent value="info" className="mt-6">
-                    <div className="space-y-6">
-                      {/* Basic Information */}
-                      <div>
-                        <h3 className="text-sm font-medium text-slate-900 mb-4">
-                          Thông tin cơ bản
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="col-span-2">
-                            <Label>
-                              Họ và tên <span className="text-red-500">*</span>
-                            </Label>
-                            <Input
-                              placeholder="VD: Nguyễn Văn A"
-                              value={formData.fullName}
-                              onChange={(e) =>
-                                setFormData({
-                                  ...formData,
-                                  fullName: e.target.value,
-                                })
-                              }
-                              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                            />
-                          </div>
-                          <div>
-                            <Label>
-                              Số điện thoại{" "}
-                              <span className="text-red-500">*</span>
-                            </Label>
-                            <Input
-                              placeholder="VD: 0901234567"
-                              value={formData.phone}
-                              onChange={(e) =>
-                                setFormData({
-                                  ...formData,
+                        <TabsContent value="info" className="mt-6">
+                          <div className="space-y-6">
+                            {/* Basic Information */}
+                            <div>
+                              <h3 className="text-sm font-medium text-slate-900 mb-4">
+                                Thông tin cơ bản
+                              </h3>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="col-span-2">
+                                  <Label>
+                                    Họ và tên <span className="text-red-500">*</span>
+                                  </Label>
+                                  <Input
+                                    placeholder="VD: Nguyễn Văn A"
+                                    value={formData.fullName}
+                                    onChange={(e) =>
+                                      setFormData({
+                                        ...formData,
+                                        fullName: e.target.value,
+                                      })
+                                    }
+                                    className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                                  />
+                                </div>
+                                <div>
+                                  <Label>
+                                    Số điện thoại{" "}
+                                    <span className="text-red-500">*</span>
+                                  </Label>
+                                  <Input
+                                    placeholder="VD: 0901234567"
+                                    value={formData.phone}
+                                    onChange={(e) =>
+                                      setFormData({
+                                        ...formData,
+
                                   phone: e.target.value,
                                 })
                               }
@@ -1747,7 +1726,9 @@ export function Staff() {
                         </h3>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="col-span-2">
-                            <Label>Tên đăng nhập</Label>
+                            <Label>
+                              Tên đăng nhập <span className="text-red-500">*</span>
+                            </Label>
                             <Input
                               placeholder="VD: nguyenvana"
                               value={accountData.username}
@@ -1761,9 +1742,10 @@ export function Staff() {
                             />
                           </div>
                           <div>
-                            <Label>Mật khẩu</Label>
-                            <Input
-                              type="password"
+                            <Label>
+                              Mật khẩu <span className="text-red-500">*</span>
+                            </Label>
+                            <PasswordInput
                               placeholder="Tối thiểu 6 ký tự"
                               value={accountData.password}
                               onChange={(e) =>
@@ -1772,13 +1754,13 @@ export function Staff() {
                                   password: e.target.value,
                                 })
                               }
-                              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                             />
                           </div>
                           <div>
-                            <Label>Xác nhận mật khẩu</Label>
-                            <Input
-                              type="password"
+                            <Label>
+                              Xác nhận mật khẩu <span className="text-red-500">*</span>
+                            </Label>
+                            <PasswordInput
                               placeholder="Nhập lại mật khẩu"
                               value={accountData.confirmPassword}
                               onChange={(e) =>
@@ -1787,47 +1769,11 @@ export function Staff() {
                                   confirmPassword: e.target.value,
                                 })
                               }
-                              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                             />
                           </div>
                         </div>
                       </div>
 
-                      {/* Authorization */}
-                      <div className="border-t pt-6">
-                        <h3 className="text-sm font-medium text-slate-900 mb-4">
-                          Phân quyền
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label>Vai trò</Label>
-                            <Select
-                              value={accountData.role}
-                              onValueChange={(value) =>
-                                setAccountData({ ...accountData, role: value })
-                              }
-                            >
-                              <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
-                                <SelectValue placeholder="Chọn vai trò" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="manager">
-                                  Quản lý - Quản lý cửa hàng
-                                </SelectItem>
-                                <SelectItem value="barista">
-                                  Pha chế - Quầy pha chế
-                                </SelectItem>
-                                <SelectItem value="cashier">
-                                  Thu ngân - Quầy thanh toán
-                                </SelectItem>
-                                <SelectItem value="server">
-                                  Phục vụ - Phục vụ bàn
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      </div>
                     </div>
                   </TabsContent>
                 </Tabs>
@@ -1850,7 +1796,6 @@ export function Staff() {
               </DialogContent>
             </Dialog>
           </div>
-
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
@@ -1870,7 +1815,8 @@ export function Staff() {
               <div className="overflow-x-auto rounded-xl">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-blue-50">
+                    <TableRow className="bg-blue-100">
+                      <TableHead className="w-16 text-sm text-center">STT</TableHead>
                       <TableHead
                         className="w-24 text-sm cursor-pointer hover:bg-blue-100 transition-colors"
                         onClick={() => handleSort("staffCode")}
@@ -1917,15 +1863,18 @@ export function Staff() {
                   {filteredStaff.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={8}
+                        colSpan={9}
                         className="text-center text-slate-500 py-8"
                       >
                         Không tìm thấy nhân viên nào
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredStaff.map((staff) => (
-                      <TableRow key={staff.id} className="hover:bg-blue-50/50">
+                    filteredStaff.map((staff, index) => (
+                      <TableRow key={staff.id} className="hover:bg-blue-100/50">
+                        <TableCell className="text-sm text-slate-600 text-center">
+                          {index + 1}
+                        </TableCell>
                         <TableCell className="text-sm text-blue-600">
                           {staff.staffCode}
                         </TableCell>
@@ -2754,9 +2703,8 @@ export function Staff() {
                     </div>
                     <div>
                       <Label>Mật khẩu mới</Label>
-                      <Input
-                        type="password"
-                        placeholder="Tối thiểu 6 ký tự"
+                      <PasswordInput
+                        placeholder="Tối thiểu 6 ký tự (Bỏ trống nếu không đổi)"
                         value={accountData.password}
                         onChange={(e) =>
                           setAccountData({
@@ -2764,13 +2712,11 @@ export function Staff() {
                             password: e.target.value,
                           })
                         }
-                        className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                       />
                     </div>
                     <div>
                       <Label>Xác nhận mật khẩu</Label>
-                      <Input
-                        type="password"
+                      <PasswordInput
                         placeholder="Nhập lại mật khẩu"
                         value={accountData.confirmPassword}
                         onChange={(e) =>
@@ -2779,51 +2725,15 @@ export function Staff() {
                             confirmPassword: e.target.value,
                           })
                         }
-                        className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Role Information */}
-                <div className="border-t pt-4">
-                  <h3 className="text-sm text-slate-900 mb-3">Phân quyền</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Vai trò</Label>
-                      <Select
-                        value={accountData.role}
-                        onValueChange={(value) =>
-                          setAccountData({ ...accountData, role: value })
-                        }
-                      >
-                        <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
-                          <SelectValue placeholder="Chọn vai trò" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="manager">
-                            Quản lý - Quản lý cửa hàng
-                          </SelectItem>
-                          <SelectItem value="barista">
-                            Pha chế - Quầy pha chế
-                          </SelectItem>
-                          <SelectItem value="cashier">
-                            Thu ngân - Quầy thanh toán
-                          </SelectItem>
-                          <SelectItem value="server">
-                            Phục vụ - Phục vụ bàn
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div className="bg-blue-100 p-4 rounded-lg border border-blue-200">
                   <p className="text-xs text-blue-900">
-                    <strong>Lưu ý:</strong> Thông tin tài khoản có thể bỏ trống.
-                    Nếu điền, vui lòng điền đầy đủ tất cả các trường. Nếu không
-                    đổi mật khẩu, để trống các trường mật khẩu.
+                    <strong>Lưu ý:</strong> Nếu không đổi mật khẩu, để trống
+                    các trường mật khẩu.
                   </p>
                 </div>
               </div>

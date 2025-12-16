@@ -1185,7 +1185,7 @@ export function PurchaseOrders() {
                                 className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
                                   presetTimeRange === option.value
                                     ? "bg-blue-600 text-white"
-                                    : "text-blue-600 hover:bg-blue-50"
+                                    : "text-blue-600 hover:bg-blue-100"
                                 }`}
                               >
                                 {option.label}
@@ -1224,7 +1224,7 @@ export function PurchaseOrders() {
                                 className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
                                   presetTimeRange === option.value
                                     ? "bg-blue-600 text-white"
-                                    : "text-blue-600 hover:bg-blue-50"
+                                    : "text-blue-600 hover:bg-blue-100"
                                 }`}
                               >
                                 {option.label}
@@ -1260,7 +1260,7 @@ export function PurchaseOrders() {
                                 className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
                                   presetTimeRange === option.value
                                     ? "bg-blue-600 text-white"
-                                    : "text-blue-600 hover:bg-blue-50"
+                                    : "text-blue-600 hover:bg-blue-100"
                                 }`}
                               >
                                 {option.label}
@@ -1476,11 +1476,13 @@ export function PurchaseOrders() {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-lg border border-slate-200">
+        <div className="bg-white rounded-xl border border-blue-200 flex-1 overflow-hidden flex flex-col">
           <div className="overflow-x-auto rounded-xl">
             <Table>
               <TableHeader>
-                <TableRow className="bg-blue-50">
+                <TableRow className="bg-blue-100">
+                  <TableHead className="w-12 text-sm text-center"></TableHead>
+                  <TableHead className="w-16 text-sm text-center">STT</TableHead>
                   <TableHead
                     className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
                     onClick={() => handleSort("code")}
@@ -1560,22 +1562,25 @@ export function PurchaseOrders() {
                   <>
                     <TableRow
                       key={order.id}
-                      className="hover:bg-blue-50/50 cursor-pointer"
+                      className="hover:bg-blue-100/50 cursor-pointer"
                       onClick={() =>
                         setExpandedRow(
                           expandedRow === order.id ? null : order.id
                         )
                       }
                     >
+                      <TableCell className="text-sm text-center">
+                        {expandedRow === order.id ? (
+                          <ChevronDown className="w-4 h-4 text-slate-600" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-slate-600" />
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-600 text-center">
+                        {index + 1}
+                      </TableCell>
                       <TableCell className="text-sm">
-                        <div className="flex items-center gap-2">
-                          {expandedRow === order.id ? (
-                            <ChevronDown className="w-4 h-4 text-slate-400" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4 text-slate-400" />
-                          )}
-                          <span className="text-blue-600">{order.code}</span>
-                        </div>
+                        <span className="text-blue-600">{order.code}</span>
                       </TableCell>
                       <TableCell className="text-sm text-slate-700">
                         {order.date}

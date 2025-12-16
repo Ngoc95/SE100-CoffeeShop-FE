@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Label } from "../ui/label";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import {
   Table,
   TableBody,
@@ -439,20 +440,54 @@ export function Customers() {
               </div>
 
               <div>
-                <Label className="text-xs text-slate-600">Trạng thái</Label>
-                <Select
+                <Label className="text-xs text-slate-600 mb-2 block">
+                  Trạng thái
+                </Label>
+                <RadioGroup
                   value={selectedStatus}
                   onValueChange={setSelectedStatus}
+                  className="space-y-2"
                 >
-                  <SelectTrigger className="mt-1 bg-white border-slate-300 shadow-none">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                    <SelectItem value="active">Hoạt động</SelectItem>
-                    <SelectItem value="inactive">Không hoạt động</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem
+                      value="all"
+                      id="customer-status-all"
+                      className="border-slate-300"
+                    />
+                    <Label
+                      htmlFor="customer-status-all"
+                      className="text-l text-slate-700 cursor-pointer font-normal"
+                    >
+                      Tất cả trạng thái
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem
+                      value="active"
+                      id="customer-status-active"
+                      className="border-slate-300"
+                    />
+                    <Label
+                      htmlFor="customer-status-active"
+                      className="text-l text-slate-700 cursor-pointer font-normal"
+                    >
+                      Hoạt động
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem
+                      value="inactive"
+                      id="customer-status-inactive"
+                      className="border-slate-300"
+                    />
+                    <Label
+                      htmlFor="customer-status-inactive"
+                      className="text-l text-slate-700 cursor-pointer font-normal"
+                    >
+                      Không hoạt động
+                    </Label>
+                  </div>
+                </RadioGroup>
               </div>
             </div>
           </div>
@@ -570,7 +605,8 @@ export function Customers() {
               <div className="overflow-x-auto rounded-xl">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-blue-50">
+                    <TableRow className="bg-blue-100">
+                      <TableHead className="w-16 text-sm text-center">STT</TableHead>
                       <TableHead className="text-sm">Mã KH</TableHead>
                       <TableHead
                         className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
@@ -611,15 +647,18 @@ export function Customers() {
                   {filteredCustomers.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={9}
+                        colSpan={10}
                         className="text-center py-8 text-slate-500"
                       >
                         Không tìm thấy khách hàng nào
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredCustomers.map((customer) => (
+                    filteredCustomers.map((customer, index) => (
                       <TableRow key={customer.id}>
+                        <TableCell className="text-slate-600 text-center">
+                          {index + 1}
+                        </TableCell>
                         <TableCell className="text-slate-900">
                           {customer.code}
                         </TableCell>

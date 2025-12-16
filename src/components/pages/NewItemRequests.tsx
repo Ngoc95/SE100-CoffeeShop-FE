@@ -575,7 +575,7 @@ export function NewItemRequests() {
           </div>
 
           {/* Data Table */}
-          <Card className="border-amber-200">
+          <Card className="border-blue-200">
             <CardHeader>
               <div className="flex items-center justify-between gap-4">
                 <CardTitle className="text-amber-950">Danh sách yêu cầu</CardTitle>
@@ -603,9 +603,9 @@ export function NewItemRequests() {
               <div className="overflow-x-auto rounded-xl">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-amber-50">
+                    <TableRow className="bg-blue-100">
                       <TableHead className="w-10"></TableHead>
-                      <TableHead className="w-16">STT</TableHead>
+                      <TableHead className="w-16 text-center">STT</TableHead>
                       <TableHead
                         className="cursor-pointer hover:bg-amber-100 transition-colors"
                         onClick={() => handleSort("name")}
@@ -668,17 +668,17 @@ export function NewItemRequests() {
                           <Fragment key={request.id}>
                             {/* Main Row */}
                             <TableRow
-                              className="hover:bg-amber-50/50 cursor-pointer transition-colors"
+                              className="hover:bg-blue-100/50 cursor-pointer transition-colors"
                               onClick={() => setExpandedRequestId(isExpanded ? null : request.id)}
                             >
                               <TableCell>
                                 {isExpanded ? (
-                                  <ChevronUp className="w-4 h-4 text-amber-600" />
+                                  <ChevronDown className="w-4 h-4 text-slate-600" />
                                 ) : (
-                                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                                  <ChevronRight className="w-4 h-4 text-slate-600" />
                                 )}
                               </TableCell>
-                              <TableCell className="text-sm text-center text-slate-600">{index + 1}</TableCell>
+                              <TableCell className="text-sm text-slate-600 text-center">{index + 1}</TableCell>
                               <TableCell className="text-sm">
                                 <div>
                                   <p className="text-slate-900">{request.suggestedName}</p>
@@ -711,7 +711,7 @@ export function NewItemRequests() {
 
                             {/* Expanded Detail Row */}
                             {isExpanded && (
-                              <TableRow className="bg-amber-50/30">
+                              <TableRow className="bg-blue-100/30">
                                 <TableCell colSpan={7} className="p-0">
                                   <div className="p-6 space-y-6">
                                     {/* Detail Grid */}
@@ -765,7 +765,7 @@ export function NewItemRequests() {
                                       {request.suggestedRecipe ? (
                                         <div className="mt-2 text-sm bg-white rounded-lg border border-slate-200 overflow-hidden">
                                           <table className="w-full text-left">
-                                            <thead className="bg-slate-50 text-xs text-slate-500 font-medium">
+                                            <thead className="bg-blue-100 text-xs font-medium">
                                               <tr>
                                                 <th className="px-3 py-2">Nguyên liệu</th>
                                                 <th className="px-3 py-2">Số lượng</th>
@@ -790,12 +790,12 @@ export function NewItemRequests() {
 
                                     <div>
                                       <Label className="text-slate-500 text-xs">Ghi chú từ nhân viên</Label>
-                                      <p className="mt-2 p-3 bg-amber-50 rounded-lg border border-amber-200 text-sm">{request.note}</p>
+                                      <p className="mt-2 p-3 bg-blue-100 rounded-lg border border-blue-200 text-sm">{request.note}</p>
                                     </div>
 
                                     {/* Action Buttons */}
                                     {request.status === 'pending' && (
-                                      <div className="flex items-center justify-end gap-3 pt-4 border-t border-amber-200">
+                                      <div className="flex items-center justify-end gap-3 pt-4 border-t border-blue-200">
                                         <Button
                                           variant="outline"
                                           className="text-red-600 border-red-200 hover:bg-red-50"
@@ -1254,7 +1254,7 @@ export function NewItemRequests() {
 
             <div>
               <Label className="text-slate-500">Ghi chú từ nhân viên</Label>
-              <p className="mt-1 p-3 bg-amber-50 rounded-lg border border-amber-200">{selectedRequest.note}</p>
+              <p className="mt-1 p-3 bg-blue-100 rounded-lg border border-amber-200">{selectedRequest.note}</p>
             </div>
           </CardContent>
         </Card>
