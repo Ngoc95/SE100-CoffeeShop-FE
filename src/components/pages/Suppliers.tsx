@@ -15,6 +15,8 @@ import {
   Printer,
   ArrowUp,
   ArrowDown,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -37,9 +39,9 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
-import { toast } from "sonner@2.0.3";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { toast } from "sonner";
 import { SupplierFormDialog } from "../SupplierFormDialog";
-import { SupplierDetailDialog } from "../SupplierDetailDialog";
 
 interface Supplier {
   id: string;
@@ -64,8 +66,7 @@ export function Suppliers() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc" | "none">("none");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const [viewingSupplier, setViewingSupplier] = useState<Supplier | null>(null);
+  const [expandedRows, setExpandedRows] = useState<string[]>([]);
 
   // Mock data
   const [suppliers, setSuppliers] = useState<Supplier[]>([
@@ -135,6 +136,12 @@ export function Suppliers() {
       status: "active",
     },
   ]);
+
+  const toggleExpand = (id: string) => {
+    setExpandedRows((prev) =>
+      prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
+    );
+  };
 
   const categories = Array.from(new Set(suppliers.map((s) => s.category)));
   const cities = Array.from(new Set(suppliers.map((s) => s.city)));
@@ -258,16 +265,6 @@ export function Suppliers() {
     e.stopPropagation();
     setEditingSupplier(supplier);
     setDialogOpen(true);
-  };
-
-  const openDetailDialog = (supplier: Supplier) => {
-    setViewingSupplier(supplier);
-    setDetailDialogOpen(true);
-  };
-  
-  const closeDetailDialog = () => {
-    setDetailDialogOpen(false);
-    setViewingSupplier(null);
   };
 
   const formatCurrency = (amount: number) => {
@@ -510,6 +507,7 @@ export function Suppliers() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-blue-100">
+                      <TableHead className="w-12"></TableHead>
                       <TableHead className="w-16 text-sm text-center">STT</TableHead>
                       <TableHead className="text-sm">Mã NCC</TableHead>
                       <TableHead
@@ -541,126 +539,220 @@ export function Suppliers() {
                   {filteredSuppliers.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={9}
+                        colSpan={10}
                         className="text-center py-8 text-slate-500"
                       >
                         Không tìm thấy nhà cung cấp nào
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredSuppliers.map((supplier, index) => (
-                      <TableRow key={supplier.id} 
-                                onDoubleClick={() => openDetailDialog(supplier)}
-                                className="cursor-pointer hover:bg-slate-50"
-                      >
-                        <TableCell className="text-sm text-slate-600 text-center">
-                          {index + 1}
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-900">
-                          {supplier.code}
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-900">
-                          {supplier.name}
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-700">
-                          <Badge variant="outline" className="bg-slate-50">
-                            {supplier.category}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-700">
-                          <div className="flex flex-col gap-0.5">
-                            <span>{supplier.city}</span>
-                            <span className="text-xs text-slate-500">
-                              {supplier.address}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-700">
-                          <div className="flex flex-col gap-0.5">
-                            <span>{supplier.contact}</span>
-                            <span className="text-xs text-slate-500">
-                              {supplier.phone}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-900">
-                          <span
-                            className={
-                              supplier.debt > 0
-                                ? "text-red-600"
-                                : "text-slate-600"
-                            }
+                    filteredSuppliers.map((supplier, index) => {
+                      const isExpanded = expandedRows.includes(supplier.id);
+                      return (
+                        <React.Fragment key={supplier.id}>
+                          <TableRow
+                            onClick={() => toggleExpand(supplier.id)}
+                            className="cursor-pointer hover:bg-slate-50"
                           >
-                            {formatCurrency(supplier.debt)}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          <Badge
-                            variant={
-                              supplier.status === "active"
-                                ? "default"
-                                : "secondary"
-                            }
-                            className={
-                              supplier.status === "active"
-                                ? "bg-emerald-500"
-                                : "bg-red-500 text-white hover:bg-red-500"
-                            }
-                          >
-                            {supplier.status === "active"
-                              ? "Hoạt động"
-                              : "Không hoạt động"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => openEditDialog(e, supplier)}
-                              className="hover:bg-blue-100"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteSupplier(supplier.id);
-                              }}
-                              className="hover:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4 text-red-600" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleToggleStatus(supplier.id);
-                              }}
-                              className={
-                                supplier.status === "active"
-                                  ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                              }
-                              title={
-                                supplier.status === "active"
-                                  ? "Vô hiệu hóa"
-                                  : "Kích hoạt"
-                              }
-                            >
-                              {supplier.status === "active" ? (
-                                <PowerOff className="w-4 h-4" />
-                              ) : (
-                                <Power className="w-4 h-4" />
-                              )}
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleExpand(supplier.id);
+                                }}
+                                className="h-8 w-8 p-0"
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="w-4 h-4" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-600 text-center">
+                              {index + 1}
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-900">
+                              {supplier.code}
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-900">
+                              {supplier.name}
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-700">
+                              <Badge variant="outline" className="bg-slate-50">
+                                {supplier.category}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-700">
+                              <div className="flex flex-col gap-0.5">
+                                <span>{supplier.city}</span>
+                                <span className="text-xs text-slate-500">
+                                  {supplier.address}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-700">
+                              <div className="flex flex-col gap-0.5">
+                                <span>{supplier.contact}</span>
+                                <span className="text-xs text-slate-500">
+                                  {supplier.phone}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-900">
+                              <span
+                                className={
+                                  supplier.debt > 0
+                                    ? "text-red-600"
+                                    : "text-slate-600"
+                                }
+                              >
+                                {formatCurrency(supplier.debt)}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              <Badge
+                                variant={
+                                  supplier.status === "active"
+                                    ? "default"
+                                    : "secondary"
+                                }
+                                className={
+                                  supplier.status === "active"
+                                    ? "bg-emerald-500"
+                                    : "bg-red-500 text-white hover:bg-red-500"
+                                }
+                              >
+                                {supplier.status === "active"
+                                  ? "Hoạt động"
+                                  : "Không hoạt động"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => openEditDialog(e, supplier)}
+                                  className="hover:bg-blue-100"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteSupplier(supplier.id);
+                                  }}
+                                  className="hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-4 h-4 text-red-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleStatus(supplier.id);
+                                  }}
+                                  className={
+                                    supplier.status === "active"
+                                      ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                  }
+                                  title={
+                                    supplier.status === "active"
+                                      ? "Vô hiệu hóa"
+                                      : "Kích hoạt"
+                                  }
+                                >
+                                  {supplier.status === "active" ? (
+                                    <PowerOff className="w-4 h-4" />
+                                  ) : (
+                                    <Power className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && (
+                            <TableRow>
+                              <TableCell colSpan={10} className="p-4 bg-slate-50">
+                                <Tabs defaultValue="info">
+                                  <TabsList>
+                                    <TabsTrigger value="info">Thông tin</TabsTrigger>
+                                    <TabsTrigger value="history">Lịch sử nhập hàng</TabsTrigger>
+                                  </TabsList>
+                                  <TabsContent value="info">
+                                    <div className="grid grid-cols-2 gap-4 py-4">
+                                      <div className="text-sm">
+                                        <span className="font-semibold">Mã NCC:</span> {supplier.code}
+                                      </div>
+                                      <div className="text-sm">
+                                        <span className="font-semibold">Tên:</span> {supplier.name}
+                                      </div>
+                                      <div className="text-sm">
+                                        <span className="font-semibold">Danh mục:</span> {supplier.category}
+                                      </div>
+                                      <div className="text-sm">
+                                        <span className="font-semibold">Người liên hệ:</span> {supplier.contact}
+                                      </div>
+                                      <div className="text-sm">
+                                        <span className="font-semibold">Điện thoại:</span> {supplier.phone}
+                                      </div>
+                                      <div className="text-sm">
+                                        <span className="font-semibold">Email:</span> {supplier.email}
+                                      </div>
+                                      <div className="text-sm col-span-2">
+                                        <span className="font-semibold">Địa chỉ:</span> {supplier.address}, {supplier.city}
+                                      </div>
+                                      <div className="text-sm">
+                                        <span className="font-semibold">Công nợ:</span>{" "}
+                                        <span className="text-red-600">{formatCurrency(supplier.debt)}</span>
+                                      </div>
+                                      <div className="text-sm">
+                                        <span className="font-semibold">Trạng thái:</span>{" "}
+                                        <Badge
+                                          variant={supplier.status === "active" ? "default" : "secondary"}
+                                          className={
+                                            supplier.status === "active"
+                                              ? "bg-green-500 text-white"
+                                              : "bg-red-500 text-white"
+                                          }
+                                        >
+                                          {supplier.status === "active" ? "Hoạt động" : "Không hoạt động"}
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                  </TabsContent>
+                                  <TabsContent value="history">
+                                    <div className="py-4">
+                                      <div className="border rounded-md">
+                                        <div className="grid grid-cols-3 p-2 font-semibold bg-gray-100">
+                                          <div>Mã nhập</div>
+                                          <div>Ngày</div>
+                                          <div className="text-right">Số tiền</div>
+                                        </div>
+                                        {transactions.map((imp) => (
+                                          <div key={imp.id} className="grid grid-cols-3 p-2 border-t">
+                                            <div>{imp.id}</div>
+                                            <div>{imp.date}</div>
+                                            <div className="text-right">{formatCurrency(imp.amount)}</div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </TabsContent>
+                                </Tabs>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      )
+                    })
                   )}
                 </TableBody>
               </Table>
@@ -679,14 +771,6 @@ export function Suppliers() {
         }}
         onSubmit={editingSupplier ? handleEditSupplier : handleAddSupplier}
         editingSupplier={editingSupplier}
-      />
-
-      {/* Detail Dialog */}
-      <SupplierDetailDialog
-        open={detailDialogOpen}
-        onClose={closeDetailDialog}
-        supplier={viewingSupplier}
-        transactions={transactions}
       />
     </div>
   );
