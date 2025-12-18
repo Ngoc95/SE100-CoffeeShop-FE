@@ -3007,24 +3007,26 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        className="h-8 w-8 p-0"
+                                        className="h-8 w-14 p-0 rounded-full border-2 border-emerald-500 hover:border-emerald-700 hover:bg-emerald-50 "
                                         onClick={() =>
                                           advanceReadyItemOneUnit(item.id)
                                         }
+                                        title="Phục vụ 1"
                                       >
-                                        <ChevronRight className="w-4 h-4" />
+                                        <ChevronRight className="w-8 h-8 " />
                                       </Button>
                                     )}
                                     {item.servedQuantity > 0 && (
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        className="h-8 w-8 p-0"
+                                        className="h-8 w-14 p-0 rounded-full border-2 border-emerald-500 bg-emerald-500 hover:border-emerald-700 hover:bg-emerald-700"
                                         onClick={() =>
                                           advanceReadyItemAllUnits(item.id)
                                         }
+                                        title="Phục vụ tất cả"
                                       >
-                                        <ChevronsRight className="w-4 h-4" />
+                                        <ChevronsRight className="w-8 h-8" />
                                       </Button>
                                     )}
                                   </div>
