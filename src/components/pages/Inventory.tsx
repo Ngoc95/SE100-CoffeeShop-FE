@@ -170,6 +170,7 @@ export function Inventory() {
     ingredients: [] as CompositeIngredient[], // Add ingredients
     isTopping: false,
     associatedProductIds: [] as string[],
+    imageUrl: "",
   });
 
   // Mock data
@@ -2055,6 +2056,15 @@ export function Inventory() {
                 </div>
               )}
 
+              <div className="flex justify-left">
+                <ImageUploadWithCrop
+                  currentImage={editValues.imageUrl}
+                  onImageChange={(url) =>
+                    setEditValues((prev) => ({ ...prev, imageUrl: url }))
+                  }
+                />
+              </div>
+
               <div className="bg-slate-50 p-3 rounded-lg">
                 <p className="text-xs text-slate-600">
                   <span className="text-red-500">*</span> Trường bắt buộc
@@ -2085,7 +2095,9 @@ export function Inventory() {
                           maxStock: editValues.maxStock,
                           sellingPrice: editValues.sellingPrice,
                           productStatus: editValues.productStatus as any,
+                          productStatus: editValues.productStatus as any,
                           ingredients: editValues.ingredients,
+                          imageUrl: editValues.imageUrl,
                           isTopping: isTopping,
                           associatedProductIds: associatedProducts.map(p => p.id),
                         }
@@ -2394,8 +2406,10 @@ export function Inventory() {
                                         sellingPrice: item.sellingPrice,
                                         productStatus: item.productStatus,
                                         ingredients: item.ingredients || [],
+                                        ingredients: item.ingredients || [],
                                         isTopping: item.isTopping || false,
                                         associatedProductIds: item.associatedProductIds || [],
+                                        imageUrl: item.imageUrl || "",
                                       });
                                       setIsTopping(item.isTopping || false);
                                       setAssociatedProducts(

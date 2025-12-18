@@ -1727,6 +1727,9 @@ export function PurchaseOrders() {
                                         Tên hàng hóa
                                       </th>
                                       <th className="px-4 py-2 text-center text-xs text-slate-600">
+                                        Hạn sử dụng
+                                      </th>
+                                      <th className="px-4 py-2 text-center text-xs text-slate-600">
                                         Số lượng
                                       </th>
                                       <th className="px-4 py-2 text-center text-xs text-slate-600">
@@ -1736,7 +1739,7 @@ export function PurchaseOrders() {
                                         Đơn giá
                                       </th>
                                       <th className="px-4 py-2 text-right text-xs text-slate-600">
-                                        Giảm giá
+                                        
                                       </th>
                                       <th className="px-4 py-2 text-right text-xs text-slate-600">
                                         Thành tiền
@@ -1756,6 +1759,9 @@ export function PurchaseOrders() {
                                           {item.name}
                                         </td>
                                         <td className="px-4 py-2 text-sm text-slate-600 text-center">
+                                          {item.expiryDate ? item.expiryDate : "-"}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-600 text-center">
                                           {item.quantity}
                                         </td>
                                         <td className="px-4 py-2 text-sm text-slate-600 text-center">
@@ -1768,10 +1774,7 @@ export function PurchaseOrders() {
                                           đ
                                         </td>
                                         <td className="px-4 py-2 text-sm text-slate-600 text-right">
-                                          {item.discount.toLocaleString(
-                                            "vi-VN"
-                                          )}
-                                          đ
+                                          
                                         </td>
                                         <td className="px-4 py-2 text-sm text-slate-900 text-right font-medium">
                                           {item.total.toLocaleString("vi-VN")}đ
@@ -2274,10 +2277,8 @@ export function PurchaseOrders() {
                     <col style={{ width: "8%", minWidth: "70px" }} />
                     <col style={{ width: "10%", minWidth: "90px" }} />
                     <col style={{ width: "12%", minWidth: "120px" }} />
-                    <col style={{ width: "13%", minWidth: "130px" }} />
-                    <col style={{ width: "13%", minWidth: "130px" }} />
-                    <col style={{ width: "10%", minWidth: "120px" }} />
-                    <col style={{ width: "0%", minWidth: "50px" }} />
+                    <col style={{ width: '12%', minWidth: '110px' }} />
+                    <col style={{ width: '18%', minWidth: '150px' }} />
                   </colgroup>
                   <thead className="bg-slate-100">
                     <tr>
@@ -2298,9 +2299,6 @@ export function PurchaseOrders() {
                       </th>
                       <th className="px-2 py-2 text-right text-xs text-slate-600">
                         Đơn giá
-                      </th>
-                      <th className="px-2 py-2 text-right text-xs text-slate-600">
-                        Giảm giá
                       </th>
                       <th className="px-2 py-2 text-right text-xs text-slate-600">
                         Thành tiền
@@ -2438,30 +2436,7 @@ export function PurchaseOrders() {
                                 />
                               </td>
                               <td className="px-2 py-2">
-                                <Input
-                                  type="text"
-                                  value={
-                                    item.discount === 0
-                                      ? ""
-                                      : formatNumberWithCommas(item.discount)
-                                  }
-                                  onChange={(e) => {
-                                    const inputValue = e.target.value;
-                                    // Allow empty input
-                                    if (
-                                      inputValue === "" ||
-                                      inputValue.trim() === ""
-                                    ) {
-                                      handleChangeItem("discount", 0);
-                                      return;
-                                    }
-                                    const parsed =
-                                      parseFormattedNumber(inputValue);
-                                    handleChangeItem("discount", parsed);
-                                  }}
-                                  className="text-sm h-8 text-right w-full bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2 [appearance:textfield]"
-                                  placeholder="0"
-                                />
+                                
                               </td>
                               <td className="px-2 py-2 text-sm text-slate-900 text-right">
                                 {item.total.toLocaleString("vi-VN")}đ
