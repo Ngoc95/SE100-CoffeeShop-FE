@@ -18,9 +18,11 @@ import {
   Box,
   X,
   Upload,
+  Download,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
+import { exportToCSV } from "../utils/export";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Checkbox } from "../ui/checkbox";
@@ -54,6 +56,7 @@ import {
 } from "../ui/table";
 import { ImageUploadWithCrop } from "../ImageUploadWithCrop";
 import { ImportExcelDialog } from "../ImportExcelDialog";
+import { ExportExcelDialog } from "../ExportExcelDialog";
 
 // Type definitions
 type ItemType = "ready-made" | "composite" | "ingredient";
@@ -100,6 +103,8 @@ interface InventoryItem {
   totalValue: number;
   avgUnitCost: number;
   sellingPrice?: number;
+  isTopping?: boolean;
+  associatedProductIds?: string[];
 }
 
 import { useAuth } from "../../contexts/AuthContext";
@@ -149,6 +154,16 @@ export function Inventory() {
   const [ingredientsToAdd, setIngredientsToAdd] = useState<string[]>([]);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
 
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+
+  // Topping states
+  const [isTopping, setIsTopping] = useState(false);
+  const [associatedProducts, setAssociatedProducts] = useState<InventoryItem[]>([]);
+  const [addAssociatedProductDialogOpen, setAddAssociatedProductDialogOpen] = useState(false);
+  const [associatedProductsToAdd, setAssociatedProductsToAdd] = useState<string[]>([]);
+  const [associatedProductSearchQuery, setAssociatedProductSearchQuery] = useState("");
+  const [associatedProductSelectedCategory, setAssociatedProductSelectedCategory] = useState("all");
+
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [editValues, setEditValues] = useState({
@@ -160,6 +175,9 @@ export function Inventory() {
     sellingPrice: undefined as number | undefined,
     productStatus: undefined as string | undefined, // Add productStatus
     ingredients: [] as CompositeIngredient[], // Add ingredients
+    isTopping: false,
+    associatedProductIds: [] as string[],
+    imageUrl: "",
   });
 
   // Mock data
@@ -858,6 +876,13 @@ export function Inventory() {
               Nhập file
             </Button>
             )}
+            <Button
+              variant="outline"
+              onClick={() => setExportDialogOpen(true)}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Xuất file
+            </Button>
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
               <DialogTrigger asChild>
                 {canCreate && (
@@ -1059,82 +1084,160 @@ export function Inventory() {
                   </div>
 
                   {addItemType === "composite" && (
-                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <Label className="text-sm">Công thức nguyên liệu</Label>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8"
-                          onClick={() => setAddIngredientDialogOpen(true)}
-                        >
-                          <Plus className="w-3 h-3 mr-1" />
-                          Thêm nguyên liệu
-                        </Button>
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="is-topping"
+                          checked={isTopping}
+                          onCheckedChange={(checked: boolean) => setIsTopping(checked as boolean)}
+                        />
+                        <Label htmlFor="is-topping" className="cursor-pointer font-medium text-slate-900">
+                          Là Topping (Sản phẩm bán kèm)
+                        </Label>
                       </div>
-                      {selectedIngredients.length === 0 ? (
-                        <p className="text-xs text-slate-500">
-                          Nhấn "Thêm nguyên liệu" để xây dựng công thức cho món
-                          này
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          <Table>
-                            <TableHeader>
-                              <TableRow className="bg-purple-100">
-                                <TableHead className="w-12">STT</TableHead>
-                                <TableHead>Mã</TableHead>
-                                <TableHead>Tên nguyên liệu</TableHead>
-                                <TableHead>Đơn vị</TableHead>
-                                <TableHead>Số lượng</TableHead>
-                                <TableHead className="w-12"></TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {selectedIngredients.map((ing: CompositeIngredient, index: number) => (
-                                <TableRow key={index}>
-                                  <TableCell>{index + 1}</TableCell>
-                                  <TableCell>{ing.ingredientId}</TableCell>
-                                  <TableCell>{ing.ingredientName}</TableCell>
-                                  <TableCell>{ing.unit}</TableCell>
-                                  <TableCell>
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      value={ing.quantity}
-                                      onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                                        const val = Number(e.target.value);
-                                        setSelectedIngredients((prev: CompositeIngredient[]) =>
-                                          prev.map((item: CompositeIngredient, idx: number) =>
-                                            idx === index
-                                              ? { ...item, quantity: val }
-                                              : item
-                                          )
-                                        );
-                                      }}
-                                      className="h-8 w-24 bg-white border-slate-300"
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-6 w-6 p-0"
-                                      onClick={() => {
-                                        setSelectedIngredients((prev: CompositeIngredient[]) =>
-                                          prev.filter((_, i) => i !== index)
-                                        );
-                                      }}
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
+
+                      {isTopping && (
+                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <Label className="text-sm font-medium text-blue-900">Món chính áp dụng</Label>
+                              <p className="text-xs text-blue-700 mt-0.5">Danh sách các món có thể thêm topping này</p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 bg-white text-blue-700 border-blue-200 hover:bg-blue-50"
+                              onClick={() => setAddAssociatedProductDialogOpen(true)}
+                            >
+                              <Plus className="w-3 h-3 mr-1" />
+                              Thêm món
+                            </Button>
+                          </div>
+                          {associatedProducts.length === 0 ? (
+                            <div className="text-center py-4 border-2 border-dashed border-blue-200 rounded-lg bg-blue-50/50">
+                              <p className="text-xs text-blue-600">
+                                Chưa có món chính nào được chọn
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="bg-blue-100 hover:bg-blue-100">
+                                    <TableHead className="w-12 text-blue-900">STT</TableHead>
+                                    <TableHead className="text-blue-900">Mã hàng</TableHead>
+                                    <TableHead className="text-blue-900">Tên hàng hóa</TableHead>
+                                    <TableHead className="text-blue-900">Đơn vị</TableHead>
+                                    <TableHead className="w-12"></TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {associatedProducts.map((prod, index) => (
+                                    <TableRow key={prod.id} className="bg-white">
+                                      <TableCell>{index + 1}</TableCell>
+                                      <TableCell>{prod.id}</TableCell>
+                                      <TableCell>{prod.name}</TableCell>
+                                      <TableCell>{prod.unit}</TableCell>
+                                      <TableCell>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 w-6 p-0 hover:text-red-600"
+                                          onClick={() => {
+                                            setAssociatedProducts((prev) =>
+                                              prev.filter((p) => p.id !== prod.id)
+                                            );
+                                          }}
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          )}
                         </div>
                       )}
+
+                      <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <Label className="text-sm">Công thức nguyên liệu</Label>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8"
+                            onClick={() => setAddIngredientDialogOpen(true)}
+                          >
+                            <Plus className="w-3 h-3 mr-1" />
+                            Thêm nguyên liệu
+                          </Button>
+                        </div>
+                        {selectedIngredients.length === 0 ? (
+                          <p className="text-xs text-slate-500">
+                            Nhấn "Thêm nguyên liệu" để xây dựng công thức cho món
+                            này
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="bg-purple-100">
+                                  <TableHead className="w-12">STT</TableHead>
+                                  <TableHead>Mã</TableHead>
+                                  <TableHead>Tên nguyên liệu</TableHead>
+                                  <TableHead>Đơn vị</TableHead>
+                                  <TableHead>Số lượng</TableHead>
+                                  <TableHead className="w-12"></TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {selectedIngredients.map((ing: CompositeIngredient, index: number) => (
+                                  <TableRow key={index}>
+                                    <TableCell>{index + 1}</TableCell>
+                                    <TableCell>{ing.ingredientId}</TableCell>
+                                    <TableCell>{ing.ingredientName}</TableCell>
+                                    <TableCell>{ing.unit}</TableCell>
+                                    <TableCell>
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        value={ing.quantity}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                                          const val = Number(e.target.value);
+                                          setSelectedIngredients((prev: CompositeIngredient[]) =>
+                                            prev.map((item: CompositeIngredient, idx: number) =>
+                                              idx === index
+                                                ? { ...item, quantity: val }
+                                                : item
+                                            )
+                                          );
+                                        }}
+                                        className="h-8 w-24 bg-white border-slate-300"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0"
+                                        onClick={() => {
+                                          setSelectedIngredients((prev: CompositeIngredient[]) =>
+                                            prev.filter((_, i) => i !== index)
+                                          );
+                                        }}
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -1463,6 +1566,200 @@ export function Inventory() {
           </DialogContent>
         </Dialog>
 
+        {/* Add Associated Product Dialog */}
+        <Dialog
+          open={addAssociatedProductDialogOpen}
+          onOpenChange={(open) => {
+            setAddAssociatedProductDialogOpen(open);
+            if (open) setAssociatedProductsToAdd([]);
+          }}
+        >
+          <DialogContent
+            className="min-w-[1100px] max-w-[1400px] w-[100vw] max-h-[90vh] flex flex-col"
+            aria-describedby={undefined}
+          >
+            <DialogHeader>
+              <DialogTitle>Thêm món chính áp dụng Topping</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 flex-1 overflow-y-auto px-1">
+              {/* Search */}
+              <div>
+                <Label>Tìm kiếm hàng hóa</Label>
+                <div className="relative mt-1.5 mb-3">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                  <Input
+                    placeholder="Nhập tên hàng hóa..."
+                    value={associatedProductSearchQuery}
+                    onChange={(e) =>
+                      setAssociatedProductSearchQuery(e.target.value)
+                    }
+                    className="pl-10 bg-white border-slate-300"
+                  />
+                </div>
+                {/* Categories */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-slate-200">
+                  {categories.map((cat) => (
+                    <Button
+                      key={cat.id}
+                      variant={
+                        associatedProductSelectedCategory === cat.id
+                          ? "default"
+                          : "outline"
+                      }
+                      size="sm"
+                      onClick={() =>
+                        setAssociatedProductSelectedCategory(cat.id)
+                      }
+                      className={
+                        associatedProductSelectedCategory === cat.id
+                          ? "bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap"
+                          : "text-slate-600 border-slate-300 hover:bg-slate-50 whitespace-nowrap"
+                      }
+                    >
+                      {cat.name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Product List */}
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50">
+                      <TableHead className="w-12 text-center">
+                        <Checkbox
+                          checked={
+                            associatedProductsToAdd.length > 0 &&
+                            items
+                              .filter(
+                                (item) =>
+                                  (item.type === "ready-made" || item.type === "composite") &&
+                                  !item.isTopping &&
+                                  item.name.toLowerCase().includes(associatedProductSearchQuery.toLowerCase()) && (associatedProductSelectedCategory === "all" || item.category === associatedProductSelectedCategory)
+                              )
+                              .every((item) => associatedProductsToAdd.includes(item.id))
+                          }
+                          onCheckedChange={(checked) => {
+                            const filteredItems = items.filter(
+                              (item) =>
+                                (item.type === "ready-made" || item.type === "composite") &&
+                                !item.isTopping &&
+                                item.name.toLowerCase().includes(associatedProductSearchQuery.toLowerCase()) && (associatedProductSelectedCategory === "all" || item.category === associatedProductSelectedCategory)
+                            );
+                            if (checked) {
+                              setAssociatedProductsToAdd((prev) => [
+                                ...new Set([...prev, ...filteredItems.map((i) => i.id)]),
+                              ]);
+                            } else {
+                              const idsToRemove = filteredItems.map((i) => i.id);
+                              setAssociatedProductsToAdd((prev) =>
+                                prev.filter((id) => !idsToRemove.includes(id))
+                              );
+                            }
+                          }}
+                        />
+                      </TableHead>
+                      <TableHead>Mã hàng</TableHead>
+                      <TableHead>Tên hàng hóa</TableHead>
+                      <TableHead>Loại</TableHead>
+                      <TableHead>Đơn vị</TableHead>
+                      <TableHead className="text-right">Giá bán</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items
+                      .filter(
+                        (item) =>
+                          (item.type === "ready-made" || item.type === "composite") &&
+                          !item.isTopping &&
+                          item.name.toLowerCase().includes(associatedProductSearchQuery.toLowerCase()) && (associatedProductSelectedCategory === "all" || item.category === associatedProductSelectedCategory)
+                      )
+                      .map((item) => {
+                        const isSelected = associatedProductsToAdd.includes(item.id);
+                        return (
+                          <TableRow
+                            key={item.id}
+                            className={isSelected ? "bg-blue-50" : ""}
+                            onClick={() => {
+                              setAssociatedProductsToAdd((prev) =>
+                                prev.includes(item.id)
+                                  ? prev.filter((id) => id !== item.id)
+                                  : [...prev, item.id]
+                              );
+                            }}
+                          >
+                            <TableCell className="text-center">
+                              <Checkbox checked={isSelected} />
+                            </TableCell>
+                            <TableCell className="font-medium">{item.id}</TableCell>
+                            <TableCell>{item.name}</TableCell>
+                            <TableCell>
+                              {item.type === "ready-made" ? (
+                                <Badge variant="outline" className="text-blue-600 bg-blue-50 border-blue-200">
+                                  Bán sẵn
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-purple-600 bg-purple-50 border-purple-200">
+                                  Pha chế
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>{item.unit}</TableCell>
+                            <TableCell className="text-right">
+                              {item.sellingPrice?.toLocaleString()} đ
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    {items.filter(
+                      (item) =>
+                        (item.type === "ready-made" || item.type === "composite") &&
+                        !item.isTopping &&
+                        item.name.toLowerCase().includes(associatedProductSearchQuery.toLowerCase()) && (associatedProductSelectedCategory === "all" || item.category === associatedProductSelectedCategory)
+                    ).length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                            Không tìm thấy hàng hóa phù hợp
+                          </TableCell>
+                        </TableRow>
+                      )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-lg flex items-center justify-between">
+                <p className="text-xs text-slate-600">
+                  <span className="font-medium">{associatedProductsToAdd.length}</span> món đã chọn
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddAssociatedProductDialogOpen(false)}>
+                Hủy
+              </Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                disabled={associatedProductsToAdd.length === 0}
+                onClick={() => {
+                  const selectedItems = items.filter((i) => associatedProductsToAdd.includes(i.id));
+                  setAssociatedProducts((prev) => {
+                    const existingIds = prev.map(p => p.id);
+                    const newItems = selectedItems.filter(item => !existingIds.includes(item.id));
+                    return [...prev, ...newItems];
+                  });
+                  setAddAssociatedProductDialogOpen(false);
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Thêm {associatedProductsToAdd.length} món
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Dialog
           open={editDialogOpen}
           onOpenChange={(open) => {
@@ -1611,88 +1908,175 @@ export function Inventory() {
 
               {/* Ingredient Editing for Composite Items */}
               {editingItem?.type === "composite" && (
-                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <Label className="text-sm">Công thức nguyên liệu</Label>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8"
-                      onClick={() => setAddIngredientDialogOpen(true)}
-                    >
-                      <Plus className="w-3 h-3 mr-1" />
-                      Thêm nguyên liệu
-                    </Button>
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="edit-is-topping"
+                      checked={isTopping}
+                      onCheckedChange={(checked: boolean) => setIsTopping(checked as boolean)}
+                    />
+                    <Label htmlFor="edit-is-topping" className="cursor-pointer font-medium text-slate-900">
+                      Là Topping (Sản phẩm bán kèm)
+                    </Label>
                   </div>
-                  {editValues.ingredients.length === 0 ? (
-                    <p className="text-xs text-slate-500">
-                      Chưa có nguyên liệu nào.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-purple-100">
-                            <TableHead className="w-12">STT</TableHead>
-                            <TableHead>Mã</TableHead>
-                            <TableHead>Tên nguyên liệu</TableHead>
-                            <TableHead>Đơn vị</TableHead>
-                            <TableHead>Số lượng</TableHead>
-                            <TableHead className="w-12"></TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {editValues.ingredients.map((ing: CompositeIngredient, index: number) => (
-                            <TableRow key={index}>
-                              <TableCell>{index + 1}</TableCell>
-                              <TableCell>{ing.ingredientId}</TableCell>
-                              <TableCell>{ing.ingredientName}</TableCell>
-                              <TableCell>{ing.unit}</TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  value={ing.quantity}
-                                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                                    const val = Number(e.target.value);
-                                    setEditValues((prev: any) => ({
-                                      ...prev,
-                                      ingredients: prev.ingredients.map(
-                                        (item: CompositeIngredient, idx: number) =>
-                                          idx === index
-                                            ? { ...item, quantity: val }
-                                            : item
-                                      ),
-                                    }));
-                                  }}
-                                  className="h-8 w-24 bg-white border-slate-300"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6 p-0"
-                                  onClick={() => {
-                                    setEditValues((prev: any) => ({
-                                      ...prev,
-                                      ingredients: prev.ingredients.filter(
-                                        (_: any, i: number) => i !== index
-                                      ),
-                                    }));
-                                  }}
-                                >
-                                  <X className="w-3 h-3" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+
+                  {isTopping && (
+                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <Label className="text-sm font-medium text-blue-900">Món chính áp dụng</Label>
+                          <p className="text-xs text-blue-700 mt-0.5">Danh sách các món có thể thêm topping này</p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 bg-white text-blue-700 border-blue-200 hover:bg-blue-50"
+                          onClick={() => setAddAssociatedProductDialogOpen(true)}
+                        >
+                          <Plus className="w-3 h-3 mr-1" />
+                          Thêm món
+                        </Button>
+                      </div>
+                      {associatedProducts.length === 0 ? (
+                        <div className="text-center py-4 border-2 border-dashed border-blue-200 rounded-lg bg-blue-50/50">
+                          <p className="text-xs text-blue-600">
+                            Chưa có món chính nào được chọn
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-blue-100 hover:bg-blue-100">
+                                <TableHead className="w-12 text-blue-900">STT</TableHead>
+                                <TableHead className="text-blue-900">Mã hàng</TableHead>
+                                <TableHead className="text-blue-900">Tên hàng hóa</TableHead>
+                                <TableHead className="text-blue-900">Đơn vị</TableHead>
+                                <TableHead className="w-12"></TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {associatedProducts.map((prod, index) => (
+                                <TableRow key={prod.id} className="bg-white">
+                                  <TableCell>{index + 1}</TableCell>
+                                  <TableCell>{prod.id}</TableCell>
+                                  <TableCell>{prod.name}</TableCell>
+                                  <TableCell>{prod.unit}</TableCell>
+                                  <TableCell>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 hover:text-red-600"
+                                      onClick={() => {
+                                        setAssociatedProducts((prev) =>
+                                          prev.filter((p) => p.id !== prod.id)
+                                        );
+                                      }}
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
                     </div>
                   )}
+
+                  <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <Label className="text-sm">Công thức nguyên liệu</Label>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                        onClick={() => setAddIngredientDialogOpen(true)}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Thêm nguyên liệu
+                      </Button>
+                    </div>
+                    {editValues.ingredients.length === 0 ? (
+                      <p className="text-xs text-slate-500">
+                        Nhấn "Thêm nguyên liệu" để xây dựng công thức cho món này
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-purple-100">
+                              <TableHead className="w-12">STT</TableHead>
+                              <TableHead>Mã</TableHead>
+                              <TableHead>Tên nguyên liệu</TableHead>
+                              <TableHead>Đơn vị</TableHead>
+                              <TableHead>Số lượng</TableHead>
+                              <TableHead className="w-12"></TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {editValues.ingredients.map((ing: CompositeIngredient, index: number) => (
+                              <TableRow key={index}>
+                                <TableCell>{index + 1}</TableCell>
+                                <TableCell>{ing.ingredientId}</TableCell>
+                                <TableCell>{ing.ingredientName}</TableCell>
+                                <TableCell>{ing.unit}</TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={ing.quantity}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                                      const val = Number(e.target.value);
+                                      setEditValues((prev: any) => ({
+                                        ...prev,
+                                        ingredients: prev.ingredients.map(
+                                          (item: CompositeIngredient, idx: number) =>
+                                            idx === index
+                                              ? { ...item, quantity: val }
+                                              : item
+                                        ),
+                                      }));
+                                    }}
+                                    className="h-8 w-24 bg-white border-slate-300"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0"
+                                    onClick={() => {
+                                      setEditValues((prev: any) => ({
+                                        ...prev,
+                                        ingredients: prev.ingredients.filter(
+                                          (_: any, i: number) => i !== index
+                                        ),
+                                      }));
+                                    }}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
+
+              <div className="flex justify-left">
+                <ImageUploadWithCrop
+                  currentImage={editValues.imageUrl}
+                  onImageChange={(url) =>
+                    setEditValues((prev) => ({ ...prev, imageUrl: url }))
+                  }
+                />
+              </div>
 
               <div className="bg-slate-50 p-3 rounded-lg">
                 <p className="text-xs text-slate-600">
@@ -1724,7 +2108,11 @@ export function Inventory() {
                           maxStock: editValues.maxStock,
                           sellingPrice: editValues.sellingPrice,
                           productStatus: editValues.productStatus as any,
+                          productStatus: editValues.productStatus as any,
                           ingredients: editValues.ingredients,
+                          imageUrl: editValues.imageUrl,
+                          isTopping: isTopping,
+                          associatedProductIds: associatedProducts.map(p => p.id),
                         }
                         : it
                     )
@@ -2032,8 +2420,18 @@ export function Inventory() {
                                           sellingPrice: item.sellingPrice,
                                           productStatus: item.productStatus,
                                           ingredients: item.ingredients || [],
+                                          isTopping: item.isTopping || false,
+                                          associatedProductIds: item.associatedProductIds || [],
+                                          imageUrl: item.imageUrl || "",
                                         });
-                                        setNewItemImage(item.imageUrl || "");
+                                        setIsTopping(item.isTopping || false);
+                                        setAssociatedProducts(
+                                          item.associatedProductIds
+                                            ? items.filter((i) =>
+                                              item.associatedProductIds?.includes(i.id)
+                                            )
+                                            : []
+                                        );
                                         setEditDialogOpen(true);
                                       }}
                                     >
@@ -2916,6 +3314,37 @@ export function Inventory() {
       <ImportExcelDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
+      />
+
+      <ExportExcelDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        data={filteredItems}
+        columns={[
+          { header: 'Mã hàng', accessor: (row: any) => row.id },
+          { header: 'Tên hàng', accessor: (row: any) => row.name },
+          { header: 'Loại', accessor: (row: any) => row.type === 'ready-made' ? 'Hàng bán sẵn' : row.type === 'ingredient' ? 'Nguyên liệu' : 'Hàng cấu thành' },
+          { header: 'Danh mục', accessor: (row: any) => categories.find(c => c.id === row.category)?.name || row.category },
+          { header: 'Đơn vị', accessor: (row: any) => row.unit },
+          { header: 'Tồn kho', accessor: (row: any) => row.currentStock },
+          { header: 'Tồn tối thiểu', accessor: (row: any) => row.minStock },
+          { header: 'Tồn tối đa', accessor: (row: any) => row.maxStock },
+          { header: 'Giá trị tồn', accessor: (row: any) => row.totalValue },
+          {
+            header: 'Trạng thái', accessor: (row: any) => {
+              switch (row.status) {
+                case 'good': return 'Đủ hàng';
+                case 'low': return 'Sắp hết hàng';
+                case 'critical': return 'Hết hàng';
+                case 'expiring': return 'Gần hết hạn';
+                case 'expired': return 'Hết hạn';
+                default: return row.status;
+              }
+            }
+          },
+        ]}
+        fileName="danh-sach-hang-hoa"
+        title="Xuất danh sách hàng hóa"
       />
     </div>
   );

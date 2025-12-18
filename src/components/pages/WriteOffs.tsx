@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Search,
   Plus,
@@ -16,6 +16,7 @@ import {
   Check,
   ArrowUp,
   ArrowDown,
+  Download,
 } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";
@@ -57,6 +58,7 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
+import { ExportExcelDialog } from "../ExportExcelDialog";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { toast } from "sonner@2.0.3";
@@ -136,7 +138,7 @@ export function WriteOffs() {
   ]);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [editingDates, setEditingDates] = useState<Record<number, string>>({});
-  
+
   // Sort states
   type SortField = "code" | "date" | "items" | "totalValue" | "reason" | "status" | null;
   type SortOrder = "asc" | "desc" | "none";
@@ -155,6 +157,7 @@ export function WriteOffs() {
     Array<{ productId: string; batchCode: string; unitPrice: number }>
   >([]);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   // Form state for creating write-off
   const [formData, setFormData] = useState({
@@ -687,6 +690,30 @@ export function WriteOffs() {
     return reasonMap[reasonCode] || reasonCode;
   };
 
+  const exportColumns = useMemo(
+    () => [
+      { header: "Mã phiếu", accessor: (row: WriteOff) => row.code },
+      { header: "Ngày xuất", accessor: (row: WriteOff) => row.date },
+      { header: "Số mặt hàng", accessor: (row: WriteOff) => row.items },
+      { header: "Tổng giá trị", accessor: (row: WriteOff) => row.totalValue },
+      {
+        header: "Lý do",
+        accessor: (row: WriteOff) => getReasonText(row.reason),
+      },
+      {
+        header: "Trạng thái",
+        accessor: (row: WriteOff) =>
+          row.status === "completed"
+            ? "Hoàn thành"
+            : row.status === "draft"
+              ? "Phiếu tạm"
+              : "Đã hủy",
+      },
+      { header: "Ghi chú", accessor: (row: WriteOff) => row.note || "" },
+    ],
+    []
+  );
+
   // Get effective date range based on dateRangeType
   const getEffectiveDateRange = (): { from: Date; to: Date } | null => {
     if (dateRangeType === "preset") {
@@ -950,26 +977,26 @@ export function WriteOffs() {
         prev.map((wo) =>
           wo.id === editingWriteOffId
             ? {
-                ...wo,
-                code: formData.code,
-                date: writeOffDate,
-                items: writeOffItems.length,
-                totalValue: totalAmount,
-                reason: formData.reason,
-                status: status,
-                note: formData.note,
-                details: {
-                  items: writeOffItems.map((item) => ({
-                    name: item.productName,
-                    batchCode: item.batchCode,
-                    quantity: item.quantity,
-                    unit: item.unit,
-                    unitPrice: item.unitPrice,
-                    total: item.total,
-                    reason: item.reason,
-                  })),
-                },
-              }
+              ...wo,
+              code: formData.code,
+              date: writeOffDate,
+              items: writeOffItems.length,
+              totalValue: totalAmount,
+              reason: formData.reason,
+              status: status,
+              note: formData.note,
+              details: {
+                items: writeOffItems.map((item) => ({
+                  name: item.productName,
+                  batchCode: item.batchCode,
+                  quantity: item.quantity,
+                  unit: item.unit,
+                  unitPrice: item.unitPrice,
+                  total: item.total,
+                  reason: item.reason,
+                })),
+              },
+            }
             : wo
         )
       );
@@ -1086,9 +1113,9 @@ export function WriteOffs() {
       const updatedWriteOffs = writeOffs.map((w) =>
         w.id === id
           ? {
-              ...w,
-              date: editedDate.replace("T", " ").slice(0, 16),
-            }
+            ...w,
+            date: editedDate.replace("T", " ").slice(0, 16),
+          }
           : w
       );
       setWriteOffs(updatedWriteOffs);
@@ -1192,11 +1219,10 @@ export function WriteOffs() {
                                   setPresetTimeRange(option.value);
                                   setDateRangeType("preset");
                                 }}
-                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                  presetTimeRange === option.value
-                                    ? "bg-blue-600 text-white"
-                                    : "text-blue-600 hover:bg-blue-100"
-                                }`}
+                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
+                                  ? "bg-blue-600 text-white"
+                                  : "text-blue-600 hover:bg-blue-100"
+                                  }`}
                               >
                                 {option.label}
                               </button>
@@ -1231,11 +1257,10 @@ export function WriteOffs() {
                                   setPresetTimeRange(option.value);
                                   setDateRangeType("preset");
                                 }}
-                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                  presetTimeRange === option.value
-                                    ? "bg-blue-600 text-white"
-                                    : "text-blue-600 hover:bg-blue-100"
-                                }`}
+                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
+                                  ? "bg-blue-600 text-white"
+                                  : "text-blue-600 hover:bg-blue-100"
+                                  }`}
                               >
                                 {option.label}
                               </button>
@@ -1267,11 +1292,10 @@ export function WriteOffs() {
                                   setPresetTimeRange(option.value);
                                   setDateRangeType("preset");
                                 }}
-                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                  presetTimeRange === option.value
-                                    ? "bg-blue-600 text-white"
-                                    : "text-blue-600 hover:bg-blue-100"
-                                }`}
+                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
+                                  ? "bg-blue-600 text-white"
+                                  : "text-blue-600 hover:bg-blue-100"
+                                  }`}
                               >
                                 {option.label}
                               </button>
@@ -1294,18 +1318,18 @@ export function WriteOffs() {
                 <div className="flex-1">
                   <Popover>
                     <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left text-sm bg-white border-slate-300"
-                      onClick={() => setDateRangeType("custom")}
-                    >
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left text-sm bg-white border-slate-300"
+                        onClick={() => setDateRangeType("custom")}
+                      >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {dateFrom && dateTo
                           ? `${format(dateFrom, "dd/MM", {
-                              locale: vi,
-                            })} - ${format(dateTo, "dd/MM/yyyy", {
-                              locale: vi,
-                            })}`
+                            locale: vi,
+                          })} - ${format(dateTo, "dd/MM/yyyy", {
+                            locale: vi,
+                          })}`
                           : "Lựa chọn khác"}
                       </Button>
                     </PopoverTrigger>
@@ -1446,7 +1470,15 @@ export function WriteOffs() {
                 onClick={() => setShowImportDialog(true)}
               >
                 <Upload className="w-4 h-4" />
-                Import Excel
+                Nhập file
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => setShowExportDialog(true)}
+              >
+                <Download className="w-4 h-4" />
+                Xuất file
               </Button>
               <Button
                 className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
@@ -1574,19 +1606,18 @@ export function WriteOffs() {
                       </TableCell>
                       <TableCell className="text-sm text-center">
                         <span
-                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
-                            wo.status === "completed"
-                              ? "bg-green-50 text-green-700"
-                              : wo.status === "draft"
+                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${wo.status === "completed"
+                            ? "bg-green-50 text-green-700"
+                            : wo.status === "draft"
                               ? "bg-orange-50 text-orange-700"
                               : "bg-red-50 text-red-700"
-                          }`}
+                            }`}
                         >
                           {wo.status === "completed"
                             ? "Hoàn thành"
                             : wo.status === "draft"
-                            ? "Phiếu tạm"
-                            : "Đã huỷ"}
+                              ? "Phiếu tạm"
+                              : "Đã huỷ"}
                         </span>
                       </TableCell>
                     </TableRow>
@@ -1619,19 +1650,18 @@ export function WriteOffs() {
                                         Trạng thái:
                                       </span>{" "}
                                       <span
-                                        className={`px-2 py-1 rounded-full text-xs ${
-                                          wo.status === "completed"
-                                            ? "bg-green-50 text-green-700"
-                                            : wo.status === "draft"
+                                        className={`px-2 py-1 rounded-full text-xs ${wo.status === "completed"
+                                          ? "bg-green-50 text-green-700"
+                                          : wo.status === "draft"
                                             ? "bg-orange-50 text-orange-700"
                                             : "bg-red-50 text-red-700"
-                                        }`}
+                                          }`}
                                       >
                                         {wo.status === "completed"
                                           ? "Hoàn thành"
                                           : wo.status === "draft"
-                                          ? "Phiếu tạm"
-                                          : "Đã huỷ"}
+                                            ? "Phiếu tạm"
+                                            : "Đã huỷ"}
                                       </span>
                                     </div>
                                     <div>
@@ -1809,10 +1839,10 @@ export function WriteOffs() {
                                             writeOffs.map((w) =>
                                               w.id === wo.id
                                                 ? {
-                                                    ...w,
-                                                    status:
-                                                      "completed" as const,
-                                                  }
+                                                  ...w,
+                                                  status:
+                                                    "completed" as const,
+                                                }
                                                 : w
                                             )
                                           );
@@ -2285,11 +2315,10 @@ export function WriteOffs() {
                     key={cat.id}
                     type="button"
                     onClick={() => setSelectedCategoryFilter(cat.id)}
-                    className={`px-3 py-1.5 text-sm border border-slate-200 rounded-lg transition-colors ${
-                      isActive
-                        ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
-                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                    }`}
+                    className={`px-3 py-1.5 text-sm border border-slate-200 rounded-lg transition-colors ${isActive
+                      ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+                      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
                   >
                     {cat.name}
                   </button>
@@ -2460,11 +2489,10 @@ export function WriteOffs() {
                                           return (
                                             <tr
                                               key={batch.batchCode}
-                                              className={`${
-                                                canSelect
-                                                  ? "hover:bg-slate-50 cursor-pointer"
-                                                  : "opacity-50"
-                                              }`}
+                                              className={`${canSelect
+                                                ? "hover:bg-slate-50 cursor-pointer"
+                                                : "opacity-50"
+                                                }`}
                                               onClick={(e) => {
                                                 e.stopPropagation();
                                                 if (canSelect) {
@@ -2522,12 +2550,12 @@ export function WriteOffs() {
                                               <td className="px-4 py-2 text-sm text-slate-600 text-center">
                                                 {batch.expiryDate
                                                   ? format(
-                                                      new Date(
-                                                        batch.expiryDate
-                                                      ),
-                                                      "dd/MM/yyyy",
-                                                      { locale: vi }
-                                                    )
+                                                    new Date(
+                                                      batch.expiryDate
+                                                    ),
+                                                    "dd/MM/yyyy",
+                                                    { locale: vi }
+                                                  )
                                                   : "—"}
                                               </td>
                                               <td className="px-4 py-2 text-sm font-medium text-slate-900 text-right">
@@ -2607,6 +2635,15 @@ export function WriteOffs() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Export Dialog */}
+      <ExportExcelDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        data={filteredWriteOffs}
+        columns={exportColumns}
+        fileName={`Danh_sach_phieu_xuat_huy_${format(new Date(), "dd-MM-yyyy")}`}
+        title="Xuất dữ liệu Xuất hủy"
+      />
     </div>
   );
 }

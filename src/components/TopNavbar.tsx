@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { 
-  LayoutDashboard, 
-  ShoppingCart, 
-  ChefHat, 
-  ArrowLeftRight, 
-  DollarSign, 
+import {
+  LayoutDashboard,
+  ShoppingCart,
+  ChefHat,
+  ArrowLeftRight,
+  DollarSign,
   FileText,
   Menu,
   X,
@@ -126,7 +126,6 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
     { id: 'invoices' as PageType, label: 'Hóa đơn' },
     { id: 'returns' as PageType, label: 'Trả hàng' },
     { id: 'purchase-orders' as PageType, label: 'Nhập hàng' },
-    { id: 'purchase-returns' as PageType, label: 'Trả hàng nhập' },
     { id: 'write-offs' as PageType, label: 'Xuất hủy' },
   ];
 
@@ -218,10 +217,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
             </div>
           </div>
         </div>
-        
-        <AccountProfileModal 
-          open={accountModalOpen} 
-          onOpenChange={setAccountModalOpen} 
+
+        <AccountProfileModal
+          open={accountModalOpen}
+          onOpenChange={setAccountModalOpen}
         />
       </nav>
     );
@@ -254,11 +253,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   <button
                     key={item.id}
                     onClick={() => onNavigate(item.id)}
-                    className={`px-4 py-2 rounded-lg transition-all text-sm ${
-                      isActive
+                    className={`px-4 py-2 rounded-lg transition-all text-sm ${isActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     {item.label}
                   </button>
@@ -270,11 +268,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all text-sm ${
-                      isGoodsActive
+                    className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all text-sm ${isGoodsActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     Hàng hóa
                     <ChevronDown className="w-4 h-4" />
@@ -305,11 +302,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   <button
                     key={item.id}
                     onClick={() => onNavigate(item.id)}
-                    className={`px-4 py-2 rounded-lg transition-all text-sm ${
-                      isActive
+                    className={`px-4 py-2 rounded-lg transition-all text-sm ${isActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     {item.label}
                   </button>
@@ -321,11 +317,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all text-sm ${
-                      isPartnerActive
+                    className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all text-sm ${isPartnerActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     Đối tác
                     <ChevronDown className="w-4 h-4" />
@@ -352,11 +347,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all text-sm ${
-                      isStaffActive
+                    className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all text-sm ${isStaffActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     Nhân viên
                     <ChevronDown className="w-4 h-4" />
@@ -383,11 +377,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all text-sm ${
-                      isTransactionActive
+                    className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all text-sm ${isTransactionActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     Giao dịch
                     <ChevronDown className="w-4 h-4" />
@@ -418,11 +411,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   <button
                     key={item.id}
                     onClick={() => onNavigate(item.id)}
-                    className={`px-4 py-2 rounded-lg transition-all text-sm ${
-                      isActive
+                    className={`px-4 py-2 rounded-lg transition-all text-sm ${isActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     {item.label}
                   </button>
@@ -438,11 +430,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   <button
                     key={item.id}
                     onClick={() => onNavigate(item.id)}
-                    className={`px-4 py-2 rounded-lg transition-all text-sm ${
-                      isActive
+                    className={`px-4 py-2 rounded-lg transition-all text-sm ${isActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     {item.label}
                   </button>
@@ -461,11 +452,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   <button
                     key={item.id}
                     onClick={() => onNavigate(item.id)}
-                    className={`px-4 py-2 rounded-lg transition-all text-sm ${
-                      isActive
+                    className={`px-4 py-2 rounded-lg transition-all text-sm ${isActive
                         ? 'bg-emerald-600 text-white shadow-md'
                         : 'text-emerald-700 hover:bg-emerald-50 border border-emerald-200'
-                    }`}
+                      }`}
                   >
                     {item.label}
                   </button>
@@ -547,11 +537,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                       onNavigate(item.id);
                       setMobileMenuOpen(false);
                     }}
-                    className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${
-                      isActive
+                    className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     {item.label}
                   </button>
@@ -573,11 +562,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                         onNavigate(item.id);
                         setMobileMenuOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${
-                        isActive
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
                           ? 'bg-blue-600 text-white shadow-md'
                           : 'text-slate-700 hover:bg-slate-100'
-                      }`}
+                        }`}
                     >
                       {item.label}
                     </button>
@@ -600,11 +588,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                         onNavigate(item.id);
                         setMobileMenuOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${
-                        isActive
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
                           ? 'bg-blue-600 text-white shadow-md'
                           : 'text-slate-700 hover:bg-slate-100'
-                      }`}
+                        }`}
                     >
                       {item.label}
                     </button>
@@ -628,11 +615,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                         onNavigate(item.id);
                         setMobileMenuOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${
-                        isActive
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
                           ? 'bg-blue-600 text-white shadow-md'
                           : 'text-slate-700 hover:bg-slate-100'
-                      }`}
+                        }`}
                     >
                       {item.label}
                     </button>
@@ -656,11 +642,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                         onNavigate(item.id);
                         setMobileMenuOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${
-                        isActive
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
                           ? 'bg-blue-600 text-white shadow-md'
                           : 'text-slate-700 hover:bg-slate-100'
-                      }`}
+                        }`}
                     >
                       {item.label}
                     </button>
@@ -684,11 +669,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                         onNavigate(item.id);
                         setMobileMenuOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${
-                        isActive
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
                           ? 'bg-blue-600 text-white shadow-md'
                           : 'text-slate-700 hover:bg-slate-100'
-                      }`}
+                        }`}
                     >
                       {item.label}
                     </button>
@@ -711,11 +695,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                         onNavigate(item.id);
                         setMobileMenuOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${
-                        isActive
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
                           ? 'bg-blue-600 text-white shadow-md'
                           : 'text-slate-700 hover:bg-slate-100'
-                      }`}
+                        }`}
                     >
                       {item.label}
                     </button>
@@ -738,11 +721,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                         onNavigate(item.id);
                         setMobileMenuOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${
-                        isActive
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
                           ? 'bg-blue-600 text-white shadow-md'
                           : 'text-slate-700 hover:bg-slate-100'
-                      }`}
+                        }`}
                     >
                       {item.label}
                     </button>
@@ -765,11 +747,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                         onNavigate(item.id);
                         setMobileMenuOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${
-                        isActive
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
                           ? 'bg-emerald-600 text-white shadow-md'
                           : 'text-emerald-700 hover:bg-emerald-50 border border-emerald-200'
-                      }`}
+                        }`}
                     >
                       {item.label}
                     </button>
@@ -781,10 +762,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
           </div>
         )}
       </div>
-      
-      <AccountProfileModal 
-        open={accountModalOpen} 
-        onOpenChange={setAccountModalOpen} 
+
+      <AccountProfileModal
+        open={accountModalOpen}
+        onOpenChange={setAccountModalOpen}
       />
     </nav>
   );
