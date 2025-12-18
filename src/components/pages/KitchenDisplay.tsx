@@ -535,6 +535,7 @@ export function KitchenDisplay() {
                                 size="sm"
                                 className="h-9 w-9 rounded-full p-0 bg-blue-600 hover:bg-blue-700"
                                 onClick={() => advanceOneUnit(item.id)}
+                                title="Hoàn thành 1"
                               >
                                 <ChevronRight className="w-4 h-4" />
                               </Button>
@@ -542,6 +543,7 @@ export function KitchenDisplay() {
                                 size="sm"
                                 className="h-9 w-9 rounded-full p-0 bg-blue-600 hover:bg-blue-700"
                                 onClick={() => advanceAllUnits(item.id)}
+                                title="Hoàn thành tất cả"
                               >
                                 <ChevronsRight className="w-4 h-4" />
                               </Button>
