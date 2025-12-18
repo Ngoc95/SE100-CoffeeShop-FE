@@ -87,6 +87,7 @@ import { ComboSuggestionBanner } from "../ComboSuggestionBanner";
 import { ComboDetectionPopup } from "../ComboDetectionPopup";
 import { CartItemDisplay } from "../CartItemDisplay";
 import { CustomerAutocomplete } from "../CustomerAutocomplete";
+import { PrintReceiptModal } from "../PrintReceiptModal";
 import { combos, type Combo } from "../../data/combos";
 import { autoComboPromotions } from "../../data/combos";
 import { IngredientSelectionDialog } from "../IngredientSelectionDialog";
@@ -124,6 +125,11 @@ interface CartItem {
   comboId?: string;
   comboItems?: CartItem[];
   comboExpanded?: boolean;
+  // Topping fields
+  isTopping?: boolean;
+  parentItemId?: string; // If this is an attached topping, store parent item ID
+  attachedToppings?: CartItem[]; // If this is a main item, store its attached toppings
+  basePrice?: number; // Original price before customization
 }
 
 interface Table {
@@ -202,7 +208,6 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [isTakeaway, setIsTakeaway] = useState(false);
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [selectedArea, setSelectedArea] = useState("all");
   const [selectedTableStatus, setSelectedTableStatus] = useState("all");
 
@@ -314,6 +319,12 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
   const [selectedPromotion, setSelectedPromotion] = useState<any>(null);
   const [usedPoints, setUsedPoints] = useState(0);
 
+  // Kitchen update needed state - track when to enable send to kitchen button
+  const [isKitchenUpdateNeeded, setIsKitchenUpdateNeeded] = useState(false);
+
+  // Print receipt modal state
+  const [printReceiptOpen, setPrintReceiptOpen] = useState(false);
+
   // Restock notification states
   const [restockedItems, setRestockedItems] = useState<string[]>([]);
   const [glowingItems, setGlowingItems] = useState<string[]>([]);
@@ -329,6 +340,16 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
   const [pendingItemToAdd, setPendingItemToAdd] = useState<
     (typeof products)[0] | null
   >(null);
+
+  // Topping states
+  const [selectedTopping, setSelectedTopping] = useState<
+    (typeof toppingProducts)[0] | null
+  >(null);
+  const [toppingActionModalOpen, setToppingActionModalOpen] = useState(false); // "Attach or standalone" modal
+  const [toppingQuantity, setToppingQuantity] = useState(1);
+  const [selectItemToAttachOpen, setSelectItemToAttachOpen] = useState(false); // Modal to select which item to attach to
+  const [selectedItemToAttachTopping, setSelectedItemToAttachTopping] =
+    useState<CartItem | null>(null);
 
   // Ready items from kitchen (waiter monitoring)
   const [readyItems, setReadyItems] = useState<ReadyItem[]>([
@@ -677,6 +698,50 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
       price: 40000,
       image: "☕",
       isNew: true,
+    },
+  ];
+
+  // Topping SKUs (independent products)
+  const toppingProducts = [
+    {
+      id: "t1",
+      name: "Trân châu đen",
+      category: "topping",
+      price: 8000,
+      image: "●",
+      compatibleWith: ["coffee", "tea", "smoothie"], // Can attach to drinks
+    },
+    {
+      id: "t2",
+      name: "Thạch xoài",
+      category: "topping",
+      price: 10000,
+      image: "🟨",
+      compatibleWith: ["tea", "smoothie"],
+    },
+    {
+      id: "t3",
+      name: "Sương sáo",
+      category: "topping",
+      price: 5000,
+      image: "❄️",
+      compatibleWith: ["coffee", "tea", "smoothie"],
+    },
+    {
+      id: "t4",
+      name: "Kem tươi",
+      category: "topping",
+      price: 12000,
+      image: "🍦",
+      compatibleWith: ["coffee", "smoothie"],
+    },
+    {
+      id: "t5",
+      name: "Choco chip",
+      category: "topping",
+      price: 7000,
+      image: "🍫",
+      compatibleWith: ["coffee", "smoothie"],
     },
   ];
 
@@ -1198,6 +1263,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
       status: "pending" as const,
     };
     updateCurrentCart([...cart, newItem]);
+    setIsKitchenUpdateNeeded(true); // Enable send to kitchen button
 
     // Open customization modal only for non-pastry items
     if (product.category !== "pastry") {
@@ -1221,11 +1287,34 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
         })
         .filter((item) => item.quantity > 0)
     );
+    // Only enable send to kitchen button if quantity increased (change > 0)
+    if (change > 0) {
+      setIsKitchenUpdateNeeded(true);
+    }
   };
 
   const removeFromCart = (id: string) => {
     const cart = getCurrentCart();
-    updateCurrentCart(cart.filter((item) => item.id !== id));
+    // When removing an item, also remove all its attached toppings
+    const updatedCart = cart
+      .filter((item) => {
+        // Don't remove items that are attached to the deleted item
+        if (item.parentItemId === id) return false;
+        // Remove the main item
+        if (item.id === id) return false;
+        return true;
+      })
+      .map((item) => {
+        // If item has attached toppings, keep the item but filter out the deleted one
+        if (item.attachedToppings) {
+          return {
+            ...item,
+            attachedToppings: item.attachedToppings.filter((t) => t.id !== id),
+          };
+        }
+        return item;
+      });
+    updateCurrentCart(updatedCart);
   };
 
   const handleSelectTable = (table: Table) => {
@@ -1277,17 +1366,22 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
 
   const handleSendToKitchen = () => {
     const cart = getCurrentCart();
-    const pendingItems = cart.filter((item) => item.status === "pending");
+    // Include items with any status except "served" (items that need to be sent to kitchen)
+    const itemsToSend = cart.filter(
+      (item) => item.status !== "served" && item.status !== "canceled"
+    );
 
-    if (pendingItems.length === 0) {
+    if (itemsToSend.length === 0) {
       toast.error("Không có món nào cần gửi bếp");
       return;
     }
 
-    // Update status of pending items to preparing
+    // Update status of items to preparing
     updateCurrentCart(
       cart.map((item) =>
-        item.status === "pending" ? { ...item, status: "preparing" } : item
+        item.status !== "served" && item.status !== "canceled"
+          ? { ...item, status: "preparing" }
+          : item
       )
     );
 
@@ -1301,12 +1395,15 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
         hour: "2-digit",
         minute: "2-digit",
       }),
-      action: `Gửi ${pendingItems.length} món đến quầy pha chế - ${orderInfo}`,
+      action: `Gửi ${itemsToSend.length} món đến quầy pha chế - ${orderInfo}`,
       staff: "Thu ngân Lan",
     };
     setOrderHistory((prev) => [historyEntry, ...prev]);
 
-    toast.success(`Đã gửi ${pendingItems.length} món đến quầy pha chế`, {
+    // Reset kitchen update flag after sending
+    setIsKitchenUpdateNeeded(false);
+
+    toast.success(`Đã gửi ${itemsToSend.length} món đến quầy pha chế`, {
       description: orderInfo,
     });
   };
@@ -1611,6 +1708,12 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
       );
     };
 
+    // Check if customization has changed
+    const hasCustomizationChanged = !isCustomizationEqual(
+      selectedItemForCustomization.customization,
+      customization
+    );
+
     // Check if there's an existing item with the same product and customization
     const existingItemWithSameCustomization = cart.find(
       (item) =>
@@ -1652,6 +1755,11 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
         )
       );
       toast.success("Đã cập nhật tùy chỉnh món");
+    }
+
+    // Enable send to kitchen button if customization changed
+    if (hasCustomizationChanged) {
+      setIsKitchenUpdateNeeded(true);
     }
 
     setCustomizationModalOpen(false);
@@ -1777,20 +1885,105 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
     }
   };
 
-  // Helper function to calculate item price with customization
+  // Helper function to get compatible items from cart for topping attachment
+  const getCompatibleItemsForTopping = (
+    topping: (typeof toppingProducts)[0]
+  ): CartItem[] => {
+    const cart = getCurrentCart();
+    return cart.filter((item) => {
+      // Only show main items (not toppings, not combos)
+      if (item.isTopping || item.isCombo || item.parentItemId) return false;
+
+      // Find the product to check its category
+      const product = products.find((p) => p.id === item.id.split("-")[0]);
+      if (!product) return false;
+
+      // Check if topping is compatible with this item's category
+      return topping.compatibleWith.includes(product.category);
+    });
+  };
+
+  // Helper function to attach topping to item
+  const attachToppingToItem = (
+    parentItemId: string,
+    topping: (typeof toppingProducts)[0],
+    quantity: number
+  ) => {
+    const cart = getCurrentCart();
+
+    // Create topping item
+    const toppingItem: CartItem = {
+      id: `${topping.id}-attached-${Date.now()}`,
+      name: topping.name,
+      price: topping.price,
+      quantity,
+      status: "pending",
+      isTopping: true,
+      parentItemId,
+      basePrice: topping.price,
+    };
+
+    // Update cart to add topping as attached to parent
+    const updatedCart = cart.map((item) => {
+      if (item.id === parentItemId) {
+        return {
+          ...item,
+          attachedToppings: [...(item.attachedToppings || []), toppingItem],
+        };
+      }
+      return item;
+    });
+
+    updateCurrentCart(updatedCart);
+    setIsKitchenUpdateNeeded(true); // Enable send to kitchen button
+    toast.success(
+      `Đã thêm ${quantity} x ${topping.name} vào ${
+        cart.find((i) => i.id === parentItemId)?.name
+      }`
+    );
+  };
+
+  // Helper function to remove attached topping
+  const removeAttachedTopping = (parentItemId: string, toppingId: string) => {
+    const cart = getCurrentCart();
+    const updatedCart = cart.map((item) => {
+      if (item.id === parentItemId && item.attachedToppings) {
+        return {
+          ...item,
+          attachedToppings: item.attachedToppings.filter(
+            (t) => t.id !== toppingId
+          ),
+        };
+      }
+      return item;
+    });
+    updateCurrentCart(updatedCart);
+  };
+
+  // Helper function to calculate item price with customization and attached toppings
   const getItemPrice = (item: CartItem): number => {
     const basePrice = item.price;
-    const toppingsPrice =
+    const customizationToppingsPrice =
       item.customization?.toppings.reduce((sum, t) => sum + t.price, 0) || 0;
-    return basePrice + toppingsPrice;
+    const attachedToppingsPrice =
+      item.attachedToppings?.reduce(
+        (sum, t) => sum + t.price * t.quantity,
+        0
+      ) || 0;
+    return basePrice + customizationToppingsPrice + attachedToppingsPrice;
   };
 
   const cart = getCurrentCart();
-  const totalAmount = cart.reduce(
-    (sum, item) => sum + getItemPrice(item) * item.quantity,
-    0
-  );
-  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const totalAmount = cart.reduce((sum, item) => {
+    // Skip attached toppings - they're included in parent price
+    if (item.parentItemId) return sum;
+    return sum + getItemPrice(item) * item.quantity;
+  }, 0);
+  const totalItems = cart.reduce((sum, item) => {
+    // Skip attached toppings - they don't count as separate items
+    if (item.parentItemId) return sum;
+    return sum + item.quantity;
+  }, 0);
 
   const getTableStatusColor = (status: Table["status"]) => {
     switch (status) {
@@ -1983,6 +2176,13 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
               className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
             >
               Thực đơn
+            </TabsTrigger>
+            <TabsTrigger
+              value="topping"
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              <Package className="w-4 h-4 mr-1" />
+              Topping
             </TabsTrigger>
             <TabsTrigger
               value="combo"
@@ -2279,6 +2479,42 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                     </Card>
                   );
                 })}
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Topping Tab */}
+          <TabsContent value="topping" className="flex-1 overflow-auto m-0">
+            <div className="p-4 lg:p-6">
+              <div className="mb-4">
+                <h3 className="text-slate-900 font-semibold mb-4">
+                  Topping & Phụ gia
+                </h3>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {toppingProducts.map((topping) => (
+                  <Card
+                    key={topping.id}
+                    className="cursor-pointer hover:shadow-md transition-all border border-slate-200 hover:border-amber-400"
+                    onClick={() => {
+                      setSelectedTopping(topping);
+                      setToppingQuantity(1);
+                      setToppingActionModalOpen(true);
+                    }}
+                  >
+                    <CardContent className="p-3">
+                      <div className="text-3xl mb-2 text-center">
+                        {topping.image}
+                      </div>
+                      <h4 className="font-semibold text-sm text-slate-900 text-center mb-1">
+                        {topping.name}
+                      </h4>
+                      <p className="text-amber-600 font-bold text-center">
+                        {topping.price.toLocaleString("vi-VN")}đ
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             </div>
           </TabsContent>
@@ -2644,25 +2880,71 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {/* Combo Suggestion Banner - will add later */}
 
-              {cart.map((item) => (
-                <CartItemDisplay
-                  key={item.id}
-                  item={item}
-                  onUpdateQuantity={updateQuantity}
-                  onRemove={removeFromCart}
-                  onCustomize={handleOpenCustomizationModal}
-                  onAddNote={handleOpenNoteDialog}
-                  onToggleComboExpansion={toggleComboExpansion}
-                  onCustomizeComboItem={handleCustomizeComboItem}
-                  getItemStatusBadge={getItemStatusBadge}
-                  restockedItems={restockedItems}
-                  glowingItems={glowingItems}
-                  appliedPromoCode={appliedPromoCode}
-                />
-              ))}
+              {cart.map((item) => {
+                // Skip attached toppings in main loop - they'll be rendered under parent
+                if (item.parentItemId) return null;
+
+                return (
+                  <div key={item.id}>
+                    {/* Main Item */}
+                    <CartItemDisplay
+                      item={item}
+                      onUpdateQuantity={updateQuantity}
+                      onRemove={removeFromCart}
+                      onCustomize={handleOpenCustomizationModal}
+                      onAddNote={handleOpenNoteDialog}
+                      onToggleComboExpansion={toggleComboExpansion}
+                      onCustomizeComboItem={handleCustomizeComboItem}
+                      getItemStatusBadge={getItemStatusBadge}
+                      restockedItems={restockedItems}
+                      glowingItems={glowingItems}
+                      appliedPromoCode={appliedPromoCode}
+                    />
+
+                    {/* Attached Toppings - Indented */}
+                    {item.attachedToppings &&
+                      item.attachedToppings.length > 0 && (
+                        <div className="ml-6 mt-1 space-y-1 border-l-2 border-amber-200 pl-3">
+                          {item.attachedToppings.map((topping) => (
+                            <div
+                              key={topping.id}
+                              className="bg-amber-50 rounded border border-amber-200 p-2 flex items-center justify-between gap-2"
+                            >
+                              <div className="flex-1">
+                                <p className="text-xs font-medium text-slate-900">
+                                  + {topping.name}
+                                </p>
+                                <p className="text-xs text-amber-700">
+                                  {topping.quantity} x{" "}
+                                  {topping.price.toLocaleString("vi-VN")}đ ={" "}
+                                  {(
+                                    topping.quantity * topping.price
+                                  ).toLocaleString("vi-VN")}
+                                  đ
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 text-slate-400 hover:text-red-600"
+                                  onClick={() =>
+                                    removeAttachedTopping(item.id, topping.id)
+                                  }
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -2738,15 +3020,14 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
           )}
 
           {/* Send to Kitchen Button - Big Primary */}
-          {cart.some((item) => item.status === "pending") && (
-            <Button
-              className="w-full bg-orange-600 hover:bg-orange-700 h-8 shadow-lg text-base"
-              onClick={handleSendToKitchen}
-            >
-              <Bell className="w-5 h-5 mr-2" />
-              Gửi pha chế
-            </Button>
-          )}
+          <Button
+            className="w-full bg-orange-600 hover:bg-orange-700 h-8 shadow-lg text-base disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleSendToKitchen}
+            disabled={cart.length === 0 || !isKitchenUpdateNeeded}
+          >
+            <Bell className="w-5 h-5 mr-2" />
+            Gửi pha chế
+          </Button>
 
           {/* Buttons Row */}
           <div className="flex gap-2">
@@ -2760,83 +3041,27 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
               Khuyến mãi
             </Button>
 
-            <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 h-9 shadow-md text-sm"
-                  disabled={cart.length === 0}
-                >
-                  <CreditCard className="w-4 h-4 mr-1" />
-                  Thanh toán
-                </Button>
-              </DialogTrigger>
-            </Dialog>
-
-            <CheckoutModal
-              open={checkoutOpen}
-              onClose={() => setCheckoutOpen(false)}
+            <Button
+              className="flex-1 bg-blue-600 hover:bg-blue-700 h-9 shadow-md text-sm"
+              disabled={cart.length === 0}
+              onClick={() => setPrintReceiptOpen(true)}
+            >
+              <CreditCard className="w-4 h-4 mr-1" />
+              Thanh toán
+            </Button>
+            <PrintReceiptModal
+              open={printReceiptOpen}
+              onClose={() => setPrintReceiptOpen(false)}
               items={cart.map((item) => ({
                 id: item.id,
                 name: item.name,
                 quantity: item.quantity,
-                price: item.price * item.quantity,
-                basePrice: item.basePrice * item.quantity,
+                price: item.price,
               }))}
               totalAmount={totalAmount}
-              discountAmount={discountAmount}
-              tableNumber={selectedTable?.number}
-              tableArea={
-                selectedTable
-                  ? areas.find((a) => a.id === selectedTable.area)?.name
-                  : undefined
-              }
-              isTakeaway={isTakeaway}
-              orderCode={selectedTable?.currentOrder || "TAKEAWAY"}
-              bankAccounts={bankAccounts}
-              onAddBankAccount={(bank, owner, account) => {
-                setBankAccounts([...bankAccounts, { bank, owner, account }]);
-              }}
-              onConfirmPayment={(method, details) => {
-                toast.success("Thanh toán thành công!");
-
-                // Xóa đơn hàng khỏi bàn hoặc takeaway
-                if (isTakeaway) {
-                  setTakeawayOrders([]);
-                } else if (selectedTable) {
-                  // Reset table orders
-                  const updatedTableOrders = { ...tableOrders };
-                  delete updatedTableOrders[selectedTable.id];
-                  setTableOrders(updatedTableOrders);
-
-                  // Reset table status to available
-                  setTables(
-                    tables.map((table) =>
-                      table.id === selectedTable.id
-                        ? {
-                            ...table,
-                            status: "available" as const,
-                            currentOrder: undefined,
-                          }
-                        : table
-                    )
-                  );
-                }
-
-                // Reset checkout modal
-                setCheckoutOpen(false);
-
-                // Reset selected table
-                setSelectedTable(null);
-                setIsTakeaway(false);
-
-                // Reset discount
-                setDiscountAmount(0);
-                setPromoCode("");
-                setPromoError("");
-                setAppliedPromoCode("");
-                setSelectedPromotion(null);
-                setUsedPoints(0);
-              }}
+              orderNumber={selectedTable?.currentOrder || "TAKEAWAY"}
+              customerName={selectedCustomer?.name || "Khách hàng"}
+              paymentMethod="Tiền mặt"
             />
           </div>
         </div>
@@ -4076,6 +4301,11 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
           basePrice={selectedItemForCustomization.price}
           onUpdate={handleUpdateCustomization}
           initialCustomization={selectedItemForCustomization.customization}
+          availableToppings={toppingProducts.map((t) => ({
+            id: t.id,
+            name: t.name,
+            price: t.price,
+          }))}
         />
       )}
 
@@ -4097,6 +4327,204 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
         selectedCustomer={null} // You can integrate customer selection here
         onApply={handleApplyPromotion}
       />
+
+      {/* Select Item to Attach Topping Modal */}
+      <Dialog
+        open={selectItemToAttachOpen}
+        onOpenChange={setSelectItemToAttachOpen}
+      >
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5" />
+              Chọn đồ uống để thêm {selectedTopping?.name}
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedTopping && (
+            <div className="space-y-4">
+              {/* Quantity Selector */}
+              <div className="space-y-2 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                <Label className="text-sm font-semibold text-slate-900">
+                  Số lượng {selectedTopping.name}
+                </Label>
+                <div className="flex items-center justify-center gap-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-9 w-9 p-0"
+                    onClick={() =>
+                      setToppingQuantity(Math.max(1, toppingQuantity - 1))
+                    }
+                  >
+                    <Minus className="w-4 h-4" />
+                  </Button>
+                  <span className="w-12 text-center font-bold text-lg text-amber-600">
+                    {toppingQuantity}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-9 w-9 p-0"
+                    onClick={() => setToppingQuantity(toppingQuantity + 1)}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Item List */}
+              <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                {getCompatibleItemsForTopping(selectedTopping).map((item) => (
+                  <Button
+                    key={item.id}
+                    variant="outline"
+                    className="w-full justify-start h-auto py-3 hover:bg-blue-50 border-blue-200"
+                    onClick={() => {
+                      attachToppingToItem(
+                        item.id,
+                        selectedTopping,
+                        toppingQuantity
+                      );
+                      setSelectItemToAttachOpen(false);
+                      setToppingActionModalOpen(false);
+                      setSelectedTopping(null);
+                      setToppingQuantity(1);
+                    }}
+                  >
+                    <div className="flex-1 text-left">
+                      <div className="font-semibold text-slate-900">
+                        {item.name} x{item.quantity}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {item.price.toLocaleString("vi-VN")}đ
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                  </Button>
+                ))}
+
+                {getCompatibleItemsForTopping(selectedTopping).length === 0 && (
+                  <div className="text-center py-8 text-slate-400">
+                    <p className="text-sm">Không có đồ uống nào tương thích</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setSelectItemToAttachOpen(false);
+              }}
+            >
+              Hủy
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Topping Action Modal - Attach or Standalone */}
+      <Dialog
+        open={toppingActionModalOpen}
+        onOpenChange={setToppingActionModalOpen}
+      >
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="w-5 h-5" />
+              {selectedTopping?.name}
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedTopping && (
+            <div className="space-y-4">
+              <div className="text-center py-4 bg-slate-50 rounded-lg">
+                <div className="text-5xl mb-2">{selectedTopping.image}</div>
+                <p className="text-2xl font-bold text-amber-600">
+                  {selectedTopping.price.toLocaleString("vi-VN")}đ
+                </p>
+              </div>
+
+              {/* Quantity Selector - Always Visible */}
+              <div className="space-y-2 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <Label className="text-sm font-semibold text-slate-900">
+                  Số lượng
+                </Label>
+                <div className="flex items-center justify-center gap-4">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="h-10 w-10 p-0 border-2"
+                    onClick={() =>
+                      setToppingQuantity(Math.max(1, toppingQuantity - 1))
+                    }
+                  >
+                    <Minus className="w-5 h-5" />
+                  </Button>
+                  <span className="w-16 text-center font-bold text-2xl text-blue-600">
+                    {toppingQuantity}
+                  </span>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="h-10 w-10 p-0 border-2"
+                    onClick={() => setToppingQuantity(toppingQuantity + 1)}
+                  >
+                    <Plus className="w-5 h-5" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <Button
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={() => {
+                    // Add as standalone item
+                    const cart = getCurrentCart();
+                    const newItem: CartItem = {
+                      id: `${selectedTopping.id}-${Date.now()}`,
+                      name: selectedTopping.name,
+                      price: selectedTopping.price,
+                      quantity: toppingQuantity,
+                      status: "pending",
+                      isTopping: true,
+                      basePrice: selectedTopping.price,
+                    };
+                    updateCurrentCart([...cart, newItem]);
+                    toast.success(
+                      `Đã thêm ${toppingQuantity} x ${selectedTopping.name}`
+                    );
+                    setToppingActionModalOpen(false);
+                    setSelectedTopping(null);
+                    setToppingQuantity(1);
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Bán riêng lẻ
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setToppingActionModalOpen(false);
+                setSelectedTopping(null);
+                setToppingQuantity(1);
+              }}
+            >
+              Hủy
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Combo Selection Popup */}
       <ComboSelectionPopup
