@@ -229,8 +229,8 @@ export function SupplierReport({ viewType, concern, searchQuery, dateFrom, dateT
         <div className="flex-1 p-6">
           <div className="mb-4">
             <h3 className="text-lg text-slate-900">
-              {concern === 'sales' 
-                ? 'Top 10 nhà cung cấp nhập hàng nhiều nhất (đã trừ trả hàng)'
+              {concern === 'sales'
+                ? 'Top 10 nhà cung cấp nhập hàng nhiều nhất'
                 : 'Top 10 nhà cung cấp có công nợ cao nhất'}
             </h3>
           </div>
@@ -245,7 +245,7 @@ export function SupplierReport({ viewType, concern, searchQuery, dateFrom, dateT
                 <XAxis type="number" />
                 <YAxis type="category" dataKey="name" width={140} />
                 <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                <Bar dataKey="value" fill="#2563eb" name={concern === 'sales' ? 'Giá trị nhập' : 'Công nợ'} />
+                <Bar dataKey="value" fill="#2563eb" name={concern === 'sales' ? 'Giá trị nhập' : 'Công nợ'} label={{ position: 'right', fill: '#1e40af', fontWeight: 'bold', fontSize: 11, formatter: (value: number) => value.toLocaleString('vi-VN') }} />
               </BarChart>
             </ResponsiveContainer>
           </div>

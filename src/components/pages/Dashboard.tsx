@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { 
+import {
   TrendingUp,
   ShoppingCart,
   Users,
@@ -21,12 +21,17 @@ import {
   Bar,
   LineChart,
   Line,
+  PieChart,
+  Pie,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend
+  Legend,
+  Label,
+  LabelList
 } from 'recharts';
 
 type TimeRange = 'today' | 'yesterday' | '7days' | 'thisMonth' | 'lastMonth';
@@ -98,8 +103,8 @@ export function Dashboard() {
     { name: '22:00', value: 6 }
   ];
 
-  // Top 10 products data
-  const topProductsData = [
+  // Top 10 products data by revenue
+  const topProductsByRevenue = [
     { name: 'Phomac dây Nga', value: 3310000 },
     { name: 'Cà phê sữa đá', value: 3000000 },
     { name: 'Sữa hạnh tây sữu Phạm', value: 2400000 },
@@ -109,8 +114,37 @@ export function Dashboard() {
     { name: 'Sữa kem viỉu Parm', value: 1200000 },
     { name: 'Thuốc lá Marlboro', value: 900000 },
     { name: 'Thuốc lá Vinataba', value: 600000 },
-    { name: 'Ghi FIZZ', value: 200000 }
+    { name: 'Ghi FIZZ', value: 200000 },
+    // Items beyond top 10 (will be grouped as "Khác")
+    { name: 'Trà sữa trân châu', value: 150000 },
+    { name: 'Sinh tố bơ', value: 120000 },
+    { name: 'Nước ép cam', value: 100000 },
+    { name: 'Bánh mì thịt', value: 80000 },
+    { name: 'Cơm gà xối mỡ', value: 50000 }
   ];
+
+  // Top 10 products data by quantity
+  const topProductsByQuantity = [
+    { name: 'Cà phê sữa đá', value: 450 },
+    { name: 'Phomac dây Nga', value: 380 },
+    { name: 'Sữa kem giá rỗ huống', value: 320 },
+    { name: 'Sữa hạnh tây sữu Phạm', value: 280 },
+    { name: 'Ghi FIZZ', value: 250 },
+    { name: 'Sữa kem viỉu Parm', value: 210 },
+    { name: 'Thít nghệ & phomac viên chiên', value: 180 },
+    { name: 'Cbiami my sứt sỉ dàm bống cỉ phạm', value: 150 },
+    { name: 'Thuốc lá Marlboro', value: 120 },
+    { name: 'Thuốc lá Vinataba', value: 90 },
+    // Items beyond top 10 (will be grouped as "Khác")
+    { name: 'Trà sữa trân châu', value: 75 },
+    { name: 'Sinh tố bơ', value: 60 },
+    { name: 'Nước ép cam', value: 45 },
+    { name: 'Bánh mì thịt', value: 30 },
+    { name: 'Cơm gà xối mỡ', value: 20 }
+  ];
+
+  // Get current top products data based on filter
+  const topProductsData = topProductsFilter === 'revenue' ? topProductsByRevenue : topProductsByQuantity;
 
   const totalSales = getSalesChartData().reduce((sum, item) => sum + item.value, 0);
 
@@ -156,7 +190,7 @@ export function Dashboard() {
                   <CheckCircle2 className="w-5 h-5 text-green-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-slate-600 mb-1">Đơn đã hoàn phục vụ</p>
+                  <p className="text-xs text-slate-600 mb-1">Đơn đã hoàn thành</p>
                   <p className="text-xl text-slate-900 mb-1">
                     {todayStats.orders.today}
                   </p>
@@ -235,16 +269,15 @@ export function Dashboard() {
               </SelectContent>
             </Select>
           </div>
-          
+
           {/* Chart View Tabs */}
           <div className="flex gap-4 mt-4 border-b border-slate-200">
             <button
               onClick={() => setSalesChartView('byHour')}
-              className={`pb-2 px-1 text-sm transition-colors relative ${
-                salesChartView === 'byHour'
-                  ? 'text-blue-600'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className={`pb-2 px-1 text-sm transition-colors relative ${salesChartView === 'byHour'
+                ? 'text-blue-600'
+                : 'text-slate-600 hover:text-slate-900'
+                }`}
             >
               Theo giờ
               {salesChartView === 'byHour' && (
@@ -253,11 +286,10 @@ export function Dashboard() {
             </button>
             <button
               onClick={() => setSalesChartView('byDay')}
-              className={`pb-2 px-1 text-sm transition-colors relative ${
-                salesChartView === 'byDay'
-                  ? 'text-blue-600'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className={`pb-2 px-1 text-sm transition-colors relative ${salesChartView === 'byDay'
+                ? 'text-blue-600'
+                : 'text-slate-600 hover:text-slate-900'
+                }`}
             >
               Theo ngày
               {salesChartView === 'byDay' && (
@@ -266,11 +298,10 @@ export function Dashboard() {
             </button>
             <button
               onClick={() => setSalesChartView('byWeekday')}
-              className={`pb-2 px-1 text-sm transition-colors relative ${
-                salesChartView === 'byWeekday'
-                  ? 'text-blue-600'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className={`pb-2 px-1 text-sm transition-colors relative ${salesChartView === 'byWeekday'
+                ? 'text-blue-600'
+                : 'text-slate-600 hover:text-slate-900'
+                }`}
             >
               Theo thứ
               {salesChartView === 'byWeekday' && (
@@ -281,40 +312,43 @@ export function Dashboard() {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={getSalesChartData()}>
+            <LineChart data={getSalesChartData()}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-              <XAxis 
-                dataKey="name" 
+              <XAxis
+                dataKey="name"
                 tick={{ fill: '#64748b', fontSize: 11 }}
                 axisLine={{ stroke: '#e2e8f0' }}
               />
-              <YAxis 
+              <YAxis
                 tick={{ fill: '#64748b', fontSize: 11 }}
                 tickFormatter={(value) => `${(value / 1000000).toFixed(0)} tr`}
                 axisLine={false}
                 tickLine={false}
               />
-              <Tooltip 
+              <Tooltip
                 formatter={(value: number) => [`${value.toLocaleString()}₫`, 'Doanh số']}
-                contentStyle={{ 
-                  backgroundColor: 'white', 
+                contentStyle={{
+                  backgroundColor: 'white',
                   border: '1px solid #e2e8f0',
                   borderRadius: '6px',
                   fontSize: '12px'
                 }}
               />
-              <Legend 
-                wrapperStyle={{ fontSize: '12px' }}
-                iconType="circle"
-                formatter={() => 'Chi nhánh trung tâm'}
-              />
-              <Bar 
-                dataKey="value" 
-                fill="#3b82f6" 
-                radius={[4, 4, 0, 0]}
-                name="Chi nhánh trung tâm"
-              />
-            </BarChart>
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+              >
+                <LabelList
+                  dataKey="value"
+                  position="top"
+                  formatter={(value: number) => `${(value / 1000000).toFixed(1)}tr`}
+                  style={{ fill: '#64748b', fontSize: 10 }}
+                />
+              </Line>
+            </LineChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
@@ -345,38 +379,38 @@ export function Dashboard() {
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={customersChartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-              <XAxis 
-                dataKey="name" 
+              <XAxis
+                dataKey="name"
                 tick={{ fill: '#64748b', fontSize: 11 }}
                 axisLine={{ stroke: '#e2e8f0' }}
               />
-              <YAxis 
+              <YAxis
                 tick={{ fill: '#64748b', fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
               />
-              <Tooltip 
+              <Tooltip
                 formatter={(value: number) => [`${value}`, 'Số khách']}
-                contentStyle={{ 
-                  backgroundColor: 'white', 
+                contentStyle={{
+                  backgroundColor: 'white',
                   border: '1px solid #e2e8f0',
                   borderRadius: '6px',
                   fontSize: '12px'
                 }}
               />
-              <Legend 
-                wrapperStyle={{ fontSize: '12px' }}
-                iconType="circle"
-                formatter={() => 'Chi nhánh trung tâm'}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="value" 
-                stroke="#3b82f6" 
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke="#3b82f6"
                 strokeWidth={2}
                 dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
-                name="Chi nhánh trung tâm"
-              />
+              >
+                <LabelList
+                  dataKey="value"
+                  position="top"
+                  style={{ fill: '#64748b', fontSize: 10 }}
+                />
+              </Line>
             </LineChart>
           </ResponsiveContainer>
         </CardContent>
@@ -416,42 +450,82 @@ export function Dashboard() {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={400}>
-            <BarChart 
-              data={topProductsData} 
-              layout="vertical"
-              margin={{ top: 5, right: 30, left: 150, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-              <XAxis 
-                type="number"
-                tick={{ fill: '#64748b', fontSize: 11 }}
-                tickFormatter={(value) => `${(value / 1000000).toFixed(1)} tr`}
-                axisLine={{ stroke: '#e2e8f0' }}
-              />
-              <YAxis 
-                type="category"
-                dataKey="name" 
-                tick={{ fill: '#64748b', fontSize: 11 }}
-                width={140}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip 
-                formatter={(value: number) => [`${value.toLocaleString()}₫`, 'Doanh thu']}
-                contentStyle={{ 
-                  backgroundColor: 'white', 
+            <PieChart>
+              <Pie
+                data={(() => {
+                  // Get top 10 items
+                  const top10 = topProductsData.slice(0, 10);
+                  // Calculate "Khác" (Others) - sum of items beyond top 10
+                  const othersValue = topProductsData.slice(10).reduce((sum, item) => sum + item.value, 0);
+
+                  // If there are items beyond top 10, add "Khác"
+                  if (othersValue > 0) {
+                    return [...top10, { name: 'Khác', value: othersValue }];
+                  }
+                  return top10;
+                })()}
+                cx="50%"
+                cy="50%"
+                labelLine={true}
+                label={(entry) => {
+                  const percent = ((entry.value / topProductsData.reduce((sum, item) => sum + item.value, 0)) * 100).toFixed(1);
+                  return `${entry.name}: ${percent}%`;
+                }}
+                outerRadius={120}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {(() => {
+                  const COLORS = [
+                    '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981',
+                    '#06b6d4', '#6366f1', '#f97316', '#14b8a6', '#a855f7',
+                    '#94a3b8' // Gray color for "Khác"
+                  ];
+                  const top10 = topProductsData.slice(0, 10);
+                  const othersValue = topProductsData.slice(10).reduce((sum, item) => sum + item.value, 0);
+                  const dataLength = othersValue > 0 ? top10.length + 1 : top10.length;
+
+                  return Array.from({ length: dataLength }, (_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ));
+                })()}
+              </Pie>
+              <Tooltip
+                formatter={(value: number) => [
+                  topProductsFilter === 'revenue'
+                    ? `${value.toLocaleString()}₫`
+                    : `${value} sản phẩm`,
+                  topProductsFilter === 'revenue' ? 'Doanh thu' : 'Số lượng'
+                ]}
+                contentStyle={{
+                  backgroundColor: 'white',
                   border: '1px solid #e2e8f0',
                   borderRadius: '6px',
                   fontSize: '12px'
                 }}
               />
-              <Bar 
-                dataKey="value" 
-                fill="#3b82f6" 
-                radius={[0, 4, 4, 0]}
-                barSize={20}
+              <Legend
+                layout="vertical"
+                align="right"
+                verticalAlign="middle"
+                wrapperStyle={{
+                  fontSize: '12px',
+                  paddingRight: '150px'
+                }}
+                formatter={(value) => {
+                  const item = topProductsData.find(p => p.name === value) ||
+                    (value === 'Khác' ? { value: topProductsData.slice(10).reduce((sum, item) => sum + item.value, 0) } : null);
+                  if (item) {
+                    if (topProductsFilter === 'revenue') {
+                      return `${value} (${(item.value / 1000000).toFixed(1)}tr)`;
+                    } else {
+                      return `${value} (${item.value})`;
+                    }
+                  }
+                  return value;
+                }}
               />
-            </BarChart>
+            </PieChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>

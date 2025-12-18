@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ShoppingBag,
   BarChart3 as BarChartIcon,
+  BarChart3,
   PieChart as PieChartIcon,
   LineChart as LineChartIcon,
 } from 'lucide-react';
@@ -32,6 +33,7 @@ import {
   Pie,
   Cell,
   Legend,
+  LabelList
 } from 'recharts';
 
 interface FinanceReportProps {
@@ -74,6 +76,16 @@ export function FinanceReport({ viewType, selectedConcerns }: FinanceReportProps
     { name: 'Chuyển khoản', value: 35, amount: 22400000, color: '#3b82f6' },
     { name: 'Ví điện tử', value: 15, amount: 9600000, color: '#60a5fa' },
     { name: 'Thẻ tín dụng', value: 5, amount: 3200000, color: '#93c5fd' },
+  ];
+
+  const revenueByDayOfWeekData = [
+    { day: 'T2', revenue: 8200000 },
+    { day: 'T3', revenue: 7800000 },
+    { day: 'T4', revenue: 9100000 },
+    { day: 'T5', revenue: 8500000 },
+    { day: 'T6', revenue: 9500000 },
+    { day: 'T7', revenue: 10200000 },
+    { day: 'CN', revenue: 11500000 },
   ];
 
   const revenueReport = [
@@ -196,10 +208,35 @@ export function FinanceReport({ viewType, selectedConcerns }: FinanceReportProps
                       }}
                     />
                     <Legend />
-                    {selectedConcerns.includes('revenue') && <Bar dataKey="revenue" fill="#059669" name="Doanh thu" />}
-                    {selectedConcerns.includes('expenses') && <Bar dataKey="expenses" fill="#dc2626" name="Chi phí" />}
+                    {selectedConcerns.includes('revenue') && (
+                      <Bar dataKey="revenue" fill="#059669" name="Doanh thu">
+                        <LabelList
+                          dataKey="revenue"
+                          position="top"
+                          formatter={(value: number) => value.toLocaleString('vi-VN')}
+                          style={{ fill: '#059669', fontSize: 12, fontWeight: 'bold' }}
+                        />
+                      </Bar>
+                    )}
+                    {selectedConcerns.includes('expenses') && (
+                      <Bar dataKey="expenses" fill="#dc2626" name="Chi phí">
+                        <LabelList
+                          dataKey="expenses"
+                          position="top"
+                          formatter={(value: number) => value.toLocaleString('vi-VN')}
+                          style={{ fill: '#dc2626', fontSize: 12, fontWeight: 'bold' }}
+                        />
+                      </Bar>
+                    )}
                     {selectedConcerns.includes('profit') && (
-                      <Line type="monotone" dataKey="profit" stroke="#2563eb" strokeWidth={3} name="Lợi nhuận" />
+                      <Line type="monotone" dataKey="profit" stroke="#2563eb" strokeWidth={3} name="Lợi nhuận">
+                        <LabelList
+                          dataKey="profit"
+                          position="top"
+                          formatter={(value: number) => `${(value / 1000000).toFixed(1)}M`}
+                          style={{ fill: '#2563eb', fontSize: 12, fontWeight: 'bold' }}
+                        />
+                      </Line>
                     )}
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -239,12 +276,60 @@ export function FinanceReport({ viewType, selectedConcerns }: FinanceReportProps
                       stroke="#2563eb"
                       strokeWidth={3}
                       dot={{ fill: '#1e40af', strokeWidth: 2, r: 4 }}
-                    />
+                    >
+                      <LabelList
+                        dataKey="revenue"
+                        position="top"
+                        formatter={(value: number) => `${(value / 1000000).toFixed(1)}M`}
+                        style={{ fill: '#2563eb', fontSize: 12, fontWeight: 'bold' }}
+                      />
+                    </Line>
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
           )}
+
+          {/* Revenue by Day of Week */}
+          {selectedConcerns.includes('revenue') && (
+            <Card className="border-blue-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-blue-900">
+                  <BarChart3 className="w-5 h-5" />
+                  Doanh thu theo ngày trong tuần
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={revenueByDayOfWeekData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="day" tick={{ fill: '#64748b', fontSize: 12 }} />
+                    <YAxis
+                      tick={{ fill: '#64748b', fontSize: 12 }}
+                      tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
+                    />
+                    <Tooltip
+                      formatter={(value: number) => `${value.toLocaleString()}₫`}
+                      contentStyle={{
+                        backgroundColor: '#eff6ff',
+                        border: '1px solid #bfdbfe',
+                        borderRadius: '8px',
+                      }}
+                    />
+                    <Bar dataKey="revenue" fill="#2563eb" radius={[8, 8, 0, 0]}>
+                      <LabelList
+                        dataKey="revenue"
+                        position="top"
+                        formatter={(value: number) => value.toLocaleString('vi-VN')}
+                        style={{ fill: '#2563eb', fontSize: 12, fontWeight: 'bold' }}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
 
           {/* Payment Methods */}
           {selectedConcerns.includes('payment') && (
@@ -369,8 +454,7 @@ export function FinanceReport({ viewType, selectedConcerns }: FinanceReportProps
                         <TableHead>Ngày</TableHead>
                         <TableHead className="text-right">Doanh thu</TableHead>
                         <TableHead className="text-right">Chi phí</TableHead>
-                        <TableHead className="text-right">Lợi nhuận gộp</TableHead>
-                        <TableHead className="text-right">Lợi nhuận ròng</TableHead>
+                        <TableHead className="text-right">Lợi nhuận</TableHead>
                         <TableHead className="text-right">Tỷ suất LN (%)</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -386,9 +470,6 @@ export function FinanceReport({ viewType, selectedConcerns }: FinanceReportProps
                           </TableCell>
                           <TableCell className="text-sm text-blue-700 text-right">
                             {item.grossProfit.toLocaleString()}₫
-                          </TableCell>
-                          <TableCell className="text-sm text-blue-900 text-right">
-                            {item.netProfit.toLocaleString()}₫
                           </TableCell>
                           <TableCell className="text-sm text-amber-700 text-right">{item.margin.toFixed(1)}%</TableCell>
                         </TableRow>

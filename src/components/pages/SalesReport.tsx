@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Download } from 'lucide-react';
 import { Button } from '../ui/button';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { ChevronDown, ChevronRight } from 'lucide-react';
@@ -18,13 +18,13 @@ interface SalesReportProps {
   selectedTable: string;
 }
 
-export function SalesReport({ 
-  viewType, 
-  concern, 
-  dateFrom, 
+export function SalesReport({
+  viewType,
+  concern,
+  dateFrom,
   dateTo,
   selectedArea,
-  selectedTable 
+  selectedTable
 }: SalesReportProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
@@ -37,7 +37,7 @@ export function SalesReport({
     }
     setExpandedRows(newExpanded);
   };
-  
+
   // Chart data for time concern - by day (net revenue)
   const timeChartDataByDay = [
     { day: '01', netRevenue: 4063000 },
@@ -279,7 +279,7 @@ export function SalesReport({
     const chartData = getChartData();
     let dataKey = concern === 'table' || concern === 'category' ? 'name' : 'day';
     let valueKey = 'revenue';
-    
+
     // For time and profit concerns, determine data key based on time range
     if (concern === 'time' || concern === 'profit') {
       const daysDiff = getDaysBetween(dateFrom, dateTo);
@@ -288,7 +288,7 @@ export function SalesReport({
         valueKey = 'netRevenue';
       }
     }
-    
+
     // Determine chart title based on concern
     const getChartTitle = () => {
       if (concern === 'profit') {
@@ -301,68 +301,115 @@ export function SalesReport({
       }
       return `Doanh thu thuần ${getConcernLabel()} ${getTimeRangeLabel()}`;
     };
-    
+
     return (
       <div className="bg-white rounded-lg border border-slate-200 p-6">
         <div className="mb-6">
           <h2 className="text-slate-900 mb-1">{getChartTitle()}</h2>
         </div>
-        
+
         <ResponsiveContainer width="100%" height={400}>
-          <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis 
-              dataKey={dataKey} 
-              stroke="#64748b"
-              tick={{ fill: '#64748b', fontSize: 12 }}
-            />
-            <YAxis 
-              stroke="#64748b"
-              tick={{ fill: '#64748b', fontSize: 12 }}
-              tickFormatter={(value) => `${(value / 1000000).toFixed(1)}tr`}
-            />
-            <Tooltip 
-              formatter={(value: number, name: string) => {
-                const labels: { [key: string]: string } = {
-                  'revenue': 'Doanh thu',
-                  'netRevenue': 'Doanh thu thuần',
-                  'profit': 'Lợi nhuận',
-                  'cost': 'Giá vốn',
-                };
-                return [formatCurrency(value), labels[name] || name];
-              }}
-              labelFormatter={(label) => {
-                if (concern === 'table' || concern === 'category') return label;
-                if ((concern === 'time' || concern === 'profit') && dataKey === 'month') return label;
-                return `Ngày ${label}`;
-              }}
-              contentStyle={{ 
-                backgroundColor: 'white', 
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-                fontSize: '14px'
-              }}
-            />
-            {concern === 'profit' ? (
-              <>
-                <Bar dataKey="profit" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="cost" fill="#fbbf24" radius={[4, 4, 0, 0]} />
-                <Legend 
-                  formatter={(value) => {
-                    const labels: { [key: string]: string } = {
-                      'profit': 'Lợi nhuận',
-                      'revenue': 'Doanh thu',
-                      'cost': 'Giá vốn',
-                    };
-                    return labels[value] || value;
-                  }}
-                />
-              </>
-            ) : (
-              <Bar dataKey={valueKey} fill="#2563eb" radius={[4, 4, 0, 0]} />
-            )}
-          </BarChart>
+          {concern === 'time' ? (
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis
+                dataKey={dataKey}
+                stroke="#64748b"
+                tick={{ fill: '#64748b', fontSize: 12 }}
+              />
+              <YAxis
+                stroke="#64748b"
+                tick={{ fill: '#64748b', fontSize: 12 }}
+                tickFormatter={(value) => `${(value / 1000000).toFixed(1)}tr`}
+              />
+              <Tooltip
+                formatter={(value: number, name: string) => {
+                  const labels: { [key: string]: string } = {
+                    'revenue': 'Doanh thu',
+                    'netRevenue': 'Doanh thu thuần',
+                    'profit': 'Lợi nhuận',
+                    'cost': 'Giá vốn',
+                  };
+                  return [formatCurrency(value), labels[name] || name];
+                }}
+                labelFormatter={(label) => {
+                  if (concern === 'table' || concern === 'category') return label;
+                  if ((concern === 'time' || concern === 'profit') && dataKey === 'month') return label;
+                  return `Ngày ${label}`;
+                }}
+                contentStyle={{
+                  backgroundColor: 'white',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+              />
+              <Line
+                type="monotone"
+                dataKey={valueKey}
+                stroke="#2563eb"
+                strokeWidth={2}
+                dot={{ fill: '#2563eb', r: 4 }}
+                activeDot={{ r: 6 }}
+                label={{ position: 'top', fill: '#1e40af', fontWeight: 'bold', fontSize: 12, formatter: (value: number) => value.toLocaleString('vi-VN') }}
+              />
+            </LineChart>
+          ) : (
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis
+                dataKey={dataKey}
+                stroke="#64748b"
+                tick={{ fill: '#64748b', fontSize: 12 }}
+              />
+              <YAxis
+                stroke="#64748b"
+                tick={{ fill: '#64748b', fontSize: 12 }}
+                tickFormatter={(value) => `${(value / 1000000).toFixed(1)}tr`}
+              />
+              <Tooltip
+                formatter={(value: number, name: string) => {
+                  const labels: { [key: string]: string } = {
+                    'revenue': 'Doanh thu',
+                    'netRevenue': 'Doanh thu thuần',
+                    'profit': 'Lợi nhuận',
+                    'cost': 'Giá vốn',
+                  };
+                  return [formatCurrency(value), labels[name] || name];
+                }}
+                labelFormatter={(label) => {
+                  if (concern === 'table' || concern === 'category') return label;
+                  if ((concern === 'time' || concern === 'profit') && dataKey === 'month') return label;
+                  return `Ngày ${label}`;
+                }}
+                contentStyle={{
+                  backgroundColor: 'white',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+              />
+              {concern === 'profit' ? (
+                <>
+                  <Bar dataKey="profit" fill="#2563eb" radius={[4, 4, 0, 0]} label={{ position: 'top', fill: '#1e40af', fontWeight: 'bold', fontSize: 11, formatter: (value: number) => value.toLocaleString('vi-VN') }} />
+                  <Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} label={{ position: 'top', fill: '#047857', fontWeight: 'bold', fontSize: 11, formatter: (value: number) => value.toLocaleString('vi-VN') }} />
+                  <Bar dataKey="cost" fill="#fbbf24" radius={[4, 4, 0, 0]} label={{ position: 'top', fill: '#b45309', fontWeight: 'bold', fontSize: 11, formatter: (value: number) => value.toLocaleString('vi-VN') }} />
+                  <Legend
+                    formatter={(value) => {
+                      const labels: { [key: string]: string } = {
+                        'profit': 'Lợi nhuận',
+                        'revenue': 'Doanh thu',
+                        'cost': 'Giá vốn',
+                      };
+                      return labels[value] || value;
+                    }}
+                  />
+                </>
+              ) : (
+                <Bar dataKey={valueKey} fill="#2563eb" radius={[4, 4, 0, 0]} label={{ position: 'top', fill: '#1e40af', fontWeight: 'bold', fontSize: 12, formatter: (value: number) => value.toLocaleString('vi-VN') }} />
+              )}
+            </BarChart>
+          )}
         </ResponsiveContainer>
       </div>
     );
@@ -398,7 +445,7 @@ export function SalesReport({
             const daysDiff = getDaysBetween(dateFrom, dateTo);
             const isByDay = daysDiff <= 30;
             const timeData = isByDay ? timeReportDataByDay : timeReportDataByMonth;
-            
+
             // Calculate totals
             const totals = timeData.reduce(
               (acc, item) => ({
@@ -454,7 +501,7 @@ export function SalesReport({
                                 <span className="text-blue-600">{item.time}</span>
                               </div>
                             </td>
-                            <td className="border border-slate-300 px-4 py-2 text-sm text-slate-900"></td>
+
                             <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatNumber(item.revenue)}</td>
                             <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatNumber(item.returnValue)}</td>
                             <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatNumber(item.netRevenue)}</td>
@@ -500,7 +547,7 @@ export function SalesReport({
             const daysDiff = getDaysBetween(dateFrom, dateTo);
             const isByDay = daysDiff <= 30;
             const profitData = isByDay ? profitReportDataByDay : profitReportDataByMonth;
-            
+
             // Calculate totals
             const totals = profitData.reduce(
               (acc, item) => ({
