@@ -14,6 +14,7 @@ import {
   Printer,
   ArrowUp,
   ArrowDown,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -74,7 +75,7 @@ interface Customer {
 }
 
 export interface Promotion {
-  id: string;
+  id:string;
   code: string;
   name: string;
   type: PromotionType;
@@ -94,6 +95,182 @@ export interface Promotion {
   status: "active" | "inactive";
 }
 
+const getPromotionTypeLabel = (type: PromotionType) => {
+  switch (type) {
+    case "percentage":
+      return "Theo phần trăm";
+    case "amount":
+      return "Theo số tiền";
+    case "fixed-price":
+      return "Đồng giá";
+    case "free-item":
+      return "Tặng món";
+    default:
+      return "";
+  }
+};
+
+const formatCurrency = (value: number) => {
+  if (typeof value !== "number") return value;
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+  }).format(value);
+};
+
+const PromotionDetails = ({ promotion }: { promotion: Promotion }) => {
+  const DetailItem = ({
+    label,
+    value,
+    className = "",
+  }: {
+    label: string;
+    value: React.ReactNode;
+    className?: string;
+  }) => (
+    <div className={className}>
+      <p className="text-sm text-slate-500">{label}</p>
+      <p className="text-base font-semibold text-slate-800">{value || "-"}</p>
+    </div>
+  );
+
+  const renderList = (title: string, items: any[] | undefined) => {
+    if (!items || items.length === 0) return null;
+    return (
+      <div>
+        <h4 className="text-base font-semibold text-slate-700 mb-2">{title}</h4>
+        <ul className="list-disc pl-5 space-y-1 text-slate-600">
+          {items.map((item, index) => (
+            <li key={index}>
+              {item.code && (
+                <span className="font-mono bg-slate-200 text-slate-700 text-xs rounded px-1.5 py-0.5 mr-2">
+                  {item.code}
+                </span>
+              )}
+              {item.name}
+              {item.quantity && (
+                <span className="text-slate-500">
+                  {" "}
+                  (Số lượng: {item.quantity})
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  };
+
+  const formatPromotionValue = (promo: Promotion) => {
+    if (promo.type === "free-item") {
+      return (
+        promo.freeItems
+          ?.map(
+            (item) =>
+              `${item.name}${item.quantity ? ` (x${item.quantity})` : ""}`
+          )
+          .join(", ") || "-"
+      );
+    }
+    if (promo.type === "percentage") {
+      return `${promo.promotionValue}%`;
+    }
+    if (promo.type === "amount" || promo.type === "fixed-price") {
+      return formatCurrency(promo.promotionValue || 0);
+    }
+    return "-";
+  };
+
+  const hasApplicableItems =
+    (promotion.applicableItems && promotion.applicableItems.length > 0) ||
+    (promotion.applicableCategories &&
+      promotion.applicableCategories.length > 0) ||
+    (promotion.applicableCombos && promotion.applicableCombos.length > 0);
+
+  const hasCustomerConditions =
+    (promotion.applicableCustomerGroups &&
+      promotion.applicableCustomerGroups.length > 0) ||
+    (promotion.applicableCustomers && promotion.applicableCustomers.length > 0);
+
+  const hasFreebies = promotion.freeItems && promotion.freeItems.length > 0;
+
+  return (
+    <div className="bg-slate-50 p-6 border-t border-slate-200">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-y-4 gap-x-6">
+        <DetailItem label="Mã khuyến mại" value={promotion.code} />
+        <DetailItem
+          label="Tên khuyến mại"
+          value={promotion.name}
+          className="col-span-2"
+        />
+        <DetailItem
+          label="Loại khuyến mại"
+          value={getPromotionTypeLabel(promotion.type)}
+        />
+        <DetailItem
+          label="Giá trị"
+          value={formatPromotionValue(promotion)}
+          className="col-span-2"
+        />
+        <DetailItem
+          label="Giá trị hóa đơn tối thiểu"
+          value={formatCurrency(promotion.minOrderValue)}
+        />
+        {promotion.maxDiscountValue && promotion.maxDiscountValue > 0 ? (
+          <DetailItem
+            label="Giảm giá tối đa"
+            value={formatCurrency(promotion.maxDiscountValue)}
+          />
+        ) : <div />}
+
+        <div className="col-span-1">
+          <p className="text-sm text-slate-500">Bắt đầu</p>
+          <p className="text-base font-semibold text-slate-800">
+            {promotion.startDate} {promotion.startTime}
+          </p>
+        </div>
+        <div className="col-span-1">
+          <p className="text-sm text-slate-500">Kết thúc</p>
+          <p className="text-base font-semibold text-slate-800">
+            {promotion.endDate} {promotion.endTime}
+          </p>
+        </div>
+        <div className="col-span-full">
+          <p className="text-sm text-slate-500">Trạng thái</p>
+          <Badge
+            variant={promotion.status === "active" ? "default" : "secondary"}
+            className={
+              promotion.status === "active"
+                ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                : "bg-red-100 text-red-800 border border-red-300"
+            }
+          >
+            {promotion.status === "active"
+              ? "Đang hoạt động"
+              : "Không hoạt động"}
+          </Badge>
+        </div>
+      </div>
+
+      {(hasFreebies || hasApplicableItems || hasCustomerConditions) && (
+        <div className="mt-6 pt-6 border-t border-slate-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {renderList("Món tặng", promotion.freeItems)}
+            {renderList("Sản phẩm áp dụng", promotion.applicableItems)}
+            {renderList("Danh mục áp dụng", promotion.applicableCategories)}
+            {renderList("Combo áp dụng", promotion.applicableCombos)}
+            {renderList(
+              "Nhóm khách hàng áp dụng",
+              promotion.applicableCustomerGroups
+            )}
+            {renderList("Khách hàng áp dụng", promotion.applicableCustomers)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export function Promotions() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState<string>("all");
@@ -102,9 +279,19 @@ export function Promotions() {
   const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(
     null
   );
-  
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+
   // Sort state
-  type SortField = "code" | "name" | "type" | "minOrderValue" | "promotionValue" | "maxDiscountValue" | "startDate" | "endDate" | "status";
+  type SortField =
+    | "code"
+    | "name"
+    | "type"
+    | "minOrderValue"
+    | "promotionValue"
+    | "maxDiscountValue"
+    | "startDate"
+    | "endDate"
+    | "status";
   type SortOrder = "asc" | "desc" | "none";
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("none");
@@ -123,7 +310,7 @@ export function Promotions() {
       endDate: "31/12/2024",
       endTime: "23:59",
       applicableItems: [],
-      applicableCategories: [],
+      applicableCategories: [{ id: "1", name: "Cà phê" }],
       applicableCombos: [],
       applicableCustomerGroups: [],
       applicableCustomers: [],
@@ -219,7 +406,12 @@ export function Promotions() {
         bValue = b.name;
       } else if (sortField === "type") {
         // Sort by type enum value directly for consistency
-        const typeOrder = { "percentage": 0, "amount": 1, "fixed-price": 2, "free-item": 3 };
+        const typeOrder = {
+          percentage: 0,
+          amount: 1,
+          "fixed-price": 2,
+          "free-item": 3,
+        };
         aValue = typeOrder[a.type] ?? 999;
         bValue = typeOrder[b.type] ?? 999;
       } else if (sortField === "minOrderValue") {
@@ -235,13 +427,29 @@ export function Promotions() {
         // Parse date string DD/MM/YYYY
         const aParts = a.startDate.split("/");
         const bParts = b.startDate.split("/");
-        aValue = new Date(parseInt(aParts[2]), parseInt(aParts[1]) - 1, parseInt(aParts[0])).getTime();
-        bValue = new Date(parseInt(bParts[2]), parseInt(bParts[1]) - 1, parseInt(bParts[0])).getTime();
+        aValue = new Date(
+          parseInt(aParts[2]),
+          parseInt(aParts[1]) - 1,
+          parseInt(aParts[0])
+        ).getTime();
+        bValue = new Date(
+          parseInt(bParts[2]),
+          parseInt(bParts[1]) - 1,
+          parseInt(bParts[0])
+        ).getTime();
       } else if (sortField === "endDate") {
         const aParts = a.endDate.split("/");
         const bParts = b.endDate.split("/");
-        aValue = new Date(parseInt(aParts[2]), parseInt(aParts[1]) - 1, parseInt(aParts[0])).getTime();
-        bValue = new Date(parseInt(bParts[2]), parseInt(bParts[1]) - 1, parseInt(bParts[0])).getTime();
+        aValue = new Date(
+          parseInt(aParts[2]),
+          parseInt(aParts[1]) - 1,
+          parseInt(aParts[0])
+        ).getTime();
+        bValue = new Date(
+          parseInt(bParts[2]),
+          parseInt(bParts[1]) - 1,
+          parseInt(bParts[0])
+        ).getTime();
       } else if (sortField === "status") {
         const statusOrder = { active: 0, inactive: 1 };
         aValue = statusOrder[a.status] ?? 0;
@@ -549,7 +757,10 @@ export function Promotions() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-blue-100">
-                      <TableHead className="w-16 text-sm text-center">STT</TableHead>
+                      <TableHead className="w-12"></TableHead>
+                      <TableHead className="w-16 text-sm text-center">
+                        STT
+                      </TableHead>
                       <TableHead
                         className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
                         onClick={() => handleSort("code")}
@@ -633,121 +844,158 @@ export function Promotions() {
                           {getSortIcon("status")}
                         </div>
                       </TableHead>
-                      <TableHead className="text-sm text-right">Thao tác</TableHead>
+                      <TableHead className="text-sm text-right">
+                        Thao tác
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
-                <TableBody>
-                  {filteredPromotions.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={13}
-                        className="text-center py-8 text-slate-500"
-                      >
-                        Không tìm thấy khuyến mại nào
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredPromotions.map((promo, index) => (
-                      <TableRow key={promo.id}>
-                        <TableCell className="text-sm text-slate-600 text-center">
-                          {index + 1}
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-900">
-                          {promo.code}
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-900">
-                          {promo.name}
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-700">
-                          {getPromotionTypeLabel(promo.type)}
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-700">
-                          {formatCurrency(promo.minOrderValue)}
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-700">
-                          {formatPromotionValue(promo)}
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-700">
-                          {promo.maxDiscountValue
-                            ? formatCurrency(promo.maxDiscountValue)
-                            : "-"}
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-700">
-                          {promo.startDate}
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-700">
-                          {promo.startTime}
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-700">
-                          {promo.endDate}
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-700">
-                          {promo.endTime}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          <Badge
-                            variant={
-                              promo.status === "active"
-                                ? "default"
-                                : "secondary"
-                            }
-                            className={
-                              promo.status === "active"
-                                ? "bg-emerald-500"
-                                : "bg-red-500 text-white hover:bg-red-500"
-                            }
-                          >
-                            {promo.status === "active"
-                              ? "Hoạt động"
-                              : "Không hoạt động"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditDialog(promo)}
-                              className="hover:bg-blue-100"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeletePromotion(promo.id)}
-                              className="hover:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4 text-red-600" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleToggleStatus(promo.id)}
-                              className={
-                                promo.status === "active"
-                                  ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                              }
-                              title={
-                                promo.status === "active"
-                                  ? "Vô hiệu hóa"
-                                  : "Kích hoạt"
-                              }
-                            >
-                              {promo.status === "active" ? (
-                                <PowerOff className="w-4 h-4" />
-                              ) : (
-                                <Power className="w-4 h-4" />
-                              )}
-                            </Button>
-                          </div>
+                  <TableBody>
+                    {filteredPromotions.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={14}
+                          className="text-center py-8 text-slate-500"
+                        >
+                          Không tìm thấy khuyến mại nào
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      filteredPromotions.map((promo, index) => (
+                        <React.Fragment key={promo.id}>
+                          <TableRow
+                            className={
+                              expandedRow === promo.id
+                                ? "bg-slate-100"
+                                : "hover:bg-slate-50"
+                            }
+                          >
+                            <TableCell className="text-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  setExpandedRow(
+                                    expandedRow === promo.id ? null : promo.id
+                                  )
+                                }
+                                className="hover:bg-slate-200"
+                              >
+                                <ChevronDown
+                                  className={`w-5 h-5 transition-transform text-slate-600 ${
+                                    expandedRow === promo.id
+                                      ? "rotate-180"
+                                      : ""
+                                  }`}
+                                />
+                              </Button>
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-600 text-center">
+                              {index + 1}
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-900">
+                              {promo.code}
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-900">
+                              {promo.name}
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-700">
+                              {getPromotionTypeLabel(promo.type)}
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-700">
+                              {formatCurrency(promo.minOrderValue)}
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-700">
+                              {formatPromotionValue(promo)}
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-700">
+                              {promo.maxDiscountValue
+                                ? formatCurrency(promo.maxDiscountValue)
+                                : "-"}
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-700">
+                              {promo.startDate}
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-700">
+                              {promo.startTime}
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-700">
+                              {promo.endDate}
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-700">
+                              {promo.endTime}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              <Badge
+                                variant={
+                                  promo.status === "active"
+                                    ? "default"
+                                    : "secondary"
+                                }
+                                className={
+                                  promo.status === "active"
+                                    ? "bg-emerald-500"
+                                    : "bg-red-500 text-white hover:bg-red-500"
+                                }
+                              >
+                                {promo.status === "active"
+                                  ? "Hoạt động"
+                                  : "Không hoạt động"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openEditDialog(promo)}
+                                  className="hover:bg-blue-100"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeletePromotion(promo.id)}
+                                  className="hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-4 h-4 text-red-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleToggleStatus(promo.id)}
+                                  className={
+                                    promo.status === "active"
+                                      ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                  }
+                                  title={
+                                    promo.status === "active"
+                                      ? "Vô hiệu hóa"
+                                      : "Kích hoạt"
+                                  }
+                                >
+                                  {promo.status === "active" ? (
+                                    <PowerOff className="w-4 h-4" />
+                                  ) : (
+                                    <Power className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {expandedRow === promo.id && (
+                            <TableRow className="bg-white">
+                              <TableCell colSpan={14} className="p-0">
+                                <PromotionDetails promotion={promo} />
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>
