@@ -66,6 +66,7 @@ import {
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { toast } from "sonner@2.0.3";
+import { ExportExcelDialog } from "../ExportExcelDialog";
 import { useAuth } from "../../contexts/AuthContext";
 import { categories } from "../../data/categories";
 
@@ -166,6 +167,7 @@ export function PurchaseOrders() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc" | "none">("none");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const [showAddItemDialog, setShowAddItemDialog] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
   const [addedItems, setAddedItems] = useState<PurchaseOrderItem[]>([]);
@@ -1182,11 +1184,10 @@ export function PurchaseOrders() {
                                   setPresetTimeRange(option.value);
                                   setDateRangeType("preset");
                                 }}
-                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                  presetTimeRange === option.value
-                                    ? "bg-blue-600 text-white"
-                                    : "text-blue-600 hover:bg-blue-100"
-                                }`}
+                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
+                                  ? "bg-blue-600 text-white"
+                                  : "text-blue-600 hover:bg-blue-100"
+                                  }`}
                               >
                                 {option.label}
                               </button>
@@ -1221,11 +1222,10 @@ export function PurchaseOrders() {
                                   setPresetTimeRange(option.value);
                                   setDateRangeType("preset");
                                 }}
-                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                  presetTimeRange === option.value
-                                    ? "bg-blue-600 text-white"
-                                    : "text-blue-600 hover:bg-blue-100"
-                                }`}
+                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
+                                  ? "bg-blue-600 text-white"
+                                  : "text-blue-600 hover:bg-blue-100"
+                                  }`}
                               >
                                 {option.label}
                               </button>
@@ -1257,11 +1257,10 @@ export function PurchaseOrders() {
                                   setPresetTimeRange(option.value);
                                   setDateRangeType("preset");
                                 }}
-                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                  presetTimeRange === option.value
-                                    ? "bg-blue-600 text-white"
-                                    : "text-blue-600 hover:bg-blue-100"
-                                }`}
+                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
+                                  ? "bg-blue-600 text-white"
+                                  : "text-blue-600 hover:bg-blue-100"
+                                  }`}
                               >
                                 {option.label}
                               </button>
@@ -1292,10 +1291,10 @@ export function PurchaseOrders() {
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {dateFrom && dateTo
                           ? `${format(dateFrom, "dd/MM", {
-                              locale: vi,
-                            })} - ${format(dateTo, "dd/MM/yyyy", {
-                              locale: vi,
-                            })}`
+                            locale: vi,
+                          })} - ${format(dateTo, "dd/MM/yyyy", {
+                            locale: vi,
+                          })}`
                           : "Lựa chọn khác"}
                       </Button>
                     </PopoverTrigger>
@@ -1448,7 +1447,15 @@ export function PurchaseOrders() {
                 onClick={() => setShowImportDialog(true)}
               >
                 <Upload className="w-4 h-4" />
-                Import Excel
+                Nhập file
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => setShowExportDialog(true)}
+              >
+                <Download className="w-4 h-4" />
+                Xuất file
               </Button>
               <Button
                 className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
@@ -1602,19 +1609,18 @@ export function PurchaseOrders() {
                       </TableCell>
                       <TableCell className="text-sm text-center">
                         <span
-                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
-                            order.status === "completed"
-                              ? "bg-green-50 text-green-700"
-                              : order.status === "draft"
+                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${order.status === "completed"
+                            ? "bg-green-50 text-green-700"
+                            : order.status === "draft"
                               ? "bg-orange-50 text-orange-700"
                               : "bg-slate-100 text-slate-600"
-                          }`}
+                            }`}
                         >
                           {order.status === "completed"
                             ? "Đã nhập hàng"
                             : order.status === "draft"
-                            ? "Phiếu tạm"
-                            : "Đã hủy"}
+                              ? "Phiếu tạm"
+                              : "Đã hủy"}
                         </span>
                       </TableCell>
                     </TableRow>
@@ -1649,19 +1655,18 @@ export function PurchaseOrders() {
                                       Trạng thái:
                                     </span>{" "}
                                     <span
-                                      className={`px-2 py-1 rounded-full text-xs ${
-                                        order.status === "completed"
-                                          ? "bg-green-50 text-green-700"
-                                          : order.status === "draft"
+                                      className={`px-2 py-1 rounded-full text-xs ${order.status === "completed"
+                                        ? "bg-green-50 text-green-700"
+                                        : order.status === "draft"
                                           ? "bg-orange-50 text-orange-700"
                                           : "bg-slate-100 text-slate-600"
-                                      }`}
+                                        }`}
                                     >
                                       {order.status === "completed"
                                         ? "Đã nhập hàng"
                                         : order.status === "draft"
-                                        ? "Phiếu tạm"
-                                        : "Đã hủy"}
+                                          ? "Phiếu tạm"
+                                          : "Đã hủy"}
                                     </span>
                                   </div>
                                   <div>
@@ -1674,8 +1679,8 @@ export function PurchaseOrders() {
                                         editingDates[order.id] !== undefined
                                           ? editingDates[order.id]
                                           : order.date.includes("T")
-                                          ? order.date
-                                          : order.date.replace(" ", "T")
+                                            ? order.date
+                                            : order.date.replace(" ", "T")
                                       }
                                       onChange={(e) => {
                                         setEditingDates({
@@ -1924,17 +1929,17 @@ export function PurchaseOrders() {
                                           purchaseOrders.map((o) =>
                                             o.id === order.id
                                               ? {
-                                                  ...o,
-                                                  status: "completed" as const,
-                                                  paymentHistory:
-                                                    paymentHistoryEntry
-                                                      ? [
-                                                          ...(o.paymentHistory ||
-                                                            []),
-                                                          paymentHistoryEntry,
-                                                        ]
-                                                      : o.paymentHistory || [],
-                                                }
+                                                ...o,
+                                                status: "completed" as const,
+                                                paymentHistory:
+                                                  paymentHistoryEntry
+                                                    ? [
+                                                      ...(o.paymentHistory ||
+                                                        []),
+                                                      paymentHistoryEntry,
+                                                    ]
+                                                    : o.paymentHistory || [],
+                                              }
                                               : o
                                           )
                                         );
@@ -2127,7 +2132,7 @@ export function PurchaseOrders() {
                                             </td>
                                             <td className="px-4 py-2 text-sm text-slate-600">
                                               {payment.paymentMethod ===
-                                              "transfer"
+                                                "transfer"
                                                 ? "Chuyển khoản"
                                                 : "Tiền mặt"}
                                             </td>
@@ -2697,21 +2702,21 @@ export function PurchaseOrders() {
                       prev.map((order) =>
                         order.id === editingOrderId
                           ? {
-                              ...order,
-                              code: formData.code,
-                              date: draftDate,
-                              supplier: formData.supplier,
-                              supplierId: formData.supplier,
-                              items: addedItems.length,
-                              totalAmount: totalValue,
-                              paidAmount: paidAmount,
-                              debtAmount: debtAmount,
-                              staff: formData.staff,
-                              note: formData.note,
-                              details: {
-                                items: addedItems,
-                              },
-                            }
+                            ...order,
+                            code: formData.code,
+                            date: draftDate,
+                            supplier: formData.supplier,
+                            supplierId: formData.supplier,
+                            items: addedItems.length,
+                            totalAmount: totalValue,
+                            paidAmount: paidAmount,
+                            debtAmount: debtAmount,
+                            staff: formData.staff,
+                            note: formData.note,
+                            details: {
+                              items: addedItems,
+                            },
+                          }
                           : order
                       )
                     );
@@ -2815,11 +2820,10 @@ export function PurchaseOrders() {
                       id: cashflowCode,
                       date: orderDate,
                       amount: paidAmount,
-                      note: `Thanh toán ${
-                        formData.paymentMethod === "cash"
-                          ? "tiền mặt"
-                          : "chuyển khoản"
-                      }`,
+                      note: `Thanh toán ${formData.paymentMethod === "cash"
+                        ? "tiền mặt"
+                        : "chuyển khoản"
+                        }`,
                     };
 
                     toast.success(
@@ -2845,25 +2849,25 @@ export function PurchaseOrders() {
                       prev.map((order) =>
                         order.id === editingOrderId
                           ? {
-                              ...order,
-                              code: formData.code,
-                              date: orderDate,
-                              supplier: formData.supplier,
-                              supplierId: formData.supplier,
-                              items: addedItems.length,
-                              totalAmount: totalValue,
-                              paidAmount: paidAmount,
-                              debtAmount: debtAmount,
-                              status: "completed",
-                              staff: formData.staff,
-                              note: formData.note,
-                              details: {
-                                items: addedItems,
-                              },
-                              paymentHistory: paymentHistoryEntry
-                                ? [paymentHistoryEntry]
-                                : [],
-                            }
+                            ...order,
+                            code: formData.code,
+                            date: orderDate,
+                            supplier: formData.supplier,
+                            supplierId: formData.supplier,
+                            items: addedItems.length,
+                            totalAmount: totalValue,
+                            paidAmount: paidAmount,
+                            debtAmount: debtAmount,
+                            status: "completed",
+                            staff: formData.staff,
+                            note: formData.note,
+                            details: {
+                              items: addedItems,
+                            },
+                            paymentHistory: paymentHistoryEntry
+                              ? [paymentHistoryEntry]
+                              : [],
+                          }
                           : order
                       )
                     );
@@ -3035,11 +3039,10 @@ export function PurchaseOrders() {
                     key={cat.id}
                     type="button"
                     onClick={() => setSelectedCategoryFilter(cat.id)}
-                    className={`px-3 py-1.5 text-sm border border-slate-200 rounded-lg transition-colors ${
-                      isActive
-                        ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
-                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                    }`}
+                    className={`px-3 py-1.5 text-sm border border-slate-200 rounded-lg transition-colors ${isActive
+                      ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+                      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
                   >
                     {cat.name}
                   </button>
@@ -3160,6 +3163,35 @@ export function PurchaseOrders() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ExportExcelDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        data={filteredOrders}
+        columns={[
+          { header: 'Mã phiếu', accessor: (row) => row.code },
+          { header: 'Ngày giờ', accessor: (row) => row.date },
+          { header: 'Nhà cung cấp', accessor: (row) => row.supplier },
+          { header: 'Số mặt hàng', accessor: (row) => row.items },
+          { header: 'Tổng giá trị', accessor: (row) => row.totalAmount },
+          { header: 'Đã trả', accessor: (row) => row.paidAmount },
+          { header: 'Còn nợ', accessor: (row) => row.debtAmount },
+          { header: 'Nhân viên', accessor: (row) => row.staff },
+          {
+            header: 'Trạng thái', accessor: (row) => {
+              switch (row.status) {
+                case 'completed': return 'Đã nhập hàng';
+                case 'draft': return 'Phiếu tạm';
+                case 'cancelled': return 'Đã hủy';
+                default: return row.status;
+              }
+            }
+          },
+          { header: 'Ghi chú', accessor: (row) => row.note || '' },
+        ]}
+        fileName="danh-sach-phieu-nhap"
+        title="Xuất danh sách phiếu nhập hàng"
+      />
     </div>
   );
 }

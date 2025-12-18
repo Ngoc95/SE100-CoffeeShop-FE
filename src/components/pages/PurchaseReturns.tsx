@@ -19,6 +19,7 @@ import {
   ArrowUp,
   ArrowDown,
   Check,
+  Download,
 } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";
@@ -59,6 +60,7 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
+import { ExportExcelDialog } from "../ExportExcelDialog";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { toast } from "sonner@2.0.3";
@@ -147,7 +149,7 @@ export function PurchaseReturns() {
   ]);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [editingDates, setEditingDates] = useState<Record<number, string>>({});
-  
+
   // Sort states
   type SortField = "code" | "date" | "supplier" | "items" | "returnAmount" | "paidAmount" | "reason" | "status" | null;
   type SortOrder = "asc" | "desc" | "none";
@@ -165,6 +167,7 @@ export function PurchaseReturns() {
   >([]);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [bankSearchOpen, setBankSearchOpen] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   // Danh sách ngân hàng Việt Nam
   const vietnameseBanks = [
@@ -727,6 +730,47 @@ export function PurchaseReturns() {
     return reasonMap[reasonCode] || reasonCode;
   };
 
+  const exportColumns = useMemo(
+    () => [
+      { header: "Mã phiếu", accessor: (row: PurchaseReturn) => row.code },
+      {
+        header: "Mã hđ nhập",
+        accessor: (row: PurchaseReturn) => row.purchaseCode,
+      },
+      { header: "Ngày trả", accessor: (row: PurchaseReturn) => row.date },
+      {
+        header: "Nhà cung cấp",
+        accessor: (row: PurchaseReturn) => row.supplier,
+      },
+      { header: "Số mặt hàng", accessor: (row: PurchaseReturn) => row.items },
+      {
+        header: "Giá trị trả",
+        accessor: (row: PurchaseReturn) => row.returnAmount,
+      },
+      {
+        header: "Tiền NCC cần trả",
+        accessor: (row: PurchaseReturn) => row.returnAmount,
+      },
+      {
+        header: "NCC đã trả",
+        accessor: (row: PurchaseReturn) => row.paidAmount,
+      },
+      {
+        header: "Lý do",
+        accessor: (row: PurchaseReturn) => getReasonText(row.reason),
+      },
+      {
+        header: "Trạng thái",
+        accessor: (row: PurchaseReturn) =>
+          row.status === "completed"
+            ? "Đã trả hàng"
+            : row.status === "draft"
+              ? "Phiếu tạm"
+              : "Đã hủy",
+      },
+    ],
+    []
+  );
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       if (sortOrder === "asc") {
@@ -951,43 +995,43 @@ export function PurchaseReturns() {
         prev.map((ret) =>
           ret.id === editingReturnId
             ? {
-                ...ret,
-                code: formData.code,
-                date: returnDate,
-                supplier: formData.supplier,
-                supplierId: formData.supplierId,
-                items: returnItems.length,
-                returnAmount: totalAmount,
-                paidAmount: paidAmount,
-                debtAmount: -debtAmount,
-                reason: formData.reason,
-                status: status,
-                paymentMethod: formData.paymentMethod,
-                bankAccount:
-                  formData.paymentMethod === "transfer"
-                    ? formData.bankAccount
-                    : undefined,
-                bankId:
-                  formData.paymentMethod === "transfer"
-                    ? formData.bankId
-                    : undefined,
-                bankName:
-                  formData.paymentMethod === "transfer"
-                    ? formData.bankName
-                    : undefined,
-                note: formData.note,
-                details: {
-                  items: returnItems.map((item) => ({
-                    name: item.productName,
-                    batchCode: item.batchCode,
-                    quantity: item.quantity,
-                    unit: item.unit,
-                    unitPrice: item.unitPrice,
-                    total: item.total,
-                    reason: item.reason,
-                  })),
-                },
-              }
+              ...ret,
+              code: formData.code,
+              date: returnDate,
+              supplier: formData.supplier,
+              supplierId: formData.supplierId,
+              items: returnItems.length,
+              returnAmount: totalAmount,
+              paidAmount: paidAmount,
+              debtAmount: -debtAmount,
+              reason: formData.reason,
+              status: status,
+              paymentMethod: formData.paymentMethod,
+              bankAccount:
+                formData.paymentMethod === "transfer"
+                  ? formData.bankAccount
+                  : undefined,
+              bankId:
+                formData.paymentMethod === "transfer"
+                  ? formData.bankId
+                  : undefined,
+              bankName:
+                formData.paymentMethod === "transfer"
+                  ? formData.bankName
+                  : undefined,
+              note: formData.note,
+              details: {
+                items: returnItems.map((item) => ({
+                  name: item.productName,
+                  batchCode: item.batchCode,
+                  quantity: item.quantity,
+                  unit: item.unit,
+                  unitPrice: item.unitPrice,
+                  total: item.total,
+                  reason: item.reason,
+                })),
+              },
+            }
             : ret
         )
       );
@@ -1302,11 +1346,10 @@ export function PurchaseReturns() {
                                 setPresetTimeRange(option.value);
                                 setDateRangeType("preset");
                               }}
-                              className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                presetTimeRange === option.value
-                                  ? "bg-blue-600 text-white"
-                                  : "text-blue-600 hover:bg-blue-100"
-                              }`}
+                              className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
+                                ? "bg-blue-600 text-white"
+                                : "text-blue-600 hover:bg-blue-100"
+                                }`}
                             >
                               {option.label}
                             </button>
@@ -1341,11 +1384,10 @@ export function PurchaseReturns() {
                                 setPresetTimeRange(option.value);
                                 setDateRangeType("preset");
                               }}
-                              className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                presetTimeRange === option.value
-                                  ? "bg-blue-600 text-white"
-                                  : "text-blue-600 hover:bg-blue-100"
-                              }`}
+                              className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
+                                ? "bg-blue-600 text-white"
+                                : "text-blue-600 hover:bg-blue-100"
+                                }`}
                             >
                               {option.label}
                             </button>
@@ -1377,11 +1419,10 @@ export function PurchaseReturns() {
                                 setPresetTimeRange(option.value);
                                 setDateRangeType("preset");
                               }}
-                              className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                presetTimeRange === option.value
-                                  ? "bg-blue-600 text-white"
-                                  : "text-blue-600 hover:bg-blue-100"
-                              }`}
+                              className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
+                                ? "bg-blue-600 text-white"
+                                : "text-blue-600 hover:bg-blue-100"
+                                }`}
                             >
                               {option.label}
                             </button>
@@ -1412,8 +1453,8 @@ export function PurchaseReturns() {
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {dateFrom && dateTo
                         ? `${format(dateFrom, "dd/MM", {
-                            locale: vi,
-                          })} - ${format(dateTo, "dd/MM/yyyy", { locale: vi })}`
+                          locale: vi,
+                        })} - ${format(dateTo, "dd/MM/yyyy", { locale: vi })}`
                         : "Lựa chọn khác"}
                     </Button>
                   </PopoverTrigger>
@@ -1557,6 +1598,14 @@ export function PurchaseReturns() {
               >
                 <Upload className="w-4 h-4" />
                 Import Excel
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => setShowExportDialog(true)}
+              >
+                <Download className="w-4 h-4" />
+                Xuất file
               </Button>
               <Button
                 className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
@@ -1720,19 +1769,18 @@ export function PurchaseReturns() {
                       </TableCell>
                       <TableCell className="text-sm text-center">
                         <span
-                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
-                            ret.status === "completed"
-                              ? "bg-green-50 text-green-700"
-                              : ret.status === "draft"
+                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${ret.status === "completed"
+                            ? "bg-green-50 text-green-700"
+                            : ret.status === "draft"
                               ? "bg-orange-50 text-orange-700"
                               : "bg-red-50 text-red-700"
-                          }`}
+                            }`}
                         >
                           {ret.status === "completed"
                             ? "Đã trả hàng"
                             : ret.status === "draft"
-                            ? "Phiếu tạm"
-                            : "Đã huỷ"}
+                              ? "Phiếu tạm"
+                              : "Đã huỷ"}
                         </span>
                       </TableCell>
                     </TableRow>
@@ -1765,19 +1813,18 @@ export function PurchaseReturns() {
                                         Trạng thái:
                                       </span>{" "}
                                       <span
-                                        className={`px-2 py-1 rounded-full text-xs ${
-                                          ret.status === "completed"
-                                            ? "bg-green-50 text-green-700"
-                                            : ret.status === "draft"
+                                        className={`px-2 py-1 rounded-full text-xs ${ret.status === "completed"
+                                          ? "bg-green-50 text-green-700"
+                                          : ret.status === "draft"
                                             ? "bg-orange-50 text-orange-700"
                                             : "bg-red-50 text-red-700"
-                                        }`}
+                                          }`}
                                       >
                                         {ret.status === "completed"
                                           ? "Đã trả hàng"
                                           : ret.status === "draft"
-                                          ? "Phiếu tạm"
-                                          : "Đã huỷ"}
+                                            ? "Phiếu tạm"
+                                            : "Đã huỷ"}
                                       </span>
                                     </div>
                                     <div>
@@ -1990,10 +2037,10 @@ export function PurchaseReturns() {
                                             returns.map((r) =>
                                               r.id === ret.id
                                                 ? {
-                                                    ...r,
-                                                    status:
-                                                      "completed" as const,
-                                                  }
+                                                  ...r,
+                                                  status:
+                                                    "completed" as const,
+                                                }
                                                 : r
                                             )
                                           );
@@ -2177,8 +2224,8 @@ export function PurchaseReturns() {
                     value={
                       formData.date
                         ? `${formData.date}T${new Date()
-                            .toTimeString()
-                            .slice(0, 5)}`
+                          .toTimeString()
+                          .slice(0, 5)}`
                         : ""
                     }
                     onChange={(e) =>
@@ -2540,7 +2587,7 @@ export function PurchaseReturns() {
                       <span className="font-semibold">
                         {formatNumberWithCommas(
                           totalAmount -
-                            parseFormattedNumber(formData.paidAmount)
+                          parseFormattedNumber(formData.paidAmount)
                         )}
                         đ
                       </span>
@@ -2662,11 +2709,10 @@ export function PurchaseReturns() {
                     key={cat.id}
                     type="button"
                     onClick={() => setSelectedCategoryFilter(cat.id)}
-                    className={`px-3 py-1.5 text-sm border border-slate-200 rounded-lg transition-colors ${
-                      isActive
-                        ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
-                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                    }`}
+                    className={`px-3 py-1.5 text-sm border border-slate-200 rounded-lg transition-colors ${isActive
+                      ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+                      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
                   >
                     {cat.name}
                   </button>
@@ -2839,11 +2885,10 @@ export function PurchaseReturns() {
                                           return (
                                             <tr
                                               key={batch.batchCode}
-                                              className={`${
-                                                canSelect
-                                                  ? "hover:bg-slate-50 cursor-pointer"
-                                                  : "opacity-50"
-                                              }`}
+                                              className={`${canSelect
+                                                ? "hover:bg-slate-50 cursor-pointer"
+                                                : "opacity-50"
+                                                }`}
                                               onClick={(e) => {
                                                 e.stopPropagation();
                                                 if (canSelect) {
@@ -2901,12 +2946,12 @@ export function PurchaseReturns() {
                                               <td className="px-4 py-2 text-sm text-slate-600 text-center">
                                                 {batch.expiryDate
                                                   ? format(
-                                                      new Date(
-                                                        batch.expiryDate
-                                                      ),
-                                                      "dd/MM/yyyy",
-                                                      { locale: vi }
-                                                    )
+                                                    new Date(
+                                                      batch.expiryDate
+                                                    ),
+                                                    "dd/MM/yyyy",
+                                                    { locale: vi }
+                                                  )
                                                   : "—"}
                                               </td>
                                               <td className="px-4 py-2 text-sm font-medium text-slate-900 text-right">
@@ -2986,6 +3031,15 @@ export function PurchaseReturns() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Export Dialog */}
+      <ExportExcelDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        data={filteredReturns}
+        columns={exportColumns}
+        fileName={`Danh_sach_phieu_tra_hang_${format(new Date(), "dd-MM-yyyy")}`}
+        title="Xuất dữ liệu Trả hàng nhập"
+      />
     </div>
   );
 }

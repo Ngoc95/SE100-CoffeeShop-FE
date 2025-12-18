@@ -18,9 +18,11 @@ import {
   Box,
   X,
   Upload,
+  Download,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
+import { exportToCSV } from "../utils/export";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Checkbox } from "../ui/checkbox";
@@ -54,6 +56,7 @@ import {
 } from "../ui/table";
 import { ImageUploadWithCrop } from "../ImageUploadWithCrop";
 import { ImportExcelDialog } from "../ImportExcelDialog";
+import { ExportExcelDialog } from "../ExportExcelDialog";
 
 // Type definitions
 type ItemType = "ready-made" | "composite" | "ingredient";
@@ -141,6 +144,7 @@ export function Inventory() {
   const [newItemImage, setNewItemImage] = useState<string>("");
   const [ingredientsToAdd, setIngredientsToAdd] = useState<string[]>([]);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
@@ -848,6 +852,13 @@ export function Inventory() {
             >
               <Upload className="w-4 h-4 mr-2" />
               Nhập file
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setExportDialogOpen(true)}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Xuất file
             </Button>
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
               <DialogTrigger asChild>
@@ -2890,6 +2901,37 @@ export function Inventory() {
       <ImportExcelDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
+      />
+
+      <ExportExcelDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        data={filteredItems}
+        columns={[
+          { header: 'Mã hàng', accessor: (row: any) => row.id },
+          { header: 'Tên hàng', accessor: (row: any) => row.name },
+          { header: 'Loại', accessor: (row: any) => row.type === 'ready-made' ? 'Hàng bán sẵn' : row.type === 'ingredient' ? 'Nguyên liệu' : 'Hàng cấu thành' },
+          { header: 'Danh mục', accessor: (row: any) => categories.find(c => c.id === row.category)?.name || row.category },
+          { header: 'Đơn vị', accessor: (row: any) => row.unit },
+          { header: 'Tồn kho', accessor: (row: any) => row.currentStock },
+          { header: 'Tồn tối thiểu', accessor: (row: any) => row.minStock },
+          { header: 'Tồn tối đa', accessor: (row: any) => row.maxStock },
+          { header: 'Giá trị tồn', accessor: (row: any) => row.totalValue },
+          {
+            header: 'Trạng thái', accessor: (row: any) => {
+              switch (row.status) {
+                case 'good': return 'Đủ hàng';
+                case 'low': return 'Sắp hết hàng';
+                case 'critical': return 'Hết hàng';
+                case 'expiring': return 'Gần hết hạn';
+                case 'expired': return 'Hết hạn';
+                default: return row.status;
+              }
+            }
+          },
+        ]}
+        fileName="danh-sach-hang-hoa"
+        title="Xuất danh sách hàng hóa"
       />
     </div>
   );
