@@ -23,6 +23,7 @@ import {
   ArrowDown,
   Save,
   DollarSign,
+  Filter,
 } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";
@@ -64,14 +65,31 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
-import { format } from "date-fns";
+import {
+  format,
+  subDays,
+  startOfWeek,
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
+  subMonths,
+  startOfQuarter,
+  endOfQuarter,
+  subQuarters,
+  startOfYear,
+  endOfYear,
+  subYears,
+} from "date-fns";
 import { vi } from "date-fns/locale";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { ExportExcelDialog } from "../ExportExcelDialog";
 import { useAuth } from "../../contexts/AuthContext";
 import { categories } from "../../data/categories";
+import { Card, CardContent } from "../ui/card";
+import { CustomerTimeFilter } from "../reports/CustomerTimeFilter";
 
 interface PurchaseOrderItem {
+
   name: string;
   batchCode: string;
   quantity: number;
@@ -125,6 +143,52 @@ export function PurchaseOrders() {
   const [dateRangeType, setDateRangeType] = useState<"preset" | "custom">(
     "preset"
   );
+  const [timePreset, setTimePreset] = useState("this-month");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
+  const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
+
+  const handleTimePresetChange = (value: string) => {
+    setTimePreset(value);
+    const now = new Date();
+    let from: Date | undefined;
+    let to: Date | undefined;
+
+    switch (value) {
+      case 'today':
+        from = now; to = now; break;
+      case 'yesterday':
+        const y = subDays(now, 1); from = y; to = y; break;
+      case 'this-week':
+        from = startOfWeek(now, { weekStartsOn: 1 }); to = endOfWeek(now, { weekStartsOn: 1 }); break;
+      case 'last-week':
+        const lastWeek = subDays(now, 7);
+        from = startOfWeek(lastWeek, { weekStartsOn: 1 }); to = endOfWeek(lastWeek, { weekStartsOn: 1 }); break;
+      case 'last-7-days':
+        from = subDays(now, 7); to = now; break;
+      case 'this-month':
+        from = startOfMonth(now); to = endOfMonth(now); break;
+      case 'last-month':
+        const lastMonth = subMonths(now, 1);
+        from = startOfMonth(lastMonth); to = endOfMonth(lastMonth); break;
+      case 'last-30-days':
+        from = subDays(now, 30); to = now; break;
+      case 'this-quarter':
+        from = startOfQuarter(now); to = endOfQuarter(now); break;
+      case 'last-quarter':
+        const lastQuarter = subQuarters(now, 1);
+        from = startOfQuarter(lastQuarter); to = endOfQuarter(lastQuarter); break;
+      case 'this-year':
+        from = startOfYear(now); to = endOfYear(now); break;
+      case 'last-year':
+        const lastYear = subYears(now, 1);
+        from = startOfYear(lastYear); to = endOfYear(lastYear); break;
+    }
+    
+    if (value !== 'custom') {
+        setDateFrom(from);
+        setDateTo(to);
+    }
+  };
 
   // Helper functions for number formatting with commas
   const formatNumberWithCommas = (value: number | string): string => {
@@ -151,9 +215,7 @@ export function PurchaseOrders() {
     const parsed = parseFloat(cleaned);
     return isNaN(parsed) ? 0 : Math.max(0, parsed); // Ensure non-negative
   };
-  const [presetTimeRange, setPresetTimeRange] = useState<string>("today");
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
-  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+
 
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([
     "completed",
@@ -161,6 +223,15 @@ export function PurchaseOrders() {
     "cancelled",
   ]);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
+  const [selectedPaymentStatuses, setSelectedPaymentStatuses] = useState<string[]>(['paid', 'partial', 'unpaid']);
+  
+  const togglePaymentStatus = (status: string) => {
+    setSelectedPaymentStatuses((prev) =>
+      prev.includes(status)
+        ? prev.filter((s) => s !== status)
+        : [...prev, status]
+    );
+  };
   const [editingDates, setEditingDates] = useState<Record<number, string>>({});
   const [sortColumn, setSortColumn] = useState<keyof PurchaseOrder | null>(
     null
@@ -542,7 +613,7 @@ export function PurchaseOrders() {
   // Get effective date range based on dateRangeType
   const getEffectiveDateRange = (): { from: Date; to: Date } | null => {
     if (dateRangeType === "preset") {
-      return getDateRangeFromPreset(presetTimeRange);
+      return getDateRangeFromPreset(timePreset);
     } else {
       // Custom date range
       if (dateFrom && dateTo) {
@@ -1190,354 +1261,186 @@ export function PurchaseOrders() {
     toast.success(`Đã thêm ${newItems.length} hàng hóa vào phiếu nhập`);
   };
 
+  const [showFilters, setShowFilters] = useState(false);
   return (
-    <div className="flex h-full bg-slate-50">
-      {/* Left Sidebar - Filters */}
-      <aside className="w-64 bg-white border-r border-slate-200 p-4 overflow-y-auto space-y-4">
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm text-slate-900 mb-3">Bộ lọc</h3>
-
-          {/* Date Range Filter - Similar to Finance.tsx */}
-          <div className="mb-4">
-            <h3 className="text-sm text-slate-900 mb-3">Thời gian</h3>
-            <RadioGroup
-              value={dateRangeType}
-              onValueChange={(value) =>
-                setDateRangeType(value as "preset" | "custom")
-              }
-            >
-              {/* Preset Time Ranges */}
-              <div className="flex items-center space-x-2 mb-3">
-                <RadioGroupItem value="preset" id="date-preset" className="border-slate-300" />
-                <div className="flex-1">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-between text-left text-sm bg-white border-slate-300"
-                        onClick={() => setDateRangeType("preset")}
-                      >
-                        <span>
-                          {presetTimeRange === "today" && "Hôm nay"}
-                          {presetTimeRange === "yesterday" && "Hôm qua"}
-                          {presetTimeRange === "this-week" && "Tuần này"}
-                          {presetTimeRange === "last-week" && "Tuần trước"}
-                          {presetTimeRange === "last-7-days" && "7 ngày qua"}
-                          {presetTimeRange === "this-month" && "Tháng này"}
-                          {presetTimeRange === "last-month" && "Tháng trước"}
-                          {presetTimeRange === "last-30-days" && "30 ngày qua"}
-                          {presetTimeRange === "this-quarter" && "Quý này"}
-                          {presetTimeRange === "last-quarter" && "Quý trước"}
-                          {presetTimeRange === "this-year" && "Năm nay"}
-                          {presetTimeRange === "last-year" && "Năm trước"}
-                        </span>
-                        <ChevronDown className="h-4 w-4 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[600px] p-4" align="start">
-                      <div className="grid grid-cols-3 gap-6">
-                        {/* Column 1: Theo ngày và tuần */}
-                        <div>
-                          <h4 className="text-sm text-slate-700 mb-3">
-                            Theo ngày và tuần
-                          </h4>
-                          <div className="space-y-2">
-                            {[
-                              { value: "today", label: "Hôm nay" },
-                              { value: "yesterday", label: "Hôm qua" },
-                              { value: "this-week", label: "Tuần này" },
-                              { value: "last-week", label: "Tuần trước" },
-                              { value: "last-7-days", label: "7 ngày qua" },
-                            ].map((option) => (
-                              <button
-                                key={option.value}
-                                onClick={() => {
-                                  setPresetTimeRange(option.value);
-                                  setDateRangeType("preset");
-                                }}
-                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
-                                  ? "bg-blue-600 text-white"
-                                  : "text-blue-600 hover:bg-blue-100"
-                                  }`}
-                              >
-                                {option.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Column 2: Theo tháng và quý */}
-                        <div>
-                          <h4 className="text-sm text-slate-700 mb-3">
-                            Theo tháng và quý
-                          </h4>
-                          <div className="space-y-2">
-                            {[
-                              { value: "this-month", label: "Tháng này" },
-                              { value: "last-month", label: "Tháng trước" },
-                              { value: "last-30-days", label: "30 ngày qua" },
-                              { value: "this-quarter", label: "Quý này" },
-                              { value: "last-quarter", label: "Quý trước" },
-                            ].map((option) => (
-                              <button
-                                key={option.value}
-                                onClick={() => {
-                                  setPresetTimeRange(option.value);
-                                  setDateRangeType("preset");
-                                }}
-                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
-                                  ? "bg-blue-600 text-white"
-                                  : "text-blue-600 hover:bg-blue-100"
-                                  }`}
-                              >
-                                {option.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Column 3: Theo năm */}
-                        <div>
-                          <h4 className="text-sm text-slate-700 mb-3">
-                            Theo năm
-                          </h4>
-                          <div className="space-y-2">
-                            {[
-                              { value: "this-year", label: "Năm nay" },
-                              { value: "last-year", label: "Năm trước" },
-                            ].map((option) => (
-                              <button
-                                key={option.value}
-                                onClick={() => {
-                                  setPresetTimeRange(option.value);
-                                  setDateRangeType("preset");
-                                }}
-                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
-                                  ? "bg-blue-600 text-white"
-                                  : "text-blue-600 hover:bg-blue-100"
-                                  }`}
-                              >
-                                {option.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-
-              {/* Custom Date Range */}
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem
-                  value="custom"
-                  id="date-custom"
-                  className="border-slate-300"
-                />
-                <div className="flex-1">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left text-sm bg-white border-slate-300"
-                        onClick={() => setDateRangeType("custom")}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dateFrom && dateTo
-                          ? `${format(dateFrom, "dd/MM", {
-                            locale: vi,
-                          })} - ${format(dateTo, "dd/MM/yyyy", {
-                            locale: vi,
-                          })}`
-                          : "Lựa chọn khác"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-4" align="start">
-                      <div className="flex gap-4">
-                        <div>
-                          <Label className="text-xs text-slate-600 mb-2 block">
-                            Từ ngày
-                          </Label>
-                          <Calendar
-                            mode="single"
-                            selected={dateFrom}
-                            onSelect={(date) => {
-                              if (date) {
-                                setDateFrom(date);
-                                setDateRangeType("custom");
-                              }
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs text-slate-600 mb-2 block">
-                            Đến ngày
-                          </Label>
-                          <Calendar
-                            mode="single"
-                            selected={dateTo}
-                            onSelect={(date) => {
-                              if (date) {
-                                setDateTo(date);
-                                setDateRangeType("custom");
-                              }
-                            }}
-                            disabled={(date) =>
-                              dateFrom ? date < dateFrom : false
-                            }
-                          />
-                        </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-            </RadioGroup>
-          </div>
-
-          {/* Status Filter with Checkboxes */}
-          <div className="mb-4">
-            <label className="block mb-2 text-slate-700 text-xs">
-              Trạng thái
-            </label>
-            <div className="space-y-2">
-              {[
-                {
-                  id: "completed",
-                  label: "Đã nhập hàng",
-                },
-                { id: "draft", label: "Phiếu tạm" },
-                { id: "cancelled", label: "Đã hủy" },
-              ].map((status) => (
-                <div key={status.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`status-${status.id}`}
-                    checked={selectedStatuses.includes(status.id)}
-                    onCheckedChange={() => toggleStatus(status.id)}
-                  />
-                  <Label
-                    htmlFor={`status-${status.id}`}
-                    className="text-sm text-slate-700 cursor-pointer flex items-center gap-2"
-                  >
-                    {status.label}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
+          <h1 className="text-blue-900 text-2xl font-semibold mb-2">Nhập hàng</h1>
+          <p className="text-slate-600 text-sm">
+            Quản lý phiếu nhập hàng từ nhà cung cấp
+          </p>
         </div>
-
-        <Separator />
-
-        {/* Quick Filters */}
-        <div>
-          <h3 className="text-sm text-slate-900 mb-3">Bộ lọc nhanh</h3>
-          <div className="space-y-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-start text-xs"
-              onClick={() => setSelectedStatuses(["draft"])}
-            >
-              <Package className="w-3 h-3 mr-2" />
-              Phiếu tạm ({draftCount})
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-start text-xs"
-              onClick={() => setSelectedStatuses(["completed"])}
-            >
-              <Package className="w-3 h-3 mr-2" />
-              Đã nhập hàng ({completedCount})
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-start text-xs"
-              onClick={() => setSelectedStatuses(["cancelled"])}
-            >
-              <Package className="w-3 h-3 mr-2" />
-              Đã hủy ({cancelledCount})
-            </Button>
-          </div>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => setShowImportDialog(true)}
+          >
+            <Upload className="w-4 h-4" />
+            Nhập file
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => setShowExportDialog(true)}
+          >
+            <Download className="w-4 h-4" />
+            Xuất file
+          </Button>
+          <Button
+            className="bg-blue-600 hover:bg-blue-700"
+            onClick={() => setCreateDialogOpen(true)}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Tạo phiếu nhập
+          </Button>
         </div>
+      </div>
 
-        <Separator />
-
-        {/* Summary */}
-        <div>
-          <h4 className="text-sm text-slate-700 mb-3">Tổng quan</h4>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-600">Tổng phiếu nhập:</span>
-              <span className="text-slate-900">{sortedOrders.length}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-600">Tổng giá trị:</span>
-              <span className="text-blue-600">
-                {totalAmount.toLocaleString("vi-VN")}đ
-              </span>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col p-6 overflow-y-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-blue-900 text-2xl font-semibold mb-2">Nhập hàng</h1>
-              <p className="text-sm text-slate-600">
-                Quản lý phiếu nhập hàng từ nhà cung cấp
-              </p>
-            </div>
+      {/* Search and Filter Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="space-y-4">
             <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input
+                  placeholder="Tìm theo mã phiếu, nhà cung cấp..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-white border-slate-300"
+                />
+              </div>
+              <CustomerTimeFilter
+                dateRangeType={dateRangeType}
+                timePreset={timePreset}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+                onDateRangeTypeChange={setDateRangeType}
+                onTimePresetChange={handleTimePresetChange}
+                onDateFromChange={setDateFrom}
+                onDateToChange={setDateTo}
+              />
               <Button
                 variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
                 className="gap-2"
-                onClick={() => setShowImportDialog(true)}
               >
-                <Upload className="w-4 h-4" />
-                Nhập file
-              </Button>
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={() => setShowExportDialog(true)}
-              >
-                <Download className="w-4 h-4" />
-                Xuất file
-              </Button>
-              <Button
-                className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
-                onClick={handleOpenCreateDialog}
-              >
-                <Plus className="w-4 h-4" />
-                Tạo phiếu nhập
+                <Filter className="w-4 h-4" />
+                Bộ lọc
               </Button>
             </div>
-          </div>
-        </div>
 
-        {/* Search Bar */}
-        <div className="mb-4">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Tìm theo mã phiếu hoặc nhà cung cấp..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-none focus:outline-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-            />
-          </div>
-        </div>
+            {showFilters && (
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Status Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Trạng thái</Label>
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="status-draft"
+                          checked={selectedStatuses.includes('draft')}
+                          onCheckedChange={() => toggleStatus('draft')}
+                          className="border-slate-300"
+                        />
+                        <Label htmlFor="status-draft" className="text-sm text-slate-700 cursor-pointer font-normal">
+                          Phiếu tạm
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="status-completed"
+                          checked={selectedStatuses.includes('completed')}
+                          onCheckedChange={() => toggleStatus('completed')}
+                          className="border-slate-300"
+                        />
+                        <Label htmlFor="status-completed" className="text-sm text-slate-700 cursor-pointer font-normal">
+                          Hoàn thành
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="status-cancelled"
+                          checked={selectedStatuses.includes('cancelled')}
+                          onCheckedChange={() => toggleStatus('cancelled')}
+                          className="border-slate-300"
+                        />
+                        <Label htmlFor="status-cancelled" className="text-sm text-slate-700 cursor-pointer font-normal">
+                          Đã hủy
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
 
-        {/* Table */}
+                  {/* Payment Status Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Thanh toán</Label>
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="payment-paid"
+                          checked={selectedPaymentStatuses.includes('paid')}
+                          onCheckedChange={() => togglePaymentStatus('paid')}
+                          className="border-slate-300"
+                        />
+                        <Label htmlFor="payment-paid" className="text-sm text-slate-700 cursor-pointer font-normal">
+                          Đã thanh toán
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="payment-partial"
+                          checked={selectedPaymentStatuses.includes('partial')}
+                          onCheckedChange={() => togglePaymentStatus('partial')}
+                          className="border-slate-300"
+                        />
+                        <Label htmlFor="payment-partial" className="text-sm text-slate-700 cursor-pointer font-normal">
+                          Thanh toán một phần
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="payment-unpaid"
+                          checked={selectedPaymentStatuses.includes('unpaid')}
+                          onCheckedChange={() => togglePaymentStatus('unpaid')}
+                          className="border-slate-300"
+                        />
+                        <Label htmlFor="payment-unpaid" className="text-sm text-slate-700 cursor-pointer font-normal">
+                          Chưa thanh toán
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick Filter */}
+                   <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Bộ lọc nhanh</Label>
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                       <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-start text-xs"
+                        onClick={() => {
+                          setSelectedStatuses([]);
+                          setSelectedPaymentStatuses([]);
+                          setSearchTerm('');
+                        }}
+                      >
+                       <X className="w-3 h-3 mr-2" />
+                        Xóa bộ lọc
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
         <div className="bg-white rounded-xl border border-blue-200 flex-1 overflow-hidden flex flex-col">
           <div className="overflow-x-auto rounded-xl">
             <Table>
@@ -2316,7 +2219,7 @@ export function PurchaseOrders() {
             </p>
           </div>
         </div>
-      </div>
+
 
       {/* Create Purchase Order Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>

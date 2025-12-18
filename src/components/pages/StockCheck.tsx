@@ -345,6 +345,7 @@ export function StockCheck() {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("none");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   // Ẩn nút X mặc định của DialogContent
@@ -688,141 +689,155 @@ export function StockCheck() {
   // Giả sử stockItemsPKK001 là danh sách kiểm kho hiện tại
   const exportData = stockItemsPKK001;
 
+
   return (
-    <div className="flex h-full">
-      {/* Left Filter Panel - giống layout trong hình: Trạng thái + Bộ lọc nhanh */}
-      <aside className="w-64 bg-white border-r border-slate-200 p-4 overflow-y-auto hidden lg:block">
-        <div className="space-y-6">
-          {/* Trạng thái */}
-          <div>
-            <h3 className="text-sm text-slate-900 mb-3">Trạng thái</h3>
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="status-draft"
-                  checked={selectedStatuses.includes("draft")}
-                  onCheckedChange={() => toggleStatus("draft")}
-                />
-                <Label
-                  htmlFor="status-draft"
-                  className="text-sm text-slate-700 cursor-pointer flex items-center gap-2"
-                >
-                  Nháp
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="status-completed"
-                  checked={selectedStatuses.includes("completed")}
-                  onCheckedChange={() => toggleStatus("completed")}
-                />
-                <Label
-                  htmlFor="status-completed"
-                  className="text-sm text-slate-700 cursor-pointer flex items-center gap-2"
-                >
-                  Hoàn thành
-                </Label>
-              </div>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Bộ lọc nhanh theo trạng thái */}
-          <div className="space-y-2">
-            <h3 className="text-sm text-slate-900 mb-1">Bộ lọc nhanh</h3>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-between text-xs"
-              onClick={() => setSelectedStatuses(["draft", "completed"])}
-            >
-              <span className="flex items-center gap-2">Tất cả</span>
-              <span className="text-slate-500 text-[11px]">
-                ({sessions.length})
-              </span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-between text-xs"
-              onClick={() => handleQuickFilterStatus("completed")}
-            >
-              <span className="flex items-center gap-2">Hoàn thành</span>
-              <span className="text-slate-500 text-[11px]">
-                ({completedCount})
-              </span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-between text-xs"
-              onClick={() => handleQuickFilterStatus("draft")}
-            >
-              <span className="flex items-center gap-2">Nháp</span>
-              <span className="text-slate-500 text-[11px]">({draftCount})</span>
-            </Button>
-          </div>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-blue-900 text-2xl font-semibold mb-2">Kiểm kho</h1>
+          <p className="text-slate-600 text-sm">
+            Quản lý phiếu kiểm kho và đối chiếu tồn kho thực tế
+          </p>
         </div>
-      </aside>
-
-      {/* Main content */}
-      <div className="flex-1 p-4 lg:p-8 space-y-6 overflow-y-auto">
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-blue-900 text-2xl font-semibold">Kiểm kho</h1>
-            <p className="text-slate-600 mt-1">
-              Quản lý phiếu kiểm kho và đối chiếu tồn kho thực tế
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setImportDialogOpen(true)}
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Nhập file
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setExportDialogOpen(true)}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Xuất file
-            </Button>
-            <ExportExcelDialog
-              open={exportDialogOpen}
-              onOpenChange={setExportDialogOpen}
-              data={exportData}
-              columns={exportColumns}
-              fileName="kiemkho.csv"
-              title="Xuất danh sách kiểm kho"
-            />
-            <Button
-              className="bg-blue-600 hover:bg-blue-700 text-white px-5"
-              onClick={handleOpenCreateDialog}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Tạo phiếu kiểm kho
-            </Button>
-
-
-          </div>
-        </div>
-
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-          <Input
-            placeholder="Tìm theo mã phiếu hoặc ghi chú..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setImportDialogOpen(true)}
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Nhập file
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setExportDialogOpen(true)}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Xuất file
+          </Button>
+          <ExportExcelDialog
+            open={exportDialogOpen}
+            onOpenChange={setExportDialogOpen}
+            data={exportData}
+            columns={exportColumns}
+            fileName="kiemkho.csv"
+            title="Xuất danh sách kiểm kho"
           />
+          <StockCheckImportDialog
+            open={importDialogOpen}
+            onOpenChange={setImportDialogOpen}
+          />
+          <Button
+            className="bg-blue-600 hover:bg-blue-700"
+            onClick={handleOpenCreateDialog}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Tạo phiếu kiểm kho
+          </Button>
         </div>
+      </div>
 
-        {/* Stock check sessions table */}
+      {/* Search and Filter Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input
+                  placeholder="Tìm theo mã phiếu hoặc ghi chú..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-white border-slate-300"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className="gap-2"
+              >
+                <Search className="w-4 h-4" />
+                Bộ lọc
+              </Button>
+            </div>
+
+            {showFilters && (
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Trạng thái</Label>
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="status-draft"
+                          checked={selectedStatuses.includes("draft")}
+                          onCheckedChange={() => toggleStatus("draft")}
+                          className="border-slate-300"
+                        />
+                        <Label
+                          htmlFor="status-draft"
+                          className="text-sm text-slate-700 cursor-pointer font-normal"
+                        >
+                          Nháp
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="status-completed"
+                          checked={selectedStatuses.includes("completed")}
+                          onCheckedChange={() => toggleStatus("completed")}
+                          className="border-slate-300"
+                        />
+                        <Label
+                          htmlFor="status-completed"
+                          className="text-sm text-slate-700 cursor-pointer font-normal"
+                        >
+                          Hoàn thành
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Thống kê</Label>
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-between text-xs"
+                        onClick={() => setSelectedStatuses(["draft", "completed"])}
+                      >
+                        <span>Tất cả</span>
+                        <span className="text-slate-500">({sessions.length})</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-between text-xs"
+                        onClick={() => handleQuickFilterStatus("completed")}
+                      >
+                        <span>Hoàn thành</span>
+                        <span className="text-slate-500">({completedCount})</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-between text-xs"
+                        onClick={() => handleQuickFilterStatus("draft")}
+                      >
+                        <span>Nháp</span>
+                        <span className="text-slate-500">({draftCount})</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Stock check sessions table */}
         <Card className="border-blue-200">
           <CardContent className="p-0">
             <div className="overflow-x-auto rounded-xl">
@@ -1603,7 +1618,6 @@ export function StockCheck() {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
 
       <StockCheckImportDialog
         open={importDialogOpen}

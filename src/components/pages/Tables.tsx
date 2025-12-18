@@ -41,7 +41,6 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
-import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { toast } from "sonner";
 
 interface TableItem {
@@ -74,6 +73,7 @@ export function Tables() {
   const [editingTable, setEditingTable] = useState<TableItem | null>(null);
   const [editingArea, setEditingArea] = useState<Area | null>(null);
   const [editAreaName, setEditAreaName] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
 
   // Mock data
   const [tables, setTables] = useState<TableItem[]>([
@@ -158,9 +158,9 @@ export function Tables() {
   const getSortIcon = (field: "name" | "area" | "seats") => {
     if (sortBy !== field) return null;
     if (sortOrder === "asc") {
-      return <ArrowUp className="w-4 h-4 inline-block ml-1" />;
+      return <ArrowUp className="w-4 h-4 inline-block ml-1 text-blue-600" />;
     } else if (sortOrder === "desc") {
-      return <ArrowDown className="w-4 h-4 inline-block ml-1" />;
+      return <ArrowDown className="w-4 h-4 inline-block ml-1 text-blue-600" />;
     }
     return null;
   };
@@ -269,423 +269,406 @@ export function Tables() {
   const inactiveTables = tables.filter((t) => t.status === "inactive").length;
 
   return (
-    <div className="flex h-full bg-slate-50">
-      {/* Left Sidebar - Filters */}
-      <div className="w-64 bg-white border-r p-6 overflow-auto">
-        <div className="space-y-6">
-          <div>
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <Label className="text-xs text-slate-600">Khu vực</Label>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5"
-                    onClick={() => {
-                      setNewAreaName("");
-                      setQuickAreaDialogOpen(true);
-                    }}
-                  >
-                    <Plus className="w-3 h-3" />
-                  </Button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Select value={selectedArea} onValueChange={setSelectedArea}>
-                    <SelectTrigger className="flex-1 bg-white border-slate-300 shadow-none">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tất cả khu vực</SelectItem>
-                      {areas.map((area) => (
-                        <SelectItem key={area.id} value={area.id}>
-                          {area.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {selectedArea !== "all" && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9"
-                      onClick={() => {
-                        const area = areas.find((a) => a.id === selectedArea);
-                        if (area) {
-                          setEditingArea(area);
-                          setEditAreaName(area.name);
-                          setEditAreaDialogOpen(true);
-                        }
-                      }}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-xs text-slate-600 mb-2 block">
-                  Trạng thái
-                </Label>
-                <RadioGroup
-                  value={selectedStatus}
-                  onValueChange={setSelectedStatus}
-                  className="space-y-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem
-                      value="all"
-                      id="status-all"
-                      className="border-slate-300"
-                    />
-                    <Label
-                      htmlFor="status-all"
-                      className="text-l text-slate-700 cursor-pointer font-normal"
-                    >
-                      Tất cả trạng thái
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem
-                      value="active"
-                      id="status-active"
-                      className="border-slate-300"
-                    />
-                    <Label
-                      htmlFor="status-active"
-                      className="text-l text-slate-700 cursor-pointer font-normal"
-                    >
-                      Hoạt động
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem
-                      value="inactive"
-                      id="status-inactive"
-                      className="border-slate-300"
-                    />
-                    <Label
-                      htmlFor="status-inactive"
-                      className="text-l text-slate-700 cursor-pointer font-normal"
-                    >
-                      Không hoạt động
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t">
-            <h3 className="text-sm text-slate-700 mb-3">Thống kê</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Tổng số bàn</span>
-                <span className="text-slate-900">{totalTables}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Bàn hoạt động</span>
-                <span className="text-emerald-600">{activeTables}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Không hoạt động</span>
-                <span className="text-red-600">{inactiveTables}</span>
-              </div>
-            </div>
-          </div>
-
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => {
-              setSelectedArea("all");
-              setSelectedStatus("all");
-              setSearchQuery("");
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-blue-900 text-2xl font-semibold mb-2">Quản lý phòng bàn</h1>
+          <p className="text-slate-600 text-sm">
+            Quản lý bàn và khu vực trong quán
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Dialog
+            open={dialogOpen}
+            onOpenChange={(open) => {
+              setDialogOpen(open);
+              if (!open) resetForm();
             }}
           >
-            <X className="w-4 h-4 mr-2" />
-            Xóa bộ lọc
-          </Button>
+            <DialogTrigger asChild>
+              {canCreate && (
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="w-4 h-4 mr-2" />
+                Thêm bàn mới
+              </Button>
+              )}
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {editingTable ? "Chỉnh sửa bàn" : "Thêm bàn mới"}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label className="mb-1 block">Tên bàn</Label>
+                  <Input
+                    placeholder="VD: Bàn 1, Bàn VIP A..."
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                  />
+                </div>
+
+                <div>
+                  <Label className="mb-1 block">Khu vực</Label>
+                  <div className="flex gap-2">
+                    <Select
+                      value={formData.area}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, area: value })
+                      }
+                    >
+                      <SelectTrigger className="bg-white border-slate-300 shadow-none">
+                        <SelectValue placeholder="Chọn khu vực" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {areas.map((area) => (
+                          <SelectItem key={area.id} value={area.id}>
+                            {area.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button type="button" variant="outline" size="icon">
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Thêm khu vực mới</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="mb-1 block">
+                              Tên khu vực
+                            </Label>
+                            <Input
+                              placeholder="VD: Tầng 3, Sân vườn..."
+                              value={newAreaName}
+                              onChange={(e) =>
+                                setNewAreaName(e.target.value)
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  handleAddArea();
+                                }
+                              }}
+                              className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            onClick={handleAddArea}
+                            className="bg-blue-600 hover:bg-blue-700"
+                          >
+                            Thêm khu vực
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="mb-1 block">Số ghế</Label>
+                  <Input
+                    type="number"
+                    placeholder="VD: 4"
+                    value={formData.seats}
+                    onChange={(e) =>
+                      setFormData({ ...formData, seats: e.target.value })
+                    }
+                    min="1"
+                    className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setDialogOpen(false)}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  onClick={handleSubmit}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {editingTable ? "Cập nhật" : "Thêm bàn"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="bg-white border-b p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-blue-900 text-2xl font-semibold">Quản lý phòng bàn</h1>
-              <p className="text-sm text-slate-600">
-                Quản lý bàn và khu vực trong quán
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Dialog
-                open={dialogOpen}
-                onOpenChange={(open) => {
-                  setDialogOpen(open);
-                  if (!open) resetForm();
-                }}
+      {/* Search and Filter Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            {/* Search and Filter Toggle */}
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input
+                  placeholder="Tìm kiếm bàn..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className="gap-2"
               >
-                <DialogTrigger asChild>
-                  {canCreate && (
-                  <Button className="bg-blue-600 hover:bg-blue-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Thêm bàn mới
-                  </Button>
-                  )}
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>
-                      {editingTable ? "Chỉnh sửa bàn" : "Thêm bàn mới"}
-                    </DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="mb-1 block">Tên bàn</Label>
-                      <Input
-                        placeholder="VD: Bàn 1, Bàn VIP A..."
-                        value={formData.name}
-                        onChange={(e) =>
-                          setFormData({ ...formData, name: e.target.value })
-                        }
-                        className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                      />
-                    </div>
+                <Filter className="w-4 h-4" />
+                Bộ lọc
+                {(selectedArea !== "all" || selectedStatus !== "all") && (
+                  <Badge className="ml-1 bg-blue-500 text-white px-1.5 py-0.5 text-xs">
+                    {(selectedArea !== "all" ? 1 : 0) + (selectedStatus !== "all" ? 1 : 0)}
+                  </Badge>
+                )}
+              </Button>
+            </div>
 
-                    <div>
-                      <Label className="mb-1 block">Khu vực</Label>
-                      <div className="flex gap-2">
-                        <Select
-                          value={formData.area}
-                          onValueChange={(value) =>
-                            setFormData({ ...formData, area: value })
-                          }
+            {/* Collapsible Filter Panel */}
+            {showFilters && (
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Area Filter */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-slate-600">Khu vực</Label>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5"
+                        onClick={() => {
+                          setNewAreaName("");
+                          setQuickAreaDialogOpen(true);
+                        }}
+                      >
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Select value={selectedArea} onValueChange={setSelectedArea}>
+                        <SelectTrigger className="flex-1 bg-white border-slate-300 shadow-none">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tất cả khu vực</SelectItem>
+                          {areas.map((area) => (
+                            <SelectItem key={area.id} value={area.id}>
+                              {area.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedArea !== "all" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={() => {
+                            const area = areas.find((a) => a.id === selectedArea);
+                            if (area) {
+                              setEditingArea(area);
+                              setEditAreaName(area.name);
+                              setEditAreaDialogOpen(true);
+                            }
+                          }}
                         >
-                          <SelectTrigger className="bg-white border-slate-300 shadow-none">
-                            <SelectValue placeholder="Chọn khu vực" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {areas.map((area) => (
-                              <SelectItem key={area.id} value={area.id}>
-                                {area.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button type="button" variant="outline" size="icon">
-                              <Plus className="w-4 h-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Thêm khu vực mới</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div>
-                                <Label className="mb-1 block">
-                                  Tên khu vực
-                                </Label>
-                                <Input
-                                  placeholder="VD: Tầng 3, Sân vườn..."
-                                  value={newAreaName}
-                                  onChange={(e) =>
-                                    setNewAreaName(e.target.value)
-                                  }
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      handleAddArea();
-                                    }
-                                  }}
-                                  className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                                />
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <Button
-                                onClick={handleAddArea}
-                                className="bg-blue-600 hover:bg-blue-700"
-                              >
-                                Thêm khu vực
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="mb-1 block">Số ghế</Label>
-                      <Input
-                        type="number"
-                        placeholder="VD: 4"
-                        value={formData.seats}
-                        onChange={(e) =>
-                          setFormData({ ...formData, seats: e.target.value })
-                        }
-                        min="1"
-                        className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                      />
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => setDialogOpen(false)}
-                    >
-                      Hủy
-                    </Button>
-                    <Button
-                      onClick={handleSubmit}
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      {editingTable ? "Cập nhật" : "Thêm bàn"}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-            <Input
-              placeholder="Tìm kiếm bàn..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-            />
-          </div>
-        </div>
+                  {/* Status Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Trạng thái</Label>
+                    <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                      <SelectTrigger className="bg-white border-slate-300 shadow-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                        <SelectItem value="active">Hoạt động</SelectItem>
+                        <SelectItem value="inactive">Không hoạt động</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-        {/* Table */}
-        <div className="flex-1 overflow-auto p-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                Danh sách bàn ({filteredTables.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto rounded-xl">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-blue-100">
-                    <TableHead className="w-16 text-sm text-center">STT</TableHead>
-                    <TableHead
-                      className="cursor-pointer hover:bg-blue-100 transition-colors"
-                      onClick={() => handleSort("name")}
-                    >
-                      <div className="flex items-center">
-                        Tên bàn
-                        {getSortIcon("name")}
+                  {/* Stats */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Thống kê</Label>
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Tổng số bàn:</span>
+                        <span className="font-medium text-slate-900">{totalTables}</span>
                       </div>
-                    </TableHead>
-                    <TableHead
-                      className="cursor-pointer hover:bg-blue-100 transition-colors"
-                      onClick={() => handleSort("area")}
-                    >
-                      <div className="flex items-center">
-                        Khu vực
-                        {getSortIcon("area")}
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Hoạt động:</span>
+                        <span className="font-medium text-emerald-600">{activeTables}</span>
                       </div>
-                    </TableHead>
-                    <TableHead
-                      className="cursor-pointer hover:bg-blue-100 transition-colors"
-                      onClick={() => handleSort("seats")}
-                    >
-                      <div className="flex items-center">
-                        Số ghế
-                        {getSortIcon("seats")}
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Không HĐ:</span>
+                        <span className="font-medium text-red-600">{inactiveTables}</span>
                       </div>
-                    </TableHead>
-                      <TableHead className="text-sm">Trạng thái</TableHead>
-                      <TableHead className="text-sm text-right">Thao tác</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredTables.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={6}
-                          className="text-center py-8 text-slate-500"
-                        >
-                          Không tìm thấy bàn nào
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredTables.map((table, index) => (
-                        <TableRow key={table.id}>
-                          <TableCell className="text-sm text-slate-600 text-center">
-                            {index + 1}
-                          </TableCell>
-                          <TableCell className="text-sm text-slate-900">
-                            {table.name}
-                          </TableCell>
-                          <TableCell className="text-sm text-slate-700">
-                            {areas.find((a) => a.id === table.area)?.name ||
-                              table.area}
-                          </TableCell>
-                          <TableCell className="text-sm text-slate-700">
-                            {table.seats} chỗ
-                          </TableCell>
-                          <TableCell className="text-sm">{getStatusBadge(table.status)}</TableCell>
-                          <TableCell className="text-sm text-right">
-                            <div className="flex justify-end gap-2">
-                              {canUpdate && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEdit(table)}
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </Button>
-                              )}
-                              {canDelete && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDelete(table.id)}
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              )}
-                              {canUpdate && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleToggleStatus(table.id)}
-                                  className={
-                                    table.status === "active"
-                                      ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                      : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                                  }
-                                >
-                                  {table.status === "active" ? (
-                                    <PowerOff className="w-4 h-4" />
-                                  ) : (
-                                    <Power className="w-4 h-4" />
-                                  )}
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Clear Filters Button */}
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedArea("all");
+                      setSelectedStatus("all");
+                      setSearchQuery("");
+                    }}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Xóa bộ lọc
+                  </Button>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            Danh sách bàn ({filteredTables.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto rounded-xl">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-blue-100">
+                <TableHead className="w-16 text-sm text-center">STT</TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("name")}
+                >
+                  <div className="flex items-center">
+                    Tên bàn
+                    {getSortIcon("name")}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("area")}
+                >
+                  <div className="flex items-center">
+                    Khu vực
+                    {getSortIcon("area")}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("seats")}
+                >
+                  <div className="flex items-center">
+                    Số ghế
+                    {getSortIcon("seats")}
+                  </div>
+                </TableHead>
+                  <TableHead className="text-sm">Trạng thái</TableHead>
+                  <TableHead className="text-sm text-right">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredTables.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="text-center py-8 text-slate-500"
+                    >
+                      Không tìm thấy bàn nào
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredTables.map((table, index) => (
+                    <TableRow key={table.id}>
+                      <TableCell className="text-sm text-slate-600 text-center">
+                        {index + 1}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-900">
+                        {table.name}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700">
+                        {areas.find((a) => a.id === table.area)?.name ||
+                          table.area}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700">
+                        {table.seats} chỗ
+                      </TableCell>
+                      <TableCell className="text-sm">{getStatusBadge(table.status)}</TableCell>
+                      <TableCell className="text-sm text-right">
+                        <div className="flex justify-end gap-2">
+                          {canUpdate && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(table)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(table.id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {canUpdate && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleToggleStatus(table.id)}
+                              className={
+                                table.status === "active"
+                                  ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                              }
+                            >
+                              {table.status === "active" ? (
+                                <PowerOff className="w-4 h-4" />
+                              ) : (
+                                <Power className="w-4 h-4" />
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Edit Area Dialog */}
       <Dialog

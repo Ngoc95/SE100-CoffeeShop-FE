@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Search, Pencil, Package, TrendingDown, DollarSign, Plus, Minus, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Pencil, Filter, Plus, Minus, ArrowUp, ArrowDown, X } from 'lucide-react';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
-import { Separator } from '../ui/separator';
 import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { categories } from '../../data/categories';
 import {
   Dialog,
@@ -215,6 +216,7 @@ export function ProductPricing() {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("none");
+  const [showFilters, setShowFilters] = useState(false);
 
   // Mock data
   const [products, setProducts] = useState([
@@ -367,100 +369,129 @@ export function ProductPricing() {
   }
 
   return (
-    <div className="flex h-full bg-slate-50">
-      {/* Left Sidebar - Filters */}
-      <aside className="w-64 bg-white border-r border-slate-200 p-4 overflow-y-auto hidden lg:block">
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-sm text-slate-900 mb-3">Danh mục</h3>
-            <div className="space-y-2">
-              {categories.map((cat) => (
-                <div key={cat.id} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id={cat.id} 
-                      checked={selectedCategories.includes(cat.id)}
-                      onCheckedChange={() => toggleCategory(cat.id)}
-                    />
-                    <Label htmlFor={cat.id} className="text-sm text-slate-700 cursor-pointer">
-                      {cat.name}
-                    </Label>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-blue-900 text-2xl font-semibold mb-2">Thiết lập giá</h1>
+          <p className="text-slate-600 text-sm">
+            Quản lý giá vốn và giá bán sản phẩm
+          </p>
+        </div>
+      </div>
+
+      {/* Search and Filter Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            {/* Search and Filter Toggle */}
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input
+                  placeholder="Tìm theo tên hoặc mã hàng..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className="gap-2"
+              >
+                <Filter className="w-4 h-4" />
+                Bộ lọc
+                {(!selectedCategories.includes('all') || selectedTypes.length < 3) && (
+                  <Badge className="ml-1 bg-blue-500 text-white px-1.5 py-0.5 text-xs">
+                    {(!selectedCategories.includes('all') ? selectedCategories.length : 0) + (selectedTypes.length < 3 ? (3 - selectedTypes.length) : 0)}
+                  </Badge>
+                )}
+              </Button>
+            </div>
+
+            {/* Collapsible Filter Panel */}
+            {showFilters && (
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Category Filters */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Danh mục</Label>
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2 max-h-60 overflow-y-auto">
+                      {categories.map((cat) => (
+                        <div key={cat.id} className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={cat.id} 
+                              checked={selectedCategories.includes(cat.id)}
+                              onCheckedChange={() => toggleCategory(cat.id)}
+                              className="border-slate-300"
+                            />
+                            <Label htmlFor={cat.id} className="text-sm text-slate-700 cursor-pointer font-normal">
+                              {cat.name}
+                            </Label>
+                          </div>
+                          <span className="text-xs text-slate-500">{cat.count}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <span className="text-xs text-slate-500">{cat.count}</span>
+
+                  {/* Type Filters */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Loại hàng hóa</Label>
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                      {[
+                        { id: 'ready-made', label: 'Hàng hóa bán sẵn' },
+                        { id: 'composite', label: 'Hàng hóa cấu thành' },
+                        { id: 'ingredient', label: 'Nguyên liệu' },
+                      ].map((type) => (
+                        <div key={type.id} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={type.id}
+                            checked={selectedTypes.includes(type.id)}
+                            onCheckedChange={() => toggleType(type.id)}
+                            className="border-slate-300"
+                          />
+                          <Label htmlFor={type.id} className="text-sm text-slate-700 cursor-pointer font-normal">
+                            {type.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
 
-          <Separator />
-
-          <div>
-            <h3 className="text-sm text-slate-900 mb-3">Loại hàng hóa</h3>
-            <div className="space-y-2">
-              {[
-                { id: 'ready-made', label: 'Hàng hóa bán sẵn' },
-                { id: 'composite', label: 'Hàng hóa cấu thành' },
-                { id: 'ingredient', label: 'Nguyên liệu' },
-              ].map((type) => (
-                <div key={type.id} className="flex items-center space-x-2">
-                  <Checkbox 
-                    id={type.id}
-                    checked={selectedTypes.includes(type.id)}
-                    onCheckedChange={() => toggleType(type.id)}
-                  />
-                  <Label htmlFor={type.id} className="text-sm text-slate-700 cursor-pointer">
-                    {type.label}
-                  </Label>
+                {/* Clear Filters Button */}
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedCategories(['all']);
+                      setSelectedTypes(['ready-made', 'composite', 'ingredient']);
+                      setSearchTerm("");
+                    }}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Xóa bộ lọc
+                  </Button>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
+        </CardContent>
+      </Card>
 
-          <Separator />
-
-          <div>
-            <h3 className="text-sm text-slate-900 mb-3">Bộ lọc nhanh</h3>
-            <div className="space-y-2">
-              <Button variant="outline" size="sm" className="w-full justify-start text-xs">
-                <DollarSign className="w-3 h-3 mr-2" />
-                Lợi nhuận thấp
-              </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start text-xs">
-                <TrendingDown className="w-3 h-3 mr-2" />
-                Giá cao nhất
-              </Button>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col p-6">
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-blue-900 text-2xl font-semibold">Thiết lập giá</h1>
-            <p className="text-slate-600 mt-1">Quản lý giá vốn và giá bán sản phẩm</p>
-          </div>
-          <div className="flex items-center gap-2"></div>
-        </div>
-
-        {/* Search Bar */}
-        <div className="mb-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-            <Input
-              placeholder="Tìm theo tên hoặc mã hàng..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-            />
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="bg-white rounded-xl border border-slate-200 flex-1 overflow-hidden flex flex-col">
-          <div className="overflow-x-auto flex-1 rounded-xl">
+      {/* Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            Danh sách sản phẩm ({filteredProducts.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto rounded-xl">
             <Table>
               <TableHeader>
                 <TableRow className="bg-blue-100">
@@ -499,15 +530,6 @@ export function ProductPricing() {
                     <div className="flex items-center">
                       Loại hàng hóa
                       {getSortIcon("type")}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => handleSort("unit")}
-                  >
-                    <div className="flex items-center">
-                      Đơn vị tính
-                      {getSortIcon("unit")}
                     </div>
                   </TableHead>
                   <TableHead
@@ -565,9 +587,6 @@ export function ProductPricing() {
                       <TableCell className="text-sm text-slate-700">
                         {getTypeLabel(product.type)}
                       </TableCell>
-                      <TableCell className="text-sm text-slate-700">
-                        {product.unit}
-                      </TableCell>
                       <TableCell className="text-sm text-slate-900 text-right">
                         {product.costPrice.toLocaleString('vi-VN')}đ
                       </TableCell>
@@ -591,15 +610,8 @@ export function ProductPricing() {
               </TableBody>
             </Table>
           </div>
-
-          {/* Footer */}
-          <div className="px-4 py-3 border-t border-slate-200 bg-slate-50">
-            <p className="text-sm text-slate-600">
-              Hiển thị {filteredProducts.length} sản phẩm
-            </p>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Price Edit Dialog */}
       <PriceEditDialog

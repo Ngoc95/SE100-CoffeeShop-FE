@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from "../../contexts/AuthContext";
-import { 
+import {
   Plus, 
   Download, 
   Search,
@@ -11,8 +11,13 @@ import {
   Trash2,
   ArrowUp,
   ArrowDown,
+  Filter,
+  ArrowUpRight,
+  ArrowDownLeft, // Check if this icon exists in lucide-react (it usually does as ArrowUpRight/ArrowDownLeft or similar. Let's assume standard names).
 } from 'lucide-react';
+import { cn } from '../ui/utils';
 import { Button } from '../ui/button';
+import { CustomerTimeFilter } from '../reports/CustomerTimeFilter'; // Import CustomerTimeFilter
 import { Input } from '../ui/input';
 import { Card, CardContent } from '../ui/card';
 import { Checkbox } from '../ui/checkbox';
@@ -56,46 +61,84 @@ import {
   CommandList,
 } from '../ui/command';
 import { Separator } from '../ui/separator';
-import { format } from 'date-fns';
+import { 
+  format, 
+  startOfWeek, 
+  endOfWeek, 
+  startOfMonth, 
+  endOfMonth, 
+  subDays,
+  subMonths,
+  subQuarters,
+  subYears,
+  startOfQuarter,
+  endOfQuarter,
+  startOfYear,
+  endOfYear
+} from 'date-fns';
 import { vi } from 'date-fns/locale';
 
 export function Finance() {
   const { hasPermission } = useAuth();
   const canCreate = hasPermission('finance:create');
 
-  const [activeTab, setActiveTab] = useState<'cash' | 'bank' | 'total'>('cash');
-  
-  // Filter states
-  const [searchCode, setSearchCode] = useState('');
-  const [searchNote, setSearchNote] = useState('');
-  const [statusCompleted, setStatusCompleted] = useState(true);
-  const [statusCancelled, setStatusCancelled] = useState(false);
-  
+  // New States for Top Filter
+  const [dateRangeType, setDateRangeType] = useState<'preset' | 'custom'>('preset');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date(2025, 11, 1));
+  const [dateTo, setDateTo] = useState<Date | undefined>(new Date(2025, 11, 31));
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTypes, setSelectedTypes] = useState<string[]>(['income', 'expense']);
+  const [selectedMethods, setSelectedMethods] = useState<string[]>(['cash', 'transfer']);
+
   // Sort states
   type SortField = "id" | "time" | "category" | "person" | "amount" | null;
   type SortOrder = "asc" | "desc" | "none";
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("none");
-  
-  // Time filter states (similar to Reports)
-  const [dateRangeType, setDateRangeType] = useState<'preset' | 'custom'>('preset');
-  const [presetTimeRange, setPresetTimeRange] = useState('this-month');
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date(2025, 11, 1));
-  const [dateTo, setDateTo] = useState<Date | undefined>(new Date(2025, 11, 2));
-  
-  // Creator filter (multiselect like in Reports)
-  const [selectedCreators, setSelectedCreators] = useState<string[]>([]);
-  const [creatorSearchOpen, setCreatorSearchOpen] = useState(false);
-  
-  const [personName, setPersonName] = useState('');
-  const [personPhone, setPersonPhone] = useState('');
-  
-  // Transaction category filter (searchable dropdown)
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [categorySearchOpen, setCategorySearchOpen] = useState(false);
-  
-  const [documentTypeReceipt, setDocumentTypeReceipt] = useState(true);
-  const [documentTypePayment, setDocumentTypePayment] = useState(true);
+  const [timePreset, setTimePreset] = useState("this-month");
+
+  const handleTimePresetChange = (value: string) => {
+    setTimePreset(value);
+    const now = new Date();
+    let from: Date | undefined;
+    let to: Date | undefined;
+
+    switch (value) {
+      case 'today':
+        from = now; to = now; break;
+      case 'yesterday':
+        const y = subDays(now, 1); from = y; to = y; break;
+      case 'this-week':
+        from = startOfWeek(now, { weekStartsOn: 1 }); to = endOfWeek(now, { weekStartsOn: 1 }); break;
+      case 'last-week':
+        const lastWeek = subDays(now, 7);
+        from = startOfWeek(lastWeek, { weekStartsOn: 1 }); to = endOfWeek(lastWeek, { weekStartsOn: 1 }); break;
+      case 'last-7-days':
+        from = subDays(now, 7); to = now; break;
+      case 'this-month':
+        from = startOfMonth(now); to = endOfMonth(now); break;
+      case 'last-month':
+        const lastMonth = subMonths(now, 1);
+        from = startOfMonth(lastMonth); to = endOfMonth(lastMonth); break;
+      case 'last-30-days':
+        from = subDays(now, 30); to = now; break;
+      case 'this-quarter':
+        from = startOfQuarter(now); to = endOfQuarter(now); break;
+      case 'last-quarter':
+        const lastQuarter = subQuarters(now, 1);
+        from = startOfQuarter(lastQuarter); to = endOfQuarter(lastQuarter); break;
+      case 'this-year':
+        from = startOfYear(now); to = endOfYear(now); break;
+      case 'last-year':
+        const lastYear = subYears(now, 1);
+        from = startOfYear(lastYear); to = endOfYear(lastYear); break;
+    }
+    
+    if (value !== 'custom') {
+        setDateFrom(from);
+        setDateTo(to);
+    }
+  };
   
   // Modal states
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
@@ -272,34 +315,53 @@ export function Finance() {
   };
 
   // Filtering logic
+  const [activeTab, setActiveTab] = useState<'cash' | 'bank' | 'total'>('cash'); // Kept for Dialog compatibility
+
+  // Filtering logic
   let filteredTransactions = allTransactions.filter(transaction => {
-    // Filter by tab
-    if (activeTab === 'cash' && transaction.method !== 'cash') return false;
-    if (activeTab === 'bank' && transaction.method !== 'bank') return false;
-    if (activeTab === 'total') return true; // Show all for total
+    // Filter by Search Term (Code, Note, Person)
+    if (searchTerm) {
+      const lowerTerm = searchTerm.toLowerCase();
+      const matchesCode = transaction.id.toLowerCase().includes(lowerTerm);
+      const matchesNote = transaction.note.toLowerCase().includes(lowerTerm);
+      const matchesPerson = transaction.person.toLowerCase().includes(lowerTerm);
+      if (!matchesCode && !matchesNote && !matchesPerson) return false;
+    }
 
-    // Filter by search code
-    if (searchCode && !transaction.id.toLowerCase().includes(searchCode.toLowerCase())) return false;
+    // Filter by Date
+    if (dateFrom || dateTo) {
+      const [datePart] = transaction.time.split(' ');
+      const [day, month, year] = datePart.split('/');
+      const transDate = new Date(Number(year), Number(month) - 1, Number(day));
+      
+      if (dateFrom) {
+        const from = new Date(dateFrom);
+        from.setHours(0, 0, 0, 0);
+        if (transDate < from) return false;
+      }
+      
+      if (dateTo) {
+        const to = new Date(dateTo);
+        to.setHours(0, 0, 0, 0);
+        if (transDate > to) return false;
+      }
+    }
 
-    // Filter by search note
-    if (searchNote && !transaction.note.toLowerCase().includes(searchNote.toLowerCase())) return false;
+    // Filter by Type (Thu/Chi)
+    const isIncome = transaction.type === 'thu';
+    const isExpense = transaction.type === 'chi';
+    if (isIncome && !selectedTypes.includes('income')) return false;
+    if (isExpense && !selectedTypes.includes('expense')) return false;
 
-    // Filter by status
-    if (!statusCompleted && transaction.status === 'completed') return false;
-    if (!statusCancelled && transaction.status === 'cancelled') return false;
-
-    // Filter by person name
-    if (personName && !transaction.person.toLowerCase().includes(personName.toLowerCase())) return false;
-
-    // Filter by categories
-    if (selectedCategories.length > 0 && !selectedCategories.includes(transaction.category)) return false;
-
-    // Filter by document type
-    if (!documentTypeReceipt && transaction.type === 'thu') return false;
-    if (!documentTypePayment && transaction.type === 'chi') return false;
+    // Filter by Method (Tien mat/Chuyen khoan)
+    // method: 'cash' | 'bank'
+    const method = transaction.method === 'cash' ? 'cash' : 'transfer'; // Map 'bank' to 'transfer' to match state
+    if (!selectedMethods.includes(method)) return false;
 
     return true;
   });
+
+
 
   // Apply sorting
   if (sortField && sortOrder !== "none") {
@@ -335,21 +397,7 @@ export function Finance() {
     });
   }
 
-  const toggleCreator = (creatorId: string) => {
-    setSelectedCreators(prev => 
-      prev.includes(creatorId) 
-        ? prev.filter(id => id !== creatorId)
-        : [...prev, creatorId]
-    );
-  };
 
-  const toggleCategory = (categoryName: string) => {
-    setSelectedCategories(prev => 
-      prev.includes(categoryName) 
-        ? prev.filter(name => name !== categoryName)
-        : [...prev, categoryName]
-    );
-  };
 
   const handleOpenReceiptDialog = () => {
     // Auto-generate receipt code
@@ -492,529 +540,202 @@ export function Finance() {
     }
   };
 
+  const [showFilters, setShowFilters] = useState(false);
   return (
-    <div className="flex h-screen bg-slate-50">
-      {/* Left Sidebar - Tabs & Filters */}
-      <div className="w-64 bg-white border-r border-slate-200 overflow-y-auto">
-        {/* Tab Navigation */}
-        <div className="p-4 border-b border-slate-200">
-          <button
-            onClick={() => setActiveTab('cash')}
-            className={`w-full text-left px-3 py-2 rounded mb-1 text-sm ${
-              activeTab === 'cash' ? 'bg-blue-100 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            Tiền mặt
-          </button>
-          <button
-            onClick={() => setActiveTab('bank')}
-            className={`w-full text-left px-3 py-2 rounded mb-1 text-sm ${
-              activeTab === 'bank' ? 'bg-blue-100 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            Ngân hàng
-          </button>
-          <button
-            onClick={() => setActiveTab('total')}
-            className={`w-full text-left px-3 py-2 rounded text-sm ${
-              activeTab === 'total' ? 'bg-blue-100 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            Tổng quỹ
-          </button>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-blue-900 text-2xl font-semibold mb-2">Sổ quỹ</h1>
+          <p className="text-slate-600 text-sm">
+            Quản lý thu chi và dòng tiền
+          </p>
         </div>
-
-        {/* Filters - Always Expanded */}
-        <div className="p-4 space-y-4">
-          {/* Search Filter */}
-          <div>
-            <h3 className="text-sm text-slate-900 mb-2">Tìm kiếm</h3>
-            <div className="space-y-2">
-              <Input
-                placeholder="Theo mã phiếu"
-                value={searchCode}
-                onChange={(e) => setSearchCode(e.target.value)}
-                className="h-9 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-              />
-              <Input
-                placeholder="Ghi chú"
-                value={searchNote}
-                onChange={(e) => setSearchNote(e.target.value)}
-                className="h-9 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-              />
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Status Filter */}
-          <div>
-            <h3 className="text-sm text-slate-900 mb-2">Trạng thái</h3>
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="status-completed"
-                  checked={statusCompleted}
-                  onCheckedChange={(checked) => setStatusCompleted(!!checked)}
-                />
-                <label htmlFor="status-completed" className="text-sm text-slate-700 cursor-pointer">
-                  Đã thanh toán
-                </label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="status-cancelled"
-                  checked={statusCancelled}
-                  onCheckedChange={(checked) => setStatusCancelled(!!checked)}
-                />
-                <label htmlFor="status-cancelled" className="text-sm text-slate-700 cursor-pointer">
-                  Đã hủy
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Time Filter - Similar to Reports */}
-          <div>
-            <h3 className="text-sm text-slate-900 mb-3">Thời gian</h3>
-            <RadioGroup value={dateRangeType} onValueChange={(value) => setDateRangeType(value as 'preset' | 'custom')}>
-              {/* Preset Time Ranges */}
-              <div className="flex items-center space-x-2 mb-3">
-                <RadioGroupItem value="preset" id="date-preset" className="border-slate-300" />
-                <div className="flex-1">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-between text-left text-sm bg-white border-slate-300"
-                        onClick={() => setDateRangeType('preset')}
-                      >
-                        <span>
-                          {presetTimeRange === 'today' && 'Hôm nay'}
-                          {presetTimeRange === 'yesterday' && 'Hôm qua'}
-                          {presetTimeRange === 'this-week' && 'Tuần này'}
-                          {presetTimeRange === 'last-week' && 'Tuần trước'}
-                          {presetTimeRange === 'last-7-days' && '7 ngày qua'}
-                          {presetTimeRange === 'this-month' && 'Tháng này'}
-                          {presetTimeRange === 'last-month' && 'Tháng trước'}
-                          {presetTimeRange === 'last-30-days' && '30 ngày qua'}
-                          {presetTimeRange === 'this-quarter' && 'Quý này'}
-                          {presetTimeRange === 'last-quarter' && 'Quý trước'}
-                          {presetTimeRange === 'this-year' && 'Năm nay'}
-                          {presetTimeRange === 'last-year' && 'Năm trước'}
-                        </span>
-                        <ChevronDown className="h-4 w-4 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[600px] p-4" align="start">
-                      <div className="grid grid-cols-3 gap-6">
-                        {/* Column 1: Theo ngày và tuần */}
-                        <div>
-                          <h4 className="text-sm text-slate-700 mb-3">Theo ngày và tuần</h4>
-                          <div className="space-y-2">
-                            {[
-                              { value: 'today', label: 'Hôm nay' },
-                              { value: 'yesterday', label: 'Hôm qua' },
-                              { value: 'this-week', label: 'Tuần này' },
-                              { value: 'last-week', label: 'Tuần trước' },
-                              { value: 'last-7-days', label: '7 ngày qua' },
-                            ].map((option) => (
-                              <button
-                                key={option.value}
-                                onClick={() => {
-                                  setPresetTimeRange(option.value);
-                                  setDateRangeType('preset');
-                                }}
-                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                  presetTimeRange === option.value
-                                    ? 'bg-blue-600 text-white'
-                                    : 'text-blue-600 hover:bg-blue-100'
-                                }`}
-                              >
-                                {option.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Column 2: Theo tháng và quý */}
-                        <div>
-                          <h4 className="text-sm text-slate-700 mb-3">Theo tháng và quý</h4>
-                          <div className="space-y-2">
-                            {[
-                              { value: 'this-month', label: 'Tháng này' },
-                              { value: 'last-month', label: 'Tháng trước' },
-                              { value: 'last-30-days', label: '30 ngày qua' },
-                              { value: 'this-quarter', label: 'Quý này' },
-                              { value: 'last-quarter', label: 'Quý trước' },
-                            ].map((option) => (
-                              <button
-                                key={option.value}
-                                onClick={() => {
-                                  setPresetTimeRange(option.value);
-                                  setDateRangeType('preset');
-                                }}
-                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                  presetTimeRange === option.value
-                                    ? 'bg-blue-600 text-white'
-                                    : 'text-blue-600 hover:bg-blue-100'
-                                }`}
-                              >
-                                {option.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Column 3: Theo năm */}
-                        <div>
-                          <h4 className="text-sm text-slate-700 mb-3">Theo năm</h4>
-                          <div className="space-y-2">
-                            {[
-                              { value: 'this-year', label: 'Năm nay' },
-                              { value: 'last-year', label: 'Năm trước' },
-                            ].map((option) => (
-                              <button
-                                key={option.value}
-                                onClick={() => {
-                                  setPresetTimeRange(option.value);
-                                  setDateRangeType('preset');
-                                }}
-                                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                  presetTimeRange === option.value
-                                    ? 'bg-blue-600 text-white'
-                                    : 'text-blue-600 hover:bg-blue-100'
-                                }`}
-                              >
-                                {option.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-
-              {/* Custom Date Range */}
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="custom" id="date-custom" className="border-slate-300" />
-                <div className="flex-1">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left text-sm bg-white border-slate-300"
-                        onClick={() => setDateRangeType('custom')}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dateFrom && dateTo
-                          ? `${format(dateFrom, 'dd/MM', { locale: vi })} - ${format(dateTo, 'dd/MM/yyyy', { locale: vi })}`
-                          : 'Lựa chọn khác'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-4" align="start">
-                      <div className="flex gap-4">
-                        <div>
-                          <Label className="text-xs text-slate-600 mb-2 block">Từ ngày</Label>
-                          <Calendar
-                            mode="single"
-                            selected={dateFrom}
-                            onSelect={(date) => {
-                              if (date) {
-                                setDateFrom(date);
-                                setDateRangeType('custom');
-                              }
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs text-slate-600 mb-2 block">Đến ngày</Label>
-                          <Calendar
-                            mode="single"
-                            selected={dateTo}
-                            onSelect={(date) => {
-                              if (date) {
-                                setDateTo(date);
-                                setDateRangeType('custom');
-                              }
-                            }}
-                            disabled={(date) => dateFrom ? date < dateFrom : false}
-                          />
-                        </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-            </RadioGroup>
-          </div>
-
-          <Separator />
-
-          {/* Creator Filter - Multiselect like Reports */}
-          <div>
-            <h3 className="text-sm text-slate-900 mb-2">Người tạo</h3>
-            <Popover open={creatorSearchOpen} onOpenChange={setCreatorSearchOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  className="w-full justify-between h-9 text-sm"
-                >
-                  <span className="text-slate-500 text-xs">
-                    {selectedCreators.length === 0
-                      ? 'Tất cả'
-                      : `Đã chọn ${selectedCreators.length}`}
-                  </span>
-                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[240px] p-0">
-                <Command>
-                  <CommandInput placeholder="Tìm người tạo..." />
-                  <CommandList>
-                    <CommandEmpty>Không tìm thấy.</CommandEmpty>
-                    <CommandGroup className="max-h-64 overflow-auto">
-                      {allCreators.map((creator) => (
-                        <CommandItem
-                          key={creator.id}
-                          onSelect={() => toggleCreator(creator.id)}
-                        >
-                          <Checkbox
-                            checked={selectedCreators.includes(creator.id)}
-                            className="mr-2"
-                          />
-                          {creator.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-            {selectedCreators.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {selectedCreators.map((creatorId) => {
-                  const creator = allCreators.find(c => c.id === creatorId);
-                  return (
-                    <div
-                      key={creatorId}
-                      className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs"
-                    >
-                      {creator?.name}
-                      <button
-                        onClick={() => toggleCreator(creatorId)}
-                        className="hover:bg-blue-100 rounded"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <Separator />
-
-          {/* Person Filter */}
-          <div>
-            <h3 className="text-sm text-slate-900 mb-2">Người nộp/nhận</h3>
-            <div className="space-y-2">
-              <Input
-                placeholder="Tên người nộp/nhận"
-                value={personName}
-                onChange={(e) => setPersonName(e.target.value)}
-                className="h-9 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-              />
-              <Input
-                placeholder="Điện thoại"
-                value={personPhone}
-                onChange={(e) => setPersonPhone(e.target.value)}
-                className="h-9 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-              />
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Transaction Category Filter - Multiselect searchable */}
-          <div>
-            <h3 className="text-sm text-slate-900 mb-2">Loại thu chi</h3>
-            <Popover open={categorySearchOpen} onOpenChange={setCategorySearchOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  className="w-full justify-between h-9 text-sm"
-                >
-                  <span className="text-slate-500 text-xs">
-                    {selectedCategories.length === 0
-                      ? 'Loại thu chi'
-                      : `Đã chọn ${selectedCategories.length}`}
-                  </span>
-                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[240px] p-0">
-                <Command>
-                  <CommandInput placeholder="Tìm loại thu chi..." />
-                  <CommandList>
-                    <CommandEmpty>Không tìm thấy.</CommandEmpty>
-                    <CommandGroup className="max-h-64 overflow-auto">
-                      {allCategories.map((category) => (
-                        <CommandItem
-                          key={category.id}
-                          onSelect={() => toggleCategory(category.name)}
-                        >
-                          <Checkbox
-                            checked={selectedCategories.includes(category.name)}
-                            className="mr-2"
-                          />
-                          {category.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-            {selectedCategories.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {selectedCategories.map((categoryName) => (
-                  <div
-                    key={categoryName}
-                    className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs"
-                  >
-                    {categoryName}
-                    <button
-                      onClick={() => toggleCategory(categoryName)}
-                      className="hover:bg-blue-100 rounded"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <Separator />
-
-          {/* Document Type Filter */}
-          <div>
-            <h3 className="text-sm text-slate-900 mb-2">Loại chứng từ</h3>
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="doc-receipt"
-                  checked={documentTypeReceipt}
-                  onCheckedChange={(checked) => setDocumentTypeReceipt(!!checked)}
-                />
-                <label htmlFor="doc-receipt" className="text-sm text-slate-700 cursor-pointer">
-                  Phiếu thu
-                </label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="doc-payment"
-                  checked={documentTypePayment}
-                  onCheckedChange={(checked) => setDocumentTypePayment(!!checked)}
-                />
-                <label htmlFor="doc-payment" className="text-sm text-slate-700 cursor-pointer">
-                  Phiếu chi
-                </label>
-              </div>
-            </div>
-          </div>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" className="gap-2" onClick={() => setReceiptDialogOpen(true)}>
+            <ArrowUpRight className="w-4 h-4 text-emerald-600" />
+            Lập phiếu thu
+          </Button>
+          <Button variant="outline" className="gap-2" onClick={() => setPaymentDialogOpen(true)}>
+            <ArrowDownLeft className="w-4 h-4 text-red-600" />
+            Lập phiếu chi
+          </Button>
+          <Button variant="outline" size="sm">
+            <Download className="w-4 h-4 mr-2" />
+            Xuất file
+          </Button>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
-            <div>
-              <h1 className="text-blue-900 text-2xl font-semibold">
-                {activeTab === 'cash' && 'Sổ quỹ tiền mặt'}
-                {activeTab === 'bank' && 'Sổ quỹ ngân hàng'}
-                {activeTab === 'total' && 'Tổng quỹ'}
-              </h1>
+       {/* Stats Cards */}
+      <div className="grid grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-slate-600 mb-2">Quỹ đầu kỳ</div>
+            <div className="text-xl text-slate-900">
+              {cashbookStats.openingBalance.toLocaleString('vi-VN')}
             </div>
-            <div className="flex items-center gap-2">
-              {activeTab !== 'total' && (
-                <>
-                  {canCreate && (
-                    <>
-                      <Button 
-                        size="sm"
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
-                        onClick={handleOpenReceiptDialog}
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Lập phiếu thu
-                      </Button>
-                      <Button 
-                        size="sm"
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
-                        onClick={handleOpenPaymentDialog}
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Lập phiếu chi
-                      </Button>
-                    </>
-                  )}
-                </>
-              )}
-              <Button variant="outline" size="sm">
-                <Download className="w-4 h-4 mr-2" />
-                Xuất file
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+             <div className="text-sm text-slate-600 mb-2">Tổng thu</div>
+            <div className="text-xl text-emerald-600">
+              {cashbookStats.totalIncome.toLocaleString('vi-VN')}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+             <div className="text-sm text-slate-600 mb-2">Tổng chi</div>
+            <div className="text-xl text-red-600">
+              {cashbookStats.totalExpense.toLocaleString('vi-VN')}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+             <div className="text-sm text-slate-600 mb-2">Tồn quỹ</div>
+            <div className="text-xl text-blue-600">
+              {cashbookStats.closingBalance.toLocaleString('vi-VN')}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filter Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input
+                  placeholder="Tìm kiếm giao dịch..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-white border-slate-300"
+                />
+              </div>
+              <CustomerTimeFilter
+                dateRangeType={dateRangeType}
+                timePreset={timePreset}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+                onDateRangeTypeChange={setDateRangeType}
+                onTimePresetChange={handleTimePresetChange}
+                onDateFromChange={setDateFrom}
+                onDateToChange={setDateTo}
+              />
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className="gap-2"
+              >
+                <Filter className="w-4 h-4" />
+                Bộ lọc
               </Button>
             </div>
-          </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-sm text-slate-600 mb-2">Quỹ đầu kỳ</div>
-                <div className="text-xl text-slate-900">
-                  {cashbookStats.openingBalance.toLocaleString('vi-VN')}
+            {showFilters && (
+               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                   <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Loại giao dịch</Label>
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                       <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="type-income"
+                          checked={selectedTypes.includes('income')}
+                           onCheckedChange={() => {
+                            setSelectedTypes(prev => 
+                              prev.includes('income') ? prev.filter(t => t !== 'income') : [...prev, 'income']
+                            )
+                          }}
+                          className="border-slate-300"
+                        />
+                        <Label htmlFor="type-income" className="text-sm text-slate-700 cursor-pointer font-normal">Phiếu thu</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="type-expense"
+                          checked={selectedTypes.includes('expense')}
+                           onCheckedChange={() => {
+                            setSelectedTypes(prev => 
+                              prev.includes('expense') ? prev.filter(t => t !== 'expense') : [...prev, 'expense']
+                            )
+                          }}
+                          className="border-slate-300"
+                        />
+                        <Label htmlFor="type-expense" className="text-sm text-slate-700 cursor-pointer font-normal">Phiếu chi</Label>
+                      </div>
+                    </div>
+                   </div>
+                   
+                   <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Phương thức</Label>
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                        <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="method-cash"
+                          checked={selectedMethods.includes('cash')}
+                           onCheckedChange={() => {
+                            setSelectedMethods(prev => 
+                              prev.includes('cash') ? prev.filter(t => t !== 'cash') : [...prev, 'cash']
+                            )
+                          }}
+                          className="border-slate-300"
+                        />
+                        <Label htmlFor="method-cash" className="text-sm text-slate-700 cursor-pointer font-normal">Tiền mặt</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="method-transfer"
+                          checked={selectedMethods.includes('transfer')}
+                           onCheckedChange={() => {
+                            setSelectedMethods(prev => 
+                              prev.includes('transfer') ? prev.filter(t => t !== 'transfer') : [...prev, 'transfer']
+                            )
+                          }}
+                          className="border-slate-300"
+                        />
+                        <Label htmlFor="method-transfer" className="text-sm text-slate-700 cursor-pointer font-normal">Chuyển khoản</Label>
+                      </div>
+                    </div>
+                   </div>
                 </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-sm text-slate-600 mb-2">Tổng thu</div>
-                <div className="text-xl text-emerald-600">
-                  {cashbookStats.totalIncome.toLocaleString('vi-VN')}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-sm text-slate-600 mb-2">Tổng chi</div>
-                <div className="text-xl text-red-600">
-                  {cashbookStats.totalExpense.toLocaleString('vi-VN')}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-sm text-slate-600 mb-2">Tồn quỹ</div>
-                <div className="text-xl text-blue-600">
-                  {cashbookStats.closingBalance.toLocaleString('vi-VN')}
-                </div>
-              </CardContent>
-            </Card>
+               </div>
+            )}
           </div>
+        </CardContent>
+      </Card>
+      {/* Tabs */}
+      <div className="flex items-center gap-2">
+        <Button 
+          variant={activeTab === 'total' ? 'default' : 'outline'}
+          onClick={() => { setActiveTab('total'); setSelectedMethods(['cash', 'transfer']); }}
+          className={activeTab === 'total' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-white border-slate-300'}
+        >
+          Tất cả
+        </Button>
+        <Button 
+          variant={activeTab === 'cash' ? 'default' : 'outline'}
+          onClick={() => { setActiveTab('cash'); setSelectedMethods(['cash']); }}
+          className={activeTab === 'cash' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-white border-slate-300'}
+        >
+          Tiền mặt
+        </Button>
+         <Button 
+          variant={activeTab === 'bank' ? 'default' : 'outline'}
+          onClick={() => { setActiveTab('bank'); setSelectedMethods(['transfer']); }}
+          className={activeTab === 'bank' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-white border-slate-300'}
+        >
+          Chuyển khoản
+        </Button>
+      </div>
 
-          {/* Transactions Table */}
-          <Card>
+      {/* Transactions Table */}
+      <Card>
             <CardContent className="p-0">
               <div className="overflow-x-auto rounded-xl">
                 <Table>
@@ -1103,8 +824,7 @@ export function Finance() {
               </div>
             </CardContent>
           </Card>
-        </div>
-      </div>
+
 
       {/* Receipt Dialog */}
       <Dialog open={receiptDialogOpen} onOpenChange={setReceiptDialogOpen}>

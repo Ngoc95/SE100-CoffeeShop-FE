@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Login } from "./components/pages/Login";
-import { TopNavbar } from "./components/TopNavbar";
+import { Sidebar } from "./components/Sidebar";
 import { Dashboard } from "./components/pages/Dashboard";
 import { POSOrdering } from "./components/pages/POSOrdering";
 import { KitchenDisplay } from "./components/pages/KitchenDisplay";
@@ -222,8 +222,8 @@ function AppContent() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50">
-      <TopNavbar
+    <div className="flex h-screen bg-slate-50">
+      <Sidebar
         currentPage={currentPage}
         onNavigate={handleNavigate}
         isFullscreen={isFullscreen}

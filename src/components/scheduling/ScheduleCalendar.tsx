@@ -270,16 +270,73 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
 
 
   return (
-    <div className="flex h-full bg-slate-50">
-      {/* Left Sidebar - Filters */}
-      <div className="w-64 bg-white border-r p-6 overflow-auto">
-        <div className="space-y-6">
+    <div className="flex flex-col h-full bg-slate-50">
+      {/* Header */}
+      <div className="bg-white border-b p-6">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <div className="space-y-4">
+            <h1 className="text-amber-950 mb-1">Xếp lịch làm việc</h1>
+            <p className="text-sm text-slate-600">
+              Quản lý lịch làm việc theo tuần cho {filteredStaff.length} nhân viên
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(true)}>
+              <Upload className="w-4 h-4 mr-2" />
+              Import
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setExportDialogOpen(true)}>
+              <Download className="w-4 h-4 mr-2" />
+              Export
+            </Button>
+          </div>
+        </div>
+
+        {/* Week Navigation */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={goToPreviousWeek}>
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-sm text-neutral-700 hover:text-amber-700"
+                >
+                  <CalendarIcon className="w-4 h-4 mr-2" />
+                  {formatWeekRange()}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={currentWeek}
+                  onSelect={(date) => {
+                    if (date) {
+                      setCurrentWeek(date);
+                      setCalendarOpen(false);
+                    }
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            <Button variant="outline" size="sm" onClick={goToNextWeek}>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Filters - Horizontal Layout */}
+        <Card className="border-slate-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-6">
               {/* Filter by Role */}
-              <div>
+              <div className="flex-1">
                 <Label className="text-xs text-slate-600 mb-2 block">Chức vụ</Label>
-                <div className="space-y-2">
+                <div className="flex items-center gap-3 flex-wrap">
                   {roles.map(role => (
                     <div key={role} className="flex items-center space-x-2">
                       <Checkbox
@@ -289,7 +346,7 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
                       />
                       <label
                         htmlFor={`role-${role}`}
-                        className="text-sm text-slate-700 cursor-pointer flex-1"
+                        className="text-sm text-slate-700 cursor-pointer"
                       >
                         {role}
                       </label>
@@ -301,10 +358,13 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
                 </div>
               </div>
 
+              {/* Divider */}
+              <div className="h-12 w-px bg-slate-200" />
+
               {/* Filter by Shift */}
-              <div className="pt-4 border-t">
+              <div className="flex-1">
                 <Label className="text-xs text-slate-600 mb-2 block">Ca làm việc</Label>
-                <div className="space-y-2">
+                <div className="flex items-center gap-3 flex-wrap">
                   {shifts.map(shift => (
                     <div key={shift.id} className="flex items-center space-x-2">
                       <Checkbox
@@ -314,119 +374,60 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
                       />
                       <label
                         htmlFor={`shift-${shift.id}`}
-                        className="text-sm text-slate-700 cursor-pointer flex-1"
+                        className="text-sm text-slate-700 cursor-pointer"
                       >
-                        <div className="flex flex-col gap-1">
-                          <span>{shift.name}</span>
-                          <span className="text-xs text-slate-500">
-                            {shift.startTime} - {shift.endTime}
-                          </span>
-                        </div>
+                        <span>{shift.name}</span>
+                        <span className="text-xs text-slate-500 ml-1">
+                          ({shift.startTime} - {shift.endTime})
+                        </span>
                       </label>
                     </div>
                   ))}
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Statistics */}
-          <div className="pt-4 border-t">
-            <h3 className="text-sm text-slate-700 mb-3">Thống kê</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Tổng nhân viên</span>
-                <span className="text-slate-900">{staff.length}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Đang hiển thị</span>
-                <span className="text-amber-600">{filteredStaff.length}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Tổng ca tuần này</span>
-                <span className="text-slate-900">
-                  {filteredStaff.reduce((sum, person) => sum + getTotalShiftsPerPerson(person.id), 0)}
-                </span>
-              </div>
-            </div>
-          </div>
+              {/* Divider */}
+              <div className="h-12 w-px bg-slate-200" />
 
-          {/* Clear Filters */}
-          {(filterRoles.length > 0 || filterShifts.length > 0) && (
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={clearFilters}
-            >
-              <X className="w-4 h-4 mr-2" />
-              Xóa bộ lọc
-            </Button>
-          )}
-        </div>
+              {/* Statistics */}
+              <div className="flex items-center gap-4">
+                <div className="text-center">
+                  <div className="text-xs text-slate-600">Tổng NV</div>
+                  <div className="text-lg font-semibold text-slate-900">{staff.length}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xs text-slate-600">Hiển thị</div>
+                  <div className="text-lg font-semibold text-amber-600">{filteredStaff.length}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xs text-slate-600">Tổng ca</div>
+                  <div className="text-lg font-semibold text-slate-900">
+                    {filteredStaff.reduce((sum, person) => sum + getTotalShiftsPerPerson(person.id), 0)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Clear Filters */}
+              {(filterRoles.length > 0 || filterShifts.length > 0) && (
+                <>
+                  <div className="h-12 w-px bg-slate-200" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearFilters}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Xóa bộ lọc
+                  </Button>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="bg-white border-b p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-amber-950 mb-1">Xếp lịch làm việc</h1>
-              <p className="text-sm text-slate-600">
-                Quản lý lịch làm việc theo tuần cho {filteredStaff.length} nhân viên
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(true)}>
-                <Upload className="w-4 h-4 mr-2" />
-                Import
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setExportDialogOpen(true)}>
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </Button>
-            </div>
-          </div>
-
-          {/* Week Navigation */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={goToPreviousWeek}>
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-sm text-neutral-700 hover:text-amber-700"
-              >
-                <CalendarIcon className="w-4 h-4 mr-2" />
-                {formatWeekRange()}
-              </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={currentWeek}
-                    onSelect={(date) => {
-                      if (date) {
-                        setCurrentWeek(date);
-                        setCalendarOpen(false);
-                      }
-                    }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <Button variant="outline" size="sm" onClick={goToNextWeek}>
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-
-          </div>
-        </div>
-
+      <div className="flex-1 overflow-hidden">
         {/* Calendar Content */}
         <div className="flex-1 overflow-auto p-6">
           <Card className="border-blue-200">

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Search, RotateCcw, Eye, ChevronDown, ChevronRight, CheckCircle, Clock, XCircle, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Filter, ChevronDown, ChevronRight, CheckCircle, Clock, XCircle, ArrowUp, ArrowDown, X } from 'lucide-react';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
-import { Separator } from '../ui/separator';
 import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import {
   Table,
   TableBody,
@@ -40,9 +41,9 @@ interface ReturnRecord {
 
 export function Returns() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDateRange, setSelectedDateRange] = useState('today');
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['pending', 'completed', 'rejected']);
   const [expandedReturnId, setExpandedReturnId] = useState<number | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
   
   // Sort states
   type SortField = "code" | "invoiceCode" | "date" | "customer" | "items" | "refundAmount" | "reason" | "status" | null;
@@ -228,96 +229,135 @@ export function Returns() {
   };
 
   return (
-    <div className="flex h-full bg-slate-50">
-      {/* Left Sidebar - Filters */}
-      <aside className="w-64 bg-white border-r border-slate-200 p-4 overflow-y-auto hidden lg:block">
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-sm text-slate-900 mb-3">Trạng thái</h3>
-            <div className="space-y-2">
-              {[
-                { id: 'pending', label: 'Chờ xử lý', color: 'bg-orange-500' },
-                { id: 'completed', label: 'Đã hoàn tiền', color: 'bg-green-500' },
-                { id: 'rejected', label: 'Từ chối', color: 'bg-red-500' },
-              ].map((status) => (
-                <div key={status.id} className="flex items-center space-x-2">
-                  <Checkbox 
-                    id={status.id}
-                    checked={selectedStatuses.includes(status.id)}
-                    onCheckedChange={() => toggleStatus(status.id)}
-                  />
-                  <Label htmlFor={status.id} className="text-sm text-slate-700 cursor-pointer flex items-center gap-2">
-                    {status.label}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Separator />
-
-          <div>
-            <h3 className="text-sm text-slate-900 mb-3">Bộ lọc nhanh</h3>
-            <div className="space-y-2">
-              <Button variant="outline" size="sm" className="w-full justify-start text-xs">
-                <Clock className="w-3 h-3 mr-2" />
-                Chờ xử lý ({pendingCount})
-              </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start text-xs">
-                <CheckCircle className="w-3 h-3 mr-2" />
-                Đã hoàn tiền ({completedCount})
-              </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start text-xs">
-                <XCircle className="w-3 h-3 mr-2" />
-                Từ chối ({rejectedCount})
-              </Button>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Summary */}
-          <div>
-            <h4 className="text-sm text-slate-900 mb-3">Tổng quan</h4>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Tổng đơn trả:</span>
-                <span className="text-slate-900">{filteredReturns.length}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Tổng hoàn tiền:</span>
-                <span className="text-red-600">{totalRefund.toLocaleString('vi-VN')}đ</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col p-6">
-        {/* Header */}
-        <div className="mb-6">
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
           <h1 className="text-blue-900 text-2xl font-semibold mb-2">Trả hàng</h1>
-          <p className="text-sm text-slate-600">Quản lý đơn trả hàng và hoàn tiền</p>
+          <p className="text-slate-600 text-sm">
+            Quản lý đơn trả hàng và hoàn tiền
+          </p>
         </div>
+      </div>
 
-        {/* Search Bar */}
-        <div className="mb-4">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Tìm theo mã đơn trả, hóa đơn hoặc khách hàng..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm bg-white shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-            />
+      {/* Search and Filter Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            {/* Search and Filter Toggle */}
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Tìm theo mã đơn trả, hóa đơn hoặc khách hàng..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm bg-white shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className="gap-2"
+              >
+                <Filter className="w-4 h-4" />
+                Bộ lọc
+                {selectedStatuses.length < 3 && selectedStatuses.length > 0 && (
+                  <Badge className="ml-1 bg-blue-500 text-white px-1.5 py-0.5 text-xs">
+                    {selectedStatuses.length}
+                  </Badge>
+                )}
+              </Button>
+            </div>
+
+            {/* Collapsible Filter Panel */}
+            {showFilters && (
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Status Filters */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Trạng thái</Label>
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                      {[
+                        { id: 'pending', label: 'Chờ xử lý', icon: Clock, color: 'text-orange-600' },
+                        { id: 'completed', label: 'Đã hoàn tiền', icon: CheckCircle, color: 'text-green-600' },
+                        { id: 'rejected', label: 'Từ chối', icon: XCircle, color: 'text-red-600' },
+                      ].map((status) => {
+                        const Icon = status.icon;
+                        return (
+                          <div key={status.id} className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={status.id}
+                              checked={selectedStatuses.includes(status.id)}
+                              onCheckedChange={() => toggleStatus(status.id)}
+                              className="border-slate-300"
+                            />
+                            <Label htmlFor={status.id} className="text-sm text-slate-700 cursor-pointer flex items-center gap-2 font-normal">
+                              <Icon className={`w-3.5 h-3.5 ${status.color}`} />
+                              {status.label}
+                            </Label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Thống kê</Label>
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Tổng đơn trả:</span>
+                        <span className="font-medium text-slate-900">{filteredReturns.length}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Chờ xử lý:</span>
+                        <span className="font-medium text-orange-600">{pendingCount}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Đã hoàn:</span>
+                        <span className="font-medium text-green-600">{completedCount}</span>
+                      </div>
+                      <div className="flex justify-between text-sm pt-2 border-t">
+                        <span className="text-slate-600">Tổng hoàn tiền:</span>
+                        <span className="font-medium text-red-600">{totalRefund.toLocaleString('vi-VN')}đ</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Clear Filters Button */}
+                {selectedStatuses.length < 3 && (
+                  <div className="flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedStatuses(['pending', 'completed', 'rejected']);
+                        setSearchTerm("");
+                      }}
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Xóa bộ lọc
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Table */}
-        <div className="bg-white rounded-xl border border-blue-200 flex-1 overflow-hidden flex flex-col">
-          <div className="overflow-x-auto flex-1 rounded-xl">
+      {/* Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            Danh sách đơn trả hàng ({filteredReturns.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto rounded-xl">
             <Table>
               <TableHeader>
                 <TableRow className="bg-blue-100">
@@ -556,15 +596,8 @@ export function Returns() {
               </TableBody>
             </Table>
           </div>
-
-          {/* Footer */}
-          <div className="px-4 py-3 border-t border-slate-200 bg-slate-50">
-            <p className="text-sm text-slate-600">
-              Hiển thị {filteredReturns.length} đơn trả hàng
-            </p>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

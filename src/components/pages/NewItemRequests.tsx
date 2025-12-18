@@ -72,6 +72,7 @@ export function NewItemRequests() {
   type SortOrder = "asc" | "desc" | "none";
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("none");
+  const [showFilters, setShowFilters] = useState(false);
 
   // Mock data
   const [requests, setRequests] = useState<NewItemRequest[]>([
@@ -377,216 +378,72 @@ export function NewItemRequests() {
   // LISTING SCREEN
   if (selectedView === 'list') {
     return (
-      <div className="flex h-full">
-        {/* Left Filter Panel */}
-        <aside className="w-64 bg-white border-r border-slate-200 p-4 overflow-y-auto hidden lg:block">
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-sm text-slate-900 mb-3">Trạng thái</h3>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="status-pending"
-                      checked={statusFilter.includes('pending')}
-                      onCheckedChange={() => toggleStatus('pending')}
-                    />
-                    <Label htmlFor="status-pending" className="text-sm text-slate-700 cursor-pointer flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-amber-500" />
-                      Chờ duyệt
-                    </Label>
-                  </div>
-                  <span className="text-xs text-slate-500">{pendingCount}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="status-approved"
-                      checked={statusFilter.includes('approved')}
-                      onCheckedChange={() => toggleStatus('approved')}
-                    />
-                    <Label htmlFor="status-approved" className="text-sm text-slate-700 cursor-pointer flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                      Đã duyệt
-                    </Label>
-                  </div>
-                  <span className="text-xs text-slate-500">{approvedCount}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="status-rejected"
-                      checked={statusFilter.includes('rejected')}
-                      onCheckedChange={() => toggleStatus('rejected')}
-                    />
-                    <Label htmlFor="status-rejected" className="text-sm text-slate-700 cursor-pointer flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-red-500" />
-                      Từ chối
-                    </Label>
-                  </div>
-                  <span className="text-xs text-slate-500">{rejectedCount}</span>
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div>
-              <h3 className="text-sm text-slate-900 mb-3">Danh mục gợi ý</h3>
-              <div className="space-y-2">
-                {[
-                  { id: 'all', label: 'Tất cả', count: requests.length },
-                  { id: 'Cà phê', label: 'Cà phê', count: requests.filter(r => r.suggestedCategory === 'Cà phê').length },
-                  { id: 'Trà', label: 'Trà', count: requests.filter(r => r.suggestedCategory === 'Trà').length },
-                  { id: 'Sinh tố', label: 'Sinh tố', count: requests.filter(r => r.suggestedCategory === 'Sinh tố').length },
-                ].map((cat) => (
-                  <div key={cat.id} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id={cat.id}
-                        checked={categoryFilter.includes(cat.id)}
-                        onCheckedChange={() => toggleCategory(cat.id)}
-                      />
-                      <Label htmlFor={cat.id} className="text-sm text-slate-700 cursor-pointer">
-                        {cat.label}
-                      </Label>
-                    </div>
-                    <span className="text-xs text-slate-500">{cat.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <Separator />
-
-            <div>
-              <h3 className="text-sm text-slate-900 mb-3">Nhân viên gửi</h3>
-              <div className="space-y-2">
-                {[
-                  { id: 'all', label: 'Tất cả', count: requests.length },
-                  { id: 'NV001', label: 'NV Minh', count: requests.filter(r => r.staffId === 'NV001').length },
-                  { id: 'NV002', label: 'NV Lan', count: requests.filter(r => r.staffId === 'NV002').length },
-                  { id: 'NV003', label: 'NV Hương', count: requests.filter(r => r.staffId === 'NV003').length },
-                ].map((staff) => (
-                  <div key={staff.id} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id={staff.id}
-                        checked={staffFilter.includes(staff.id)}
-                        onCheckedChange={() => toggleStaff(staff.id)}
-                      />
-                      <Label htmlFor={staff.id} className="text-sm text-slate-700 cursor-pointer">
-                        {staff.label}
-                      </Label>
-                    </div>
-                    <span className="text-xs text-slate-500">{staff.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <Separator />
-
-            <div>
-              <h3 className="text-sm text-slate-900 mb-3">Bộ lọc nhanh</h3>
-              <div className="space-y-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-start text-xs"
-                  onClick={() => {
-                    setStatusFilter(['pending']);
-                    setCategoryFilter(['all']);
-                    setStaffFilter(['all']);
-                  }}
-                >
-                  <AlertCircle className="w-3 h-3 mr-2" />
-                  Chờ xử lý ({pendingCount})
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-start text-xs"
-                  onClick={() => {
-                    setStatusFilter(['pending', 'approved', 'rejected']);
-                    setCategoryFilter(['all']);
-                    setStaffFilter(['all']);
-                    setSearchTerm('');
-                  }}
-                >
-                  <X className="w-3 h-3 mr-2" />
-                  Xóa bộ lọc
-                </Button>
-              </div>
-            </div>
+      <div className="p-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-blue-900 text-2xl font-semibold mb-2">Yêu cầu món mới</h1>
+            <p className="text-slate-600 text-sm">
+              Duyệt các món mới được đề xuất từ nhân viên bán hàng
+            </p>
           </div>
-        </aside>
+        </div>
 
-        {/* Main Content */}
-        <div className="flex-1 p-4 lg:p-8 space-y-6 overflow-y-auto">
-          {/* Header */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-blue-900 text-2xl font-semibold">Yêu cầu món mới</h1>
-              <p className="text-neutral-600 mt-1">Duyệt các món mới được đề xuất từ nhân viên bán hàng</p>
-            </div>
-          </div>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-neutral-700 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                Chờ duyệt
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl text-amber-900">{pendingCount}</p>
+              <p className="text-xs text-neutral-500 mt-1">yêu cầu</p>
+            </CardContent>
+          </Card>
 
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm text-neutral-700 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" />
-                  Chờ duyệt
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl text-amber-900">{pendingCount}</p>
-                <p className="text-xs text-neutral-500 mt-1">yêu cầu</p>
-              </CardContent>
-            </Card>
+          <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-neutral-700 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                Đã duyệt
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl text-emerald-900">{approvedCount}</p>
+              <p className="text-xs text-neutral-500 mt-1">yêu cầu</p>
+            </CardContent>
+          </Card>
 
-            <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm text-neutral-700 flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4" />
-                  Đã duyệt
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl text-emerald-900">{approvedCount}</p>
-                <p className="text-xs text-neutral-500 mt-1">yêu cầu</p>
-              </CardContent>
-            </Card>
+          <Card className="border-red-200 bg-gradient-to-br from-red-50 to-white">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-neutral-700 flex items-center gap-2">
+                <XCircle className="w-4 h-4" />
+                Từ chối
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl text-red-900">{rejectedCount}</p>
+              <p className="text-xs text-neutral-500 mt-1">yêu cầu</p>
+            </CardContent>
+          </Card>
+        </div>
 
-            <Card className="border-red-200 bg-gradient-to-br from-red-50 to-white">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm text-neutral-700 flex items-center gap-2">
-                  <XCircle className="w-4 h-4" />
-                  Từ chối
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl text-red-900">{rejectedCount}</p>
-                <p className="text-xs text-neutral-500 mt-1">yêu cầu</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Data Table */}
-          <Card className="border-blue-200">
-            <CardHeader>
-              <div className="flex items-center justify-between gap-4">
-                <CardTitle className="text-amber-950">Danh sách yêu cầu</CardTitle>
-                <div className="relative w-80">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-neutral-400" />
+        {/* Search and Filter Bar */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                   <Input
                     type="text"
                     placeholder="Tìm theo tên món..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 h-9 bg-white border-slate-300 shadow-none rounded-lg focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                    className="pl-10 bg-white border-slate-300"
                   />
                   {searchTerm && (
                     <button
@@ -597,6 +454,167 @@ export function NewItemRequests() {
                     </button>
                   )}
                 </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="gap-2"
+                >
+                  <Filter className="w-4 h-4" />
+                  Bộ lọc
+                </Button>
+              </div>
+
+              {showFilters && (
+                <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Status Filter */}
+                    <div className="space-y-2">
+                      <Label className="text-xs text-slate-600">Trạng thái</Label>
+                      <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="status-pending"
+                              checked={statusFilter.includes('pending')}
+                              onCheckedChange={() => toggleStatus('pending')}
+                              className="border-slate-300"
+                            />
+                            <Label htmlFor="status-pending" className="text-sm text-slate-700 cursor-pointer flex items-center gap-2 font-normal">
+                              <div className="w-2 h-2 rounded-full bg-amber-500" />
+                              Chờ duyệt
+                            </Label>
+                          </div>
+                          <span className="text-xs text-slate-500">{pendingCount}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="status-approved"
+                              checked={statusFilter.includes('approved')}
+                              onCheckedChange={() => toggleStatus('approved')}
+                              className="border-slate-300"
+                            />
+                            <Label htmlFor="status-approved" className="text-sm text-slate-700 cursor-pointer flex items-center gap-2 font-normal">
+                              <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                              Đã duyệt
+                            </Label>
+                          </div>
+                          <span className="text-xs text-slate-500">{approvedCount}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="status-rejected"
+                              checked={statusFilter.includes('rejected')}
+                              onCheckedChange={() => toggleStatus('rejected')}
+                              className="border-slate-300"
+                            />
+                            <Label htmlFor="status-rejected" className="text-sm text-slate-700 cursor-pointer flex items-center gap-2 font-normal">
+                              <div className="w-2 h-2 rounded-full bg-red-500" />
+                              Từ chối
+                            </Label>
+                          </div>
+                          <span className="text-xs text-slate-500">{rejectedCount}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Category Filter */}
+                    <div className="space-y-2">
+                      <Label className="text-xs text-slate-600">Danh mục gợi ý</Label>
+                      <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                        {[
+                          { id: 'all', label: 'Tất cả', count: requests.length },
+                          { id: 'Cà phê', label: 'Cà phê', count: requests.filter(r => r.suggestedCategory === 'Cà phê').length },
+                          { id: 'Trà', label: 'Trà', count: requests.filter(r => r.suggestedCategory === 'Trà').length },
+                          { id: 'Sinh tố', label: 'Sinh tố', count: requests.filter(r => r.suggestedCategory === 'Sinh tố').length },
+                        ].map((cat) => (
+                          <div key={cat.id} className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id={cat.id}
+                                checked={categoryFilter.includes(cat.id)}
+                                onCheckedChange={() => toggleCategory(cat.id)}
+                                className="border-slate-300"
+                              />
+                              <Label htmlFor={cat.id} className="text-sm text-slate-700 cursor-pointer font-normal">
+                                {cat.label}
+                              </Label>
+                            </div>
+                            <span className="text-xs text-slate-500">{cat.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Staff Filter */}
+                    <div className="space-y-2">
+                      <Label className="text-xs text-slate-600">Nhân viên gửi</Label>
+                      <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                        {[
+                          { id: 'all', label: 'Tất cả', count: requests.length },
+                          { id: 'NV001', label: 'NV Minh', count: requests.filter(r => r.staffId === 'NV001').length },
+                          { id: 'NV002', label: 'NV Lan', count: requests.filter(r => r.staffId === 'NV002').length },
+                          { id: 'NV003', label: 'NV Hương', count: requests.filter(r => r.staffId === 'NV003').length },
+                        ].map((staff) => (
+                          <div key={staff.id} className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id={staff.id}
+                                checked={staffFilter.includes(staff.id)}
+                                onCheckedChange={() => toggleStaff(staff.id)}
+                                className="border-slate-300"
+                              />
+                              <Label htmlFor={staff.id} className="text-sm text-slate-700 cursor-pointer font-normal">
+                                {staff.label}
+                              </Label>
+                            </div>
+                            <span className="text-xs text-slate-500">{staff.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick Filters */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setStatusFilter(['pending']);
+                        setCategoryFilter(['all']);
+                        setStaffFilter(['all']);
+                      }}
+                    >
+                      <AlertCircle className="w-3 h-3 mr-2" />
+                      Chờ xử lý ({pendingCount})
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setStatusFilter(['pending', 'approved', 'rejected']);
+                        setCategoryFilter(['all']);
+                        setStaffFilter(['all']);
+                        setSearchTerm('');
+                      }}
+                    >
+                      <X className="w-3 h-3 mr-2" />
+                      Xóa bộ lọc
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Data Table */}
+        <Card className="border-blue-200">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-4">
+                <CardTitle className="text-amber-950">Danh sách yêu cầu</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -845,7 +863,6 @@ export function NewItemRequests() {
               </div>
             </CardContent>
           </Card>
-        </div>
 
         {/* Create Item Dialog */}
         <Dialog open={createItemDialogOpen} onOpenChange={setCreateItemDialogOpen}>

@@ -19,6 +19,7 @@ import {
   X,
   Upload,
   Download,
+  Filter,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
@@ -57,6 +58,7 @@ import {
 import { ImageUploadWithCrop } from "../ImageUploadWithCrop";
 import { ImportExcelDialog } from "../ImportExcelDialog";
 import { ExportExcelDialog } from "../ExportExcelDialog";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 // Type definitions
 type ItemType = "ready-made" | "composite" | "ingredient";
@@ -745,117 +747,7 @@ export function Inventory() {
   );
 
   return (
-    <div className="flex h-full">
-      {/* Left Filter Panel */}
-      <aside className="w-64 bg-white border-r border-slate-200 p-4 overflow-y-auto hidden lg:block">
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-sm text-slate-900 mb-3">Danh mục</h3>
-            <div className="space-y-2">
-              {categories.map((cat) => (
-                <div key={cat.id} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id={cat.id}
-                      checked={selectedCategories.includes(cat.id)}
-                      onCheckedChange={() => toggleCategory(cat.id)}
-                    />
-                    <Label
-                      htmlFor={cat.id}
-                      className="text-sm text-slate-700 cursor-pointer"
-                    >
-                      {cat.name}
-                    </Label>
-                  </div>
-                  <span className="text-xs text-slate-500">{cat.count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Separator />
-
-          <div>
-            <h3 className="text-sm text-slate-900 mb-3">Trạng thái tồn kho</h3>
-            <div className="space-y-2">
-              {[
-                { id: "good", label: "Đủ hàng", color: "bg-emerald-500" },
-                { id: "low", label: "Sắp hết hàng", color: "bg-amber-500" },
-                { id: "critical", label: "Hết hàng", color: "bg-red-500" },
-                { id: "expiring", label: "Gần hết hạn", color: "bg-orange-500" },
-                { id: "expired", label: "Hết hạn", color: "bg-red-700" },
-              ].map((status) => (
-                <div key={status.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={status.id}
-                    checked={selectedStockStatuses.includes(status.id)}
-                    onCheckedChange={() => toggleStockStatus(status.id)}
-                  />
-                  <Label
-                    htmlFor={status.id}
-                    className="text-sm text-slate-700 cursor-pointer flex items-center gap-2"
-                  >
-                    {status.label}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Separator />
-
-          <div>
-            <h3 className="text-sm text-slate-900 mb-3">Trạng thái mặt hàng</h3>
-            <div className="space-y-2">
-              {[
-                { id: "selling", label: "Đang bán", color: "bg-blue-700" },
-                { id: "hot", label: "Bán chạy", color: "bg-blue-600" },
-                { id: "not_running", label: "Không chạy", color: "bg-blue-1000" },
-                { id: "paused", label: "Tạm ngưng", color: "bg-blue-300" },
-              ].map((status) => (
-                <div key={status.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={status.id}
-                    checked={selectedProductStatuses.includes(status.id)}
-                    onCheckedChange={() => toggleProductStatus(status.id)}
-                  />
-                  <Label
-                    htmlFor={status.id}
-                    className="text-sm text-slate-700 cursor-pointer flex items-center gap-2"
-                  >
-                    {status.label}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Separator />
-
-          <div>
-            <h3 className="text-sm text-slate-900 mb-3">Bộ lọc nhanh</h3>
-            <div className="space-y-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full justify-start text-xs"
-              >
-                <TrendingDown className="w-3 h-3 mr-2" />
-                Tồn kho thấp ({lowStockCount})
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full justify-start text-xs"
-              >
-                <AlertTriangle className="w-3 h-3 mr-2" />
-                Sắp hết hạn ({expiringCount})
-              </Button>
-            </div>
-          </div>
-        </div>
-      </aside>
-
+    <div className="h-full flex flex-col">
       {/* Main Content */}
       <div className="flex-1 p-4 lg:p-8 space-y-6 overflow-y-auto">
         {/* Header */}
@@ -2183,15 +2075,157 @@ export function Inventory() {
           </Card>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-          <Input
-            placeholder="Tìm kiếm..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-          />
+        {/* Search & Filters */}
+        <div className="flex flex-col lg:flex-row gap-4 mb-6">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Input
+              placeholder="Tìm kiếm theo tên, mã hàng..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 lg:pb-0">
+            {/* Categories Filter */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={`font-normal ${selectedCategories.length > 1 || (selectedCategories[0] !== 'all') ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-dashed'}`}
+                >
+                  <Filter className="w-4 h-4 mr-2" />
+                  Danh mục
+                  {selectedCategories.length > 0 && selectedCategories[0] !== 'all' && (
+                    <Badge variant="secondary" className="ml-2 bg-slate-200 text-slate-700 hover:bg-slate-300">
+                      {selectedCategories.filter(c => c !== 'all').length}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[280px] p-4" align="end">
+                <div className="space-y-4">
+                  <h4 className="font-medium leading-none">Danh mục</h4>
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {categories.map((cat) => (
+                      <div key={cat.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`filter-cat-${cat.id}`}
+                          checked={selectedCategories.includes(cat.id)}
+                          onCheckedChange={() => toggleCategory(cat.id)}
+                        />
+                        <Label htmlFor={`filter-cat-${cat.id}`} className="text-sm font-normal cursor-pointer flex-1">
+                          {cat.name}
+                        </Label>
+                        <span className="text-xs text-slate-500">{cat.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Stock Status Filter */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={`font-normal ${selectedStockStatuses.length < 5 ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-dashed'}`}
+                >
+                  <Package className="w-4 h-4 mr-2" />
+                  Trạng thái kho
+                  {selectedStockStatuses.length < 5 && (
+                    <Badge variant="secondary" className="ml-2 bg-slate-200 text-slate-700 hover:bg-slate-300">
+                      {selectedStockStatuses.length}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[250px] p-4" align="end">
+                <div className="space-y-4">
+                  <h4 className="font-medium leading-none">Trạng thái tồn kho</h4>
+                  <div className="space-y-2">
+                    {[
+                      { id: "good", label: "Đủ hàng" },
+                      { id: "low", label: "Sắp hết hàng" },
+                      { id: "critical", label: "Hết hàng" },
+                      { id: "expiring", label: "Gần hết hạn" },
+                      { id: "expired", label: "Hết hạn" },
+                    ].map((status) => (
+                      <div key={status.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`filter-stock-${status.id}`}
+                          checked={selectedStockStatuses.includes(status.id)}
+                          onCheckedChange={() => toggleStockStatus(status.id)}
+                        />
+                        <Label htmlFor={`filter-stock-${status.id}`} className="text-sm font-normal cursor-pointer">
+                          {status.label}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Product Status Filter */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={`font-normal ${selectedProductStatuses.length < 4 ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-dashed'}`}
+                >
+                  <Layers className="w-4 h-4 mr-2" />
+                  Trạng thái bán
+                  {selectedProductStatuses.length < 4 && (
+                    <Badge variant="secondary" className="ml-2 bg-slate-200 text-slate-700 hover:bg-slate-300">
+                      {selectedProductStatuses.length}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[250px] p-4" align="end">
+                <div className="space-y-4">
+                  <h4 className="font-medium leading-none">Trạng thái bán</h4>
+                  <div className="space-y-2">
+                    {[
+                      { id: "selling", label: "Đang bán" },
+                      { id: "hot", label: "Bán chạy" },
+                      { id: "not_running", label: "Không chạy" },
+                      { id: "paused", label: "Tạm ngưng" },
+                    ].map((status) => (
+                      <div key={status.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`filter-prod-${status.id}`}
+                          checked={selectedProductStatuses.includes(status.id)}
+                          onCheckedChange={() => toggleProductStatus(status.id)}
+                        />
+                        <Label htmlFor={`filter-prod-${status.id}`} className="text-sm font-normal cursor-pointer">
+                          {status.label}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {(selectedCategories.length > 0 && selectedCategories[0] !== 'all' || selectedStockStatuses.length < 5 || selectedProductStatuses.length < 4) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                onClick={() => {
+                  setSelectedCategories(['all']);
+                  setSelectedStockStatuses(['good', 'low', 'critical', 'expiring', 'expired']);
+                  setSelectedProductStatuses(['selling', 'hot', 'not_running', 'paused']);
+                }}
+              >
+                Xóa bộ lọc
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Tabs */}

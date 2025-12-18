@@ -44,7 +44,7 @@ import {
   TableHeader,
   TableRow,
 } from '../ui/table';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { ImportExportExcelDialog } from '../ImportExportExcelDialog';
 
 interface ImportItem {

@@ -38,7 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { PromotionFormDialog } from "../PromotionFormDialog";
 
 export type PromotionType =
@@ -575,193 +575,176 @@ export function Promotions() {
     (p) => p.status === "inactive"
   ).length;
 
+  const [showFilters, setShowFilters] = useState(false);
+
   return (
-    <div className="flex h-full bg-slate-50">
-      {/* Left Sidebar - Filters & Stats */}
-      <div className="w-64 bg-white border-r p-6 overflow-auto">
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-sm text-slate-700 mb-3 flex items-center gap-2">
-              <Filter className="w-4 h-4" />
-              Bộ lọc
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <Label className="text-xs text-slate-600">
-                  Loại khuyến mại
-                </Label>
-                <Select value={selectedType} onValueChange={setSelectedType}>
-                  <SelectTrigger className="mt-1 bg-white border-slate-300 shadow-none">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tất cả loại</SelectItem>
-                    <SelectItem value="percentage">Theo phần trăm</SelectItem>
-                    <SelectItem value="amount">Theo số tiền</SelectItem>
-                    <SelectItem value="fixed-price">Đồng giá</SelectItem>
-                    <SelectItem value="free-item">Tặng món</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label className="text-xs text-slate-600 mb-2 block">
-                  Trạng thái
-                </Label>
-                <RadioGroup
-                  value={selectedStatus}
-                  onValueChange={setSelectedStatus}
-                  className="space-y-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem
-                      value="all"
-                      id="promotion-status-all"
-                      className="border-slate-300"
-                    />
-                    <Label
-                      htmlFor="promotion-status-all"
-                      className="text-l text-slate-700 cursor-pointer font-normal"
-                    >
-                      Tất cả trạng thái
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem
-                      value="active"
-                      id="promotion-status-active"
-                      className="border-slate-300"
-                    />
-                    <Label
-                      htmlFor="promotion-status-active"
-                      className="text-l text-slate-700 cursor-pointer font-normal"
-                    >
-                      Hoạt động
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem
-                      value="inactive"
-                      id="promotion-status-inactive"
-                      className="border-slate-300"
-                    />
-                    <Label
-                      htmlFor="promotion-status-inactive"
-                      className="text-l text-slate-700 cursor-pointer font-normal"
-                    >
-                      Không hoạt động
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t">
-            <h3 className="text-sm text-slate-700 mb-3">Thống kê</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Tổng khuyến mại</span>
-                <span className="text-slate-900">{totalPromotions}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Đang hoạt động</span>
-                <span className="text-emerald-600">{activePromotions}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Không hoạt động</span>
-                <span className="text-gray-600">{inactivePromotions}</span>
-              </div>
-            </div>
-          </div>
-
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-blue-900 text-2xl font-semibold mb-2">Khuyến mại</h1>
+          <p className="text-slate-600 text-sm">
+            Quản lý chương trình khuyến mại
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
           <Button
             variant="outline"
-            className="w-full"
+            onClick={() => toast.info("Chức năng import đang phát triển")}
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Import Excel
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => toast.info("Chức năng export đang phát triển")}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export Excel
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => {
-              setSelectedType("all");
-              setSelectedStatus("all");
-              setSearchQuery("");
+              toast.info("Chức năng in đang phát triển");
+              window.print();
             }}
           >
-            <X className="w-4 h-4 mr-2" />
-            Xóa bộ lọc
+            <Printer className="w-4 h-4 mr-2" />
+            In danh sách
           </Button>
+          {canCreate && (
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                setEditingPromotion(null);
+                setDialogOpen(true);
+              }}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Tạo khuyến mại
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="bg-white border-b p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-blue-900 text-2xl font-semibold mb-2">Khuyến mại</h1>
-              <p className="text-slate-600 text-sm">
-                Quản lý chương trình khuyến mại
-              </p>
-            </div>
+      {/* Search and Filter Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            {/* Search and Filter Toggle */}
             <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input
+                  placeholder="Tìm kiếm theo mã, tên khuyến mại..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                />
+              </div>
               <Button
                 variant="outline"
-                onClick={() => toast.info("Chức năng import đang phát triển")}
+                onClick={() => setShowFilters(!showFilters)}
+                className="gap-2"
               >
-                <Upload className="w-4 h-4 mr-2" />
-                Import Excel
+                <Filter className="w-4 h-4" />
+                Bộ lọc
+                {(selectedType !== "all" || selectedStatus !== "all") && (
+                  <Badge className="ml-1 bg-blue-500 text-white px-1.5 py-0.5 text-xs">
+                    {(selectedType !== "all" ? 1 : 0) + (selectedStatus !== "all" ? 1 : 0)}
+                  </Badge>
+                )}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => toast.info("Chức năng export đang phát triển")}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export Excel
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  toast.info("Chức năng in đang phát triển");
-                  window.print();
-                }}
-              >
-                <Printer className="w-4 h-4 mr-2" />
-                In danh sách
-              </Button>
-              {canCreate && (
-                <Button
-                  className="bg-blue-600 hover:bg-blue-700"
-                  onClick={() => {
-                    setEditingPromotion(null);
-                    setDialogOpen(true);
-                  }}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Tạo khuyến mại
-                </Button>
-              )}
             </div>
-          </div>
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-            <Input
-              placeholder="Tìm kiếm theo mã, tên khuyến mại..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-            />
-          </div>
-        </div>
+            {/* Collapsible Filter Panel */}
+            {showFilters && (
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Type Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">
+                      Loại khuyến mại
+                    </Label>
+                    <Select value={selectedType} onValueChange={setSelectedType}>
+                      <SelectTrigger className="bg-white border-slate-300 shadow-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả loại</SelectItem>
+                        <SelectItem value="percentage">Theo phần trăm</SelectItem>
+                        <SelectItem value="amount">Theo số tiền</SelectItem>
+                        <SelectItem value="fixed-price">Đồng giá</SelectItem>
+                        <SelectItem value="free-item">Tặng món</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-        {/* Table */}
-        <div className="flex-1 overflow-auto p-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                Danh sách khuyến mại ({filteredPromotions.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto rounded-xl">
+                  {/* Status Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Trạng thái</Label>
+                    <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                      <SelectTrigger className="bg-white border-slate-300 shadow-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                        <SelectItem value="active">Hoạt động</SelectItem>
+                        <SelectItem value="inactive">Không hoạt động</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Thống kê</Label>
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Tổng:</span>
+                        <span className="font-medium text-slate-900">{totalPromotions}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Hoạt động:</span>
+                        <span className="font-medium text-emerald-600">{activePromotions}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Không hoạt động:</span>
+                        <span className="font-medium text-gray-600">{inactivePromotions}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Clear Filters Button */}
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedType("all");
+                      setSelectedStatus("all");
+                      setSearchQuery("");
+                    }}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Xóa bộ lọc
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            Danh sách khuyến mại ({filteredPromotions.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto rounded-xl">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-blue-100">
@@ -1012,8 +995,8 @@ export function Promotions() {
               </div>
             </CardContent>
           </Card>
-        </div>
-      </div>
+
+
 
       {/* Form Dialog */}
       <PromotionFormDialog

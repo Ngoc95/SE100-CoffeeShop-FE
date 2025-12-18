@@ -31,7 +31,6 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Label } from "../ui/label";
-import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import {
   Table,
   TableBody,
@@ -73,6 +72,7 @@ export function Suppliers() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Mock data
   const [suppliers, setSuppliers] = useState<Supplier[]>([
@@ -291,490 +291,464 @@ export function Suppliers() {
     { id: "PN001", date: "2023-10-26", amount: 5000000 },
     { id: "PN002", date: "2023-11-12", amount: 7500000 },
     { id: "PN003", date: "2023-12-05", amount: 3200000 },
-    ];
+  ];
 
   return (
-    <div className="flex h-full bg-slate-50">
-      {/* Left Sidebar - Filters */}
-      <div className="w-64 bg-white border-r p-6 overflow-auto">
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-sm text-slate-700 mb-3 flex items-center gap-2">
-              <Filter className="w-4 h-4" />
-              Bộ lọc
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <Label className="text-xs text-slate-600">Danh mục</Label>
-                <Select
-                  value={selectedCategory}
-                  onValueChange={setSelectedCategory}
-                >
-                  <SelectTrigger className="mt-1 bg-white border-slate-300 shadow-none">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tất cả danh mục</SelectItem>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label className="text-xs text-slate-600">
-                  Tỉnh / Thành phố
-                </Label>
-                <Select value={selectedCity} onValueChange={setSelectedCity}>
-                  <SelectTrigger className="mt-1 bg-white border-slate-300 shadow-none">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tất cả thành phố</SelectItem>
-                    {cities.map((city) => (
-                      <SelectItem key={city} value={city}>
-                        {city}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label className="text-xs text-slate-600 mb-2 block">
-                  Trạng thái
-                </Label>
-                <RadioGroup
-                  value={selectedStatus}
-                  onValueChange={setSelectedStatus}
-                  className="space-y-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem
-                      value="all"
-                      id="supplier-status-all"
-                      className="border-slate-300"
-                    />
-                    <Label
-                      htmlFor="supplier-status-all"
-                      className="text-l text-slate-700 cursor-pointer font-normal"
-                    >
-                      Tất cả trạng thái
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem
-                      value="active"
-                      id="supplier-status-active"
-                      className="border-slate-300"
-                    />
-                    <Label
-                      htmlFor="supplier-status-active"
-                      className="text-l text-slate-700 cursor-pointer font-normal"
-                    >
-                      Hoạt động
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem
-                      value="inactive"
-                      id="supplier-status-inactive"
-                      className="border-slate-300"
-                    />
-                    <Label
-                      htmlFor="supplier-status-inactive"
-                      className="text-l text-slate-700 cursor-pointer font-normal"
-                    >
-                      Không hoạt động
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t">
-            <h3 className="text-sm text-slate-700 mb-3">Thống kê</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Tổng nhà cung cấp</span>
-                <span className="text-slate-900">{totalSuppliers}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Đang hoạt động</span>
-                <span className="text-emerald-600">{activeSuppliers}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Không hoạt động</span>
-                <span className="text-gray-600">{inactiveSuppliers}</span>
-              </div>
-              <div className="flex justify-between text-sm pt-2 border-t">
-                <span className="text-slate-600">Tổng công nợ</span>
-                <span className="text-red-600">
-                  {formatCurrency(totalDebt)}
-                </span>
-              </div>
-            </div>
-          </div>
-
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-blue-900 text-2xl font-semibold mb-2">Nhà cung cấp</h1>
+          <p className="text-slate-600 text-sm">
+            Quản lý thông tin nhà cung cấp
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
           <Button
             variant="outline"
-            className="w-full"
+            onClick={() =>
+              toast.success("Chức năng import đang phát triển")
+            }
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Import Excel
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() =>
+              toast.success("Chức năng export đang phát triển")
+            }
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export Excel
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => {
-              setSelectedCategory("all");
-              setSelectedCity("all");
-              setSelectedStatus("all");
-              setSearchQuery("");
+              toast.success("Chức năng in đang phát triển");
+              window.print();
             }}
           >
-            <X className="w-4 h-4 mr-2" />
-            Xóa bộ lọc
+            <Printer className="w-4 h-4 mr-2" />
+            In danh sách
           </Button>
+          {canCreate && (
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                setEditingSupplier(null);
+                setDialogOpen(true);
+              }}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Thêm nhà cung cấp
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="bg-white border-b p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-blue-900 text-2xl font-semibold mb-2">Nhà cung cấp</h1>
-              <p className="text-slate-600 text-sm">
-                Quản lý thông tin nhà cung cấp
-              </p>
-            </div>
+      {/* Search and Filter Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            {/* Search and Filter Toggle */}
             <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input
+                  placeholder="Tìm kiếm theo tên, mã, số điện thoại..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                />
+              </div>
               <Button
                 variant="outline"
-                onClick={() =>
-                  toast.success("Chức năng import đang phát triển")
-                }
+                onClick={() => setShowFilters(!showFilters)}
+                className="gap-2"
               >
-                <Upload className="w-4 h-4 mr-2" />
-                Import Excel
+                <Filter className="w-4 h-4" />
+                Bộ lọc
+                {(selectedCategory !== "all" || selectedStatus !== "all" || selectedCity !== "all") && (
+                  <Badge className="ml-1 bg-blue-500 text-white px-1.5 py-0.5 text-xs">
+                    {(selectedCategory !== "all" ? 1 : 0) + (selectedStatus !== "all" ? 1 : 0) + (selectedCity !== "all" ? 1 : 0)}
+                  </Badge>
+                )}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  toast.success("Chức năng export đang phát triển")
-                }
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export Excel
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  toast.success("Chức năng in đang phát triển");
-                  window.print();
-                }}
-              >
-                <Printer className="w-4 h-4 mr-2" />
-                In danh sách
-              </Button>
-              {canCreate && (
-                <Button
-                  className="bg-blue-600 hover:bg-blue-700"
-                  onClick={() => {
-                    setEditingSupplier(null);
-                    setDialogOpen(true);
-                  }}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Thêm nhà cung cấp
-                </Button>
-              )}
             </div>
-          </div>
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-            <Input
-              placeholder="Tìm kiếm theo tên, mã, số điện thoại..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-            />
-          </div>
-        </div>
+            {/* Collapsible Filter Panel */}
+            {showFilters && (
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* Category Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Danh mục</Label>
+                    <Select
+                      value={selectedCategory}
+                      onValueChange={setSelectedCategory}
+                    >
+                      <SelectTrigger className="bg-white border-slate-300 shadow-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả danh mục</SelectItem>
+                        {categories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-        {/* Table */}
-        <div className="flex-1 overflow-auto p-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                Danh sách nhà cung cấp ({filteredSuppliers.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto rounded-xl">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-blue-100">
-                      <TableHead className="w-12"></TableHead>
-                      <TableHead className="w-16 text-sm text-center">STT</TableHead>
-                      <TableHead className="text-sm">Mã NCC</TableHead>
-                      <TableHead
-                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                        onClick={() => handleSort("name")}
-                      >
-                        <div className="flex items-center">
-                          Tên NCC
-                          {getSortIcon("name")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="text-sm">Danh mục</TableHead>
-                      <TableHead className="text-sm">Địa chỉ</TableHead>
-                      <TableHead className="text-sm">Liên hệ</TableHead>
-                      <TableHead
-                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                        onClick={() => handleSort("debt")}
-                      >
-                        <div className="flex items-center">
-                          Công nợ
-                          {getSortIcon("debt")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="text-sm">Trạng thái</TableHead>
-                      <TableHead className="text-sm text-right">Thao tác</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                <TableBody>
-                  {filteredSuppliers.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={10}
-                        className="text-center py-8 text-slate-500"
-                      >
-                        Không tìm thấy nhà cung cấp nào
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredSuppliers.map((supplier, index) => {
-                      const isExpanded = expandedRows.includes(supplier.id);
-                      return (
-                        <React.Fragment key={supplier.id}>
-                          <TableRow
-                            onClick={() => toggleExpand(supplier.id)}
-                            className="cursor-pointer hover:bg-slate-50"
-                          >
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleExpand(supplier.id);
-                                }}
-                                className="h-8 w-8 p-0"
-                              >
-                                {isExpanded ? (
-                                  <ChevronDown className="w-4 h-4" />
-                                ) : (
-                                  <ChevronRight className="w-4 h-4" />
-                                )}
-                              </Button>
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-600 text-center">
-                              {index + 1}
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-900">
-                              {supplier.code}
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-900">
-                              {supplier.name}
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-700">
-                              <Badge variant="outline" className="bg-slate-50">
-                                {supplier.category}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-700">
-                              <div className="flex flex-col gap-0.5">
-                                <span>{supplier.city}</span>
-                                <span className="text-xs text-slate-500">
-                                  {supplier.address}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-700">
-                              <div className="flex flex-col gap-0.5">
-                                <span>{supplier.contact}</span>
-                                <span className="text-xs text-slate-500">
-                                  {supplier.phone}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-900">
-                              <span
-                                className={
-                                  supplier.debt > 0
-                                    ? "text-red-600"
-                                    : "text-slate-600"
-                                }
-                              >
-                                {formatCurrency(supplier.debt)}
+                  {/* City Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">
+                      Tỉnh / Thành phố
+                    </Label>
+                    <Select value={selectedCity} onValueChange={setSelectedCity}>
+                      <SelectTrigger className="bg-white border-slate-300 shadow-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả thành phố</SelectItem>
+                        {cities.map((city) => (
+                          <SelectItem key={city} value={city}>
+                            {city}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Status Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Trạng thái</Label>
+                    <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                      <SelectTrigger className="bg-white border-slate-300 shadow-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                        <SelectItem value="active">Hoạt động</SelectItem>
+                        <SelectItem value="inactive">Không hoạt động</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Thống kê</Label>
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Tổng:</span>
+                        <span className="font-medium text-slate-900">{totalSuppliers}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Hoạt động:</span>
+                        <span className="font-medium text-emerald-600">{activeSuppliers}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Công nợ:</span>
+                        <span className="font-medium text-red-600">{formatCurrency(totalDebt)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Clear Filters Button */}
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedCategory("all");
+                      setSelectedCity("all");
+                      setSelectedStatus("all");
+                      setSearchQuery("");
+                    }}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Xóa bộ lọc
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            Danh sách nhà cung cấp ({filteredSuppliers.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto rounded-xl">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-blue-100">
+                  <TableHead className="w-12"></TableHead>
+                  <TableHead className="w-16 text-sm text-center">STT</TableHead>
+                  <TableHead className="text-sm">Mã NCC</TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("name")}
+                  >
+                    <div className="flex items-center">
+                      Tên NCC
+                      {getSortIcon("name")}
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-sm">Danh mục</TableHead>
+                  <TableHead className="text-sm">Địa chỉ</TableHead>
+                  <TableHead className="text-sm">Liên hệ</TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("debt")}
+                  >
+                    <div className="flex items-center">
+                      Công nợ
+                      {getSortIcon("debt")}
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-sm">Trạng thái</TableHead>
+                  <TableHead className="text-sm text-right">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredSuppliers.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={10}
+                      className="text-center py-8 text-slate-500"
+                    >
+                      Không tìm thấy nhà cung cấp nào
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredSuppliers.map((supplier, index) => {
+                    const isExpanded = expandedRows.includes(supplier.id);
+                    return (
+                      <React.Fragment key={supplier.id}>
+                        <TableRow
+                          onClick={() => toggleExpand(supplier.id)}
+                          className="cursor-pointer hover:bg-slate-50"
+                        >
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleExpand(supplier.id);
+                              }}
+                              className="h-8 w-8 p-0"
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="w-4 h-4" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-600 text-center">
+                            {index + 1}
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-900">
+                            {supplier.code}
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-900">
+                            {supplier.name}
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-700">
+                            <Badge variant="outline" className="bg-slate-50">
+                              {supplier.category}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-700">
+                            <div className="flex flex-col gap-0.5">
+                              <span>{supplier.city}</span>
+                              <span className="text-xs text-slate-500">
+                                {supplier.address}
                               </span>
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              <Badge
-                                variant={
-                                  supplier.status === "active"
-                                    ? "default"
-                                    : "secondary"
-                                }
-                                className={
-                                  supplier.status === "active"
-                                    ? "bg-emerald-500"
-                                    : "bg-red-500 text-white hover:bg-red-500"
-                                }
-                              >
-                                {supplier.status === "active"
-                                  ? "Hoạt động"
-                                  : "Không hoạt động"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-sm text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                {canUpdate && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => openEditDialog(e, supplier)}
-                                    className="hover:bg-blue-100"
-                                  >
-                                    <Pencil className="w-4 h-4" />
-                                  </Button>
-                                )}
-                                {canDelete && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteSupplier(supplier.id);
-                                    }}
-                                    className="hover:bg-red-50"
-                                  >
-                                    <Trash2 className="w-4 h-4 text-red-600" />
-                                  </Button>
-                                )}
-                                {canUpdate && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleToggleStatus(supplier.id);
-                                    }}
-                                    className={
-                                      supplier.status === "active"
-                                        ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                        : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                                    }
-                                    title={
-                                      supplier.status === "active"
-                                        ? "Vô hiệu hóa"
-                                        : "Kích hoạt"
-                                    }
-                                  >
-                                    {supplier.status === "active" ? (
-                                      <PowerOff className="w-4 h-4" />
-                                    ) : (
-                                      <Power className="w-4 h-4" />
-                                    )}
-                                  </Button>
-                                )}
-                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-700">
+                            <div className="flex flex-col gap-0.5">
+                              <span>{supplier.contact}</span>
+                              <span className="text-xs text-slate-500">
+                                {supplier.phone}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-900">
+                            <span
+                              className={
+                                supplier.debt > 0
+                                  ? "text-red-600"
+                                  : "text-slate-600"
+                              }
+                            >
+                              {formatCurrency(supplier.debt)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <Badge
+                              variant={
+                                supplier.status === "active"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                              className={
+                                supplier.status === "active"
+                                  ? "bg-emerald-500"
+                                  : "bg-red-500 text-white hover:bg-red-500"
+                              }
+                            >
+                              {supplier.status === "active"
+                                ? "Hoạt động"
+                                : "Không hoạt động"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {canUpdate && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => openEditDialog(e, supplier)}
+                                  className="hover:bg-blue-100"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {canDelete && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteSupplier(supplier.id);
+                                  }}
+                                  className="hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-4 h-4 text-red-600" />
+                                </Button>
+                              )}
+                              {canUpdate && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleStatus(supplier.id);
+                                  }}
+                                  className={
+                                    supplier.status === "active"
+                                      ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                  }
+                                  title={
+                                    supplier.status === "active"
+                                      ? "Vô hiệu hóa"
+                                      : "Kích hoạt"
+                                  }
+                                >
+                                  {supplier.status === "active" ? (
+                                    <PowerOff className="w-4 h-4" />
+                                  ) : (
+                                    <Power className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && (
+                          <TableRow>
+                            <TableCell colSpan={10} className="p-4 bg-slate-50">
+                              <Tabs defaultValue="info">
+                                <TabsList>
+                                  <TabsTrigger value="info">Thông tin</TabsTrigger>
+                                  <TabsTrigger value="history">Lịch sử nhập hàng</TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="info">
+                                  <div className="grid grid-cols-2 gap-4 py-4">
+                                    <div className="text-sm">
+                                      <span className="font-semibold">Mã NCC:</span> {supplier.code}
+                                    </div>
+                                    <div className="text-sm">
+                                      <span className="font-semibold">Tên:</span> {supplier.name}
+                                    </div>
+                                    <div className="text-sm">
+                                      <span className="font-semibold">Danh mục:</span> {supplier.category}
+                                    </div>
+                                    <div className="text-sm">
+                                      <span className="font-semibold">Người liên hệ:</span> {supplier.contact}
+                                    </div>
+                                    <div className="text-sm">
+                                      <span className="font-semibold">Điện thoại:</span> {supplier.phone}
+                                    </div>
+                                    <div className="text-sm">
+                                      <span className="font-semibold">Email:</span> {supplier.email}
+                                    </div>
+                                    <div className="text-sm col-span-2">
+                                      <span className="font-semibold">Địa chỉ:</span> {supplier.address}, {supplier.city}
+                                    </div>
+                                    <div className="text-sm">
+                                      <span className="font-semibold">Công nợ:</span>{" "}
+                                      <span className="text-red-600">{formatCurrency(supplier.debt)}</span>
+                                    </div>
+                                    <div className="text-sm">
+                                      <span className="font-semibold">Trạng thái:</span>{" "}
+                                      <Badge
+                                        variant={supplier.status === "active" ? "default" : "secondary"}
+                                        className={
+                                          supplier.status === "active"
+                                            ? "bg-green-500 text-white"
+                                            : "bg-red-500 text-white"
+                                        }
+                                      >
+                                        {supplier.status === "active" ? "Hoạt động" : "Không hoạt động"}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                </TabsContent>
+                                <TabsContent value="history">
+                                  <div className="py-4">
+                                    <div className="border rounded-md">
+                                      <div className="grid grid-cols-3 p-2 font-semibold bg-gray-100">
+                                        <div>Mã nhập</div>
+                                        <div>Ngày</div>
+                                        <div className="text-right">Số tiền</div>
+                                      </div>
+                                      {transactions.map((imp) => (
+                                        <div key={imp.id} className="grid grid-cols-3 p-2 border-t">
+                                          <div>{imp.id}</div>
+                                          <div>{imp.date}</div>
+                                          <div className="text-right">{formatCurrency(imp.amount)}</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </TabsContent>
+                              </Tabs>
                             </TableCell>
                           </TableRow>
-                          {isExpanded && (
-                            <TableRow>
-                              <TableCell colSpan={10} className="p-4 bg-slate-50">
-                                <Tabs defaultValue="info">
-                                  <TabsList>
-                                    <TabsTrigger value="info">Thông tin</TabsTrigger>
-                                    <TabsTrigger value="history">Lịch sử nhập hàng</TabsTrigger>
-                                  </TabsList>
-                                  <TabsContent value="info">
-                                    <div className="grid grid-cols-2 gap-4 py-4">
-                                      <div className="text-sm">
-                                        <span className="font-semibold">Mã NCC:</span> {supplier.code}
-                                      </div>
-                                      <div className="text-sm">
-                                        <span className="font-semibold">Tên:</span> {supplier.name}
-                                      </div>
-                                      <div className="text-sm">
-                                        <span className="font-semibold">Danh mục:</span> {supplier.category}
-                                      </div>
-                                      <div className="text-sm">
-                                        <span className="font-semibold">Người liên hệ:</span> {supplier.contact}
-                                      </div>
-                                      <div className="text-sm">
-                                        <span className="font-semibold">Điện thoại:</span> {supplier.phone}
-                                      </div>
-                                      <div className="text-sm">
-                                        <span className="font-semibold">Email:</span> {supplier.email}
-                                      </div>
-                                      <div className="text-sm col-span-2">
-                                        <span className="font-semibold">Địa chỉ:</span> {supplier.address}, {supplier.city}
-                                      </div>
-                                      <div className="text-sm">
-                                        <span className="font-semibold">Công nợ:</span>{" "}
-                                        <span className="text-red-600">{formatCurrency(supplier.debt)}</span>
-                                      </div>
-                                      <div className="text-sm">
-                                        <span className="font-semibold">Trạng thái:</span>{" "}
-                                        <Badge
-                                          variant={supplier.status === "active" ? "default" : "secondary"}
-                                          className={
-                                            supplier.status === "active"
-                                              ? "bg-green-500 text-white"
-                                              : "bg-red-500 text-white"
-                                          }
-                                        >
-                                          {supplier.status === "active" ? "Hoạt động" : "Không hoạt động"}
-                                        </Badge>
-                                      </div>
-                                    </div>
-                                  </TabsContent>
-                                  <TabsContent value="history">
-                                    <div className="py-4">
-                                      <div className="border rounded-md">
-                                        <div className="grid grid-cols-3 p-2 font-semibold bg-gray-100">
-                                          <div>Mã nhập</div>
-                                          <div>Ngày</div>
-                                          <div className="text-right">Số tiền</div>
-                                        </div>
-                                        {transactions.map((imp) => (
-                                          <div key={imp.id} className="grid grid-cols-3 p-2 border-t">
-                                            <div>{imp.id}</div>
-                                            <div>{imp.date}</div>
-                                            <div className="text-right">{formatCurrency(imp.amount)}</div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </TabsContent>
-                                </Tabs>
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </React.Fragment>
-                      )
-                    })
-                  )}
-                </TableBody>
-              </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Form Dialog */}
       <SupplierFormDialog

@@ -52,8 +52,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
-import { Separator } from '../ui/separator';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar as CalendarComponent } from '../ui/calendar';
 import {
@@ -93,7 +92,7 @@ import {
   ComposedChart,
   Area
 } from 'recharts';
-import { format } from 'date-fns';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subDays, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { EmployeeFilter, Employee } from '../EmployeeFilter';
 import { CategoryFilter, Category } from '../CategoryFilter';
@@ -147,6 +146,7 @@ export function Reports() {
   const [productsCategory, setProductsCategory] = useState('all');
   const [productCategorySearchOpen, setProductCategorySearchOpen] = useState(false);
 
+
   // Customer report filters
   const [customerTimeRange, setCustomerTimeRange] = useState<TimeRange>('week');
   const [customerDateFrom, setCustomerDateFrom] = useState<Date | undefined>(new Date(2025, 10, 24));
@@ -157,6 +157,7 @@ export function Reports() {
   const [customerTimePreset, setCustomerTimePreset] = useState('this-week');
   const [customerDateRangeType, setCustomerDateRangeType] = useState<'preset' | 'custom'>('preset');
 
+
   // Supplier report filters
   const [supplierViewType, setSupplierViewType] = useState<'chart' | 'report'>('report');
   const [supplierConcern, setSupplierConcern] = useState<'sales' | 'debt'>('sales');
@@ -165,6 +166,7 @@ export function Reports() {
   const [supplierDateFrom, setSupplierDateFrom] = useState<Date | undefined>(new Date(2025, 10, 1));
   const [supplierDateTo, setSupplierDateTo] = useState<Date | undefined>(new Date(2025, 10, 30));
   const [supplierSearchQuery, setSupplierSearchQuery] = useState('');
+
 
   // Sales report filters
   const [salesViewType, setSalesViewType] = useState<'chart' | 'report'>('chart');
@@ -176,6 +178,7 @@ export function Reports() {
   const [salesSelectedArea, setSalesSelectedArea] = useState('all');
   const [salesSelectedTable, setSalesSelectedTable] = useState('all');
   const [tableSearchOpen, setTableSearchOpen] = useState(false);
+
 
   // View types for other tabs
   const [financeViewType, setFinanceViewType] = useState<'chart' | 'report'>('chart');
@@ -191,12 +194,136 @@ export function Reports() {
   const [employeeDateTo, setEmployeeDateTo] = useState<Date | undefined>(new Date(2025, 11, 4));
   const [employeeSalesMode, setEmployeeSalesMode] = useState<'invoice' | 'items'>('invoice');
 
+
   // Finance tab specific filters
   const [financeDateRangeType, setFinanceDateRangeType] = useState<'preset' | 'custom'>('preset');
   const [financePresetTimeRange, setFinancePresetTimeRange] = useState('this-week');
   const [financeDateFrom, setFinanceDateFrom] = useState<Date | undefined>(new Date(2025, 0, 13));
   const [financeDateTo, setFinanceDateTo] = useState<Date | undefined>(new Date(2025, 0, 19));
   const [selectedFinanceConcerns, setSelectedFinanceConcerns] = useState<string[]>(['revenue', 'expenses', 'profit']);
+
+
+  const calculateDateRange = (preset: string) => {
+    const now = new Date();
+    let from = now;
+    let to = now;
+
+    switch (preset) {
+      case 'today':
+        from = now;
+        to = now;
+        break;
+      case 'yesterday':
+        from = subDays(now, 1);
+        to = subDays(now, 1);
+        break;
+      case 'this-week':
+        from = startOfWeek(now, { weekStartsOn: 1 });
+        to = endOfWeek(now, { weekStartsOn: 1 });
+        break;
+      case 'this-month':
+        from = startOfMonth(now);
+        to = endOfMonth(now);
+        break;
+      case 'last-month':
+        const lastMonth = subMonths(now, 1);
+        from = startOfMonth(lastMonth);
+        to = endOfMonth(lastMonth);
+        break;
+      case 'this-year':
+        from = startOfYear(now);
+        to = endOfYear(now);
+        break;
+    }
+    return { from, to };
+  };
+
+  const handleEodTimePresetChange = (v: string) => {
+    setPresetTimeRange(v);
+    if (v === 'custom') {
+      setDateRangeType('custom');
+    } else {
+      setDateRangeType('preset');
+      const { from, to } = calculateDateRange(v);
+      if(v === 'today') {
+        setSelectedDate(from);
+      }
+      setDateFrom(from);
+      setDateTo(to);
+    }
+  };
+
+  const handleFinanceTimePresetChange = (v: string) => {
+    setFinancePresetTimeRange(v);
+    if (v === 'custom') {
+      setFinanceDateRangeType('custom');
+    } else {
+      setFinanceDateRangeType('preset');
+      const { from, to } = calculateDateRange(v);
+      setFinanceDateFrom(from);
+      setFinanceDateTo(to);
+    }
+  };
+
+  const handleProductsTimePresetChange = (v: string) => {
+    setProductsPresetTimeRange(v);
+    if (v === 'custom') {
+      setProductsDateRangeType('custom');
+    } else {
+      setProductsDateRangeType('preset');
+      const { from, to } = calculateDateRange(v);
+      setProductsDateFrom(from);
+      setProductsDateTo(to);
+    }
+  };
+
+  const handleSalesTimePresetChange = (v: string) => {
+    setSalesTimePreset(v);
+    if (v === 'custom') {
+      setSalesDateRangeType('custom');
+    } else {
+      setSalesDateRangeType('preset');
+      const { from, to } = calculateDateRange(v);
+      setSalesDateFrom(from);
+      setSalesDateTo(to);
+    }
+  };
+
+  const handleCustomerTimePresetChange = (v: string) => {
+    setCustomerTimePreset(v);
+    if (v === 'custom') {
+      setCustomerDateRangeType('custom');
+    } else {
+      setCustomerDateRangeType('preset');
+      const { from, to } = calculateDateRange(v);
+      setCustomerDateFrom(from);
+      setCustomerDateTo(to);
+    }
+  };
+
+  const handleSupplierTimePresetChange = (v: string) => {
+      setSupplierTimePreset(v);
+      if (v === 'custom') {
+          setSupplierDateRangeType('custom');
+      } else {
+          setSupplierDateRangeType('preset');
+          const { from, to } = calculateDateRange(v);
+          setSupplierDateFrom(from);
+          setSupplierDateTo(to);
+      }
+  };
+
+  const handleEmployeeTimePresetChange = (v: string) => {
+      setEmployeePresetTimeRange(v);
+      if (v === 'custom') {
+          setEmployeeDateRangeType('custom');
+      } else {
+          setEmployeeDateRangeType('preset');
+          const { from, to } = calculateDateRange(v);
+          setEmployeeDateFrom(from);
+          setEmployeeDateTo(to);
+      }
+  };
 
   // Sample data
   const employees: Employee[] = [
@@ -863,1967 +990,10 @@ export function Reports() {
     // For 'custom', don't auto-set dates - let user pick
   };
 
-  // Handle customer time preset change
-  const handleCustomerTimePresetChange = (preset: string) => {
-    setCustomerTimePreset(preset);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
 
-    switch (preset) {
-      case 'today':
-        setCustomerDateFrom(today);
-        setCustomerDateTo(today);
-        break;
-      case 'yesterday':
-        setCustomerDateFrom(yesterday);
-        setCustomerDateTo(yesterday);
-        break;
-      case 'this-week':
-        const weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - today.getDay());
-        setCustomerDateFrom(weekStart);
-        setCustomerDateTo(today);
-        break;
-      case 'last-week':
-        const lastWeekEnd = new Date(today);
-        lastWeekEnd.setDate(today.getDate() - today.getDay() - 1);
-        const lastWeekStart = new Date(lastWeekEnd);
-        lastWeekStart.setDate(lastWeekEnd.getDate() - 6);
-        setCustomerDateFrom(lastWeekStart);
-        setCustomerDateTo(lastWeekEnd);
-        break;
-      case 'last-7-days':
-        const sevenDaysAgo = new Date(today);
-        sevenDaysAgo.setDate(today.getDate() - 7);
-        setCustomerDateFrom(sevenDaysAgo);
-        setCustomerDateTo(today);
-        break;
-      case 'this-month':
-        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-        setCustomerDateFrom(monthStart);
-        setCustomerDateTo(today);
-        break;
-      case 'last-month':
-        const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-        setCustomerDateFrom(lastMonthStart);
-        setCustomerDateTo(lastMonthEnd);
-        break;
-      case 'last-30-days':
-        const thirtyDaysAgo = new Date(today);
-        thirtyDaysAgo.setDate(today.getDate() - 30);
-        setCustomerDateFrom(thirtyDaysAgo);
-        setCustomerDateTo(today);
-        break;
-      case 'this-year':
-        const yearStart = new Date(today.getFullYear(), 0, 1);
-        setCustomerDateFrom(yearStart);
-        setCustomerDateTo(today);
-        break;
-      case 'last-year':
-        const lastYearStart = new Date(today.getFullYear() - 1, 0, 1);
-        const lastYearEnd = new Date(today.getFullYear() - 1, 11, 31);
-        setCustomerDateFrom(lastYearStart);
-        setCustomerDateTo(lastYearEnd);
-        break;
-      case 'this-quarter':
-        const currentQuarter = Math.floor(today.getMonth() / 3);
-        const quarterStart = new Date(today.getFullYear(), currentQuarter * 3, 1);
-        setCustomerDateFrom(quarterStart);
-        setCustomerDateTo(today);
-        break;
-      case 'last-quarter':
-        const lastQuarter = Math.floor(today.getMonth() / 3) - 1;
-        const lastQuarterYear = lastQuarter < 0 ? today.getFullYear() - 1 : today.getFullYear();
-        const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
-        const lastQuarterStart = new Date(lastQuarterYear, adjustedQuarter * 3, 1);
-        const lastQuarterEnd = new Date(lastQuarterYear, adjustedQuarter * 3 + 3, 0);
-        setCustomerDateFrom(lastQuarterStart);
-        setCustomerDateTo(lastQuarterEnd);
-        break;
-    }
-  };
-
-  // Handle supplier time preset change
-  const handleSupplierTimePresetChange = (preset: string) => {
-    setSupplierTimePreset(preset);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-
-    switch (preset) {
-      case 'today':
-        setSupplierDateFrom(today);
-        setSupplierDateTo(today);
-        break;
-      case 'yesterday':
-        setSupplierDateFrom(yesterday);
-        setSupplierDateTo(yesterday);
-        break;
-      case 'this-week':
-        const weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - today.getDay());
-        setSupplierDateFrom(weekStart);
-        setSupplierDateTo(today);
-        break;
-      case 'last-week':
-        const lastWeekEnd = new Date(today);
-        lastWeekEnd.setDate(today.getDate() - today.getDay() - 1);
-        const lastWeekStart = new Date(lastWeekEnd);
-        lastWeekStart.setDate(lastWeekEnd.getDate() - 6);
-        setSupplierDateFrom(lastWeekStart);
-        setSupplierDateTo(lastWeekEnd);
-        break;
-      case 'last-7-days':
-        const sevenDaysAgo = new Date(today);
-        sevenDaysAgo.setDate(today.getDate() - 7);
-        setSupplierDateFrom(sevenDaysAgo);
-        setSupplierDateTo(today);
-        break;
-      case 'this-month':
-        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-        setSupplierDateFrom(monthStart);
-        setSupplierDateTo(today);
-        break;
-      case 'last-month':
-        const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-        setSupplierDateFrom(lastMonthStart);
-        setSupplierDateTo(lastMonthEnd);
-        break;
-      case 'last-30-days':
-        const thirtyDaysAgo = new Date(today);
-        thirtyDaysAgo.setDate(today.getDate() - 30);
-        setSupplierDateFrom(thirtyDaysAgo);
-        setSupplierDateTo(today);
-        break;
-      case 'this-year':
-        const yearStart = new Date(today.getFullYear(), 0, 1);
-        setSupplierDateFrom(yearStart);
-        setSupplierDateTo(today);
-        break;
-      case 'last-year':
-        const lastYearStart = new Date(today.getFullYear() - 1, 0, 1);
-        const lastYearEnd = new Date(today.getFullYear() - 1, 11, 31);
-        setSupplierDateFrom(lastYearStart);
-        setSupplierDateTo(lastYearEnd);
-        break;
-      case 'this-quarter':
-        const currentQuarter = Math.floor(today.getMonth() / 3);
-        const quarterStart = new Date(today.getFullYear(), currentQuarter * 3, 1);
-        setSupplierDateFrom(quarterStart);
-        setSupplierDateTo(today);
-        break;
-      case 'last-quarter':
-        const lastQuarter = Math.floor(today.getMonth() / 3) - 1;
-        const lastQuarterYear = lastQuarter < 0 ? today.getFullYear() - 1 : today.getFullYear();
-        const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
-        const lastQuarterStart = new Date(lastQuarterYear, adjustedQuarter * 3, 1);
-        const lastQuarterEnd = new Date(lastQuarterYear, adjustedQuarter * 3 + 3, 0);
-        setSupplierDateFrom(lastQuarterStart);
-        setSupplierDateTo(lastQuarterEnd);
-        break;
-    }
-  };
-
-  // Handle sales time preset change
-  const handleSalesTimePresetChange = (preset: string) => {
-    setSalesTimePreset(preset);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-
-    switch (preset) {
-      case 'today':
-        setSalesDateFrom(today);
-        setSalesDateTo(today);
-        break;
-      case 'yesterday':
-        setSalesDateFrom(yesterday);
-        setSalesDateTo(yesterday);
-        break;
-      case 'this-week':
-        const weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - today.getDay());
-        setSalesDateFrom(weekStart);
-        setSalesDateTo(today);
-        break;
-      case 'last-week':
-        const lastWeekEnd = new Date(today);
-        lastWeekEnd.setDate(today.getDate() - today.getDay() - 1);
-        const lastWeekStart = new Date(lastWeekEnd);
-        lastWeekStart.setDate(lastWeekEnd.getDate() - 6);
-        setSalesDateFrom(lastWeekStart);
-        setSalesDateTo(lastWeekEnd);
-        break;
-      case 'last-7-days':
-        const sevenDaysAgo = new Date(today);
-        sevenDaysAgo.setDate(today.getDate() - 7);
-        setSalesDateFrom(sevenDaysAgo);
-        setSalesDateTo(today);
-        break;
-      case 'this-month':
-        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-        setSalesDateFrom(monthStart);
-        setSalesDateTo(today);
-        break;
-      case 'last-month':
-        const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-        setSalesDateFrom(lastMonthStart);
-        setSalesDateTo(lastMonthEnd);
-        break;
-      case 'last-30-days':
-        const thirtyDaysAgo = new Date(today);
-        thirtyDaysAgo.setDate(today.getDate() - 30);
-        setSalesDateFrom(thirtyDaysAgo);
-        setSalesDateTo(today);
-        break;
-      case 'this-year':
-        const yearStart = new Date(today.getFullYear(), 0, 1);
-        setSalesDateFrom(yearStart);
-        setSalesDateTo(today);
-        break;
-      case 'last-year':
-        const lastYearStart = new Date(today.getFullYear() - 1, 0, 1);
-        const lastYearEnd = new Date(today.getFullYear() - 1, 11, 31);
-        setSalesDateFrom(lastYearStart);
-        setSalesDateTo(lastYearEnd);
-        break;
-      case 'this-quarter':
-        const currentQuarter = Math.floor(today.getMonth() / 3);
-        const quarterStart = new Date(today.getFullYear(), currentQuarter * 3, 1);
-        setSalesDateFrom(quarterStart);
-        setSalesDateTo(today);
-        break;
-      case 'last-quarter':
-        const lastQuarter = Math.floor(today.getMonth() / 3) - 1;
-        const lastQuarterYear = lastQuarter < 0 ? today.getFullYear() - 1 : today.getFullYear();
-        const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
-        const lastQuarterStart = new Date(lastQuarterYear, adjustedQuarter * 3, 1);
-        const lastQuarterEnd = new Date(lastQuarterYear, adjustedQuarter * 3 + 3, 0);
-        setSalesDateFrom(lastQuarterStart);
-        setSalesDateTo(lastQuarterEnd);
-        break;
-    }
-  };
 
   return (
     <div className="h-full flex bg-slate-50">
-      {/* Left Sidebar - Filters */}
-      <aside className="w-72 bg-white border-r border-slate-200 overflow-y-auto hidden lg:block">
-        <div className="p-6 space-y-6">
-          {activeTab === 'endofday' ? (
-            // END OF DAY SPECIFIC FILTERS
-            <>
-
-              {/* Mối quan tâm */}
-              <div>
-                <h3 className="text-sm text-slate-900 mb-3">Mối quan tâm</h3>
-                <RadioGroup value={eodConcern} onValueChange={(value) => setEodConcern(value as ConcernType)}>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="sales" id="concern-sales" className="border-slate-300" />
-                    <Label htmlFor="concern-sales" className="text-sm text-slate-700 cursor-pointer">
-                      Bán hàng
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="cashflow" id="concern-cashflow" className="border-slate-300" />
-                    <Label htmlFor="concern-cashflow" className="text-sm text-slate-700 cursor-pointer">
-                      Thu chi
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="products" id="concern-products" className="border-slate-300" />
-                    <Label htmlFor="concern-products" className="text-sm text-slate-700 cursor-pointer">
-                      Hàng hóa
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="cancellations" id="concern-cancellations" className="border-slate-300" />
-                    <Label htmlFor="concern-cancellations" className="text-sm text-slate-700 cursor-pointer">
-                      Hủy món
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="summary" id="concern-summary" className="border-slate-300" />
-                    <Label htmlFor="concern-summary" className="text-sm text-slate-700 cursor-pointer">
-                      Tổng hợp
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              <Separator />
-
-              {/* Thời gian */}
-              <div>
-                <h3 className="text-sm text-slate-900 mb-3">Thời gian</h3>
-                <RadioGroup value={dateRangeType} onValueChange={(value) => setDateRangeType(value as 'preset' | 'custom')}>
-                  {/* Preset Time Ranges */}
-                  <div className="flex items-center space-x-2 mb-3">
-                    <RadioGroupItem value="preset" id="date-preset" className="border-slate-300" />
-                    <div className="flex-1">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="w-full justify-between text-left text-sm bg-white border-slate-300"
-                            onClick={() => setDateRangeType('preset')}
-                          >
-                            <span>
-                              {presetTimeRange === 'today' && 'Hôm nay'}
-                              {presetTimeRange === 'yesterday' && 'Hôm qua'}
-                              {presetTimeRange === 'this-week' && 'Tuần này'}
-                              {presetTimeRange === 'last-week' && 'Tuần trước'}
-                              {presetTimeRange === 'last-7-days' && '7 ngày qua'}
-                              {presetTimeRange === 'this-month' && 'Tháng này'}
-                              {presetTimeRange === 'last-month' && 'Tháng trước'}
-                              {presetTimeRange === 'last-30-days' && '30 ngày qua'}
-                              {presetTimeRange === 'this-quarter' && 'Quý này'}
-                              {presetTimeRange === 'last-quarter' && 'Quý trước'}
-                              {presetTimeRange === 'this-year' && 'Năm nay'}
-                              {presetTimeRange === 'last-year' && 'Năm trước'}
-                            </span>
-                            <ChevronDown className="h-4 w-4 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[600px] p-4" align="start">
-                          <div className="grid grid-cols-3 gap-6">
-                            {/* Column 1: Theo ngày và tuần */}
-                            <div>
-                              <h4 className="text-sm text-slate-700 mb-3">Theo ngày và tuần</h4>
-                              <div className="space-y-2">
-                                {[
-                                  { value: 'today', label: 'Hôm nay' },
-                                  { value: 'yesterday', label: 'Hôm qua' },
-                                  { value: 'this-week', label: 'Tuần này' },
-                                  { value: 'last-week', label: 'Tuần trước' },
-                                  { value: 'last-7-days', label: '7 ngày qua' },
-                                ].map((option) => (
-                                  <button
-                                    key={option.value}
-                                    onClick={() => {
-                                      setPresetTimeRange(option.value);
-                                      setDateRangeType('preset');
-                                    }}
-                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
-                                      ? 'bg-blue-600 text-white'
-                                      : 'text-blue-600 hover:bg-blue-50'
-                                      }`}
-                                  >
-                                    {option.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Column 2: Theo tháng và quý */}
-                            <div>
-                              <h4 className="text-sm text-slate-700 mb-3">Theo tháng và quý</h4>
-                              <div className="space-y-2">
-                                {[
-                                  { value: 'this-month', label: 'Tháng này' },
-                                  { value: 'last-month', label: 'Tháng trước' },
-                                  { value: 'last-30-days', label: '30 ngày qua' },
-                                  { value: 'this-quarter', label: 'Quý này' },
-                                  { value: 'last-quarter', label: 'Quý trước' },
-                                ].map((option) => (
-                                  <button
-                                    key={option.value}
-                                    onClick={() => {
-                                      setPresetTimeRange(option.value);
-                                      setDateRangeType('preset');
-                                    }}
-                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
-                                      ? 'bg-blue-600 text-white'
-                                      : 'text-blue-600 hover:bg-blue-50'
-                                      }`}
-                                  >
-                                    {option.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Column 3: Theo năm */}
-                            <div>
-                              <h4 className="text-sm text-slate-700 mb-3">Theo năm</h4>
-                              <div className="space-y-2">
-                                {[
-                                  { value: 'this-year', label: 'Năm nay' },
-                                  { value: 'last-year', label: 'Năm trước' },
-                                ].map((option) => (
-                                  <button
-                                    key={option.value}
-                                    onClick={() => {
-                                      setPresetTimeRange(option.value);
-                                      setDateRangeType('preset');
-                                    }}
-                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
-                                      ? 'bg-blue-600 text-white'
-                                      : 'text-blue-600 hover:bg-blue-50'
-                                      }`}
-                                  >
-                                    {option.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
-
-                  {/* Custom Date Range */}
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="custom" id="date-custom" className="border-slate-300" />
-                    <div className="flex-1">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="w-full justify-start text-left text-sm bg-white border-slate-300"
-                            onClick={() => setDateRangeType('custom')}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {dateFrom && dateTo
-                              ? `${format(dateFrom, 'dd/MM', { locale: vi })} - ${format(dateTo, 'dd/MM/yyyy', { locale: vi })}`
-                              : 'Lựa chọn khác'}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-4" align="start">
-                          <div className="flex gap-4">
-                            <div>
-                              <Label className="text-xs text-slate-600 mb-2 block">Từ ngày</Label>
-                              <CalendarComponent
-                                mode="single"
-                                selected={dateFrom}
-                                onSelect={(date) => {
-                                  if (date) {
-                                    setDateFrom(date);
-                                    setDateRangeType('custom');
-                                  }
-                                }}
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs text-slate-600 mb-2 block">Đến ngày</Label>
-                              <CalendarComponent
-                                mode="single"
-                                selected={dateTo}
-                                onSelect={(date) => {
-                                  if (date) {
-                                    setDateTo(date);
-                                    setDateRangeType('custom');
-                                  }
-                                }}
-                                disabled={(date) => dateFrom ? date < dateFrom : false}
-                              />
-                            </div>
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              <Separator />
-
-              {/* Conditional Filters based on Concern */}
-              {eodConcern === 'products' && (
-                <>
-                  {/* Tìm kiếm hàng hóa */}
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Tìm kiếm hàng hóa</h3>
-                    <Input
-                      placeholder="Theo tên, mã hàng"
-                      value={productSearch}
-                      onChange={(e) => setProductSearch(e.target.value)}
-                      className="text-sm bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                    />
-                  </div>
-
-                  <Separator />
-
-                  {/* Chọn loại hàng */}
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Chọn loại hàng</h3>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className="w-full text-left border border-slate-300 rounded-lg px-3 py-2 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-auto min-h-[40px]">
-                          <div className="flex flex-wrap gap-1.5 items-center">
-                            {selectedProductCategories.length > 0 ? (
-                              selectedProductCategories.map((item) => (
-                                <Badge
-                                  key={item.id}
-                                  variant="secondary"
-                                  className="bg-slate-200 text-slate-900 pr-1 text-xs"
-                                >
-                                  {item.name}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleRemoveItem(item.id, selectedProductCategories, setSelectedProductCategories);
-                                    }}
-                                    className="ml-1 hover:bg-slate-300 rounded-sm p-0.5"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </Badge>
-                              ))
-                            ) : (
-                              <span className="text-slate-500 text-sm">Chọn loại hàng</span>
-                            )}
-                          </div>
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-72 p-3" align="start">
-                        <div className="space-y-2">
-                          {productCategories.map((cat) => (
-                            <div
-                              key={cat.id}
-                              className="flex items-center justify-between p-2 hover:bg-slate-100 rounded cursor-pointer"
-                              onClick={() => handleMultiSelect(cat, selectedProductCategories, setSelectedProductCategories)}
-                            >
-                              <span className="text-sm text-slate-900">{cat.name}</span>
-                              {selectedProductCategories.some(s => s.id === cat.id) && (
-                                <CheckCircle2 className="h-4 w-4 text-blue-600" />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </>
-              )}
-
-              {eodConcern === 'cancellations' && (
-                <>
-                  {/* Tìm kiếm khách hàng */}
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Tìm kiếm khách hàng</h3>
-                    <Input
-                      placeholder="Theo mã, tên, điện thoại"
-                      value={customerSearch}
-                      onChange={(e) => setCustomerSearch(e.target.value)}
-                      className="text-sm bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                    />
-                  </div>
-
-                  <Separator />
-
-                  {/* Tìm kiếm hàng hóa */}
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Tìm kiếm hàng hóa</h3>
-                    <Input
-                      placeholder="Theo tên, mã hàng"
-                      value={productSearch}
-                      onChange={(e) => setProductSearch(e.target.value)}
-                      className="text-sm bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                    />
-                  </div>
-
-                  <Separator />
-
-                  {/* Nhân viên hủy */}
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Nhân viên hủy</h3>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className="w-full text-left border border-slate-300 rounded-lg px-3 py-2 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-auto min-h-[40px]">
-                          <div className="flex flex-wrap gap-1.5 items-center">
-                            {selectedCancelers.length > 0 ? (
-                              selectedCancelers.map((item) => (
-                                <Badge
-                                  key={item.id}
-                                  variant="secondary"
-                                  className="bg-slate-200 text-slate-900 pr-1 text-xs"
-                                >
-                                  {item.name}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleRemoveItem(item.id, selectedCancelers, setSelectedCancelers);
-                                    }}
-                                    className="ml-1 hover:bg-slate-300 rounded-sm p-0.5"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </Badge>
-                              ))
-                            ) : (
-                              <span className="text-slate-500 text-sm">Chọn nhân viên</span>
-                            )}
-                          </div>
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-72 p-3" align="start">
-                        <div className="space-y-2">
-                          {employees.map((emp) => (
-                            <div
-                              key={emp.id}
-                              className="flex items-center justify-between p-2 hover:bg-slate-100 rounded cursor-pointer"
-                              onClick={() => handleMultiSelect(emp, selectedCancelers, setSelectedCancelers)}
-                            >
-                              <span className="text-sm text-slate-900">{emp.code ? `${emp.code} - ${emp.name}` : emp.name}</span>
-                              {selectedCancelers.some(s => s.id === emp.id) && (
-                                <CheckCircle2 className="h-4 w-4 text-blue-600" />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </>
-              )}
-
-              {eodConcern === 'summary' && (
-                <>
-                  {/* Người nhận đơn */}
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Người nhận đơn</h3>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className="w-full text-left border border-slate-300 rounded-lg px-3 py-2 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-auto min-h-[40px]">
-                          <div className="flex flex-wrap gap-1.5 items-center">
-                            {selectedReceivers.length > 0 ? (
-                              selectedReceivers.map((item) => (
-                                <Badge
-                                  key={item.id}
-                                  variant="secondary"
-                                  className="bg-slate-200 text-slate-900 pr-1 text-xs"
-                                >
-                                  {item.name}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleRemoveItem(item.id, selectedReceivers, setSelectedReceivers);
-                                    }}
-                                    className="ml-1 hover:bg-slate-300 rounded-sm p-0.5"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </Badge>
-                              ))
-                            ) : (
-                              <span className="text-slate-500 text-sm">Chọn người nhận</span>
-                            )}
-                          </div>
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-72 p-3" align="start">
-                        <div className="space-y-2">
-                          {receivers.map((receiver) => (
-                            <div
-                              key={receiver.id}
-                              className="flex items-center justify-between p-2 hover:bg-slate-100 rounded cursor-pointer"
-                              onClick={() => handleMultiSelect(receiver, selectedReceivers, setSelectedReceivers)}
-                            >
-                              <span className="text-sm text-slate-900">{receiver.name}</span>
-                              {selectedReceivers.some(s => s.id === receiver.id) && (
-                                <CheckCircle2 className="h-4 w-4 text-blue-600" />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <Separator />
-
-                  {/* Người tạo */}
-                  <EmployeeFilter
-                    employees={employees}
-                    selectedEmployeeIds={selectedCreators}
-                    onSelectionChange={setSelectedCreators}
-                    label="Người tạo"
-                    placeholder="Tìm người tạo..."
-                  />
-                </>
-              )}
-
-              {(eodConcern === 'sales' || eodConcern === 'cashflow') && (
-                <>
-                  {/* Khách hàng */}
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Khách hàng</h3>
-                    <Input
-                      placeholder="Theo mã, tên, điện thoại"
-                      value={customerSearch}
-                      onChange={(e) => setCustomerSearch(e.target.value)}
-                      className="text-sm bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                    />
-                  </div>
-
-                  <Separator />
-
-                  {/* Người tạo */}
-                  <EmployeeFilter
-                    employees={employees}
-                    selectedEmployeeIds={selectedCreators}
-                    onSelectionChange={setSelectedCreators}
-                    label="Người tạo"
-                    placeholder="Tìm người tạo..."
-                  />
-
-                  <Separator />
-
-                  {/* Phương thức thanh toán */}
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Phương thức thanh toán</h3>
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="payment-all"
-                          checked={selectedPaymentMethods.length === 0 || selectedPaymentMethods.length === paymentMethods.length}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedPaymentMethods(paymentMethods.map(m => m.id));
-                            } else {
-                              setSelectedPaymentMethods([]);
-                            }
-                          }}
-                        />
-                        <label htmlFor="payment-all" className="text-sm text-slate-700 cursor-pointer">
-                          Tất cả
-                        </label>
-                      </div>
-                      {paymentMethods.map((method) => (
-                        <div key={method.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`payment-${method.id}`}
-                            checked={selectedPaymentMethods.includes(method.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedPaymentMethods([...selectedPaymentMethods, method.id]);
-                              } else {
-                                const newSelection = selectedPaymentMethods.filter(id => id !== method.id);
-                                setSelectedPaymentMethods(newSelection);
-                              }
-                            }}
-                          />
-                          <label htmlFor={`payment-${method.id}`} className="text-sm text-slate-700 cursor-pointer">
-                            {method.name}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {eodConcern === 'cashflow' && (
-                    <>
-                      <Separator />
-
-                      {/* Loại thu chi */}
-                      <CategoryFilter
-                        categories={cashflowTypes}
-                        selectedCategoryNames={selectedCashflowTypes}
-                        onSelectionChange={setSelectedCashflowTypes}
-                      />
-                    </>
-                  )}
-                </>
-              )}
-            </>
-          ) : activeTab === 'customers' ? (
-            // CUSTOMER REPORT FILTERS
-            <>
-              {/* Kiểu hiển thị */}
-              <div>
-                <h3 className="text-sm text-slate-900 mb-3">Kiểu hiển thị</h3>
-                <div className="flex gap-2">
-                  <Button
-                    variant={customerViewType === 'chart' ? 'default' : 'outline'}
-                    size="sm"
-                    className={`flex-1 ${customerViewType === 'chart' ? 'bg-blue-600' : ''}`}
-                    onClick={() => setCustomerViewType('chart')}
-                  >
-                    <BarChart3 className="w-4 h-4 mr-2" />
-                    Biểu đồ
-                  </Button>
-                  <Button
-                    variant={customerViewType === 'report' ? 'default' : 'outline'}
-                    size="sm"
-                    className={`flex-1 ${customerViewType === 'report' ? 'bg-blue-600' : ''}`}
-                    onClick={() => setCustomerViewType('report')}
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    Báo cáo
-                  </Button>
-                </div>
-              </div>
-
-              <Separator />
-
-              <CustomerTimeFilter
-                dateRangeType={customerDateRangeType}
-                timePreset={customerTimePreset}
-                dateFrom={customerDateFrom}
-                dateTo={customerDateTo}
-                onDateRangeTypeChange={setCustomerDateRangeType}
-                onTimePresetChange={handleCustomerTimePresetChange}
-                onDateFromChange={setCustomerDateFrom}
-                onDateToChange={setCustomerDateTo}
-              />
-
-              <Separator />
-
-              {/* Tìm kiếm khách hàng */}
-              <div>
-                <h3 className="text-sm text-slate-900 mb-3">Tìm kiếm khách hàng</h3>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input
-                    placeholder="Tìm theo tên, mã, SĐT..."
-                    value={customerSearchQuery}
-                    onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                    className="pl-9 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                  />
-                </div>
-              </div>
-            </>
-          ) : activeTab === 'suppliers' ? (
-            // SUPPLIER REPORT FILTERS
-            <>
-              {/* Kiểu hiển thị */}
-              <div>
-                <h3 className="text-sm text-slate-900 mb-3">Kiểu hiển thị</h3>
-                <div className="flex gap-2">
-                  <Button
-                    variant={supplierViewType === 'chart' ? 'default' : 'outline'}
-                    size="sm"
-                    className={`flex-1 ${supplierViewType === 'chart' ? 'bg-blue-600' : ''}`}
-                    onClick={() => setSupplierViewType('chart')}
-                  >
-                    <BarChart3 className="w-4 h-4 mr-2" />
-                    Biểu đồ
-                  </Button>
-                  <Button
-                    variant={supplierViewType === 'report' ? 'default' : 'outline'}
-                    size="sm"
-                    className={`flex-1 ${supplierViewType === 'report' ? 'bg-blue-600' : ''}`}
-                    onClick={() => setSupplierViewType('report')}
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    Báo cáo
-                  </Button>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Mối quan tâm */}
-              <div>
-                <h3 className="text-sm text-slate-900 mb-3">Mối quan tâm</h3>
-                <RadioGroup value={supplierConcern} onValueChange={(value) => setSupplierConcern(value as 'sales' | 'debt')}>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="sales" id="supplier-concern-sales" className="border-slate-300" />
-                    <Label htmlFor="supplier-concern-sales" className="text-sm text-slate-700 cursor-pointer">
-                      Nhập hàng
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="debt" id="supplier-concern-debt" className="border-slate-300" />
-                    <Label htmlFor="supplier-concern-debt" className="text-sm text-slate-700 cursor-pointer">
-                      Công nợ
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              <Separator />
-
-              <CustomerTimeFilter
-                dateRangeType={supplierDateRangeType}
-                timePreset={supplierTimePreset}
-                dateFrom={supplierDateFrom}
-                dateTo={supplierDateTo}
-                onDateRangeTypeChange={setSupplierDateRangeType}
-                onTimePresetChange={handleSupplierTimePresetChange}
-                onDateFromChange={setSupplierDateFrom}
-                onDateToChange={setSupplierDateTo}
-              />
-
-              <Separator />
-
-              {/* Tìm kiếm nhà cung cấp */}
-              <div>
-                <h3 className="text-sm text-slate-900 mb-3">Tìm kiếm nhà cung cấp</h3>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input
-                    placeholder="Theo mã, tên, điện thoại"
-                    value={supplierSearchQuery}
-                    onChange={(e) => setSupplierSearchQuery(e.target.value)}
-                    className="pl-9 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                  />
-                </div>
-              </div>
-            </>
-          ) : activeTab === 'sales' ? (
-            // SALES REPORT FILTERS
-            <>
-              {/* Kiểu hiển thị - only show for time and profit concerns */}
-              {(salesConcern === 'time' || salesConcern === 'profit') && (
-                <>
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Kiểu hiển thị</h3>
-                    <div className="flex gap-2">
-                      <Button
-                        variant={salesViewType === 'chart' ? 'default' : 'outline'}
-                        size="sm"
-                        className={`flex-1 ${salesViewType === 'chart' ? 'bg-blue-600' : ''}`}
-                        onClick={() => setSalesViewType('chart')}
-                      >
-                        <BarChart3 className="w-4 h-4 mr-2" />
-                        Biểu đồ
-                      </Button>
-                      <Button
-                        variant={salesViewType === 'report' ? 'default' : 'outline'}
-                        size="sm"
-                        className={`flex-1 ${salesViewType === 'report' ? 'bg-blue-600' : ''}`}
-                        onClick={() => setSalesViewType('report')}
-                      >
-                        <FileText className="w-4 h-4 mr-2" />
-                        Báo cáo
-                      </Button>
-                    </div>
-                  </div>
-
-                  <Separator />
-                </>
-              )}
-
-              {/* Mối quan tâm */}
-              <div>
-                <h3 className="text-sm text-slate-900 mb-3">Mối quan tâm</h3>
-                <RadioGroup value={salesConcern} onValueChange={(value) => {
-                  const newConcern = value as 'time' | 'profit' | 'discount' | 'return' | 'table' | 'category';
-                  setSalesConcern(newConcern);
-                  // Auto-set to 'report' view for concerns without chart
-                  if (newConcern === 'discount' || newConcern === 'return' || newConcern === 'table' || newConcern === 'category') {
-                    setSalesViewType('report');
-                  }
-                }}>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="time" id="sales-concern-time" className="border-slate-300" />
-                    <Label htmlFor="sales-concern-time" className="text-sm text-slate-700 cursor-pointer">
-                      Thời gian
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="profit" id="sales-concern-profit" className="border-slate-300" />
-                    <Label htmlFor="sales-concern-profit" className="text-sm text-slate-700 cursor-pointer">
-                      Lợi nhuận
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="discount" id="sales-concern-discount" className="border-slate-300" />
-                    <Label htmlFor="sales-concern-discount" className="text-sm text-slate-700 cursor-pointer">
-                      Giảm giá HĐ
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="return" id="sales-concern-return" className="border-slate-300" />
-                    <Label htmlFor="sales-concern-return" className="text-sm text-slate-700 cursor-pointer">
-                      Trả hàng
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="table" id="sales-concern-table" className="border-slate-300" />
-                    <Label htmlFor="sales-concern-table" className="text-sm text-slate-700 cursor-pointer">
-                      Phòng/Bàn
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="category" id="sales-concern-category" className="border-slate-300" />
-                    <Label htmlFor="sales-concern-category" className="text-sm text-slate-700 cursor-pointer">
-                      Danh mục hàng hóa
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              <Separator />
-
-              <CustomerTimeFilter
-                dateRangeType={salesDateRangeType}
-                timePreset={salesTimePreset}
-                dateFrom={salesDateFrom}
-                dateTo={salesDateTo}
-                onDateRangeTypeChange={setSalesDateRangeType}
-                onTimePresetChange={handleSalesTimePresetChange}
-                onDateFromChange={setSalesDateFrom}
-                onDateToChange={setSalesDateTo}
-              />
-
-              <Separator />
-
-              {/* Phòng / Bàn */}
-              <div>
-                <h3 className="text-sm text-slate-900 mb-3">Phòng / Bàn</h3>
-                <div className="space-y-3">
-                  <Select value={salesSelectedArea} onValueChange={setSalesSelectedArea}>
-                    <SelectTrigger className="w-full bg-white border border-slate-300 shadow-none">
-                      <SelectValue placeholder="Chọn khu vực" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tất cả khu vực</SelectItem>
-                      <SelectItem value="floor1">Tầng 1</SelectItem>
-                      <SelectItem value="floor2">Tầng 2</SelectItem>
-                      <SelectItem value="outdoor">Khu ngoài trời</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Popover open={tableSearchOpen} onOpenChange={setTableSearchOpen}>
-                    <PopoverTrigger asChild>
-                      <button className="flex w-full items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm h-9 whitespace-nowrap transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-blue-500/50 focus-visible:border-blue-500 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50">
-                        <span className={salesSelectedTable ? '' : 'text-muted-foreground'}>
-                          {salesSelectedTable === 'all'
-                            ? 'Tất cả phòng/bàn'
-                            : salesSelectedTable === 'table1' ? 'Bàn 01'
-                              : salesSelectedTable === 'table2' ? 'Bàn 02'
-                                : salesSelectedTable === 'table3' ? 'Bàn 03'
-                                  : salesSelectedTable === 'vip1' ? 'Bàn VIP 1'
-                                    : salesSelectedTable === 'vip2' ? 'Bàn VIP 2'
-                                      : 'Chọn phòng/bàn'}
-                        </span>
-                        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[var(--radix-select-trigger-width)] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Tìm phòng/bàn..." className="bg-white border border-slate-300 focus:border-blue-500 focus:ring-blue-500 focus:ring-2" />
-                        <CommandList>
-                          <CommandEmpty>Không tìm thấy.</CommandEmpty>
-                          <CommandGroup className="max-h-64 overflow-auto">
-                            <CommandItem
-                              onSelect={() => {
-                                setSalesSelectedTable('all');
-                                setTableSearchOpen(false);
-                              }}
-                            >
-                              Tất cả phòng/bàn
-                            </CommandItem>
-                            <CommandItem
-                              onSelect={() => {
-                                setSalesSelectedTable('table1');
-                                setTableSearchOpen(false);
-                              }}
-                            >
-                              Bàn 01
-                            </CommandItem>
-                            <CommandItem
-                              onSelect={() => {
-                                setSalesSelectedTable('table2');
-                                setTableSearchOpen(false);
-                              }}
-                            >
-                              Bàn 02
-                            </CommandItem>
-                            <CommandItem
-                              onSelect={() => {
-                                setSalesSelectedTable('table3');
-                                setTableSearchOpen(false);
-                              }}
-                            >
-                              Bàn 03
-                            </CommandItem>
-                            <CommandItem
-                              onSelect={() => {
-                                setSalesSelectedTable('vip1');
-                                setTableSearchOpen(false);
-                              }}
-                            >
-                              Bàn VIP 1
-                            </CommandItem>
-                            <CommandItem
-                              onSelect={() => {
-                                setSalesSelectedTable('vip2');
-                                setTableSearchOpen(false);
-                              }}
-                            >
-                              Bàn VIP 2
-                            </CommandItem>
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-            </>
-          ) : activeTab === 'products' ? (
-            // PRODUCTS SPECIFIC FILTERS
-            <>
-              {/* Kiểu hiển thị - chỉ hiển thị khi không phải import-export hoặc write-off */}
-              {(productsConcern !== 'import-export' && productsConcern !== 'write-off') && (
-                <>
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Kiểu hiển thị</h3>
-                    <div className="flex gap-2">
-                      <Button
-                        variant={productsViewType === 'chart' ? 'default' : 'outline'}
-                        size="sm"
-                        className={`flex-1 ${productsViewType === 'chart' ? 'bg-blue-600' : ''}`}
-                        onClick={() => setProductsViewType('chart')}
-                      >
-                        <BarChart3 className="w-4 h-4 mr-2" />
-                        Biểu đồ
-                      </Button>
-                      <Button
-                        variant={productsViewType === 'report' ? 'default' : 'outline'}
-                        size="sm"
-                        className={`flex-1 ${productsViewType === 'report' ? 'bg-blue-600' : ''}`}
-                        onClick={() => setProductsViewType('report')}
-                      >
-                        <FileText className="w-4 h-4 mr-2" />
-                        Báo cáo
-                      </Button>
-                    </div>
-                  </div>
-
-                  <Separator />
-                </>
-              )}
-
-              {/* Mối quan tâm */}
-              <div>
-                <h3 className="text-sm text-slate-900 mb-3">Mối quan tâm</h3>
-                <RadioGroup value={productsConcern} onValueChange={(value) => setProductsConcern(value as typeof productsConcern)}>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="sales" id="products-concern-sales" className="border-slate-300" />
-                    <Label htmlFor="products-concern-sales" className="text-sm text-slate-700 cursor-pointer">
-                      Bán hàng
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="profit" id="products-concern-profit" className="border-slate-300" />
-                    <Label htmlFor="products-concern-profit" className="text-sm text-slate-700 cursor-pointer">
-                      Lợi nhuận
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="import-export" id="products-concern-import-export" className="border-slate-300" />
-                    <Label htmlFor="products-concern-import-export" className="text-sm text-slate-700 cursor-pointer">
-                      Xuất nhập tồn
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="write-off" id="products-concern-write-off" className="border-slate-300" />
-                    <Label htmlFor="products-concern-write-off" className="text-sm text-slate-700 cursor-pointer">
-                      Xuất hủy
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              <Separator />
-
-              {/* Thời gian */}
-              <div>
-                <h3 className="text-sm text-slate-900 mb-3">Thời gian</h3>
-                <RadioGroup value={productsDateRangeType} onValueChange={(value) => setProductsDateRangeType(value as 'preset' | 'custom')}>
-                  {/* Preset Time Ranges */}
-                  <div className="flex items-center space-x-2 mb-3">
-                    <RadioGroupItem value="preset" id="products-date-preset" className="border-slate-300" />
-                    <div className="flex-1">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="w-full justify-between text-left text-sm bg-white border-slate-300"
-                            onClick={() => setProductsDateRangeType('preset')}
-                          >
-                            <span>
-                              {productsPresetTimeRange === 'today' && 'Hôm nay'}
-                              {productsPresetTimeRange === 'yesterday' && 'Hôm qua'}
-                              {productsPresetTimeRange === 'this-week' && 'Tuần này'}
-                              {productsPresetTimeRange === 'last-week' && 'Tuần trước'}
-                              {productsPresetTimeRange === 'last-7-days' && '7 ngày qua'}
-                              {productsPresetTimeRange === 'this-month' && 'Tháng này'}
-                              {productsPresetTimeRange === 'last-month' && 'Tháng trước'}
-                              {productsPresetTimeRange === 'last-30-days' && '30 ngày qua'}
-                              {productsPresetTimeRange === 'this-quarter' && 'Quý này'}
-                              {productsPresetTimeRange === 'last-quarter' && 'Quý trước'}
-                              {productsPresetTimeRange === 'this-year' && 'Năm nay'}
-                              {productsPresetTimeRange === 'last-year' && 'Năm trước'}
-                            </span>
-                            <ChevronDown className="h-4 w-4 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[600px] p-4" align="start">
-                          <div className="grid grid-cols-3 gap-6">
-                            {/* Column 1: Theo ngày và tuần */}
-                            <div>
-                              <h4 className="text-sm text-slate-700 mb-3">Theo ngày và tuần</h4>
-                              <div className="space-y-2">
-                                {[
-                                  { value: 'today', label: 'Hôm nay' },
-                                  { value: 'yesterday', label: 'Hôm qua' },
-                                  { value: 'this-week', label: 'Tuần này' },
-                                  { value: 'last-week', label: 'Tuần trước' },
-                                  { value: 'last-7-days', label: '7 ngày qua' },
-                                ].map((option) => (
-                                  <button
-                                    key={option.value}
-                                    onClick={() => {
-                                      setProductsPresetTimeRange(option.value);
-                                      setProductsDateRangeType('preset');
-                                    }}
-                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${productsPresetTimeRange === option.value
-                                      ? 'bg-blue-600 text-white'
-                                      : 'text-blue-600 hover:bg-blue-50'
-                                      }`}
-                                  >
-                                    {option.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Column 2: Theo tháng và quý */}
-                            <div>
-                              <h4 className="text-sm text-slate-700 mb-3">Theo tháng và quý</h4>
-                              <div className="space-y-2">
-                                {[
-                                  { value: 'this-month', label: 'Tháng này' },
-                                  { value: 'last-month', label: 'Tháng trước' },
-                                  { value: 'last-30-days', label: '30 ngày qua' },
-                                  { value: 'this-quarter', label: 'Quý này' },
-                                  { value: 'last-quarter', label: 'Quý trước' },
-                                ].map((option) => (
-                                  <button
-                                    key={option.value}
-                                    onClick={() => {
-                                      setProductsPresetTimeRange(option.value);
-                                      setProductsDateRangeType('preset');
-                                    }}
-                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${productsPresetTimeRange === option.value
-                                      ? 'bg-blue-600 text-white'
-                                      : 'text-blue-600 hover:bg-blue-50'
-                                      }`}
-                                  >
-                                    {option.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Column 3: Theo năm */}
-                            <div>
-                              <h4 className="text-sm text-slate-700 mb-3">Theo năm</h4>
-                              <div className="space-y-2">
-                                {[
-                                  { value: 'this-year', label: 'Năm nay' },
-                                  { value: 'last-year', label: 'Năm trước' },
-                                ].map((option) => (
-                                  <button
-                                    key={option.value}
-                                    onClick={() => {
-                                      setProductsPresetTimeRange(option.value);
-                                      setProductsDateRangeType('preset');
-                                    }}
-                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${productsPresetTimeRange === option.value
-                                      ? 'bg-blue-600 text-white'
-                                      : 'text-blue-600 hover:bg-blue-50'
-                                      }`}
-                                  >
-                                    {option.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
-
-                  {/* Custom Date Range */}
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="custom" id="products-date-custom" className="border-slate-300" />
-                    <div className="flex-1">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="w-full justify-start text-left text-sm bg-white border-slate-300"
-                            onClick={() => setProductsDateRangeType('custom')}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {productsDateFrom && productsDateTo
-                              ? `${format(productsDateFrom, 'dd/MM', { locale: vi })} - ${format(productsDateTo, 'dd/MM/yyyy', { locale: vi })}`
-                              : 'Lựa chọn khác'}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-4" align="start">
-                          <div className="flex gap-4">
-                            <div>
-                              <Label className="text-xs text-slate-600 mb-2 block">Từ ngày</Label>
-                              <CalendarComponent
-                                mode="single"
-                                selected={productsDateFrom}
-                                onSelect={(date) => {
-                                  if (date) {
-                                    setProductsDateFrom(date);
-                                    setProductsDateRangeType('custom');
-                                  }
-                                }}
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs text-slate-600 mb-2 block">Đến ngày</Label>
-                              <CalendarComponent
-                                mode="single"
-                                selected={productsDateTo}
-                                onSelect={(date) => {
-                                  if (date) {
-                                    setProductsDateTo(date);
-                                    setProductsDateRangeType('custom');
-                                  }
-                                }}
-                                disabled={(date) => productsDateFrom ? date < productsDateFrom : false}
-                              />
-                            </div>
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              <Separator />
-
-              {/* Tìm kiếm hàng hóa */}
-              <div>
-                <h3 className="text-sm text-slate-900 mb-3">Hàng hóa</h3>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input
-                    placeholder="Theo tên, mã hàng"
-                    value={productsSearchQuery}
-                    onChange={(e) => setProductsSearchQuery(e.target.value)}
-                    className="pl-9 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                  />
-                </div>
-              </div>
-
-
-
-              {/* Danh mục hàng hóa */}
-              <div>
-                <h3 className="text-sm text-slate-900 mb-3">Danh mục hàng hóa</h3>
-                <Popover open={productCategorySearchOpen} onOpenChange={setProductCategorySearchOpen}>
-                  <PopoverTrigger asChild>
-                    <button className="flex w-full items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm h-9 whitespace-nowrap transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-blue-500/50 focus-visible:border-blue-500 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50">
-                      <span className={productsCategory ? '' : 'text-slate-500'}>
-                        {productsCategory === 'all'
-                          ? 'Tất cả'
-                          : productCategories.find(cat => cat.id === productsCategory)?.name || 'Chọn danh mục'}
-                      </span>
-                      <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[var(--radix-select-trigger-width)] p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Tìm danh mục..." className="bg-white border border-slate-300 focus:border-blue-500 focus:ring-blue-500 focus:ring-2" />
-                      <CommandList>
-                        <CommandEmpty>Không tìm thấy.</CommandEmpty>
-                        <CommandGroup className="max-h-64 overflow-auto">
-                          <CommandItem
-                            onSelect={() => {
-                              setProductsCategory('all');
-                              setProductCategorySearchOpen(false);
-                            }}
-                          >
-                            Tất cả
-                          </CommandItem>
-                          {productCategories.map((cat) => (
-                            <CommandItem
-                              key={cat.id}
-                              onSelect={() => {
-                                setProductsCategory(cat.id);
-                                setProductCategorySearchOpen(false);
-                              }}
-                            >
-                              {cat.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </>
-          ) : (
-            // DEFAULT FILTERS FOR OTHER TABS (Finance, Employees, etc.)
-            <>
-              {/* View Type */}
-              <div>
-                <h3 className="text-sm text-slate-900 mb-3">Kiểu hiển thị</h3>
-                <div className="flex gap-2">
-                  <Button
-                    variant={
-                      (activeTab === 'finance' && financeViewType === 'chart') ||
-                        (activeTab === 'employees' && employeesViewType === 'chart')
-                        ? 'default' : 'outline'
-                    }
-                    size="sm"
-                    className={`flex-1 ${(activeTab === 'finance' && financeViewType === 'chart') ||
-                      (activeTab === 'employees' && employeesViewType === 'chart')
-                      ? 'bg-blue-600' : ''
-                      }`}
-                    onClick={() => {
-                      if (activeTab === 'finance') setFinanceViewType('chart');
-                      else if (activeTab === 'employees') setEmployeesViewType('chart');
-                    }}
-                  >
-                    <BarChart3 className="w-4 h-4 mr-2" />
-                    Biểu đồ
-                  </Button>
-                  <Button
-                    variant={
-                      (activeTab === 'finance' && financeViewType === 'report') ||
-                        (activeTab === 'employees' && employeesViewType === 'report')
-                        ? 'default' : 'outline'
-                    }
-                    size="sm"
-                    className={`flex-1 ${(activeTab === 'finance' && financeViewType === 'report') ||
-                      (activeTab === 'employees' && employeesViewType === 'report')
-                      ? 'bg-blue-600' : ''
-                      }`}
-                    onClick={() => {
-                      if (activeTab === 'finance') setFinanceViewType('report');
-                      else if (activeTab === 'employees') setEmployeesViewType('report');
-                    }}
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    Báo cáo
-                  </Button>
-                </div>
-              </div>
-
-              {activeTab === 'finance' ? (
-                <>
-                  <Separator />
-
-                  {/* Finance Concerns */}
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Mối quan tâm</h3>
-                    <div className="space-y-2">
-                      {concernsByTab['finance']?.map((concern) => (
-                        <div key={concern.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`finance-concern-${concern.id}`}
-                            checked={selectedFinanceConcerns.includes(concern.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedFinanceConcerns([...selectedFinanceConcerns, concern.id]);
-                              } else {
-                                setSelectedFinanceConcerns(selectedFinanceConcerns.filter(c => c !== concern.id));
-                              }
-                            }}
-                          />
-                          <Label htmlFor={`finance-concern-${concern.id}`} className="text-sm text-slate-700 cursor-pointer">
-                            {concern.label}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Finance Time Range */}
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Thời gian</h3>
-                    <RadioGroup value={financeDateRangeType} onValueChange={(value) => setFinanceDateRangeType(value as 'preset' | 'custom')}>
-                      {/* Preset Time Ranges */}
-                      <div className="flex items-center space-x-2 mb-3">
-                        <RadioGroupItem value="preset" id="finance-date-preset" className="border-slate-300" />
-                        <div className="flex-1">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className="w-full justify-between text-left text-sm bg-white border-slate-300"
-                                onClick={() => setFinanceDateRangeType('preset')}
-                              >
-                                <span>
-                                  {financePresetTimeRange === 'today' && 'Hôm nay'}
-                                  {financePresetTimeRange === 'yesterday' && 'Hôm qua'}
-                                  {financePresetTimeRange === 'this-week' && 'Tuần này'}
-                                  {financePresetTimeRange === 'last-week' && 'Tuần trước'}
-                                  {financePresetTimeRange === 'last-7-days' && '7 ngày qua'}
-                                  {financePresetTimeRange === 'this-month' && 'Tháng này'}
-                                  {financePresetTimeRange === 'last-month' && 'Tháng trước'}
-                                  {financePresetTimeRange === 'last-30-days' && '30 ngày qua'}
-                                  {financePresetTimeRange === 'this-quarter' && 'Quý này'}
-                                  {financePresetTimeRange === 'last-quarter' && 'Quý trước'}
-                                  {financePresetTimeRange === 'this-year' && 'Năm nay'}
-                                  {financePresetTimeRange === 'last-year' && 'Năm trước'}
-                                </span>
-                                <ChevronDown className="h-4 w-4 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[600px] p-4" align="start">
-                              <div className="grid grid-cols-3 gap-6">
-                                {/* Column 1: Theo ngày và tuần */}
-                                <div>
-                                  <h4 className="text-sm text-slate-700 mb-3">Theo ngày và tuần</h4>
-                                  <div className="space-y-2">
-                                    {[
-                                      { value: 'today', label: 'Hôm nay' },
-                                      { value: 'yesterday', label: 'Hôm qua' },
-                                      { value: 'this-week', label: 'Tuần này' },
-                                      { value: 'last-week', label: 'Tuần trước' },
-                                      { value: 'last-7-days', label: '7 ngày qua' },
-                                    ].map((option) => (
-                                      <button
-                                        key={option.value}
-                                        onClick={() => {
-                                          setFinancePresetTimeRange(option.value);
-                                          setFinanceDateRangeType('preset');
-                                        }}
-                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${financePresetTimeRange === option.value
-                                          ? 'bg-blue-600 text-white'
-                                          : 'text-blue-600 hover:bg-blue-50'
-                                          }`}
-                                      >
-                                        {option.label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                {/* Column 2: Theo tháng và quý */}
-                                <div>
-                                  <h4 className="text-sm text-slate-700 mb-3">Theo tháng và quý</h4>
-                                  <div className="space-y-2">
-                                    {[
-                                      { value: 'this-month', label: 'Tháng này' },
-                                      { value: 'last-month', label: 'Tháng trước' },
-                                      { value: 'last-30-days', label: '30 ngày qua' },
-                                      { value: 'this-quarter', label: 'Quý này' },
-                                      { value: 'last-quarter', label: 'Quý trước' },
-                                    ].map((option) => (
-                                      <button
-                                        key={option.value}
-                                        onClick={() => {
-                                          setFinancePresetTimeRange(option.value);
-                                          setFinanceDateRangeType('preset');
-                                        }}
-                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${financePresetTimeRange === option.value
-                                          ? 'bg-blue-600 text-white'
-                                          : 'text-blue-600 hover:bg-blue-50'
-                                          }`}
-                                      >
-                                        {option.label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                {/* Column 3: Theo năm */}
-                                <div>
-                                  <h4 className="text-sm text-slate-700 mb-3">Theo năm</h4>
-                                  <div className="space-y-2">
-                                    {[
-                                      { value: 'this-year', label: 'Năm nay' },
-                                      { value: 'last-year', label: 'Năm trước' },
-                                    ].map((option) => (
-                                      <button
-                                        key={option.value}
-                                        onClick={() => {
-                                          setFinancePresetTimeRange(option.value);
-                                          setFinanceDateRangeType('preset');
-                                        }}
-                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${financePresetTimeRange === option.value
-                                          ? 'bg-blue-600 text-white'
-                                          : 'text-blue-600 hover:bg-blue-50'
-                                          }`}
-                                      >
-                                        {option.label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-
-                      {/* Custom Date Range */}
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="custom" id="finance-date-custom" className="border-slate-300" />
-                        <div className="flex-1">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className="w-full justify-start text-left text-sm bg-white border-slate-300"
-                                onClick={() => setFinanceDateRangeType('custom')}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {financeDateFrom && financeDateTo
-                                  ? `${format(financeDateFrom, 'dd/MM', { locale: vi })} - ${format(financeDateTo, 'dd/MM/yyyy', { locale: vi })}`
-                                  : 'Lựa chọn khác'}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-4" align="start">
-                              <div className="flex gap-4">
-                                <div>
-                                  <Label className="text-xs text-slate-600 mb-2 block">Từ ngày</Label>
-                                  <CalendarComponent
-                                    mode="single"
-                                    selected={financeDateFrom}
-                                    onSelect={(date) => {
-                                      if (date) {
-                                        setFinanceDateFrom(date);
-                                        setFinanceDateRangeType('custom');
-                                      }
-                                    }}
-                                  />
-                                </div>
-                                <div>
-                                  <Label className="text-xs text-slate-600 mb-2 block">Đến ngày</Label>
-                                  <CalendarComponent
-                                    mode="single"
-                                    selected={financeDateTo}
-                                    onSelect={(date) => {
-                                      if (date) {
-                                        setFinanceDateTo(date);
-                                        setFinanceDateRangeType('custom');
-                                      }
-                                    }}
-                                    disabled={(date) => financeDateFrom ? date < financeDateFrom : false}
-                                  />
-                                </div>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-                    </RadioGroup>
-                  </div>
-                </>
-              ) : activeTab === 'employees' ? (
-                <>
-                  <Separator />
-
-                  {/* Employee Concerns */}
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Mối quan tâm</h3>
-                    <RadioGroup value={employeeConcern} onValueChange={(value) => setEmployeeConcern(value as 'profit' | 'sales-by-employee')}>
-                      <div className="flex items-center space-x-2 mb-2">
-                        <RadioGroupItem value="profit" id="employee-concern-profit" className="border-slate-300" />
-                        <Label htmlFor="employee-concern-profit" className="text-sm text-slate-700 cursor-pointer">
-                          Lợi nhuận
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="sales-by-employee" id="employee-concern-sales" className="border-slate-300" />
-                        <Label htmlFor="employee-concern-sales" className="text-sm text-slate-700 cursor-pointer">
-                          Hàng bán theo nhân viên
-                        </Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <Separator />
-
-                  {/* Employee Time Range */}
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Thời gian</h3>
-                    <RadioGroup value={employeeDateRangeType} onValueChange={(value) => setEmployeeDateRangeType(value as 'preset' | 'custom')}>
-                      {/* Preset Time Ranges */}
-                      <div className="flex items-center space-x-2 mb-3">
-                        <RadioGroupItem value="preset" id="employee-date-preset" className="border-slate-300" />
-                        <div className="flex-1">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className="w-full justify-between text-left text-sm bg-white border-slate-300"
-                                onClick={() => setEmployeeDateRangeType('preset')}
-                              >
-                                <span>
-                                  {employeePresetTimeRange === 'today' && 'Hôm nay'}
-                                  {employeePresetTimeRange === 'yesterday' && 'Hôm qua'}
-                                  {employeePresetTimeRange === 'this-week' && 'Tuần này'}
-                                  {employeePresetTimeRange === 'last-week' && 'Tuần trước'}
-                                  {employeePresetTimeRange === 'last-7-days' && '7 ngày qua'}
-                                  {employeePresetTimeRange === 'this-month' && 'Tháng này'}
-                                  {employeePresetTimeRange === 'last-month' && 'Tháng trước'}
-                                  {employeePresetTimeRange === 'last-30-days' && '30 ngày qua'}
-                                  {employeePresetTimeRange === 'this-quarter' && 'Quý này'}
-                                  {employeePresetTimeRange === 'last-quarter' && 'Quý trước'}
-                                  {employeePresetTimeRange === 'this-year' && 'Năm nay'}
-                                  {employeePresetTimeRange === 'last-year' && 'Năm trước'}
-                                </span>
-                                <ChevronDown className="h-4 w-4 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[600px] p-4" align="start">
-                              <div className="grid grid-cols-3 gap-6">
-                                {/* Column 1: Theo ngày và tuần */}
-                                <div>
-                                  <h4 className="text-sm text-slate-700 mb-3">Theo ngày và tuần</h4>
-                                  <div className="space-y-2">
-                                    {[
-                                      { value: 'today', label: 'Hôm nay' },
-                                      { value: 'yesterday', label: 'Hôm qua' },
-                                      { value: 'this-week', label: 'Tuần này' },
-                                      { value: 'last-week', label: 'Tuần trước' },
-                                      { value: 'last-7-days', label: '7 ngày qua' },
-                                    ].map((option) => (
-                                      <button
-                                        key={option.value}
-                                        onClick={() => {
-                                          setEmployeePresetTimeRange(option.value);
-                                          setEmployeeDateRangeType('preset');
-                                        }}
-                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${employeePresetTimeRange === option.value
-                                          ? 'bg-blue-600 text-white'
-                                          : 'text-blue-600 hover:bg-blue-50'
-                                          }`}
-                                      >
-                                        {option.label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                {/* Column 2: Theo tháng và quý */}
-                                <div>
-                                  <h4 className="text-sm text-slate-700 mb-3">Theo tháng và quý</h4>
-                                  <div className="space-y-2">
-                                    {[
-                                      { value: 'this-month', label: 'Tháng này' },
-                                      { value: 'last-month', label: 'Tháng trước' },
-                                      { value: 'last-30-days', label: '30 ngày qua' },
-                                      { value: 'this-quarter', label: 'Quý này' },
-                                      { value: 'last-quarter', label: 'Quý trước' },
-                                    ].map((option) => (
-                                      <button
-                                        key={option.value}
-                                        onClick={() => {
-                                          setEmployeePresetTimeRange(option.value);
-                                          setEmployeeDateRangeType('preset');
-                                        }}
-                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${employeePresetTimeRange === option.value
-                                          ? 'bg-blue-600 text-white'
-                                          : 'text-blue-600 hover:bg-blue-50'
-                                          }`}
-                                      >
-                                        {option.label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                {/* Column 3: Theo năm */}
-                                <div>
-                                  <h4 className="text-sm text-slate-700 mb-3">Theo năm</h4>
-                                  <div className="space-y-2">
-                                    {[
-                                      { value: 'this-year', label: 'Năm nay' },
-                                      { value: 'last-year', label: 'Năm trước' },
-                                    ].map((option) => (
-                                      <button
-                                        key={option.value}
-                                        onClick={() => {
-                                          setEmployeePresetTimeRange(option.value);
-                                          setEmployeeDateRangeType('preset');
-                                        }}
-                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${employeePresetTimeRange === option.value
-                                          ? 'bg-blue-600 text-white'
-                                          : 'text-blue-600 hover:bg-blue-50'
-                                          }`}
-                                      >
-                                        {option.label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-
-                      {/* Custom Date Range */}
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="custom" id="employee-date-custom" className="border-slate-300" />
-                        <div className="flex-1">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className="w-full justify-start text-left text-sm bg-white border-slate-300"
-                                onClick={() => setEmployeeDateRangeType('custom')}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {employeeDateFrom && employeeDateTo
-                                  ? `${format(employeeDateFrom, 'dd/MM', { locale: vi })} - ${format(employeeDateTo, 'dd/MM/yyyy', { locale: vi })}`
-                                  : 'Lựa chọn khác'}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-4" align="start">
-                              <div className="flex gap-4">
-                                <div>
-                                  <Label className="text-xs text-slate-600 mb-2 block">Từ ngày</Label>
-                                  <CalendarComponent
-                                    mode="single"
-                                    selected={employeeDateFrom}
-                                    onSelect={(date) => {
-                                      if (date) {
-                                        setEmployeeDateFrom(date);
-                                        setEmployeeDateRangeType('custom');
-                                      }
-                                    }}
-                                  />
-                                </div>
-                                <div>
-                                  <Label className="text-xs text-slate-600 mb-2 block">Đến ngày</Label>
-                                  <CalendarComponent
-                                    mode="single"
-                                    selected={employeeDateTo}
-                                    onSelect={(date) => {
-                                      if (date) {
-                                        setEmployeeDateTo(date);
-                                        setEmployeeDateRangeType('custom');
-                                      }
-                                    }}
-                                    disabled={(date) => employeeDateFrom ? date < employeeDateFrom : false}
-                                  />
-                                </div>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                </>
-              ) : (
-                <>
-                  <Separator />
-
-                  {/* Concerns/Interests */}
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Mối quan tâm</h3>
-                    <div className="space-y-2">
-                      {currentConcerns.map((concern) => (
-                        <div key={concern.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`concern-${concern.id}`}
-                            checked={selectedConcerns.includes(concern.id)}
-                            onCheckedChange={() => handleConcernToggle(concern.id)}
-                          />
-                          <Label htmlFor={`concern-${concern.id}`} className="text-sm text-slate-700 cursor-pointer">
-                            {concern.label}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Time Range */}
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Khoảng thời gian</h3>
-                    <div className="space-y-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className={`w-full justify-start ${timeRange === 'today' ? 'bg-blue-50 border-blue-200 text-blue-900' : ''}`}
-                        onClick={() => setTimeRange('today')}
-                      >
-                        <Calendar className="w-4 h-4 mr-2" />
-                        Hôm nay
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className={`w-full justify-start ${timeRange === 'week' ? 'bg-blue-50 border-blue-200 text-blue-900' : ''}`}
-                        onClick={() => setTimeRange('week')}
-                      >
-                        Tuần này
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className={`w-full justify-start ${timeRange === 'month' ? 'bg-blue-50 border-blue-200 text-blue-900' : ''}`}
-                        onClick={() => setTimeRange('month')}
-                      >
-                        Tháng này
-                      </Button>
-                      <Button variant="outline" size="sm" className="w-full justify-start">
-                        Tùy chỉnh
-                      </Button>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Quick Search */}
-                  <div>
-                    <h3 className="text-sm text-slate-900 mb-3">Tìm kiếm nhanh</h3>
-                    <div className="space-y-2">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <Input
-                          placeholder="Tìm khách hàng..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="pl-9 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                        />
-                      </div>
-                      <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                        <SelectTrigger className="bg-white border-slate-300 shadow-none">
-                          <SelectValue placeholder="Nhân viên" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Tất cả nhân viên</SelectItem>
-                          <SelectItem value="emp1">Nguyễn Văn A</SelectItem>
-                          <SelectItem value="emp2">Trần Thị B</SelectItem>
-                          <SelectItem value="emp3">Lê Văn C</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
-                        <SelectTrigger className="bg-white border-slate-300 shadow-none">
-                          <SelectValue placeholder="Phương thức TT" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Tất cả</SelectItem>
-                          <SelectItem value="cash">Tiền mặt</SelectItem>
-                          <SelectItem value="transfer">Chuyển khoản</SelectItem>
-                          <SelectItem value="ewallet">Ví điện tử</SelectItem>
-                          <SelectItem value="card">Thẻ tín dụng</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </aside>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -2899,6 +1069,244 @@ export function Reports() {
                 Nhà cung cấp
               </TabsTrigger>
             </TabsList>
+          </div>
+
+          {/* New Horizontal Filter Bar */}
+          <div className="bg-white border-b border-slate-200 px-6 py-4">
+            <div className="flex flex-col gap-4">
+              
+              {/* Row 1: Filters */}
+              <div className="flex flex-wrap items-center gap-4">
+                 
+                 {/* END OF DAY FILTERS */}
+                 {activeTab === 'endofday' && (
+                    <>
+                       <div className="min-w-[200px]">
+                          <Select value={eodConcern} onValueChange={(v: string) => setEodConcern(v as any)}>
+                             <SelectTrigger><SelectValue placeholder="Mối quan tâm" /></SelectTrigger>
+                             <SelectContent>
+                                <SelectItem value="sales">Bán hàng</SelectItem>
+                                <SelectItem value="cashflow">Thu chi</SelectItem>
+                                <SelectItem value="products">Hàng hóa</SelectItem>
+                                <SelectItem value="cancellations">Hủy món</SelectItem>
+                                <SelectItem value="summary">Tổng hợp</SelectItem>
+                             </SelectContent>
+                          </Select>
+                       </div>
+                       
+                       <CustomerTimeFilter
+                           dateRangeType={dateRangeType}
+                           timePreset={presetTimeRange}
+                           dateFrom={dateFrom}
+                           dateTo={dateTo}
+                           onDateRangeTypeChange={setDateRangeType}
+                           onTimePresetChange={handleEodTimePresetChange}
+                           onDateFromChange={setDateFrom}
+                           onDateToChange={setDateTo}
+                       />
+
+                       {(eodConcern === 'products' || eodConcern === 'cancellations') && (
+                          <Input 
+                             placeholder="Tìm hàng hóa..." 
+                             value={productSearch} 
+                             onChange={(e) => setProductSearch(e.target.value)}
+                             className="w-[200px]" 
+                          />
+                       )}
+                       {(eodConcern === 'cancellations' || eodConcern === 'sales' || eodConcern === 'cashflow') && (
+                          <Input 
+                             placeholder="Tìm khách hàng..." 
+                             value={customerSearch} 
+                             onChange={(e) => setCustomerSearch(e.target.value)}
+                             className="w-[200px]" 
+                          />
+                       )}
+                    </>
+                 )}
+
+                 {/* FINANCE FILTERS */}
+                 {activeTab === 'finance' && (
+                    <>
+                       <div className="flex items-center gap-2 border p-2 rounded-md border-dashed">
+                          {concernsByTab['finance']?.map(c => (
+                             <div key={c.id} className="flex items-center gap-1">
+                                <Checkbox 
+                                   id={c.id} 
+                                   checked={selectedFinanceConcerns.includes(c.id)}
+                                   onCheckedChange={(checked: boolean | 'indeterminate') => {
+                                      if (checked === true) setSelectedFinanceConcerns([...selectedFinanceConcerns, c.id]);
+                                      else if (checked === false) setSelectedFinanceConcerns(selectedFinanceConcerns.filter(x => x !== c.id));
+                                   }}
+                                />
+                                <Label htmlFor={c.id} className="text-sm">{c.label}</Label>
+                             </div>
+                          ))}
+                       </div>
+                       
+                       <CustomerTimeFilter
+                           dateRangeType={financeDateRangeType}
+                           timePreset={financePresetTimeRange}
+                           dateFrom={financeDateFrom}
+                           dateTo={financeDateTo}
+                           onDateRangeTypeChange={setFinanceDateRangeType}
+                           onTimePresetChange={handleFinanceTimePresetChange}
+                           onDateFromChange={setFinanceDateFrom}
+                           onDateToChange={setFinanceDateTo}
+                       />
+
+                       <div className="flex bg-slate-100 rounded-lg p-1">
+                           <button onClick={() => setFinanceViewType('chart')} className={`px-3 py-1 text-sm rounded ${financeViewType === 'chart' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Biểu đồ</button>
+                           <button onClick={() => setFinanceViewType('report')} className={`px-3 py-1 text-sm rounded ${financeViewType === 'report' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Báo cáo</button>
+                       </div>
+                    </>
+                 )}
+
+                 {/* PRODUCTS FILTERS */}
+                 {activeTab === 'products' && (
+                    <>
+                       <Select value={productsConcern} onValueChange={(v: string) => setProductsConcern(v as any)}>
+                          <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                             <SelectItem value="sales">Bán hàng</SelectItem>
+                             <SelectItem value="profit">Lợi nhuận</SelectItem>
+                             <SelectItem value="import-export">Xuất nhập tồn</SelectItem>
+                             <SelectItem value="write-off">Xuất hủy</SelectItem>
+                          </SelectContent>
+                       </Select>
+                       
+                       <CustomerTimeFilter
+                           dateRangeType={productsDateRangeType}
+                           timePreset={productsPresetTimeRange}
+                           dateFrom={productsDateFrom}
+                           dateTo={productsDateTo}
+                           onDateRangeTypeChange={setProductsDateRangeType}
+                           onTimePresetChange={handleProductsTimePresetChange}
+                           onDateFromChange={setProductsDateFrom}
+                           onDateToChange={setProductsDateTo}
+                       />
+
+                       <Input 
+                          placeholder="Tìm sản phẩm..." 
+                          value={productsSearchQuery} 
+                          onChange={(e) => setProductsSearchQuery(e.target.value)}
+                          className="w-[200px]" 
+                       />
+
+                       {(productsConcern !== 'import-export' && productsConcern !== 'write-off') && (
+                          <div className="flex bg-slate-100 rounded-lg p-1">
+                              <button onClick={() => setProductsViewType('chart')} className={`px-3 py-1 text-sm rounded ${productsViewType === 'chart' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Biểu đồ</button>
+                              <button onClick={() => setProductsViewType('report')} className={`px-3 py-1 text-sm rounded ${productsViewType === 'report' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Báo cáo</button>
+                          </div>
+                       )}
+                    </>
+                 )}
+
+                 {/* SALES FILTERS */}
+                 {activeTab === 'sales' && (
+                    <>
+                       <Select value={salesConcern} onValueChange={(v: string) => { setSalesConcern(v as any); if(['discount','return','table','category'].includes(v)) setSalesViewType('report'); }}>
+                          <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                             <SelectItem value="time">Thời gian</SelectItem>
+                             <SelectItem value="profit">Lợi nhuận</SelectItem>
+                             <SelectItem value="discount">Giảm giá</SelectItem>
+                             <SelectItem value="return">Trả hàng</SelectItem>
+                             <SelectItem value="table">Phòng/Bàn</SelectItem>
+                             <SelectItem value="category">Danh mục</SelectItem>
+                          </SelectContent>
+                       </Select>
+                       
+                       <CustomerTimeFilter
+                           dateRangeType={salesDateRangeType}
+                           timePreset={salesTimePreset}
+                           dateFrom={salesDateFrom}
+                           dateTo={salesDateTo}
+                           onDateRangeTypeChange={setSalesDateRangeType}
+                           onTimePresetChange={handleSalesTimePresetChange}
+                           onDateFromChange={setSalesDateFrom}
+                           onDateToChange={setSalesDateTo}
+                       />
+
+
+                       {salesConcern === 'table' && (
+                          <Select value={salesSelectedArea} onValueChange={setSalesSelectedArea}>
+                             <SelectTrigger className="w-[150px]"><SelectValue placeholder="Khu vực" /></SelectTrigger>
+                             <SelectContent>
+                                <SelectItem value="all">Tất cả</SelectItem>
+                                <SelectItem value="floor1">Tầng 1</SelectItem>
+                                <SelectItem value="floor2">Tầng 2</SelectItem>
+                             </SelectContent>
+                          </Select>
+                       )}
+
+                       {(salesConcern === 'time' || salesConcern === 'profit') && (
+                          <div className="flex bg-slate-100 rounded-lg p-1">
+                              <button onClick={() => setSalesViewType('chart')} className={`px-3 py-1 text-sm rounded ${salesViewType === 'chart' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Biểu đồ</button>
+                              <button onClick={() => setSalesViewType('report')} className={`px-3 py-1 text-sm rounded ${salesViewType === 'report' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Báo cáo</button>
+                          </div>
+                       )}
+                    </>
+                 )}
+
+                 {/* CUSTOMERS & SUPPLIERS FILTERS */}
+                 {(activeTab === 'customers' || activeTab === 'suppliers') && (
+                     <>
+                        <CustomerTimeFilter
+                            dateRangeType={activeTab === 'customers' ? customerDateRangeType : supplierDateRangeType}
+                            timePreset={activeTab === 'customers' ? customerTimePreset : supplierTimePreset}
+                            dateFrom={activeTab === 'customers' ? customerDateFrom : supplierDateFrom}
+                            dateTo={activeTab === 'customers' ? customerDateTo : supplierDateTo}
+                            onDateRangeTypeChange={activeTab === 'customers' ? setCustomerDateRangeType : setSupplierDateRangeType}
+                            onTimePresetChange={activeTab === 'customers' ? handleCustomerTimePresetChange : handleSupplierTimePresetChange}
+                            onDateFromChange={activeTab === 'customers' ? setCustomerDateFrom : setSupplierDateFrom}
+                            onDateToChange={activeTab === 'customers' ? setCustomerDateTo : setSupplierDateTo}
+                        />
+
+                        <Input 
+                           placeholder={`Tìm ${activeTab === 'customers' ? 'khách hàng' : 'nhà cung cấp'}...`} 
+                           value={activeTab === 'customers' ? customerSearchQuery : supplierSearchQuery} 
+                           onChange={(e) => activeTab === 'customers' ? setCustomerSearchQuery(e.target.value) : setSupplierSearchQuery(e.target.value)}
+                           className="w-[200px]" 
+                        />
+                        
+                        <div className="flex bg-slate-100 rounded-lg p-1">
+                            <button onClick={() => activeTab === 'customers' ? setCustomerViewType('chart') : setSupplierViewType('chart')} className={`px-3 py-1 text-sm rounded ${(activeTab === 'customers' ? customerViewType : supplierViewType) === 'chart' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Biểu đồ</button>
+                            <button onClick={() => activeTab === 'customers' ? setCustomerViewType('report') : setSupplierViewType('report')} className={`px-3 py-1 text-sm rounded ${(activeTab === 'customers' ? customerViewType : supplierViewType) === 'report' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Báo cáo</button>
+                        </div>
+                     </>
+                 )}
+                 
+                 {/* EMPLOYEES FILTERS */}
+                 {activeTab === 'employees' && (
+                    <>
+                       <Select value={employeeConcern} onValueChange={(v: string) => setEmployeeConcern(v as any)}>
+                          <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                             <SelectItem value="profit">Lợi nhuận</SelectItem>
+                             <SelectItem value="sales-by-employee">Hàng bán</SelectItem>
+                          </SelectContent>
+                       </Select>
+
+                       <CustomerTimeFilter
+                           dateRangeType={employeeDateRangeType}
+                           timePreset={employeePresetTimeRange}
+                           dateFrom={employeeDateFrom}
+                           dateTo={employeeDateTo}
+                           onDateRangeTypeChange={setEmployeeDateRangeType}
+                           onTimePresetChange={handleEmployeeTimePresetChange}
+                           onDateFromChange={setEmployeeDateFrom}
+                           onDateToChange={setEmployeeDateTo}
+                       />
+                       
+                       <div className="flex bg-slate-100 rounded-lg p-1">
+                           <button onClick={() => setEmployeesViewType('chart')} className={`px-3 py-1 text-sm rounded ${employeesViewType === 'chart' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Biểu đồ</button>
+                           <button onClick={() => setEmployeesViewType('report')} className={`px-3 py-1 text-sm rounded ${employeesViewType === 'report' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Báo cáo</button>
+                       </div>
+                    </>
+                 )}
+
+              </div>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -3406,7 +1814,7 @@ export function Reports() {
             <TabsContent value="endofday" className="m-0 p-8">
               <EndOfDayReport
                 concern={eodConcern}
-                dateRangeType={dateRangeType}
+                dateRangeType={dateRangeType as any}
                 selectedDate={selectedDate}
                 dateFrom={dateFrom}
                 dateTo={dateTo}
