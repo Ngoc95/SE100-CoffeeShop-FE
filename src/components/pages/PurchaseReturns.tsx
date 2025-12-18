@@ -1597,7 +1597,7 @@ export function PurchaseReturns() {
                 onClick={() => setShowImportDialog(true)}
               >
                 <Upload className="w-4 h-4" />
-                Import Excel
+                Nhập file
               </Button>
               <Button
                 variant="outline"
