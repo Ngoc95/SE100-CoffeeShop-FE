@@ -284,6 +284,12 @@ export function Suppliers() {
   ).length;
   const totalDebt = suppliers.reduce((sum, s) => sum + s.debt, 0);
 
+  const transactions = [
+    { id: "PN001", date: "2023-10-26", amount: 5000000 },
+    { id: "PN002", date: "2023-11-12", amount: 7500000 },
+    { id: "PN003", date: "2023-12-05", amount: 3200000 },
+    ];
+
   return (
     <div className="flex h-full bg-slate-50">
       {/* Left Sidebar - Filters */}
@@ -680,6 +686,7 @@ export function Suppliers() {
         open={detailDialogOpen}
         onClose={closeDetailDialog}
         supplier={viewingSupplier}
+        transactions={transactions}
       />
     </div>
   );

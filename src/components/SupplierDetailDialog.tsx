@@ -32,18 +32,14 @@ interface SupplierDetailDialogProps {
   open: boolean;
   onClose: () => void;
   supplier: Supplier | null;
+  transactions: Import[];
 }
-
-const mockImports: Import[] = [
-  { id: "PN001", date: "2023-10-26", amount: 5000000 },
-  { id: "PN002", date: "2023-11-12", amount: 7500000 },
-  { id: "PN003", date: "2023-12-05", amount: 3200000 },
-];
 
 export function SupplierDetailDialog({
   open,
   onClose,
   supplier,
+  transactions,
 }: SupplierDetailDialogProps) {
   if (!supplier) return null;
 
@@ -110,7 +106,7 @@ export function SupplierDetailDialog({
               <div>Ngày</div>
               <div className="text-right">Số tiền</div>
             </div>
-            {mockImports.map((imp) => (
+            {transactions.map((imp) => (
               <div key={imp.id} className="grid grid-cols-3 p-2 border-t">
                 <div>{imp.id}</div>
                 <div>{imp.date}</div>
