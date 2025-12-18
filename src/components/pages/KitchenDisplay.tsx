@@ -454,8 +454,8 @@ export function KitchenDisplay() {
     <div className="h-full flex flex-col bg-slate-50">
       {/* Header */}
       <div className="bg-white border-b shadow-sm px-4 lg:px-6 py-3">
-        <h2 className="text-blue-900 mb-1">Màn hình pha chế - Theo món</h2>
-        <p className="text-xs text-slate-600">
+        <h1 className="text-blue-900 text-2xl font-semibold mb-1">Màn hình pha chế - Theo món</h1>
+        <p className="text-sm text-slate-600">
           {pendingItems.length} món chờ • {inProgressItems.length} món đang làm
         </p>
       </div>

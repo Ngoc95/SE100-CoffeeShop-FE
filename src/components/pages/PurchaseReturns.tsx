@@ -1585,7 +1585,7 @@ export function PurchaseReturns() {
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-slate-900 mb-2">Trả hàng nhập</h1>
+              <h1 className="text-blue-900 text-2xl font-semibold mb-2">Trả hàng nhập</h1>
               <p className="text-sm text-slate-600">
                 Quản lý phiếu trả hàng cho nhà cung cấp
               </p>

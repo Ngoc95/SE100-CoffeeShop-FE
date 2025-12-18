@@ -726,7 +726,7 @@ export function ImportExport() {
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h1 className="text-amber-950">Nhập/Xuất/Trả hàng</h1>
+            <h1 className="text-blue-900 text-2xl font-semibold">Nhập/Xuất/Trả hàng</h1>
             <p className="text-neutral-600 mt-1">Quản lý luồng hàng hóa</p>
           </div>
           <div className="flex gap-2">

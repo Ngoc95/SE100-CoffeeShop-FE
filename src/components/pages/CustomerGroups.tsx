@@ -493,7 +493,7 @@ export function CustomerGroups() {
         <div className="bg-white border-b p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-slate-900 mb-2">Nhóm khách hàng</h1>
+              <h1 className="text-blue-900 text-2xl font-semibold mb-2">Nhóm khách hàng</h1>
               <p className="text-slate-600 text-sm">
                 Quản lý nhóm khách hàng và phân loại
               </p>

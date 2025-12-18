@@ -297,7 +297,7 @@ export function Returns() {
       <div className="flex-1 flex flex-col p-6">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-slate-900 mb-2">Trả hàng</h1>
+          <h1 className="text-blue-900 text-2xl font-semibold mb-2">Trả hàng</h1>
           <p className="text-sm text-slate-600">Quản lý đơn trả hàng và hoàn tiền</p>
         </div>
 

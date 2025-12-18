@@ -152,7 +152,7 @@ export function Dashboard() {
     <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-50">
       {/* Header */}
       <div>
-        <h1 className="text-2xl text-blue-900 mb-1">Tổng quan</h1>
+        <h1 className="text-blue-900 text-2xl font-semibold mb-1">Tổng quan</h1>
         <p className="text-sm text-slate-600">
           Chào buổi sáng! Đây là tổng quan hoạt động của bạn hôm nay.
         </p>

@@ -599,15 +599,11 @@ export function Finance() {
                           {presetTimeRange === 'last-7-days' && '7 ngày qua'}
                           {presetTimeRange === 'this-month' && 'Tháng này'}
                           {presetTimeRange === 'last-month' && 'Tháng trước'}
-                          {presetTimeRange === 'this-month-lunar' && 'Tháng này (âm lịch)'}
-                          {presetTimeRange === 'last-month-lunar' && 'Tháng trước (âm lịch)'}
                           {presetTimeRange === 'last-30-days' && '30 ngày qua'}
                           {presetTimeRange === 'this-quarter' && 'Quý này'}
                           {presetTimeRange === 'last-quarter' && 'Quý trước'}
                           {presetTimeRange === 'this-year' && 'Năm nay'}
                           {presetTimeRange === 'last-year' && 'Năm trước'}
-                          {presetTimeRange === 'this-year-lunar' && 'Năm nay (âm lịch)'}
-                          {presetTimeRange === 'last-year-lunar' && 'Năm trước (âm lịch)'}
                         </span>
                         <ChevronDown className="h-4 w-4 opacity-50" />
                       </Button>
@@ -650,8 +646,6 @@ export function Finance() {
                             {[
                               { value: 'this-month', label: 'Tháng này' },
                               { value: 'last-month', label: 'Tháng trước' },
-                              { value: 'this-month-lunar', label: 'Tháng này (âm lịch)' },
-                              { value: 'last-month-lunar', label: 'Tháng trước (âm lịch)' },
                               { value: 'last-30-days', label: '30 ngày qua' },
                               { value: 'this-quarter', label: 'Quý này' },
                               { value: 'last-quarter', label: 'Quý trước' },
@@ -681,8 +675,6 @@ export function Finance() {
                             {[
                               { value: 'this-year', label: 'Năm nay' },
                               { value: 'last-year', label: 'Năm trước' },
-                              { value: 'this-year-lunar', label: 'Năm nay (âm lịch)' },
-                              { value: 'last-year-lunar', label: 'Năm trước (âm lịch)' },
                             ].map((option) => (
                               <button
                                 key={option.value}
@@ -947,7 +939,7 @@ export function Finance() {
         <div className="p-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-amber-950">
+              <h1 className="text-blue-900 text-2xl font-semibold">
                 {activeTab === 'cash' && 'Sổ quỹ tiền mặt'}
                 {activeTab === 'bank' && 'Sổ quỹ ngân hàng'}
                 {activeTab === 'total' && 'Tổng quỹ'}
@@ -1237,7 +1229,6 @@ export function Finance() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="other">Khác</SelectItem>
-                    <SelectItem value="customer">Khách hàng</SelectItem>
                     <SelectItem value="staff">Nhân viên</SelectItem>
                     <SelectItem value="supplier">Nhà cung cấp</SelectItem>
                   </SelectContent>
@@ -1502,7 +1493,6 @@ export function Finance() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="other">Khác</SelectItem>
-                    <SelectItem value="customer">Khách hàng</SelectItem>
                     <SelectItem value="staff">Nhân viên</SelectItem>
                     <SelectItem value="supplier">Nhà cung cấp</SelectItem>
                   </SelectContent>

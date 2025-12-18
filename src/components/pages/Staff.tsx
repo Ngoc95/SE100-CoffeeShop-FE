@@ -900,7 +900,7 @@ export function Staff({
           <div className="bg-white border-b p-6 pb-0">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h1 className="text-2xl font-bold text-blue-600">Quản lý nhân viên</h1>
+                <h1 className="text-blue-900 text-2xl font-semibold">Quản lý nhân viên</h1>
                 <p className="text-sm text-slate-600 mt-1">
                   Quản lý thông tin và thiết lập nhân viên
                 </p>

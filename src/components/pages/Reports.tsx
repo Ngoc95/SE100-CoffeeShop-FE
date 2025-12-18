@@ -1180,15 +1180,11 @@ export function Reports() {
                               {presetTimeRange === 'last-7-days' && '7 ngày qua'}
                               {presetTimeRange === 'this-month' && 'Tháng này'}
                               {presetTimeRange === 'last-month' && 'Tháng trước'}
-                              {presetTimeRange === 'this-month-lunar' && 'Tháng này (âm lịch)'}
-                              {presetTimeRange === 'last-month-lunar' && 'Tháng trước (âm lịch)'}
                               {presetTimeRange === 'last-30-days' && '30 ngày qua'}
                               {presetTimeRange === 'this-quarter' && 'Quý này'}
                               {presetTimeRange === 'last-quarter' && 'Quý trước'}
                               {presetTimeRange === 'this-year' && 'Năm nay'}
                               {presetTimeRange === 'last-year' && 'Năm trước'}
-                              {presetTimeRange === 'this-year-lunar' && 'Năm nay (âm lịch)'}
-                              {presetTimeRange === 'last-year-lunar' && 'Năm trước (âm lịch)'}
                             </span>
                             <ChevronDown className="h-4 w-4 opacity-50" />
                           </Button>
@@ -1230,8 +1226,6 @@ export function Reports() {
                                 {[
                                   { value: 'this-month', label: 'Tháng này' },
                                   { value: 'last-month', label: 'Tháng trước' },
-                                  { value: 'this-month-lunar', label: 'Tháng này (âm lịch)' },
-                                  { value: 'last-month-lunar', label: 'Tháng trước (âm lịch)' },
                                   { value: 'last-30-days', label: '30 ngày qua' },
                                   { value: 'this-quarter', label: 'Quý này' },
                                   { value: 'last-quarter', label: 'Quý trước' },
@@ -1260,8 +1254,6 @@ export function Reports() {
                                 {[
                                   { value: 'this-year', label: 'Năm nay' },
                                   { value: 'last-year', label: 'Năm trước' },
-                                  { value: 'this-year-lunar', label: 'Năm nay (âm lịch)' },
-                                  { value: 'last-year-lunar', label: 'Năm trước (âm lịch)' },
                                 ].map((option) => (
                                   <button
                                     key={option.value}
@@ -2058,15 +2050,11 @@ export function Reports() {
                               {productsPresetTimeRange === 'last-7-days' && '7 ngày qua'}
                               {productsPresetTimeRange === 'this-month' && 'Tháng này'}
                               {productsPresetTimeRange === 'last-month' && 'Tháng trước'}
-                              {productsPresetTimeRange === 'this-month-lunar' && 'Tháng này (âm lịch)'}
-                              {productsPresetTimeRange === 'last-month-lunar' && 'Tháng trước (âm lịch)'}
                               {productsPresetTimeRange === 'last-30-days' && '30 ngày qua'}
                               {productsPresetTimeRange === 'this-quarter' && 'Quý này'}
                               {productsPresetTimeRange === 'last-quarter' && 'Quý trước'}
                               {productsPresetTimeRange === 'this-year' && 'Năm nay'}
                               {productsPresetTimeRange === 'last-year' && 'Năm trước'}
-                              {productsPresetTimeRange === 'this-year-lunar' && 'Năm nay (âm lịch)'}
-                              {productsPresetTimeRange === 'last-year-lunar' && 'Năm trước (âm lịch)'}
                             </span>
                             <ChevronDown className="h-4 w-4 opacity-50" />
                           </Button>
@@ -2108,8 +2096,6 @@ export function Reports() {
                                 {[
                                   { value: 'this-month', label: 'Tháng này' },
                                   { value: 'last-month', label: 'Tháng trước' },
-                                  { value: 'this-month-lunar', label: 'Tháng này (âm lịch)' },
-                                  { value: 'last-month-lunar', label: 'Tháng trước (âm lịch)' },
                                   { value: 'last-30-days', label: '30 ngày qua' },
                                   { value: 'this-quarter', label: 'Quý này' },
                                   { value: 'last-quarter', label: 'Quý trước' },
@@ -2138,8 +2124,6 @@ export function Reports() {
                                 {[
                                   { value: 'this-year', label: 'Năm nay' },
                                   { value: 'last-year', label: 'Năm trước' },
-                                  { value: 'this-year-lunar', label: 'Năm nay (âm lịch)' },
-                                  { value: 'last-year-lunar', label: 'Năm trước (âm lịch)' },
                                 ].map((option) => (
                                   <button
                                     key={option.value}
@@ -2380,14 +2364,21 @@ export function Reports() {
                                   {financePresetTimeRange === 'yesterday' && 'Hôm qua'}
                                   {financePresetTimeRange === 'this-week' && 'Tuần này'}
                                   {financePresetTimeRange === 'last-week' && 'Tuần trước'}
+                                  {financePresetTimeRange === 'last-7-days' && '7 ngày qua'}
                                   {financePresetTimeRange === 'this-month' && 'Tháng này'}
                                   {financePresetTimeRange === 'last-month' && 'Tháng trước'}
+                                  {financePresetTimeRange === 'last-30-days' && '30 ngày qua'}
+                                  {financePresetTimeRange === 'this-quarter' && 'Quý này'}
+                                  {financePresetTimeRange === 'last-quarter' && 'Quý trước'}
+                                  {financePresetTimeRange === 'this-year' && 'Năm nay'}
+                                  {financePresetTimeRange === 'last-year' && 'Năm trước'}
                                 </span>
                                 <ChevronDown className="h-4 w-4 opacity-50" />
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-[400px] p-4" align="start">
-                              <div className="grid grid-cols-2 gap-4">
+                            <PopoverContent className="w-[600px] p-4" align="start">
+                              <div className="grid grid-cols-3 gap-6">
+                                {/* Column 1: Theo ngày và tuần */}
                                 <div>
                                   <h4 className="text-sm text-slate-700 mb-3">Theo ngày và tuần</h4>
                                   <div className="space-y-2">
@@ -2396,6 +2387,7 @@ export function Reports() {
                                       { value: 'yesterday', label: 'Hôm qua' },
                                       { value: 'this-week', label: 'Tuần này' },
                                       { value: 'last-week', label: 'Tuần trước' },
+                                      { value: 'last-7-days', label: '7 ngày qua' },
                                     ].map((option) => (
                                       <button
                                         key={option.value}
@@ -2413,12 +2405,42 @@ export function Reports() {
                                     ))}
                                   </div>
                                 </div>
+
+                                {/* Column 2: Theo tháng và quý */}
                                 <div>
-                                  <h4 className="text-sm text-slate-700 mb-3">Theo tháng</h4>
+                                  <h4 className="text-sm text-slate-700 mb-3">Theo tháng và quý</h4>
                                   <div className="space-y-2">
                                     {[
                                       { value: 'this-month', label: 'Tháng này' },
                                       { value: 'last-month', label: 'Tháng trước' },
+                                      { value: 'last-30-days', label: '30 ngày qua' },
+                                      { value: 'this-quarter', label: 'Quý này' },
+                                      { value: 'last-quarter', label: 'Quý trước' },
+                                    ].map((option) => (
+                                      <button
+                                        key={option.value}
+                                        onClick={() => {
+                                          setFinancePresetTimeRange(option.value);
+                                          setFinanceDateRangeType('preset');
+                                        }}
+                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${financePresetTimeRange === option.value
+                                          ? 'bg-blue-600 text-white'
+                                          : 'text-blue-600 hover:bg-blue-50'
+                                          }`}
+                                      >
+                                        {option.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Column 3: Theo năm */}
+                                <div>
+                                  <h4 className="text-sm text-slate-700 mb-3">Theo năm</h4>
+                                  <div className="space-y-2">
+                                    {[
+                                      { value: 'this-year', label: 'Năm nay' },
+                                      { value: 'last-year', label: 'Năm trước' },
                                     ].map((option) => (
                                       <button
                                         key={option.value}
@@ -2544,15 +2566,11 @@ export function Reports() {
                                   {employeePresetTimeRange === 'last-7-days' && '7 ngày qua'}
                                   {employeePresetTimeRange === 'this-month' && 'Tháng này'}
                                   {employeePresetTimeRange === 'last-month' && 'Tháng trước'}
-                                  {employeePresetTimeRange === 'this-month-lunar' && 'Tháng này (âm lịch)'}
-                                  {employeePresetTimeRange === 'last-month-lunar' && 'Tháng trước (âm lịch)'}
                                   {employeePresetTimeRange === 'last-30-days' && '30 ngày qua'}
                                   {employeePresetTimeRange === 'this-quarter' && 'Quý này'}
                                   {employeePresetTimeRange === 'last-quarter' && 'Quý trước'}
                                   {employeePresetTimeRange === 'this-year' && 'Năm nay'}
                                   {employeePresetTimeRange === 'last-year' && 'Năm trước'}
-                                  {employeePresetTimeRange === 'this-year-lunar' && 'Năm nay (âm lịch)'}
-                                  {employeePresetTimeRange === 'last-year-lunar' && 'Năm trước (âm lịch)'}
                                 </span>
                                 <ChevronDown className="h-4 w-4 opacity-50" />
                               </Button>
@@ -2594,8 +2612,6 @@ export function Reports() {
                                     {[
                                       { value: 'this-month', label: 'Tháng này' },
                                       { value: 'last-month', label: 'Tháng trước' },
-                                      { value: 'this-month-lunar', label: 'Tháng này (âm lịch)' },
-                                      { value: 'last-month-lunar', label: 'Tháng trước (âm lịch)' },
                                       { value: 'last-30-days', label: '30 ngày qua' },
                                       { value: 'this-quarter', label: 'Quý này' },
                                       { value: 'last-quarter', label: 'Quý trước' },
@@ -2624,8 +2640,6 @@ export function Reports() {
                                     {[
                                       { value: 'this-year', label: 'Năm nay' },
                                       { value: 'last-year', label: 'Năm trước' },
-                                      { value: 'this-year-lunar', label: 'Năm nay (âm lịch)' },
-                                      { value: 'last-year-lunar', label: 'Năm trước (âm lịch)' },
                                     ].map((option) => (
                                       <button
                                         key={option.value}
@@ -2817,7 +2831,7 @@ export function Reports() {
         <div className="bg-white border-b border-slate-200 px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-blue-900">Báo cáo</h1>
+              <h1 className="text-blue-900 text-2xl font-semibold">Báo cáo</h1>
               <p className="text-slate-600 mt-1">
                 Phân tích và thống kê toàn diện hoạt động kinh doanh
               </p>

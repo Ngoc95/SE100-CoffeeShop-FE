@@ -2377,7 +2377,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
           <Separator className="bg-blue-300 my-1" />
           <div className="flex justify-between text-sm">
             <span className="text-blue-950">Tổng cộng</span>
-            <span className="text-blue-900">
+            <span className="text-blue-900 text-2xl font-semibold">
               {(totalAmount - discountAmount).toLocaleString()}₫
             </span>
           </div>
@@ -2444,8 +2444,8 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
         <div className="p-4 lg:p-2 border-b bg-slate-50">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-blue-900">Menu & Bàn</h2>
-              <p className="text-xs text-slate-500">Chọn bàn và gọi món</p>
+              <h2 className="text-blue-900 text-2xl font-semibold">Menu & Bàn</h2>
+              <p className="text-sm text-slate-500">Chọn bàn và gọi món</p>
             </div>
             <div className="flex gap-2">
               <Button
@@ -3904,7 +3904,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                       <span className="text-sm text-slate-600">
                         Tổng đơn mới:
                       </span>
-                      <span className="text-blue-900">
+                      <span className="text-blue-900 text-2xl font-semibold">
                         {cart
                           .filter((item) => (splitItems[item.id] || 0) > 0)
                           .reduce(

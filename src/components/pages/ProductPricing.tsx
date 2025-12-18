@@ -439,7 +439,7 @@ export function ProductPricing() {
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-blue-900">Thiết lập giá</h1>
+            <h1 className="text-blue-900 text-2xl font-semibold">Thiết lập giá</h1>
             <p className="text-slate-600 mt-1">Quản lý giá vốn và giá bán sản phẩm</p>
           </div>
           <div className="flex items-center gap-2"></div>

@@ -861,7 +861,7 @@ export function Inventory() {
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h1 className="text-blue-900">Kho & Nguyên liệu</h1>
+            <h1 className="text-blue-900 text-2xl font-semibold">Kho & Nguyên liệu</h1>
             <p className="text-slate-600 mt-1">
               Quản lý tồn kho và nguyên liệu
             </p>
@@ -1125,9 +1125,9 @@ export function Inventory() {
                                 <TableHeader>
                                   <TableRow className="bg-blue-100 hover:bg-blue-100">
                                     <TableHead className="w-12 text-blue-900">STT</TableHead>
-                                    <TableHead className="text-blue-900">Mã hàng</TableHead>
-                                    <TableHead className="text-blue-900">Tên hàng hóa</TableHead>
-                                    <TableHead className="text-blue-900">Đơn vị</TableHead>
+                                    <TableHead className="text-blue-900 text-2xl font-semibold">Mã hàng</TableHead>
+                                    <TableHead className="text-blue-900 text-2xl font-semibold">Tên hàng hóa</TableHead>
+                                    <TableHead className="text-blue-900 text-2xl font-semibold">Đơn vị</TableHead>
                                     <TableHead className="w-12"></TableHead>
                                   </TableRow>
                                 </TableHeader>
@@ -1949,9 +1949,9 @@ export function Inventory() {
                             <TableHeader>
                               <TableRow className="bg-blue-100 hover:bg-blue-100">
                                 <TableHead className="w-12 text-blue-900">STT</TableHead>
-                                <TableHead className="text-blue-900">Mã hàng</TableHead>
-                                <TableHead className="text-blue-900">Tên hàng hóa</TableHead>
-                                <TableHead className="text-blue-900">Đơn vị</TableHead>
+                                <TableHead className="text-blue-900 text-2xl font-semibold">Mã hàng</TableHead>
+                                <TableHead className="text-blue-900 text-2xl font-semibold">Tên hàng hóa</TableHead>
+                                <TableHead className="text-blue-900 text-2xl font-semibold">Đơn vị</TableHead>
                                 <TableHead className="w-12"></TableHead>
                               </TableRow>
                             </TableHeader>

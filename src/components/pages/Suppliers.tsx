@@ -425,7 +425,7 @@ export function Suppliers() {
         <div className="bg-white border-b p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-slate-900 mb-2">Nhà cung cấp</h1>
+              <h1 className="text-blue-900 text-2xl font-semibold mb-2">Nhà cung cấp</h1>
               <p className="text-slate-600 text-sm">
                 Quản lý thông tin nhà cung cấp
               </p>

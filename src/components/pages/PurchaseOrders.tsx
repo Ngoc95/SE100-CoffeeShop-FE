@@ -1225,19 +1225,11 @@ export function PurchaseOrders() {
                           {presetTimeRange === "last-7-days" && "7 ngày qua"}
                           {presetTimeRange === "this-month" && "Tháng này"}
                           {presetTimeRange === "last-month" && "Tháng trước"}
-                          {presetTimeRange === "this-month-lunar" &&
-                            "Tháng này (âm lịch)"}
-                          {presetTimeRange === "last-month-lunar" &&
-                            "Tháng trước (âm lịch)"}
                           {presetTimeRange === "last-30-days" && "30 ngày qua"}
                           {presetTimeRange === "this-quarter" && "Quý này"}
                           {presetTimeRange === "last-quarter" && "Quý trước"}
                           {presetTimeRange === "this-year" && "Năm nay"}
                           {presetTimeRange === "last-year" && "Năm trước"}
-                          {presetTimeRange === "this-year-lunar" &&
-                            "Năm nay (âm lịch)"}
-                          {presetTimeRange === "last-year-lunar" &&
-                            "Năm trước (âm lịch)"}
                         </span>
                         <ChevronDown className="h-4 w-4 opacity-50" />
                       </Button>
@@ -1283,14 +1275,6 @@ export function PurchaseOrders() {
                             {[
                               { value: "this-month", label: "Tháng này" },
                               { value: "last-month", label: "Tháng trước" },
-                              {
-                                value: "this-month-lunar",
-                                label: "Tháng này (âm lịch)",
-                              },
-                              {
-                                value: "last-month-lunar",
-                                label: "Tháng trước (âm lịch)",
-                              },
                               { value: "last-30-days", label: "30 ngày qua" },
                               { value: "this-quarter", label: "Quý này" },
                               { value: "last-quarter", label: "Quý trước" },
@@ -1321,14 +1305,6 @@ export function PurchaseOrders() {
                             {[
                               { value: "this-year", label: "Năm nay" },
                               { value: "last-year", label: "Năm trước" },
-                              {
-                                value: "this-year-lunar",
-                                label: "Năm nay (âm lịch)",
-                              },
-                              {
-                                value: "last-year-lunar",
-                                label: "Năm trước (âm lịch)",
-                              },
                             ].map((option) => (
                               <button
                                 key={option.value}
@@ -1514,7 +1490,7 @@ export function PurchaseOrders() {
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-slate-900 mb-2">Nhập hàng</h1>
+              <h1 className="text-blue-900 text-2xl font-semibold mb-2">Nhập hàng</h1>
               <p className="text-sm text-slate-600">
                 Quản lý phiếu nhập hàng từ nhà cung cấp
               </p>

@@ -49,7 +49,7 @@ export function StaffSettings() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-blue-600 mb-2">Thiết lập</h1>
+        <h1 className="text-blue-900 text-2xl font-semibold mb-2">Thiết lập</h1>
         <p className="text-slate-600">
           Thiết lập các thông số để tối ưu vận hành và tính lương cho nhân viên
         </p>

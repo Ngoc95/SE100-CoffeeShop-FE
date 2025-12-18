@@ -64,7 +64,7 @@ export function MenuRecipe() {
     <div className="p-4 lg:p-8 space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-amber-950">Thực đơn & Công thức</h1>
+          <h1 className="text-blue-900 text-2xl font-semibold">Thực đơn & Công thức</h1>
           <p className="text-neutral-600 mt-1">Quản lý món ăn và công thức pha chế</p>
         </div>
         <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>

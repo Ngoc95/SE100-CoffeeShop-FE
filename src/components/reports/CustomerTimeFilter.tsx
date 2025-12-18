@@ -51,15 +51,11 @@ export function CustomerTimeFilter({
                     {timePreset === 'last-7-days' && '7 ngày qua'}
                     {timePreset === 'this-month' && 'Tháng này'}
                     {timePreset === 'last-month' && 'Tháng trước'}
-                    {timePreset === 'this-month-lunar' && 'Tháng này (âm lịch)'}
-                    {timePreset === 'last-month-lunar' && 'Tháng trước (âm lịch)'}
                     {timePreset === 'last-30-days' && '30 ngày qua'}
                     {timePreset === 'this-quarter' && 'Quý này'}
                     {timePreset === 'last-quarter' && 'Quý trước'}
                     {timePreset === 'this-year' && 'Năm nay'}
                     {timePreset === 'last-year' && 'Năm trước'}
-                    {timePreset === 'this-year-lunar' && 'Năm nay (âm lịch)'}
-                    {timePreset === 'last-year-lunar' && 'Năm trước (âm lịch)'}
                   </span>
                   <ChevronDown className="h-4 w-4 opacity-50" />
                 </Button>
@@ -102,8 +98,6 @@ export function CustomerTimeFilter({
                       {[
                         { value: 'this-month', label: 'Tháng này' },
                         { value: 'last-month', label: 'Tháng trước' },
-                        { value: 'this-month-lunar', label: 'Tháng này (âm lịch)' },
-                        { value: 'last-month-lunar', label: 'Tháng trước (âm lịch)' },
                         { value: 'last-30-days', label: '30 ngày qua' },
                         { value: 'this-quarter', label: 'Quý này' },
                         { value: 'last-quarter', label: 'Quý trước' },
@@ -133,8 +127,6 @@ export function CustomerTimeFilter({
                       {[
                         { value: 'this-year', label: 'Năm nay' },
                         { value: 'last-year', label: 'Năm trước' },
-                        { value: 'this-year-lunar', label: 'Năm nay (âm lịch)' },
-                        { value: 'last-year-lunar', label: 'Năm trước (âm lịch)' },
                       ].map((option) => (
                         <button
                           key={option.value}

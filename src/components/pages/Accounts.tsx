@@ -334,7 +334,7 @@ export function Accounts() {
     <div className="p-6 space-y-6">
       {/* Header with Add Button */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">Quản lý người dùng</h1>
+        <h1 className="text-blue-900 text-2xl font-semibold">Quản lý người dùng</h1>
         {canCreate && (
           <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setAddDialogOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />

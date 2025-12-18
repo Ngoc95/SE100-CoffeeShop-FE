@@ -527,7 +527,7 @@ export function NewItemRequests() {
           {/* Header */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
-              <h1 className="text-blue-900">Yêu cầu món mới</h1>
+              <h1 className="text-blue-900 text-2xl font-semibold">Yêu cầu món mới</h1>
               <p className="text-neutral-600 mt-1">Duyệt các món mới được đề xuất từ nhân viên bán hàng</p>
             </div>
           </div>
@@ -1183,7 +1183,7 @@ export function NewItemRequests() {
 
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-amber-950">Chi tiết yêu cầu món mới</h1>
+              <h1 className="text-blue-900 text-2xl font-semibold">Chi tiết yêu cầu món mới</h1>
               <p className="text-neutral-600 mt-1">Xem xét và phê duyệt yêu cầu từ nhân viên</p>
             </div>
             <Button variant="outline" onClick={() => setSelectedView('list')}>
@@ -1319,7 +1319,7 @@ export function NewItemRequests() {
             </Breadcrumb>
 
             <div>
-              <h1 className="text-amber-950">Tạo món mới (BM1)</h1>
+              <h1 className="text-blue-900 text-2xl font-semibold">Tạo món mới (BM1)</h1>
               <p className="text-neutral-600 mt-1">Hoàn tất thông tin để thêm món vào thực đơn</p>
             </div>
           </div>

@@ -294,7 +294,7 @@ export function ScheduleCalendar({ shifts: propsShifts, schedule: propsSchedule,
                         {role}
                       </label>
                       <Badge variant="secondary" className="text-xs">
-                        {staff.filter(s => s.role === role).length}
+                        {staff.filter(s => s.positionLabel === role).length}
                       </Badge>
                     </div>
                   ))}

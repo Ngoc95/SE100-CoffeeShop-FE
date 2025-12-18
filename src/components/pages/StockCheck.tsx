@@ -771,7 +771,7 @@ export function StockCheck() {
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h1 className="text-blue-900">Kiểm kho</h1>
+            <h1 className="text-blue-900 text-2xl font-semibold">Kiểm kho</h1>
             <p className="text-slate-600 mt-1">
               Quản lý phiếu kiểm kho và đối chiếu tồn kho thực tế
             </p>
