@@ -11,10 +11,28 @@ import {
   Tag,
   Edit2,
   AlertCircle,
+  X,
 } from "lucide-react";
+import { useState } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "./ui/dialog";
+import { Label } from "./ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { Input } from "./ui/input";
 import { ItemCustomization } from "./ItemCustomizationModal";
 
 interface CartItem {
@@ -39,6 +57,7 @@ interface CartItem {
   comboId?: string;
   comboItems?: CartItem[];
   comboExpanded?: boolean;
+  isTopping?: boolean;
 }
 
 interface CartItemDisplayProps {
@@ -71,6 +90,73 @@ export function CartItemDisplay({
   const isRestocked = restockedItems.includes(item.id);
   const isGlowing = glowingItems.includes(item.id);
 
+  // Confirmation dialog states
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [decreaseConfirmOpen, setDecreaseConfirmOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [otherReason, setOtherReason] = useState("");
+  const [cancelQuantity, setCancelQuantity] = useState(1);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+
+  const cancelReasons = [
+    "Khác",
+    "Khách đợi lâu",
+    "Khách không hài lòng",
+    "Khách đổi món",
+    "Khách hủy món",
+    "Nhân viên ghi sai đơn",
+  ];
+
+  const handleDeleteClick = () => {
+    setItemToDelete(item.id);
+    setCancelReason("");
+    setOtherReason("");
+    setCancelQuantity(item.quantity); // Default: delete all
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDecreaseClick = () => {
+    setItemToDelete(item.id);
+    setCancelReason("");
+    setOtherReason("");
+    setCancelQuantity(1); // Default: decrease by 1
+    setDecreaseConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (cancelReason && (cancelReason !== "Khác" || otherReason.trim())) {
+      // Remove the item completely
+      onRemove(item.id);
+      setDeleteConfirmOpen(false);
+      setCancelReason("");
+      setOtherReason("");
+      setCancelQuantity(1);
+    }
+  };
+
+  const handleConfirmDecrease = () => {
+    if (cancelReason && (cancelReason !== "Khác" || otherReason.trim())) {
+      // Decrease by cancelQuantity
+      onUpdateQuantity(item.id, -cancelQuantity);
+      setDecreaseConfirmOpen(false);
+      setCancelReason("");
+      setOtherReason("");
+      setCancelQuantity(1);
+    }
+  };
+
+  const handleIncreaseCancelQty = () => {
+    if (cancelQuantity < item.quantity) {
+      setCancelQuantity(cancelQuantity + 1);
+    }
+  };
+
+  const handleDecreaseCancelQty = () => {
+    if (cancelQuantity > 1) {
+      setCancelQuantity(cancelQuantity - 1);
+    }
+  };
+
   // Calculate topping extras
   const getToppingExtras = (customization?: ItemCustomization) => {
     if (!customization || !customization.toppings.length) return 0;
@@ -81,12 +167,12 @@ export function CartItemDisplay({
   const getStatusTextColor = (status?: CartItem["status"]) => {
     switch (status) {
       case "pending":
-        return "text-slate-900";
       case "preparing":
-        return "text-red-600"; // Đang đợi bếp chế biến - Đỏ
+        return "text-slate-900"; // Màu đen khi pending hoặc preparing
       case "completed":
+        return "text-red-600"; // Màu đỏ khi completed
       case "served":
-        return "text-green-600"; // Hoàn thành - Xanh
+        return "text-green-600"; // Màu xanh khi served
     }
   };
 
@@ -162,7 +248,7 @@ export function CartItemDisplay({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => onRemove(item.id)}
+              onClick={handleDeleteClick}
               className="h-7 w-7 p-0 flex-shrink-0 ml-2"
             >
               <Trash2 className="w-4 h-4 text-red-600" />
@@ -267,7 +353,7 @@ export function CartItemDisplay({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onUpdateQuantity(item.id, -1)}
+                onClick={handleDecreaseClick}
                 className="h-7 w-7 p-0 flex-shrink-0"
               >
                 <Minus className="w-3 h-3" />
@@ -306,189 +392,415 @@ export function CartItemDisplay({
 
   // Regular Item Rendering
   return (
-    <Card
-      className={`border-blue-200 shadow-sm transition-all ${
-        isGlowing ? "restock-glow" : ""
-      } ${isRestocked ? "green-ripple" : ""}`}
-    >
-      <CardContent className="p-3">
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex-1 min-w-0">
-            {/* Item name with status color, icon, and completed count */}
-            <div className="flex items-center gap-2 mb-2">
-              <p
-                className={`text-sm font-medium break-words ${getStatusTextColor(
-                  item.status
-                )}`}
-              >
-                {item.name}
-              </p>
-              {getCompletedCount() > 0 && (
-                <div className="flex items-center gap-1 bg-green-100 text-green-700 rounded-md px-1.5 py-0.5 text-xs font-medium">
-                  <CheckCircle2 className="w-3 h-3" />
-                  {getCompletedCount()}
-                </div>
-              )}
-            </div>
-
-            {isRestocked && (
-              <div className="mb-2 restock-badge-fade">
-                <Badge
-                  variant="outline"
-                  className="bg-emerald-50 border-emerald-500 text-emerald-700 text-xs flex items-center gap-1 w-fit"
+    <>
+      <Card
+        className={`border-blue-200 shadow-sm transition-all ${
+          isGlowing ? "restock-glow" : ""
+        } ${isRestocked ? "green-ripple" : ""}`}
+      >
+        <CardContent className="p-3">
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex-1 min-w-0">
+              {/* Item name with status color, icon, and completed count */}
+              <div className="flex items-center gap-2 mb-2">
+                <p
+                  className={`text-sm font-medium break-words ${getStatusTextColor(
+                    item.status
+                  )}`}
                 >
-                  <PackageCheck className="w-3 h-3" />
-                  Đã bổ sung NL
-                </Badge>
-              </div>
-            )}
-
-            {item.customization && (
-              <div className="mb-2 bg-slate-50 rounded-md p-2 space-y-1">
-                <div className="flex items-center gap-2 text-xs text-slate-600">
-                  <span>
-                    Đường:{" "}
-                    <span className="text-slate-800">
-                      {item.customization.sugarLevel}
-                    </span>
-                  </span>
-                  <span className="text-slate-300">•</span>
-                  <span>
-                    Đá:{" "}
-                    <span className="text-slate-800">
-                      {item.customization.iceLevel}
-                    </span>
-                  </span>
-                </div>
-
-                {item.customization.toppings.length > 0 && (
-                  <div className="flex gap-1 flex-wrap">
-                    {item.customization.toppings.map((topping, idx) => (
-                      <Badge
-                        key={idx}
-                        variant="outline"
-                        className="text-xs px-1.5 py-0.5 bg-white border-blue-200 text-blue-700"
-                      >
-                        {topping.name}
-                      </Badge>
-                    ))}
+                  {item.name}
+                </p>
+                {getCompletedCount() > 0 && (
+                  <div className="flex items-center gap-1 bg-green-100 text-green-700 rounded-md px-1.5 py-0.5 text-xs font-medium">
+                    <CheckCircle2 className="w-3 h-3" />
+                    {getCompletedCount()}
                   </div>
                 )}
               </div>
-            )}
 
-            {!item.customization &&
-              item.toppings &&
-              item.toppings.length > 0 && (
-                <div className="mb-2">
-                  <span className="text-xs text-slate-500 block mb-1">
-                    Topping:
-                  </span>
-                  <div className="flex gap-1 flex-wrap">
-                    {item.toppings.map((topping, idx) => (
-                      <Badge
-                        key={idx}
-                        variant="outline"
-                        className="text-xs px-1 py-0"
-                      >
-                        {topping}
-                      </Badge>
-                    ))}
+              {isRestocked && (
+                <div className="mb-2 restock-badge-fade">
+                  <Badge
+                    variant="outline"
+                    className="bg-emerald-50 border-emerald-500 text-emerald-700 text-xs flex items-center gap-1 w-fit"
+                  >
+                    <PackageCheck className="w-3 h-3" />
+                    Đã bổ sung NL
+                  </Badge>
+                </div>
+              )}
+
+              {item.customization && (
+                <div className="mb-2 bg-slate-50 rounded-md p-2 space-y-1">
+                  <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <span>
+                      Đường:{" "}
+                      <span className="text-slate-800">
+                        {item.customization.sugarLevel}
+                      </span>
+                    </span>
+                    <span className="text-slate-300">•</span>
+                    <span>
+                      Đá:{" "}
+                      <span className="text-slate-800">
+                        {item.customization.iceLevel}
+                      </span>
+                    </span>
                   </div>
+
+                  {item.customization.toppings.length > 0 && (
+                    <div className="flex gap-1 flex-wrap">
+                      {item.customization.toppings.map((topping, idx) => (
+                        <Badge
+                          key={idx}
+                          variant="outline"
+                          className="text-xs px-1.5 py-0.5 bg-white border-blue-200 text-blue-700"
+                        >
+                          {topping.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
-            {item.notes && (
-              <div className="flex items-start gap-1 mb-2">
-                <MessageSquare className="w-3 h-3 text-slate-400 mt-0.5 flex-shrink-0" />
-                <span className="text-xs text-slate-500 italic break-words">
-                  "{item.notes}"
-                </span>
-              </div>
-            )}
+              {!item.customization &&
+                item.toppings &&
+                item.toppings.length > 0 && (
+                  <div className="mb-2">
+                    <span className="text-xs text-slate-500 block mb-1">
+                      Topping:
+                    </span>
+                    <div className="flex gap-1 flex-wrap">
+                      {item.toppings.map((topping, idx) => (
+                        <Badge
+                          key={idx}
+                          variant="outline"
+                          className="text-xs px-1 py-0"
+                        >
+                          {topping}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-            {isRestocked && (
-              <div className="bg-emerald-50 border border-emerald-200 p-2 rounded mb-2">
-                <p className="text-xs text-emerald-700 break-words flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" />
-                  Nguyên liệu đã sẵn sàng. Có thể pha chế.
-                </p>
-              </div>
-            )}
-
-            {appliedPromoCode === "GIAMCF" &&
-              item.name.toLowerCase().includes("cà phê") && (
-                <div className="flex items-center gap-1 mb-1">
-                  <Tag className="w-3 h-3 text-green-600" />
-                  <span className="text-xs text-green-700">
-                    –5.000đ Khuyến mãi Cà phê
+              {item.notes && (
+                <div className="flex items-start gap-1 mb-2">
+                  <MessageSquare className="w-3 h-3 text-slate-400 mt-0.5 flex-shrink-0" />
+                  <span className="text-xs text-slate-500 italic break-words">
+                    "{item.notes}"
                   </span>
                 </div>
               )}
+
+              {isRestocked && (
+                <div className="bg-emerald-50 border border-emerald-200 p-2 rounded mb-2">
+                  <p className="text-xs text-emerald-700 break-words flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Nguyên liệu đã sẵn sàng. Có thể pha chế.
+                  </p>
+                </div>
+              )}
+
+              {appliedPromoCode === "GIAMCF" &&
+                item.name.toLowerCase().includes("cà phê") && (
+                  <div className="flex items-center gap-1 mb-1">
+                    <Tag className="w-3 h-3 text-green-600" />
+                    <span className="text-xs text-green-700">
+                      –5.000đ Khuyến mãi Cà phê
+                    </span>
+                  </div>
+                )}
+            </div>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDeleteClick}
+              className="h-7 w-7 p-0 flex-shrink-0 ml-2"
+            >
+              <Trash2 className="w-4 h-4 text-red-600" />
+            </Button>
           </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onRemove(item.id)}
-            className="h-7 w-7 p-0 flex-shrink-0 ml-2"
-          >
-            <Trash2 className="w-4 h-4 text-red-600" />
-          </Button>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDecreaseClick}
+                className="h-7 w-7 p-0 flex-shrink-0"
+              >
+                <Minus className="w-3 h-3" />
+              </Button>
+              <span className="text-sm w-8 text-center">{item.quantity}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onUpdateQuantity(item.id, 1)}
+                className="h-7 w-7 p-0 flex-shrink-0"
+              >
+                <Plus className="w-3 h-3" />
+              </Button>
+            </div>
+            <span className="text-sm text-blue-700">
+              {item.price.toLocaleString()}₫
+            </span>
+            <span className="text-sm text-blue-900 font-medium">
+              = {(item.price * item.quantity).toLocaleString()}₫
+            </span>
+            {!item.isTopping && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onCustomize(item)}
+                className="h-7 px-2 flex-shrink-0"
+                title="Tùy chỉnh món"
+                disabled={
+                  item.status === "preparing" ||
+                  item.status === "completed" ||
+                  item.status === "served"
+                }
+              >
+                <Settings className="w-3 h-3 mr-1" />
+                <span className="text-xs">Tùy chỉnh</span>
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onUpdateQuantity(item.id, -1)}
-              className="h-7 w-7 p-0 flex-shrink-0"
+              onClick={() => onAddNote(item)}
+              className="h-7 w-7 p-0 flex-shrink-0 ml-auto"
+              title="Thêm ghi chú"
             >
-              <Minus className="w-3 h-3" />
-            </Button>
-            <span className="text-sm w-8 text-center">{item.quantity}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onUpdateQuantity(item.id, 1)}
-              className="h-7 w-7 p-0 flex-shrink-0"
-            >
-              <Plus className="w-3 h-3" />
+              <MessageSquare className="w-3 h-3" />
             </Button>
           </div>
-          <span className="text-sm text-blue-700">
-            {item.price.toLocaleString()}₫
-          </span>
-          <span className="text-sm text-blue-900 font-medium">
-            = {(item.price * item.quantity).toLocaleString()}₫
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onCustomize(item)}
-            className="h-7 px-2 flex-shrink-0"
-            title="Tùy chỉnh món"
-            disabled={
-              item.status === "preparing" ||
-              item.status === "completed" ||
-              item.status === "served"
-            }
-          >
-            <Settings className="w-3 h-3 mr-1" />
-            <span className="text-xs">Tùy chỉnh</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onAddNote(item)}
-            className="h-7 w-7 p-0 flex-shrink-0 ml-auto"
-            title="Thêm ghi chú"
-          >
-            <MessageSquare className="w-3 h-3" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              Xác nhận giảm / Hủy món
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-slate-700">
+                Bạn có chắc chắn muốn xóa{" "}
+                <span className="font-semibold text-slate-900">
+                  {item.name}
+                </span>{" "}
+                khỏi đơn hàng không?
+              </p>
+              <div className="flex items-center gap-3 mt-3">
+                <span className="text-sm text-slate-600">Số lượng hủy:</span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDecreaseCancelQty}
+                    disabled={cancelQuantity <= 1}
+                    className="h-7 w-7 p-0"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </Button>
+                  <span className="text-sm font-medium w-8 text-center">
+                    {cancelQuantity}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleIncreaseCancelQty}
+                    disabled={cancelQuantity >= item.quantity}
+                    className="h-7 w-7 p-0"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                  <span className="text-sm text-slate-600 ml-1">
+                    / {item.quantity}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label
+                htmlFor="delete-reason"
+                className="text-sm font-medium mb-2 block"
+              >
+                Lý do hủy <span className="text-red-500">*</span>
+              </Label>
+              <Select value={cancelReason} onValueChange={setCancelReason}>
+                <SelectTrigger id="delete-reason">
+                  <SelectValue placeholder="Chọn lý do hủy..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {cancelReasons.map((reason) => (
+                    <SelectItem key={reason} value={reason}>
+                      {reason}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {cancelReason === "Khác" && (
+              <div>
+                <Label
+                  htmlFor="other-delete-reason"
+                  className="text-sm font-medium mb-2 block"
+                >
+                  Ghi chú lý do khác
+                </Label>
+                <Input
+                  id="other-delete-reason"
+                  placeholder="Nhập lý do hủy..."
+                  value={otherReason}
+                  onChange={(e) => setOtherReason(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmOpen(false)}
+            >
+              Bỏ qua
+            </Button>
+            <Button
+              onClick={handleConfirmDelete}
+              disabled={
+                !cancelReason ||
+                (cancelReason === "Khác" && !otherReason.trim())
+              }
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Chắc chắn
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Decrease Confirmation Dialog */}
+      <Dialog open={decreaseConfirmOpen} onOpenChange={setDecreaseConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-600" />
+              Xác nhận giảm / Hủy món
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-slate-700">
+                Bạn có chắc chắn muốn giảm số lượng{" "}
+                <span className="font-semibold text-slate-900">
+                  {item.name}
+                </span>{" "}
+                không?
+              </p>
+              <div className="flex items-center gap-3 mt-3">
+                <span className="text-sm text-slate-600">Số lượng hủy:</span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDecreaseCancelQty}
+                    disabled={cancelQuantity <= 1}
+                    className="h-7 w-7 p-0"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </Button>
+                  <span className="text-sm font-medium w-8 text-center">
+                    {cancelQuantity}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleIncreaseCancelQty}
+                    disabled={cancelQuantity >= item.quantity}
+                    className="h-7 w-7 p-0"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                  <span className="text-sm text-slate-600 ml-1">
+                    / {item.quantity}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label
+                htmlFor="decrease-reason"
+                className="text-sm font-medium mb-2 block"
+              >
+                Lý do hủy <span className="text-red-500">*</span>
+              </Label>
+              <Select value={cancelReason} onValueChange={setCancelReason}>
+                <SelectTrigger id="decrease-reason">
+                  <SelectValue placeholder="Chọn lý do hủy..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {cancelReasons.map((reason) => (
+                    <SelectItem key={reason} value={reason}>
+                      {reason}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {cancelReason === "Khác" && (
+              <div>
+                <Label
+                  htmlFor="other-decrease-reason"
+                  className="text-sm font-medium mb-2 block"
+                >
+                  Ghi chú lý do khác
+                </Label>
+                <Input
+                  id="other-decrease-reason"
+                  placeholder="Nhập lý do hủy..."
+                  value={otherReason}
+                  onChange={(e) => setOtherReason(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDecreaseConfirmOpen(false)}
+            >
+              Bỏ qua
+            </Button>
+            <Button
+              onClick={handleConfirmDecrease}
+              disabled={
+                !cancelReason ||
+                (cancelReason === "Khác" && !otherReason.trim())
+              }
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Chắc chắn
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
