@@ -14,6 +14,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
+import { ExportExcelDialog } from "../ExportExcelDialog";
+import { Download } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";
 import { Separator } from "../ui/separator";
@@ -343,6 +345,7 @@ export function StockCheck() {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("none");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   // Ẩn nút X mặc định của DialogContent
   useEffect(() => {
@@ -665,6 +668,18 @@ export function StockCheck() {
     }
   };
 
+  // Cấu hình cột và dữ liệu xuất file (ví dụ cho stockItemsPKK001, cần chỉnh lại cho đúng dữ liệu thực tế)
+  const exportColumns = [
+    { header: 'Mã hàng', accessor: (row: any) => row.code },
+    { header: 'Tên hàng', accessor: (row: any) => row.name },
+    { header: 'Đơn vị', accessor: (row: any) => row.unit },
+    { header: 'Tồn hệ thống', accessor: (row: any) => row.systemQty },
+    { header: 'Tồn thực tế', accessor: (row: any) => row.realQty },
+    { header: 'Ghi chú', accessor: (row: any) => row.note },
+  ];
+  // Giả sử stockItemsPKK001 là danh sách kiểm kho hiện tại
+  const exportData = stockItemsPKK001;
+
   return (
     <div className="flex h-full">
       {/* Left Filter Panel - giống layout trong hình: Trạng thái + Bộ lọc nhanh */}
@@ -762,12 +777,28 @@ export function StockCheck() {
               Nhập file
             </Button>
             <Button
+              variant="outline"
+              onClick={() => setExportDialogOpen(true)}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Xuất file
+            </Button>
+            <ExportExcelDialog
+              open={exportDialogOpen}
+              onOpenChange={setExportDialogOpen}
+              data={exportData}
+              columns={exportColumns}
+              fileName="kiemkho.csv"
+              title="Xuất danh sách kiểm kho"
+            />
+            <Button
               className="bg-blue-600 hover:bg-blue-700 text-white px-5"
               onClick={handleOpenCreateDialog}
             >
               <Plus className="w-4 h-4 mr-2" />
               Tạo phiếu kiểm kho
             </Button>
+
 
           </div>
         </div>
