@@ -378,6 +378,14 @@ export function StockCheck() {
     }
   }, [selectItemsDialogOpen]);
 
+  // Auto-select all items when dialog opens
+  useEffect(() => {
+    if (selectItemsDialogOpen) {
+      const allCodes = availableItems.map((item) => item.code);
+      setSelectedItemCodes((prev) => [...new Set([...prev, ...allCodes])]);
+    }
+  }, [selectItemsDialogOpen]);
+
   const toggleStatus = (status: "draft" | "completed") => {
     setSelectedStatuses((prev) =>
       prev.includes(status)

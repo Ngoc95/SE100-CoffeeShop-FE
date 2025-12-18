@@ -174,6 +174,7 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
             </div>
 
             <div className="flex items-center gap-2">
+              {hasAccess('accounts') && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm">
@@ -187,6 +188,7 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              )}
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -466,6 +468,7 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
 
           {/* Right Actions */}
           <div className="flex items-center gap-2">
+            {hasAccess('accounts') && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm">
@@ -479,6 +482,7 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            )}
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

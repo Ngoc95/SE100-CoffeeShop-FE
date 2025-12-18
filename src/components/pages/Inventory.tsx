@@ -2108,7 +2108,7 @@ export function Inventory() {
                           maxStock: editValues.maxStock,
                           sellingPrice: editValues.sellingPrice,
                           productStatus: editValues.productStatus as any,
-                          productStatus: editValues.productStatus as any,
+
                           ingredients: editValues.ingredients,
                           imageUrl: editValues.imageUrl,
                           isTopping: isTopping,
@@ -2765,6 +2765,9 @@ export function Inventory() {
                                         sellingPrice: item.sellingPrice,
                                         productStatus: item.productStatus,
                                         ingredients: item.ingredients || [],
+                                        isTopping: item.isTopping || false,
+                                        associatedProductIds: item.associatedProductIds || [],
+                                        imageUrl: item.imageUrl || "",
                                       });
                                       setEditDialogOpen(true);
                                     }}
@@ -3130,6 +3133,9 @@ export function Inventory() {
                                         sellingPrice: item.sellingPrice,
                                         productStatus: item.productStatus,
                                         ingredients: item.ingredients || [],
+                                        isTopping: item.isTopping || false,
+                                        associatedProductIds: item.associatedProductIds || [],
+                                        imageUrl: item.imageUrl || "",
                                       });
                                       setEditDialogOpen(true);
                                     }}

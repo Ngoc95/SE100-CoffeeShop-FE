@@ -22,6 +22,7 @@ import {
   ArrowUp,
   ArrowDown,
   Save,
+  DollarSign,
 } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";
@@ -168,6 +169,12 @@ export function PurchaseOrders() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  
+  // Payment Dialog State
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [selectedOrderToPay, setSelectedOrderToPay] = useState<PurchaseOrder | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentNote, setPaymentNote] = useState("");
   const [showAddItemDialog, setShowAddItemDialog] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
   const [addedItems, setAddedItems] = useState<PurchaseOrderItem[]>([]);
@@ -708,7 +715,8 @@ export function PurchaseOrders() {
       supplier: "",
       staff: defaultStaff,
       note: "",
-      paidAmount: initialTotalValue.toString(),
+
+      paidAmount: "0",
       paymentMethod: "cash",
       bankAccount: "",
       bankId: "",
@@ -942,6 +950,77 @@ export function PurchaseOrders() {
     } catch (error) {
       console.error("Error saving cashflow entry:", error);
     }
+  };
+
+
+
+  const handleOpenPaymentDialog = (order: PurchaseOrder) => {
+    setSelectedOrderToPay(order);
+    const remaining = order.totalAmount - order.paidAmount;
+    setPaymentAmount(formatNumberWithCommas(remaining));
+    setPaymentNote(`Thanh toán nợ - Phiếu nhập ${order.code}`);
+    setPaymentDialogOpen(true);
+  };
+
+  const handlePaymentSubmit = () => {
+    if (!selectedOrderToPay) return;
+
+    const amount = parseFormattedNumber(paymentAmount);
+    if (amount <= 0) {
+      toast.error("Vui lòng nhập số tiền hợp lệ");
+      return;
+    }
+
+    const remaining = selectedOrderToPay.totalAmount - selectedOrderToPay.paidAmount;
+    if (amount > remaining) {
+      toast.error(`Số tiền thanh toán không được vượt quá số nợ còn lại (${formatNumberWithCommas(remaining)}đ)`);
+      return;
+    }
+
+    // Create cashflow entry
+    const cashflowCode = `PC${selectedOrderToPay.code.replace("PN", "")}-${Date.now().toString().slice(-4)}`;
+    const cashflowEntry = {
+      id: `CF-${Date.now()}`,
+      code: cashflowCode,
+      date: new Date().toISOString(),
+      type: "expense",
+      category: "pay-supplier",
+      amount: amount,
+      paymentMethod: "cash",
+      description: paymentNote || `Thanh toán nợ - Phiếu nhập ${selectedOrderToPay.code}`,
+      staff: user?.fullName || "Staff",
+      supplier: selectedOrderToPay.supplier,
+      status: "completed"
+    };
+
+    saveCashflowEntry(cashflowEntry);
+
+    // Update order
+    setPurchaseOrders(
+      purchaseOrders.map((o) =>
+        o.id === selectedOrderToPay.id
+          ? {
+            ...o,
+            paidAmount: o.paidAmount + amount,
+            paymentHistory: [
+              ...(o.paymentHistory || []),
+              {
+                id: cashflowCode,
+                date: formatDateTime(new Date()),
+                amount: amount,
+                note: paymentNote || "Thanh toán nợ"
+              }
+            ]
+          }
+          : o
+      )
+    );
+
+    toast.success(`Đã tạo phiếu chi ${formatNumberWithCommas(amount)}đ`);
+    setPaymentDialogOpen(false);
+    setSelectedOrderToPay(null);
+    setPaymentAmount("");
+    setPaymentNote("");
   };
 
   // Mock inventory items (ingredients and ready-made only, no composite)
@@ -1854,6 +1933,19 @@ export function PurchaseOrders() {
 
                               {/* Action Buttons */}
                               <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                                {order.totalAmount > order.paidAmount && (
+                                  <Button
+                                    className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                                    onClick={(e: any) => {
+                                      e.stopPropagation();
+                                      handleOpenPaymentDialog(order);
+                                    }}
+                                  >
+                                    <DollarSign className="w-4 h-4" />
+                                    Thanh toán
+                                  </Button>
+                                )}
+
                                 {order.status === "draft" ? (
                                   <>
                                     <Button
@@ -2059,42 +2151,71 @@ export function PurchaseOrders() {
                               {(() => {
                                 // Load cashflow entries from localStorage
                                 let paymentHistory: any[] = [];
-                                try {
-                                  const stored =
-                                    localStorage.getItem("cashflowEntries");
-                                  if (stored) {
-                                    const cashflowEntries = JSON.parse(stored);
-                                    // Filter entries related to this purchase order
-                                    paymentHistory = cashflowEntries.filter(
-                                      (entry: any) =>
-                                        entry.category === "pay-supplier" &&
-                                        (entry.description?.includes(
-                                          order.code
-                                        ) ||
-                                          entry.supplier === order.supplier)
+                                
+                                // Only look for external payment history if the order has been paid partially or fully
+                                if (order.paidAmount > 0) {
+                                  try {
+                                    const stored =
+                                      localStorage.getItem("cashflowEntries");
+                                    if (stored) {
+                                      const cashflowEntries = JSON.parse(stored);
+                                      // Filter entries related to this purchase order
+                                      paymentHistory = cashflowEntries.filter(
+                                        (entry: any) =>
+                                          entry.category === "pay-supplier" &&
+                                          (
+                                            // Match by specific description pattern
+                                            entry.description?.includes(`Phiếu nhập ${order.code}`) ||
+                                            // Or match by direct payment history ID if present
+                                            (order.paymentHistory?.some(ph => ph.id === entry.code))
+                                          )
+                                      );
+                                    }
+                                  } catch (error) {
+                                    console.error(
+                                      "Error loading payment history:",
+                                      error
                                     );
                                   }
-                                } catch (error) {
-                                  console.error(
-                                    "Error loading payment history:",
-                                    error
-                                  );
                                 }
 
                                 // Also include paymentHistory from order if exists
                                 if (order.paymentHistory) {
-                                  paymentHistory = [
-                                    ...order.paymentHistory.map((ph) => ({
-                                      id: ph.id,
-                                      code: ph.id,
-                                      date: ph.date,
-                                      amount: ph.amount,
-                                      note: ph.note,
-                                      paymentMethod: "cash",
-                                    })),
-                                    ...paymentHistory,
-                                  ];
+                                  const orderHistory = order.paymentHistory.map((ph) => ({
+                                    id: ph.id, // Usually matches code
+                                    code: ph.id,
+                                    date: ph.date,
+                                    amount: ph.amount,
+                                    note: ph.note,
+                                    paymentMethod: "cash",
+                                    type: "order-history"
+                                  }));
+                                  
+                                  // Merge and deduplicate
+                                  // Priority: Cashflow entries (more detailed) > Order history
+                                  const combined = [...paymentHistory, ...orderHistory];
+                                  const uniqueMap = new Map();
+                                  
+                                  combined.forEach(item => {
+                                      // If we haven't seen this code yet, add it.
+                                      // If we HAVE seen it, we generally prefer the one from cashflow (already in paymentHistory array) 
+                                      // unless the new one provides something missing? 
+                                      // Actually, since we put paymentHistory (cashflow) FIRST in the spread above? No, we put `...paymentHistory` first.
+                                      // Wait: The code snippet I'm replacing ends with `...paymentHistory` being appended to `order.paymentHistory`.
+                                      // In my replacement: `[...paymentHistory, ...orderHistory]`.
+                                      // Iterating: 
+                                      // 1. cashflow item (Code A) -> added directly.
+                                      // 2. order item (Code A) -> ignored (duplicate).
+                                      if (!uniqueMap.has(item.code)) {
+                                          uniqueMap.set(item.code, item);
+                                      }
+                                  });
+                                  
+                                  paymentHistory = Array.from(uniqueMap.values());
                                 }
+                                
+                                // Sort by date descending
+                                paymentHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
                                 return paymentHistory.length > 0 ? (
                                   <div className="border rounded-lg overflow-hidden">
@@ -2118,6 +2239,9 @@ export function PurchaseOrders() {
                                           </th>
                                           <th className="px-4 py-2 text-right text-xs text-slate-600">
                                             Tiền chi
+                                          </th>
+                                          <th className="px-4 py-2 text-center text-xs text-slate-600">
+                                            Thao tác
                                           </th>
                                         </tr>
                                       </thead>
@@ -2149,6 +2273,43 @@ export function PurchaseOrders() {
                                                 "vi-VN"
                                               )}
                                               đ
+                                            </td>
+                                            <td className="px-4 py-2 text-center">
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  if (confirm("Chắc chắn xóa lịch sử thanh toán này?")) {
+                                                    // 1. Update purchaseOrders state
+                                                    const updatedOrders = purchaseOrders.map(o => {
+                                                      if (o.id === order.id) {
+                                                        const newHistory = (o.paymentHistory || []).filter(ph => ph.id !== payment.id);
+                                                        // Decrease paidAmount
+                                                        const newPaidAmount = Math.max(0, o.paidAmount - payment.amount);
+                                                        return { ...o, paidAmount: newPaidAmount, paymentHistory: newHistory };
+                                                      }
+                                                      return o;
+                                                    });
+                                                    setPurchaseOrders(updatedOrders);
+
+                                                    // 2. Remove from localStorage cashflowEntries
+                                                    try {
+                                                      const stored = localStorage.getItem("cashflowEntries");
+                                                      if (stored) {
+                                                        const cashflowEntries = JSON.parse(stored);
+                                                        const newCashflow = cashflowEntries.filter((entry: any) => entry.code !== payment.id && entry.code !== payment.code);
+                                                        localStorage.setItem("cashflowEntries", JSON.stringify(newCashflow));
+                                                        toast.success("Đã xóa lịch sử thanh toán");
+                                                      }
+                                                    } catch (err) {
+                                                      console.error("Error deleting from storage", err);
+                                                    }
+                                                  }
+                                                }}
+                                                className="text-slate-400 hover:text-red-600 transition-colors"
+                                                title="Xóa thanh toán"
+                                              >
+                                                <Trash2 className="w-4 h-4" />
+                                              </button>
                                             </td>
                                           </tr>
                                         ))}
@@ -2186,10 +2347,10 @@ export function PurchaseOrders() {
         <DialogContent
           className="min-w-[1100px] max-w-[1400px] w-[95vw] max-h-[90vh] overflow-hidden flex flex-col"
           aria-describedby={undefined}
-          onInteractOutside={(e) => {
+          onInteractOutside={(e: any) => {
             e.preventDefault();
           }}
-          onEscapeKeyDown={(e) => {
+          onEscapeKeyDown={(e: any) => {
             e.preventDefault();
           }}
         >
@@ -2683,9 +2844,11 @@ export function PurchaseOrders() {
                             supplier: formData.supplier,
                             supplierId: formData.supplier,
                             items: addedItems.length,
+                            items: addedItems.length,
                             totalAmount: totalValue,
-                            paidAmount: paidAmount,
-                            debtAmount: debtAmount,
+                            // Force paidAmount to 0 for drafts
+                            paidAmount: 0,
+                            debtAmount: totalValue,
                             staff: formData.staff,
                             note: formData.note,
                             details: {
@@ -2696,7 +2859,7 @@ export function PurchaseOrders() {
                       )
                     );
                     toast.success("Đã cập nhật phiếu nhập hàng");
-                  } else {
+                    } else {
                     // Create new draft order
                     const draftOrder: PurchaseOrder = {
                       id: Date.now(),
@@ -2706,8 +2869,9 @@ export function PurchaseOrders() {
                       supplierId: formData.supplier,
                       items: addedItems.length,
                       totalAmount: totalValue,
-                      paidAmount: paidAmount,
-                      debtAmount: debtAmount,
+                      // Force paidAmount to 0 for drafts as requested
+                      paidAmount: 0,
+                      debtAmount: totalValue,
                       status: "draft",
                       staff: formData.staff,
                       note: formData.note,
@@ -2718,23 +2882,14 @@ export function PurchaseOrders() {
                     };
 
                     setPurchaseOrders([draftOrder, ...purchaseOrders]);
-
-                    if (debtAmount > 0 && formData.supplier) {
-                      toast.success(
-                        `Đã lưu nháp. Công nợ NCC: ${debtAmount.toLocaleString(
-                          "vi-VN"
-                        )}đ`
-                      );
-                    } else {
-                      toast.success("Đã lưu nháp phiếu nhập hàng");
-                    }
+                    toast.success("Đã lưu nháp phiếu nhập hàng");
                   }
 
                   handleCreateOrder();
                 }}
-              >
-                Lưu nháp
-              </Button>
+            >
+              Lưu nháp
+            </Button>
               <Button
                 className="bg-blue-600 hover:bg-blue-700"
                 disabled={addedItems.length === 0}
@@ -3167,6 +3322,80 @@ export function PurchaseOrders() {
         fileName="danh-sach-phieu-nhap"
         title="Xuất danh sách phiếu nhập hàng"
       />
+      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Thanh toán cho nhà cung cấp</DialogTitle>
+          </DialogHeader>
+          {selectedOrderToPay && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-slate-500">Mã phiếu:</span>
+                  <span className="ml-2 font-medium text-slate-900">{selectedOrderToPay.code}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Nhà cung cấp:</span>
+                  <span className="ml-2 font-medium text-blue-600">{selectedOrderToPay.supplier}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Tổng tiền:</span>
+                  <span className="ml-2 font-medium text-slate-900">{formatNumberWithCommas(selectedOrderToPay.totalAmount)}đ</span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Đã trả:</span>
+                  <span className="ml-2 font-medium text-green-600">{formatNumberWithCommas(selectedOrderToPay.paidAmount)}đ</span>
+                </div>
+                <div className="col-span-2 border-t pt-2 mt-2">
+                  <span className="text-slate-500">Số tiền còn nợ:</span>
+                  <span className="ml-2 font-bold text-red-600 text-lg">
+                    {formatNumberWithCommas(selectedOrderToPay.totalAmount - selectedOrderToPay.paidAmount)}đ
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="payment-amount">Số tiền thanh toán</Label>
+                <div className="relative">
+                  <Input
+                    id="payment-amount"
+                    value={paymentAmount}
+                    onChange={(e) => {
+                      // Allow only numbers and format immediately
+                      const rawVal = e.target.value.replace(/,/g, "");
+                      if (!isNaN(Number(rawVal)) || rawVal === "") {
+                        setPaymentAmount(formatNumberWithCommas(rawVal));
+                      }
+                    }}
+                    placeholder="Nhập số tiền..."
+                    className="pr-10 font-medium text-lg"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">đ</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="payment-note">Ghi chú</Label>
+                <Textarea
+                  id="payment-note"
+                  value={paymentNote}
+                  onChange={(e) => setPaymentNote(e.target.value)}
+                  placeholder="Ghi chú cho phiếu chi..."
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>
+              Hủy bỏ
+            </Button>
+            <Button onClick={handlePaymentSubmit} className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Check className="w-4 h-4 mr-2" />
+              Xác nhận thanh toán
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
