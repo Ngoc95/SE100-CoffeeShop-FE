@@ -26,6 +26,7 @@ import { Returns } from "./components/pages/Returns";
 import { PurchaseOrders } from "./components/pages/PurchaseOrders";
 import { PurchaseReturns } from "./components/pages/PurchaseReturns";
 import { WriteOffs } from "./components/pages/WriteOffs";
+import { Accounts } from "./components/pages/Accounts";
 import { POSOrderPanelRestockedDemo } from "./components/POSOrderPanelRestockedDemo";
 import { Toaster } from "./components/ui/sonner";
 
@@ -54,10 +55,11 @@ export type PageType =
   | "purchase-returns"
   | "write-offs"
   | "new-item-requests"
+  | "accounts"
   | "pos-demo-restocked";
 
 function AppContent() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, hasPermission } = useAuth();
   const [currentPage, setCurrentPage] = useState<PageType>("dashboard");
 
   // Redirect based on user role when logged in
@@ -90,20 +92,44 @@ function AppContent() {
   const hasPageAccess = (page: PageType): boolean => {
     if (!user) return false;
 
-    // Manager has access to all pages
-    if (user.role === "manager") return true;
+    // Map pages to required permissions (string or array of strings for OR logic)
+    const pagePermissions: Record<PageType, string | string[]> = {
+      'dashboard': 'dashboard:view',
+      'pos': 'pos:access',
+      'kitchen': 'kitchen:access',
+      'inventory': 'goods_inventory:view',
+      'product-pricing': 'goods_pricing:view',
+      'stock-check': 'goods_stock_check:view',
+      'import-export': 'goods_import_export:view',
+      'menu': 'goods_recipe:view',
+      'tables': 'tables:view',
+      'scheduling': ['staff_scheduling:view', 'staff_timekeeping:view', 'staff_payroll:view'],
+      'staff': 'staff:view',
+      'staff-settings': 'staff_settings:view',
+      'customers': 'customers:view',
+      'customer-groups': 'customer_groups:view',
+      'suppliers': 'suppliers:view',
+      'promotions': 'promotions:view',
+      'finance': 'finance:view',
+      'reports': 'reports:view',
+      'invoices': 'invoices:view',
+      'returns': 'returns:view',
+      'purchase-orders': 'purchase_orders:view',
+      'purchase-returns': 'purchase_returns:view',
+      'write-offs': 'write_offs:view',
+      'new-item-requests': 'goods_new_items:view',
+      'accounts': 'system_users:view',
+      'pos-demo-restocked': 'pos:access',
+    };
 
-    // Barista can only access kitchen
-    if (user.role === "barista") {
-      return page === "kitchen";
+    const requiredPermission = pagePermissions[page];
+    if (!requiredPermission) return true; // Allow access if no permission defined
+    
+    if (Array.isArray(requiredPermission)) {
+      return requiredPermission.some(permission => hasPermission(permission as any));
     }
 
-    // Cashier and Server can only access POS
-    if (user.role === "cashier" || user.role === "server") {
-      return page === "pos";
-    }
-
-    return false;
+    return hasPermission(requiredPermission as any);
   };
 
   // Handle navigation with permission check
@@ -186,6 +212,8 @@ function AppContent() {
         return <WriteOffs />;
       case "new-item-requests":
         return <NewItemRequests />;
+      case "accounts":
+        return <Accounts />;
       case "pos-demo-restocked":
         return <POSOrderPanelRestockedDemo />;
       default:

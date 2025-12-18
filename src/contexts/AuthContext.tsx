@@ -1,4 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
+import { Permission } from '../types/account';
+import { initialAccounts } from '../data/accountData';
+import { initialRoles } from '../data/roleData';
 
 export type UserRole = 'manager' | 'barista' | 'cashier' | 'server';
 
@@ -8,6 +11,8 @@ export interface User {
   fullName: string;
   role: UserRole;
   roleLabel: string;
+  roleId: string;
+  permissions: Permission[];
 }
 
 interface AuthContextType {
@@ -15,6 +20,11 @@ interface AuthContextType {
   login: (username: string, password: string) => boolean;
   logout: () => void;
   isAuthenticated: boolean;
+  hasPermission: (permission: Permission) => boolean;
+  canView: (module: string) => boolean;
+  canCreate: (module: string) => boolean;
+  canUpdate: (module: string) => boolean;
+  canDelete: (module: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,6 +38,8 @@ const MOCK_USERS: Array<User & { password: string }> = [
     fullName: 'Nguyễn Văn A',
     role: 'manager',
     roleLabel: 'Quản lý',
+    roleId: 'role-manager',
+    permissions: [], // Will be loaded from account data
   },
   {
     id: '2',
@@ -36,6 +48,8 @@ const MOCK_USERS: Array<User & { password: string }> = [
     fullName: 'Trần Thị B',
     role: 'barista',
     roleLabel: 'Pha chế',
+    roleId: 'role-barista',
+    permissions: [],
   },
   {
     id: '3',
@@ -44,6 +58,8 @@ const MOCK_USERS: Array<User & { password: string }> = [
     fullName: 'Lê Văn C',
     role: 'cashier',
     roleLabel: 'Thu ngân',
+    roleId: 'role-cashier',
+    permissions: [],
   },
   {
     id: '4',
@@ -52,6 +68,8 @@ const MOCK_USERS: Array<User & { password: string }> = [
     fullName: 'Phạm Thị D',
     role: 'server',
     roleLabel: 'Phục vụ',
+    roleId: 'role-server',
+    permissions: [],
   },
 ];
 
@@ -64,9 +82,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     if (foundUser) {
+      // Find account in account data
+      const account = initialAccounts.find((acc) => acc.username === username);
+      
+      let permissions: Permission[] = [];
+      
+      if (account) {
+        // Use custom permissions if available, otherwise use role permissions
+        if (account.customPermissions) {
+          permissions = account.customPermissions;
+        } else {
+          const role = initialRoles.find((r) => r.id === account.roleId);
+          permissions = role?.permissions || [];
+        }
+      }
+
       const { password: _, ...userWithoutPassword } = foundUser;
-      setUser(userWithoutPassword);
-      localStorage.setItem('user', JSON.stringify(userWithoutPassword));
+      const userWithPermissions = {
+        ...userWithoutPassword,
+        permissions,
+      };
+      
+      setUser(userWithPermissions);
+      localStorage.setItem('user', JSON.stringify(userWithPermissions));
       return true;
     }
 
@@ -78,6 +116,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('user');
   };
 
+  // Permission helper functions
+  const hasPermission = (permission: Permission): boolean => {
+    if (!user) return false;
+    return user.permissions.includes(permission);
+  };
+
+  const canView = (module: string): boolean => {
+    if (!user) return false;
+    const viewPermission = `${module}:view` as Permission;
+    return hasPermission(viewPermission);
+  };
+
+  const canCreate = (module: string): boolean => {
+    if (!user) return false;
+    const createPermission = `${module}:create` as Permission;
+    return hasPermission(createPermission);
+  };
+
+  const canUpdate = (module: string): boolean => {
+    if (!user) return false;
+    const updatePermission = `${module}:update` as Permission;
+    return hasPermission(updatePermission);
+  };
+
+  const canDelete = (module: string): boolean => {
+    if (!user) return false;
+    const deletePermission = `${module}:delete` as Permission;
+    return hasPermission(deletePermission);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -85,6 +153,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         isAuthenticated: !!user,
+        hasPermission,
+        canView,
+        canCreate,
+        canUpdate,
+        canDelete,
       }}
     >
       {children}

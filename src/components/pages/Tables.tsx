@@ -1,5 +1,6 @@
 import { useState } from "react";
 import * as React from "react";
+import { useAuth } from "../../contexts/AuthContext";
 import {
   Plus,
   Search,
@@ -57,6 +58,11 @@ interface Area {
 }
 
 export function Tables() {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('tables:create');
+  const canUpdate = hasPermission('tables:update');
+  const canDelete = hasPermission('tables:delete');
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedArea, setSelectedArea] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -424,10 +430,12 @@ export function Tables() {
                 }}
               >
                 <DialogTrigger asChild>
+                  {canCreate && (
                   <Button className="bg-blue-600 hover:bg-blue-700">
                     <Plus className="w-4 h-4 mr-2" />
                     Thêm bàn mới
                   </Button>
+                  )}
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
@@ -629,37 +637,43 @@ export function Tables() {
                           <TableCell className="text-sm">{getStatusBadge(table.status)}</TableCell>
                           <TableCell className="text-sm text-right">
                             <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEdit(table)}
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDelete(table.id)}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleToggleStatus(table.id)}
-                                className={
-                                  table.status === "active"
-                                    ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                                }
-                              >
-                                {table.status === "active" ? (
-                                  <PowerOff className="w-4 h-4" />
-                                ) : (
-                                  <Power className="w-4 h-4" />
-                                )}
-                              </Button>
+                              {canUpdate && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEdit(table)}
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {canDelete && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDelete(table.id)}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {canUpdate && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleToggleStatus(table.id)}
+                                  className={
+                                    table.status === "active"
+                                      ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                  }
+                                >
+                                  {table.status === "active" ? (
+                                    <PowerOff className="w-4 h-4" />
+                                  ) : (
+                                    <Power className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>

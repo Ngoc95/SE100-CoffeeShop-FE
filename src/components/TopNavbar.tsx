@@ -8,9 +8,9 @@ import {
   FileText,
   Menu,
   X,
-  Bell,
   Settings,
   User,
+  Users,
   ChevronDown,
   Home,
   LogOut
@@ -38,14 +38,61 @@ interface TopNavbarProps {
 export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [accountModalOpen, setAccountModalOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
 
   const handleLogout = () => {
     logout();
   };
 
-  // Check if user can access full menu (only manager)
-  const canAccessFullMenu = user?.role === 'manager';
+  // Allow all logged in users to access the menu, but filter items by permission
+  const canAccessFullMenu = true;
+
+  // Check permission for a specific page
+  const hasAccess = (page: PageType) => {
+    if (!user) return false;
+    
+    // Admin/Manager bypass (optional, but good for safety if permissions strictly defined)
+    // if (user.role === 'manager') return true; 
+
+    // Permission mapping - should match App.tsx
+    const pagePermissions: Record<PageType, string | string[]> = {
+      'dashboard': 'dashboard:view',
+      'pos': 'pos:access',
+      'kitchen': 'kitchen:access',
+      'inventory': 'goods_inventory:view',
+      'product-pricing': 'goods_pricing:view',
+      'stock-check': 'goods_stock_check:view',
+      'import-export': 'goods_import_export:view',
+      'menu': 'goods_recipe:view',
+      'tables': 'tables:view',
+      'scheduling': ['staff_scheduling:view', 'staff_timekeeping:view', 'staff_payroll:view'],
+      'staff': 'staff:view',
+      'staff-settings': 'staff_settings:view',
+      'customers': 'customers:view',
+      'customer-groups': 'customer_groups:view',
+      'suppliers': 'suppliers:view',
+      'promotions': 'promotions:view',
+      'finance': 'finance:view',
+      'reports': 'reports:view',
+      'invoices': 'invoices:view',
+      'returns': 'returns:view',
+      'purchase-orders': 'purchase_orders:view',
+      'purchase-returns': 'purchase_returns:view',
+      'write-offs': 'write_offs:view',
+      'new-item-requests': 'goods_new_items:view',
+      'accounts': 'system_users:view',
+      'pos-demo-restocked': 'pos:access',
+    };
+
+    const requiredPermission = pagePermissions[page];
+    if (!requiredPermission) return true; // No restriction defined
+
+    if (Array.isArray(requiredPermission)) {
+      return requiredPermission.some(p => hasPermission(p as any));
+    }
+    return hasPermission(requiredPermission as any);
+  };
+
 
   const mainMenuItems = [
     { id: 'dashboard' as PageType, label: 'Tổng quan' },
@@ -107,7 +154,7 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
         <div className="px-4 lg:px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
-              {canAccessFullMenu ? (
+              {canAccessFullMenu && hasAccess('dashboard') ? (
                 <Button
                   variant="outline"
                   onClick={() => onNavigate('dashboard')}
@@ -128,12 +175,19 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
             </div>
 
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="relative">
-                <Bell className="w-5 h-5" />
-                <Badge className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center p-0 bg-red-500 text-white text-xs">
-                  3
-                </Badge>
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Settings className="w-5 h-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 z-50" sideOffset={5}>
+                  <DropdownMenuItem onClick={() => onNavigate('accounts')}>
+                    <Users className="w-4 h-4 mr-2" />
+                    Quản lý người dùng
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -192,7 +246,9 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
           {canAccessFullMenu && (
             <div className="hidden lg:flex items-center gap-1">
               {/* Tổng quan */}
-              {mainMenuItems.map((item) => {
+              {mainMenuItems
+                .filter(item => hasAccess(item.id))
+                .map((item) => {
                 const isActive = currentPage === item.id;
                 return (
                   <button
@@ -210,6 +266,7 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
               })}
 
               {/* Hàng hóa Dropdown */}
+              {goodsMenuItems.some(item => hasAccess(item.id)) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -224,7 +281,9 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  {goodsMenuItems.map((item) => (
+                  {goodsMenuItems
+                    .filter(item => hasAccess(item.id))
+                    .map((item) => (
                     <DropdownMenuItem
                       key={item.id}
                       onClick={() => onNavigate(item.id)}
@@ -235,9 +294,12 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
+              )}
 
               {/* Phòng bàn */}
-              {tableMenuItems.map((item) => {
+              {tableMenuItems
+                .filter(item => hasAccess(item.id))
+                .map((item) => {
                 const isActive = currentPage === item.id;
                 return (
                   <button
@@ -255,6 +317,7 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
               })}
 
               {/* Đối tác Dropdown */}
+              {partnerMenuItems.some(item => hasAccess(item.id)) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -269,7 +332,9 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  {partnerMenuItems.map((item) => (
+                  {partnerMenuItems
+                    .filter(item => hasAccess(item.id))
+                    .map((item) => (
                     <DropdownMenuItem
                       key={item.id}
                       onClick={() => onNavigate(item.id)}
@@ -280,8 +345,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
+              )}
 
               {/* Nhân viên Dropdown */}
+              {staffMenuItems.some(item => hasAccess(item.id)) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -296,7 +363,9 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  {staffMenuItems.map((item) => (
+                  {staffMenuItems
+                    .filter(item => hasAccess(item.id))
+                    .map((item) => (
                     <DropdownMenuItem
                       key={item.id}
                       onClick={() => onNavigate(item.id)}
@@ -307,8 +376,10 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
+              )}
 
               {/* Giao dịch Dropdown */}
+              {transactionMenuItems.some(item => hasAccess(item.id)) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -323,7 +394,9 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  {transactionMenuItems.map((item) => (
+                  {transactionMenuItems
+                    .filter(item => hasAccess(item.id))
+                    .map((item) => (
                     <DropdownMenuItem
                       key={item.id}
                       onClick={() => onNavigate(item.id)}
@@ -334,9 +407,12 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
+              )}
 
               {/* Tài chính */}
-              {financeMenuItems.map((item) => {
+              {financeMenuItems
+                .filter(item => hasAccess(item.id))
+                .map((item) => {
                 const isActive = currentPage === item.id;
                 return (
                   <button
@@ -354,7 +430,9 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
               })}
 
               {/* Báo cáo */}
-              {reportMenuItems.map((item) => {
+              {reportMenuItems
+                .filter(item => hasAccess(item.id))
+                .map((item) => {
                 const isActive = currentPage === item.id;
                 return (
                   <button
@@ -375,7 +453,9 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
               <div className="h-6 w-px bg-slate-200 mx-2" />
 
               {/* Fullscreen items */}
-              {fullscreenMenuItems.map((item) => {
+              {fullscreenMenuItems
+                .filter(item => hasAccess(item.id))
+                .map((item) => {
                 const isActive = currentPage === item.id;
                 return (
                   <button
@@ -396,12 +476,19 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
 
           {/* Right Actions */}
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="relative">
-              <Bell className="w-5 h-5" />
-              <Badge className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center p-0 bg-red-500 text-white text-xs">
-                3
-              </Badge>
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <Settings className="w-5 h-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 z-50" sideOffset={5}>
+                <DropdownMenuItem onClick={() => onNavigate('accounts')}>
+                  <Users className="w-4 h-4 mr-2" />
+                  Quản lý người dùng
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -449,7 +536,9 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
           <div className="lg:hidden py-4 border-t">
             <div className="space-y-1">
               {/* Tổng quan */}
-              {mainMenuItems.map((item) => {
+              {mainMenuItems
+                .filter(item => hasAccess(item.id))
+                .map((item) => {
                 const isActive = currentPage === item.id;
                 return (
                   <button
@@ -470,9 +559,12 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
               })}
 
               {/* Hàng hóa section */}
+              {goodsMenuItems.some(item => hasAccess(item.id)) && (
               <div className="pt-2">
                 <p className="px-3 py-1 text-xs text-slate-500">Hàng hóa</p>
-                {goodsMenuItems.map((item) => {
+                {goodsMenuItems
+                  .filter(item => hasAccess(item.id))
+                  .map((item) => {
                   const isActive = currentPage === item.id;
                   return (
                     <button
@@ -492,10 +584,14 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   );
                 })}
               </div>
+              )}
 
               {/* Phòng bàn */}
+              {tableMenuItems.some(item => hasAccess(item.id)) && (
               <div className="pt-2">
-                {tableMenuItems.map((item) => {
+                {tableMenuItems
+                  .filter(item => hasAccess(item.id))
+                  .map((item) => {
                   const isActive = currentPage === item.id;
                   return (
                     <button
@@ -515,11 +611,15 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   );
                 })}
               </div>
+              )}
 
               {/* Đối tác section */}
+              {partnerMenuItems.some(item => hasAccess(item.id)) && (
               <div className="pt-2">
                 <p className="px-3 py-1 text-xs text-slate-500">Đối tác</p>
-                {partnerMenuItems.map((item) => {
+                {partnerMenuItems
+                  .filter(item => hasAccess(item.id))
+                  .map((item) => {
                   const isActive = currentPage === item.id;
                   return (
                     <button
@@ -539,11 +639,15 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   );
                 })}
               </div>
+              )}
 
               {/* Nhân viên section */}
+              {staffMenuItems.some(item => hasAccess(item.id)) && (
               <div className="pt-2">
                 <p className="px-3 py-1 text-xs text-slate-500">Nhân viên</p>
-                {staffMenuItems.map((item) => {
+                {staffMenuItems
+                  .filter(item => hasAccess(item.id))
+                  .map((item) => {
                   const isActive = currentPage === item.id;
                   return (
                     <button
@@ -563,11 +667,15 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   );
                 })}
               </div>
+              )}
 
               {/* Giao dịch section */}
+              {transactionMenuItems.some(item => hasAccess(item.id)) && (
               <div className="pt-2">
                 <p className="px-3 py-1 text-xs text-slate-500">Giao dịch</p>
-                {transactionMenuItems.map((item) => {
+                {transactionMenuItems
+                  .filter(item => hasAccess(item.id))
+                  .map((item) => {
                   const isActive = currentPage === item.id;
                   return (
                     <button
@@ -587,10 +695,14 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   );
                 })}
               </div>
+              )}
 
               {/* Tài chính */}
+              {financeMenuItems.some(item => hasAccess(item.id)) && (
               <div className="pt-2">
-                {financeMenuItems.map((item) => {
+                {financeMenuItems
+                  .filter(item => hasAccess(item.id))
+                  .map((item) => {
                   const isActive = currentPage === item.id;
                   return (
                     <button
@@ -610,10 +722,14 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   );
                 })}
               </div>
+              )}
 
               {/* Báo cáo */}
+              {reportMenuItems.some(item => hasAccess(item.id)) && (
               <div className="pt-2">
-                {reportMenuItems.map((item) => {
+                {reportMenuItems
+                  .filter(item => hasAccess(item.id))
+                  .map((item) => {
                   const isActive = currentPage === item.id;
                   return (
                     <button
@@ -633,10 +749,14 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   );
                 })}
               </div>
+              )}
 
               {/* Fullscreen items */}
+              {fullscreenMenuItems.some(item => hasAccess(item.id)) && (
               <div className="pt-4 border-t mt-2">
-                {fullscreenMenuItems.map((item) => {
+                {fullscreenMenuItems
+                  .filter(item => hasAccess(item.id))
+                  .map((item) => {
                   const isActive = currentPage === item.id;
                   return (
                     <button
@@ -656,6 +776,7 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   );
                 })}
               </div>
+              )}
             </div>
           </div>
         )}

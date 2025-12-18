@@ -1,5 +1,6 @@
 import { useState } from "react";
 import * as React from "react";
+import { useAuth } from "../../contexts/AuthContext";
 import {
   Plus,
   Search,
@@ -37,7 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { SupplierFormDialog } from "../SupplierFormDialog";
 
 interface Supplier {
@@ -55,6 +56,11 @@ interface Supplier {
 }
 
 export function Suppliers() {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('suppliers:create');
+  const canUpdate = hasPermission('suppliers:update');
+  const canDelete = hasPermission('suppliers:delete');
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -453,16 +459,18 @@ export function Suppliers() {
                 <Printer className="w-4 h-4 mr-2" />
                 In danh sách
               </Button>
-              <Button
-                className="bg-blue-600 hover:bg-blue-700"
-                onClick={() => {
-                  setEditingSupplier(null);
-                  setDialogOpen(true);
-                }}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Thêm nhà cung cấp
-              </Button>
+              {canCreate && (
+                <Button
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={() => {
+                    setEditingSupplier(null);
+                    setDialogOpen(true);
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Thêm nhà cung cấp
+                </Button>
+              )}
             </div>
           </div>
 
@@ -591,43 +599,49 @@ export function Suppliers() {
                         </TableCell>
                         <TableCell className="text-sm text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditDialog(supplier)}
-                              className="hover:bg-blue-100"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteSupplier(supplier.id)}
-                              className="hover:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4 text-red-600" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleToggleStatus(supplier.id)}
-                              className={
-                                supplier.status === "active"
-                                  ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                              }
-                              title={
-                                supplier.status === "active"
-                                  ? "Vô hiệu hóa"
-                                  : "Kích hoạt"
-                              }
-                            >
-                              {supplier.status === "active" ? (
-                                <PowerOff className="w-4 h-4" />
-                              ) : (
-                                <Power className="w-4 h-4" />
-                              )}
-                            </Button>
+                            {canUpdate && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditDialog(supplier)}
+                                className="hover:bg-blue-100"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteSupplier(supplier.id)}
+                                className="hover:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-600" />
+                              </Button>
+                            )}
+                            {canUpdate && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleStatus(supplier.id)}
+                                className={
+                                  supplier.status === "active"
+                                    ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                }
+                                title={
+                                  supplier.status === "active"
+                                    ? "Vô hiệu hóa"
+                                    : "Kích hoạt"
+                                }
+                              >
+                                {supplier.status === "active" ? (
+                                  <PowerOff className="w-4 h-4" />
+                                ) : (
+                                  <Power className="w-4 h-4" />
+                                )}
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

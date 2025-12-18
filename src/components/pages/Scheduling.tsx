@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "../../contexts/AuthContext";
 import { Settings, Calendar, Clock, Calculator } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { ShiftManagement } from "../scheduling/ShiftManagement";
@@ -18,7 +19,17 @@ interface Shift {
 }
 
 export function Scheduling() {
-  const [activeTab, setActiveTab] = useState("shifts");
+  const { hasPermission } = useAuth();
+  const canViewScheduling = hasPermission('staff_scheduling:view');
+  const canViewTimekeeping = hasPermission('staff_timekeeping:view');
+  const canViewPayroll = hasPermission('staff_payroll:view');
+
+  const [activeTab, setActiveTab] = useState(() => {
+    if (canViewScheduling) return "shifts";
+    if (canViewTimekeeping) return "timekeeping";
+    if (canViewPayroll) return "payroll";
+    return "shifts";
+  });
   const [schedule, setSchedule] =
     useState<Record<string, Record<string, string[]>>>(initialSchedule);
   const [timekeepingData, setTimekeepingData] = useState<
@@ -67,28 +78,39 @@ export function Scheduling() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full max-w-3xl grid-cols-4">
+          {canViewScheduling && (
           <TabsTrigger value="shifts" className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
             Quản lý ca làm việc
           </TabsTrigger>
+          )}
+          {canViewScheduling && (
           <TabsTrigger value="schedule" className="flex items-center gap-2">
             <Calendar className="w-4 h-4" />
             Xếp lịch nhân viên
           </TabsTrigger>
+          )}
+          {canViewTimekeeping && (
           <TabsTrigger value="timekeeping" className="flex items-center gap-2">
             <Clock className="w-4 h-4" />
             Bảng chấm công
           </TabsTrigger>
+          )}
+          {canViewPayroll && (
           <TabsTrigger value="payroll" className="flex items-center gap-2">
             <Calculator className="w-4 h-4" />
             Bảng lương
           </TabsTrigger>
+          )}
         </TabsList>
 
+        {canViewScheduling && (
         <TabsContent value="shifts" className="mt-6">
           <ShiftManagement shifts={shifts} setShifts={setShifts} />
         </TabsContent>
+        )}
 
+        {canViewScheduling && (
         <TabsContent value="schedule" className="mt-6">
           <ScheduleCalendar
             shifts={shifts}
@@ -96,7 +118,9 @@ export function Scheduling() {
             setSchedule={setSchedule}
           />
         </TabsContent>
+        )}
 
+        {canViewTimekeeping && (
         <TabsContent value="timekeeping" className="mt-6">
           <TimekeepingBoard
             shifts={shifts}
@@ -106,13 +130,16 @@ export function Scheduling() {
             onChange={setTimekeepingData}
           />
         </TabsContent>
+        )}
 
+        {canViewPayroll && (
         <TabsContent value="payroll" className="mt-6">
           <PayrollBoard
             shifts={shifts}
             timekeepingData={timekeepingData}
           />
         </TabsContent>
+        )}
       </Tabs>
     </div>
   );

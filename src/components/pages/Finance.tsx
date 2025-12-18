@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from "../../contexts/AuthContext";
 import { 
   Plus, 
   Download, 
@@ -59,6 +60,9 @@ import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 
 export function Finance() {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('finance:create');
+
   const [activeTab, setActiveTab] = useState<'cash' | 'bank' | 'total'>('cash');
   
   // Filter states
@@ -952,22 +956,26 @@ export function Finance() {
             <div className="flex items-center gap-2">
               {activeTab !== 'total' && (
                 <>
-                  <Button 
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                    onClick={handleOpenReceiptDialog}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Lập phiếu thu
-                  </Button>
-                  <Button 
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                    onClick={handleOpenPaymentDialog}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Lập phiếu chi
-                  </Button>
+                  {canCreate && (
+                    <>
+                      <Button 
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={handleOpenReceiptDialog}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Lập phiếu thu
+                      </Button>
+                      <Button 
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={handleOpenPaymentDialog}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Lập phiếu chi
+                      </Button>
+                    </>
+                  )}
                 </>
               )}
               <Button variant="outline" size="sm">

@@ -102,7 +102,14 @@ interface InventoryItem {
   sellingPrice?: number;
 }
 
+import { useAuth } from "../../contexts/AuthContext";
+
 export function Inventory() {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('goods_inventory:create');
+  const canUpdate = hasPermission('goods_inventory:update');
+  const canDelete = hasPermission('goods_inventory:delete');
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([
     "all",
@@ -842,6 +849,7 @@ export function Inventory() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {canCreate && (
             <Button
               variant="outline"
               onClick={() => setImportDialogOpen(true)}
@@ -849,12 +857,15 @@ export function Inventory() {
               <Upload className="w-4 h-4 mr-2" />
               Nhập file
             </Button>
+            )}
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
               <DialogTrigger asChild>
+                {canCreate && (
                 <Button className="bg-blue-600 hover:bg-blue-700">
                   <Plus className="w-4 h-4 mr-2" />
                   Thêm hàng hóa
                 </Button>
+                )}
               </DialogTrigger>
               <DialogContent className="min-w-[1100px] max-w-[1300px] w-[100vw] max-h-[90vh] flex flex-col" aria-describedby={undefined}>
                 <DialogHeader>
@@ -1141,6 +1152,7 @@ export function Inventory() {
                   >
                     Hủy
                   </Button>
+                  {canCreate && (
                   <Button className="bg-blue-600 hover:bg-blue-700">
                     <Plus className="w-4 h-4 mr-2" />
                     {addItemType === "composite"
@@ -1149,6 +1161,7 @@ export function Inventory() {
                         ? "Thêm hàng hóa"
                         : "Thêm nguyên liệu"}
                   </Button>
+                  )}
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -2004,29 +2017,42 @@ export function Inventory() {
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <div className="flex justify-end gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      setEditingItem(item);
-                                      setEditValues({
-                                        name: item.name,
-                                        category: item.category,
-                                        unit: item.unit,
-                                        minStock: item.minStock,
-                                        maxStock: item.maxStock,
-                                        sellingPrice: item.sellingPrice,
-                                        productStatus: item.productStatus,
-                                        ingredients: item.ingredients || [],
-                                      });
-                                      setEditDialogOpen(true);
-                                    }}
-                                  >
-                                    <Pencil className="w-4 h-4" />
-                                  </Button>
-                                  <Button variant="ghost" size="sm">
-                                    <Trash2 className="w-4 h-4 text-red-600" />
-                                  </Button>
+                                  {canUpdate && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setEditingItem(item);
+                                        setEditValues({
+                                          name: item.name,
+                                          category: item.category,
+                                          unit: item.unit,
+                                          minStock: item.minStock,
+                                          maxStock: item.maxStock,
+                                          sellingPrice: item.sellingPrice,
+                                          productStatus: item.productStatus,
+                                          ingredients: item.ingredients || [],
+                                        });
+                                        setNewItemImage(item.imageUrl || "");
+                                        setEditDialogOpen(true);
+                                      }}
+                                    >
+                                      <Pencil className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                  {canDelete && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        if (confirm(`Bạn có chắc muốn xóa ${item.name}?`)) {
+                                          setItems(items.filter((i) => i.id !== item.id));
+                                        }
+                                      }}
+                                    >
+                                      <Trash2 className="w-4 h-4 text-red-600" />
+                                    </Button>
+                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>

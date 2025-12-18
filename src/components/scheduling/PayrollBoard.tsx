@@ -1,5 +1,18 @@
 import React, { useMemo, useState } from "react";
-import { Calculator, ChevronDown, ChevronUp, Plus, X, FileSpreadsheet } from "lucide-react";
+import { Calculator, ChevronDown, ChevronUp, Plus, X, FileSpreadsheet, RefreshCw } from "lucide-react";
+import { PayrollDetailModal } from "./PayrollDetailModal";
+import { SalaryBreakdownModal } from "./SalaryBreakdownModal";
+import { calculateStaffOvertime } from "./payrollHelpers";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import {
@@ -29,13 +42,19 @@ import {
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { staffMembers, initialSchedule, StaffMember } from "../../data/staffData";
+import { useAuth } from "../../contexts/AuthContext";
 import type { TimekeepingEntry } from "./TimekeepingBoard";
 
 interface PayrollDetail {
   staffId: string;
   staffName: string;
-  totalAmount: number;
-  paidAmount: number;
+  totalAmount: number; // Lương cơ bản (theo ca hoặc cố định)
+  overtimeAmount: number; // Tiền làm thêm
+  bonus: number; // Thưởng
+  penalty: number; // Phạt
+  finalAmount: number; // Tổng lương = totalAmount + overtimeAmount + bonus - penalty
+  paidAmount: number; // Đã trả
+  remainingAmount: number; // Còn lại = finalAmount - paidAmount
 }
 
 interface PayrollPayment {
@@ -44,9 +63,9 @@ interface PayrollPayment {
   staffName: string;
   amount: number;
   note?: string;
-   method: "cash" | "transfer";
-   bankAccount?: string;
-   bankName?: string;
+  method: "cash" | "transfer";
+  bankAccount?: string;
+  bankName?: string;
 }
 
 interface PayrollItem {
@@ -165,86 +184,52 @@ const calculateEntryAmount = (
   }
 
   const salarySettings = staff.salarySettings;
+  if (!salarySettings) return 0;
+
   const dateObj = new Date(entry.date);
   const dayType = getDayTypeFromDate(dateObj);
 
-  let basePerShift: number;
-  let baseFactor = 1;
-
-  if (salarySettings && salarySettings.salaryType === "shift") {
+  // Lương theo ca (shift-based)
+  if (salarySettings.salaryType === "shift") {
     const shiftSetting =
       salarySettings.shifts.find((sh) => sh.id === entry.shiftId) ||
       salarySettings.shifts[0];
 
-    basePerShift = parseCurrency(shiftSetting?.salaryPerShift);
+    const basePerShift = parseCurrency(shiftSetting?.salaryPerShift);
     if (!basePerShift) return 0;
 
+    let baseFactor = 1;
+
+    // Nghỉ phép
     if (entry.status === "day-off") {
       if (entry.leaveType === "approved-leave") {
         baseFactor = parseCoefficient(shiftSetting?.dayOffCoeff, 0);
       } else {
-        baseFactor = 0;
+        baseFactor = 0; // Nghỉ không phép = 0
       }
-    } else if (dayType === "saturday") {
+    } 
+    // Hệ số theo ngày
+    else if (dayType === "saturday") {
       baseFactor = parseCoefficient(shiftSetting?.saturdayCoeff, 1);
     } else if (dayType === "sunday") {
       baseFactor = parseCoefficient(shiftSetting?.sundayCoeff, 1);
-    } else {
-      baseFactor = 1;
     }
-  } else {
-    basePerShift = staff.salary ? Math.round(staff.salary / 26) : 200000;
-    if (entry.status === "day-off") {
-      if (entry.leaveType === "approved-leave") {
-        baseFactor = 1;
-      } else {
-        baseFactor = 0;
-      }
-    } else {
-      baseFactor = 1;
-    }
+
+    let amount = basePerShift * baseFactor;
+
+    // Tính overtime (chỉ cho lương theo ca) - Đã tách thành function riêng, nhưng vẫn giữ ở đây để tính tổng từng entry nếu cần
+    // Tuy nhiên, logic mới là overtime tính riêng.
+    // Nếu giữ logic cũ ở đây thì calculateStaffPayroll sẽ bao gồm cả overtime.
+    // Để tránh double counting, ta sẽ loại bỏ overtime ở đây.
+    
+    // UPDATE: calculateEntryAmount chỉ nên trả về lương cơ bản của ca đó.
+    // Overtime được tính riêng bằng calculateStaffOvertime.
+    
+    return amount;
   }
-
-  let amount = basePerShift * baseFactor;
-
-  if (
-    salarySettings &&
-    salarySettings.overtimeEnabled &&
-    (entry.overtimeBefore || entry.overtimeAfter)
-  ) {
-    const shiftInfo = shifts.find((sh) => sh.id === entry.shiftId);
-    if (shiftInfo) {
-      const startParts = shiftInfo.startTime.split(":").map(Number);
-      const endParts = shiftInfo.endTime.split(":").map(Number);
-      const shiftMinutes =
-        endParts[0] * 60 + endParts[1] - (startParts[0] * 60 + startParts[1]);
-      if (shiftMinutes > 0) {
-        const hourlyBase = basePerShift / (shiftMinutes / 60);
-        const overtimeMinutes =
-          (entry.overtimeBeforeHours || 0) * 60 +
-          (entry.overtimeBeforeMinutes || 0) +
-          (entry.overtimeAfterHours || 0) * 60 +
-          (entry.overtimeAfterMinutes || 0);
-        if (overtimeMinutes > 0) {
-          let coeffValue: string | undefined;
-          if (entry.status === "day-off") {
-            coeffValue = salarySettings.overtimeCoeffs.dayOff;
-          } else if (dayType === "saturday") {
-            coeffValue = salarySettings.overtimeCoeffs.saturday;
-          } else if (dayType === "sunday") {
-            coeffValue = salarySettings.overtimeCoeffs.sunday;
-          } else {
-            coeffValue = salarySettings.overtimeCoeffs.weekday;
-          }
-          const overtimeFactor = parseCoefficient(coeffValue, 1);
-          const overtimeHours = overtimeMinutes / 60;
-          amount += hourlyBase * overtimeHours * overtimeFactor;
-        }
-      }
-    }
-  }
-
-  return amount;
+  
+  // Lương cố định (fixed) - không tính theo ca
+  return 0;
 };
 
 const calculateStaffPayroll = (
@@ -254,32 +239,36 @@ const calculateStaffPayroll = (
   periodStart: Date,
   periodEnd: Date
 ) => {
+  const salarySettings = staff.salarySettings;
+  
+  // Lương cố định - trả lương tháng cố định
+  if (salarySettings?.salaryType === "fixed") {
+    const monthlySalary = parseCurrency(salarySettings.salaryAmount);
+    return monthlySalary;
+  }
+
+  // Lương theo ca - tính theo chấm công
   if (!timekeepingData || Object.keys(timekeepingData).length === 0) {
     return 0;
   }
 
-  const staffTimekeeping = timekeepingData[staff.id];
-  if (!staffTimekeeping) {
-    return 0;
-  }
-
-  const fromTime = periodStart.getTime();
-  const toTime = periodEnd.getTime();
-
   let total = 0;
+  const fromStr = formatISODate(periodStart);
+  const toStr = formatISODate(periodEnd);
 
-  Object.entries(staffTimekeeping).forEach(([shiftId, dateMap]) => {
-    Object.values(dateMap || {}).forEach((rawEntry) => {
-      if (!rawEntry || typeof rawEntry !== "object") return;
-      const entry = rawEntry as TimekeepingEntry;
-      if (!entry.date) return;
-      const entryDateStr = entry.date.split("T")[0];
-      const fromStr = formatISODate(periodStart);
-      const toStr = formatISODate(periodEnd);
-      if (entryDateStr < fromStr || entryDateStr > toStr) {
-        return;
-      }
-      const amount = calculateEntryAmount(entry, staff, shifts);
+  // Duyệt qua cấu trúc: timekeepingData[date][shiftId][staffId]
+  Object.entries(timekeepingData).forEach(([date, shiftMap]) => {
+    // Check if date in range
+    const dateStr = date.split("T")[0];
+    if (dateStr < fromStr || dateStr > toStr) {
+      return;
+    }
+
+    Object.entries(shiftMap || {}).forEach(([shiftId, staffMap]) => {
+      const entry = (staffMap as any)?.[staff.id];
+      if (!entry || typeof entry !== "object") return;
+      
+      const amount = calculateEntryAmount(entry as TimekeepingEntry, staff, shifts);
       total += amount;
     });
   });
@@ -321,6 +310,18 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
   const [selectedPaymentStaffIds, setSelectedPaymentStaffIds] = useState<
     string[]
   >([]);
+
+  const { hasPermission } = useAuth();
+  const canView = hasPermission('staff_payroll:view');
+  const canCreate = hasPermission('staff_payroll:create');
+  const canUpdate = hasPermission('staff_payroll:update');
+  const canDelete = hasPermission('staff_payroll:delete');
+  const canPayment = hasPermission('staff_payroll:payment');
+
+  if (!canView) return null; // Or render "Access Denied"
+
+  // Use string to support formatted input (comma separated)
+  const [paymentAmounts, setPaymentAmounts] = useState<Record<string, string>>({});
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [periodType, setPeriodType] = useState<"monthly" | "custom">("monthly");
   const monthlyOptions = useMemo(buildMonthlyOptions, []);
@@ -330,6 +331,15 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
   );
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  
+  // New states for detail modal
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [selectedPayrollId, setSelectedPayrollId] = useState<string | null>(null);
+  const [deleteData, setDeleteData] = useState<{ id: string } | null>(null);
+
+  // New states for salary breakdown modal
+  const [breakdownStaffId, setBreakdownStaffId] = useState<string | null>(null);
+  const [breakdownModalOpen, setBreakdownModalOpen] = useState(false);
 
   const persistPayrolls = (items: PayrollItem[]) => {
     setPayrolls(items);
@@ -389,15 +399,31 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
             periodEnd
           )
         );
+        
+        const overtimeAmount = Math.round(
+          calculateStaffOvertime(s, timekeepingData, shifts, periodStart, periodEnd)
+        );
+
+        const bonus = 0;
+        const penalty = 0;
+        const finalAmount = totalAmount + overtimeAmount + bonus - penalty;
+        const paidAmount = 0;
+        const remainingAmount = finalAmount - paidAmount;
+        
         return {
           staffId: s.id,
           staffName: s.fullName,
           totalAmount,
-          paidAmount: 0,
+          overtimeAmount,
+          bonus,
+          penalty,
+          finalAmount,
+          paidAmount,
+          remainingAmount,
         };
       });
 
-    const totalAmount = details.reduce((sum, d) => sum + d.totalAmount, 0);
+    const totalAmount = details.reduce((sum, d) => sum + d.finalAmount, 0);
 
     const id = `BL${(payrolls.length + 1).toString().padStart(6, "0")}`;
 
@@ -427,6 +453,106 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
 
   const workRangeText = getWorkRange();
 
+  const handleReloadPayroll = (payrollId: string) => {
+    const payroll = payrolls.find((p) => p.id === payrollId);
+    if (!payroll) return;
+
+    const parts = payroll.workRange.split(" - ");
+    if (parts.length !== 2) return;
+
+    const start = parseDMYToDate(parts[0]);
+    const end = parseDMYToDate(parts[1]);
+
+    if (!start || !end) return;
+
+    const existingDetailsMap = new Map(payroll.details.map((d) => [d.staffId, d]));
+
+    const newDetails: PayrollDetail[] = staffMembers
+      .filter((s) => s.position !== "manager")
+      .slice(0, 4)
+      .map((s) => {
+        const totalAmount = Math.round(
+          calculateStaffPayroll(s, timekeepingData, shifts, start, end)
+        );
+        const overtimeAmount = Math.round(
+          calculateStaffOvertime(s, timekeepingData, shifts, start, end)
+        );
+
+        const existing = existingDetailsMap.get(s.id);
+        const bonus = existing ? existing.bonus : 0;
+        const penalty = existing ? existing.penalty : 0;
+        const paidAmount = existing ? existing.paidAmount : 0;
+
+        const finalAmount = totalAmount + overtimeAmount + bonus - penalty;
+        const remainingAmount = finalAmount - paidAmount;
+
+        return {
+          staffId: s.id,
+          staffName: s.fullName,
+          totalAmount,
+          overtimeAmount,
+          bonus,
+          penalty,
+          finalAmount,
+          paidAmount,
+          remainingAmount,
+        };
+      });
+
+    const newTotalAmount = newDetails.reduce((sum, d) => sum + d.finalAmount, 0);
+
+    const updatedPayrolls = payrolls.map((p) => {
+      if (p.id === payrollId) {
+        return { ...p, details: newDetails, totalAmount: newTotalAmount };
+      }
+      return p;
+    });
+
+    persistPayrolls(updatedPayrolls);
+  };
+
+  const handleUpdateDetails = (payrollId: string, updatedDetails: PayrollDetail[]) => {
+    const newTotalAmount = updatedDetails.reduce((sum, d) => sum + d.finalAmount, 0);
+    
+    const updatedPayrolls = payrolls.map(p => {
+      if (p.id === payrollId) {
+        return {
+          ...p,
+          details: updatedDetails,
+          totalAmount: newTotalAmount
+        };
+      }
+      return p;
+    });
+    
+    persistPayrolls(updatedPayrolls);
+  };
+
+  const handleFinalizePayroll = (payrollId: string) => {
+     const updatedPayrolls = payrolls.map(p => {
+      if (p.id === payrollId) {
+        return {
+          ...p,
+          status: "closed" as const
+        };
+      }
+      return p;
+    });
+    persistPayrolls(updatedPayrolls);
+  };
+
+  const handleDeletePayroll = () => {
+    if (!deleteData) return;
+    const next = payrolls.filter((item) => item.id !== deleteData.id);
+    persistPayrolls(next);
+    if (expandedPayrollId === deleteData.id) {
+      setExpandedPayrollId(null);
+    }
+    setDeleteData(null);
+  };
+
+  const selectedPayroll = payrolls.find(p => p.id === selectedPayrollId);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -434,13 +560,15 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
           <Calculator className="w-4 h-4" />
           Danh sách bảng lương
         </CardTitle>
-        <Button
-          className="bg-blue-600 hover:bg-blue-700"
-          onClick={() => setCreateDialogOpen(true)}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Bảng tính lương
-        </Button>
+        {canCreate && (
+          <Button
+            className="bg-blue-600 hover:bg-blue-700"
+            onClick={() => setCreateDialogOpen(true)}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Bảng tính lương
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
@@ -593,168 +721,91 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
                                   </div>
                                 </div>
                               </div>
-                              {p.status === "draft" && (
-                                <div className="mt-4 flex justify-end gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-slate-300 text-slate-700 hover:bg-slate-50 ml-auto"
-                                    onClick={() => {
-                                      const header = [
-                                        "Mã nhân viên",
-                                        "Tên nhân viên",
-                                        "Tổng lương",
-                                        "Đã thanh toán",
-                                        "Còn lại",
+                              <div className="mt-4 flex justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-slate-300 text-slate-700 hover:bg-slate-50 ml-auto"
+                                  onClick={() => {
+                                    const header = [
+                                      "Mã nhân viên",
+                                      "Tên nhân viên",
+                                      "Tổng lương",
+                                      "Đã thanh toán",
+                                      "Còn lại",
+                                    ];
+                                    const rows = p.details.map((d) => {
+                                      const remaining = (d.finalAmount || d.totalAmount || 0) - (d.paidAmount || 0);
+                                      return [
+                                        d.staffId,
+                                        d.staffName,
+                                        d.finalAmount || d.totalAmount || 0,
+                                        d.paidAmount || 0,
+                                        remaining,
                                       ];
-                                      const rows = p.details.map((d) => {
-                                        const remainStaff =
-                                          d.totalAmount - d.paidAmount;
-                                        return [
-                                          d.staffId,
-                                          d.staffName,
-                                          d.totalAmount,
-                                          d.paidAmount,
-                                          remainStaff,
-                                        ];
-                                      });
-                                      const csv = [header, ...rows]
-                                        .map((row) =>
-                                          row
-                                            .map((value) =>
-                                              `"${String(value).replace(
-                                                /"/g,
-                                                '""'
-                                              )}"`
-                                            )
-                                            .join(",")
-                                        )
-                                        .join("\n");
-                                      const blob = new Blob([csv], {
-                                        type: "text/csv;charset=utf-8;",
-                                      });
-                                      const url = URL.createObjectURL(blob);
-                                      const link =
-                                        document.createElement("a");
-                                      link.href = url;
-                                      link.download = `${p.id}.csv`;
-                                      document.body.appendChild(link);
-                                      link.click();
-                                      document.body.removeChild(link);
-                                      URL.revokeObjectURL(url);
-                                    }}
-                                  >
-                                    <FileSpreadsheet className="w-4 h-4 mr-1" />
-                                    Xuất file
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-slate-300 text-slate-700 hover:bg-slate-50"
-                                    onClick={() => {
-                                      let from = new Date();
-                                      let to = new Date();
-                                      if (p.periodType === "monthly") {
-                                        const found = monthlyOptions.find(
-                                          (m) => m.range === p.workRange
-                                        );
-                                        if (found) {
-                                          from = new Date(found.startDate);
-                                          to = new Date(found.endDate);
-                                        }
-                                      } else {
-                                        const parts = p.workRange.split(" - ");
-                                        const fromDate =
-                                          parts[0] && parseDMYToDate(parts[0]);
-                                        const toDate =
-                                          parts[1] && parseDMYToDate(parts[1]);
-                                        if (fromDate && toDate) {
-                                          from = fromDate;
-                                          to = toDate;
-                                        }
-                                      }
-                                      const details: PayrollDetail[] =
-                                        staffMembers
-                                          .filter(
-                                            (s) =>
-                                              s.position !== "manager" &&
-                                              p.details.some(
-                                                (d) => d.staffId === s.id
-                                              )
+                                    });
+                                    const csv = [header, ...rows]
+                                      .map((row) =>
+                                        row
+                                          .map((value) =>
+                                            `"${String(value).replace(
+                                              /"/g,
+                                              '""'
+                                            )}"`
                                           )
-                                          .map((s) => {
-                                            const totalAmount = Math.round(
-                                              calculateStaffPayroll(
-                                                s,
-                                                timekeepingData,
-                                                shifts,
-                                                from,
-                                                to
-                                              )
-                                            );
-                                            const existing = p.details.find(
-                                              (d) => d.staffId === s.id
-                                            );
-                                            const paidAmount =
-                                              existing?.paidAmount || 0;
-                                            return {
-                                              staffId: s.id,
-                                              staffName: s.fullName,
-                                              totalAmount,
-                                              paidAmount,
-                                            };
-                                          });
-                                      const totalAmount = details.reduce(
-                                        (sum, d) => sum + d.totalAmount,
-                                        0
-                                      );
-                                      const updated: PayrollItem = {
-                                        ...p,
-                                        totalAmount,
-                                        paidAmount: p.paidAmount,
-                                        details,
-                                      };
-                                      const next = payrolls.map((item) =>
-                                        item.id === p.id ? updated : item
-                                      );
-                                      persistPayrolls(next);
-                                    }}
-                                  >
-                                    Tải lại dữ liệu
-                                  </Button>
+                                          .join(",")
+                                      )
+                                      .join("\n");
+                                    const blob = new Blob([csv], {
+                                      type: "text/csv;charset=utf-8;",
+                                    });
+                                    const url = URL.createObjectURL(blob);
+                                    const link =
+                                      document.createElement("a");
+                                    link.href = url;
+                                    link.download = `${p.id}.csv`;
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    URL.revokeObjectURL(url);
+                                  }}
+                                >
+                                  <FileSpreadsheet className="w-4 h-4 mr-1" />
+                                  Xuất file
+                                </Button>
+                                {canDelete && (
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     className="border-red-500 text-red-600 hover:bg-red-50"
-                                    onClick={() => {
-                                      const next = payrolls.filter(
-                                        (item) => item.id !== p.id
-                                      );
-                                      persistPayrolls(next);
-                                      if (expandedPayrollId === p.id) {
-                                        setExpandedPayrollId(null);
-                                      }
-                                    }}
+                                    onClick={() => setDeleteData({ id: p.id })}
                                   >
                                     <X className="w-4 h-4 mr-1" />
                                     Huỷ bảng lương
                                   </Button>
+                                )}
+                                {p.status === "draft" && (
                                   <Button
                                     size="sm"
-                                    className="bg-emerald-600 hover:bg-emerald-700"
-                                    onClick={() => {
-                                      const next = payrolls.map((item) =>
-                                        item.id === p.id
-                                          ? { ...item, status: "closed" }
-                                          : item
-                                      );
-                                      persistPayrolls(next);
-                                    }}
+                                    variant="outline"
+                                    className="border-slate-300 text-slate-700 hover:bg-slate-50"
+                                    onClick={() => handleReloadPayroll(p.id)}
                                   >
-                                    Chốt lương
+                                    <RefreshCw className="w-4 h-4 mr-1" />
+                                    Tải lại
                                   </Button>
-                                </div>
-                              )}
+                                )}
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-700"
+                                  onClick={() => {
+                                    setSelectedPayrollId(p.id);
+                                    setDetailModalOpen(true);
+                                  }}
+                                >
+                                  Xem bảng lương
+                                </Button>
+                              </div>
                             </TabsContent>
                             <TabsContent value="payroll">
                               <div className="space-y-4">
@@ -765,70 +816,29 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
                                   <div className="flex items-center gap-2 ml-auto">
                                     <Button
                                       size="sm"
-                                      variant="outline"
-                                      className="border-slate-300 text-slate-700 hover:bg-slate-50"
-                                      onClick={() => {
-                                        const header = [
-                                          "Mã nhân viên",
-                                          "Tên nhân viên",
-                                          "Tổng lương",
-                                          "Đã thanh toán",
-                                          "Còn lại",
-                                        ];
-                                        const rows = p.details.map((d) => {
-                                          const remainStaff =
-                                            d.totalAmount - d.paidAmount;
-                                          return [
-                                            d.staffId,
-                                            d.staffName,
-                                            d.totalAmount,
-                                            d.paidAmount,
-                                            remainStaff,
-                                          ];
-                                        });
-                                        const csv = [header, ...rows]
-                                          .map((row) =>
-                                            row
-                                              .map((value) =>
-                                                `"${String(value).replace(
-                                                  /"/g,
-                                                  '""'
-                                                )}"`
-                                              )
-                                              .join(",")
-                                          )
-                                          .join("\n");
-                                        const blob = new Blob([csv], {
-                                          type: "text/csv;charset=utf-8;",
-                                        });
-                                        const url = URL.createObjectURL(blob);
-                                        const link =
-                                          document.createElement("a");
-                                        link.href = url;
-                                        link.download = `${p.id}.csv`;
-                                        document.body.appendChild(link);
-                                        link.click();
-                                        document.body.removeChild(link);
-                                        URL.revokeObjectURL(url);
-                                      }}
-                                    >
-                                      <FileSpreadsheet className="w-4 h-4 mr-1" />
-                                      Xuất file
-                                    </Button>
-                                    <Button
-                                      size="sm"
                                       className="bg-blue-600 hover:bg-blue-700"
+                                      disabled={!canPayment}
                                       onClick={() => {
                                         setPaymentPayrollId(p.id);
                                         setSelectedPaymentStaffIds(
                                           p.details
                                             .filter(
                                               (d) =>
-                                                d.totalAmount > d.paidAmount
+                                                (d.finalAmount || d.totalAmount || 0) > (d.paidAmount || 0)
                                             )
                                             .map((d) => d.staffId)
                                         );
                                         setPaymentDialogOpen(true);
+                                        const initialAmounts: Record<string, string> = {};
+                                        p.details.forEach(d => {
+                                           const final = d.finalAmount || d.totalAmount || 0;
+                                           const paid = d.paidAmount || 0;
+                                           const remaining = Math.max(0, final - paid);
+                                           if (remaining > 0) {
+                                               initialAmounts[d.staffId] = remaining.toLocaleString("en-US");
+                                           }
+                                        });
+                                        setPaymentAmounts(initialAmounts);
                                       }}
                                     >
                                       Thanh toán
@@ -840,13 +850,16 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
                                     <thead className="bg-slate-100">
                                       <tr>
                                         <th className="px-4 py-2 text-left text-xs text-slate-600">
+                                          Mã phiếu
+                                        </th>
+                                        <th className="px-4 py-2 text-left text-xs text-slate-600">
                                           Nhân viên
                                         </th>
                                         <th className="px-4 py-2 text-right text-xs text-slate-600">
                                           Tổng lương
                                         </th>
                                         <th className="px-4 py-2 text-right text-xs text-slate-600">
-                                          Đã thanh toán
+                                          Đã trả
                                         </th>
                                         <th className="px-4 py-2 text-right text-xs text-slate-600">
                                           Còn lại
@@ -855,21 +868,25 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                       {p.details.map((d) => {
-                                        const remainStaff =
-                                          d.totalAmount - d.paidAmount;
+                                        const final = d.finalAmount || d.totalAmount || 0;
+                                        const paid = d.paidAmount || 0;
+                                        const remaining = final - paid;
                                         return (
                                           <tr key={d.staffId}>
-                                            <td className="px-4 py-2 text-sm text-slate-900">
-                                              {d.staffName}
+                                            <td className="px-4 py-3 text-sm text-slate-500">
+                                              {p.id}-{d.staffId}
                                             </td>
-                                            <td className="px-4 py-2 text-sm text-right text-slate-900">
-                                              {d.totalAmount.toLocaleString()}₫
+                                            <td className="px-4 py-3 text-sm text-slate-900">
+                                              <div className="font-medium">{d.staffName}</div>
                                             </td>
-                                            <td className="px-4 py-2 text-sm text-right text-slate-700">
-                                              {d.paidAmount.toLocaleString()}₫
+                                            <td className="px-4 py-3 text-sm text-right font-semibold text-slate-900">
+                                              {final.toLocaleString()}₫
                                             </td>
-                                            <td className="px-4 py-2 text-sm text-right text-slate-900">
-                                              {remainStaff.toLocaleString()}₫
+                                            <td className="px-4 py-3 text-sm text-right text-slate-700">
+                                              {paid.toLocaleString()}₫
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-right font-medium text-blue-600">
+                                              {remaining.toLocaleString()}₫
                                             </td>
                                           </tr>
                                         );
@@ -886,41 +903,43 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
                                     <thead className="bg-slate-100">
                                       <tr>
                                         <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                          Mã phiếu
-                                        </th>
-                                        <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                          Thời gian
+                                          Ngày
                                         </th>
                                         <th className="px-4 py-2 text-left text-xs text-slate-600">
                                           Nhân viên
                                         </th>
-                                        <th className="px-4 py-2 text-right text-xs text-slate-600">
-                                          Tiền chi
-                                        </th>
                                         <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                          Phương thức
+                                          Hình thức
+                                        </th>
+                                        <th className="px-4 py-2 text-right text-xs text-slate-600">
+                                          Số tiền
+                                        </th>
+                                        <th className="px-4 py-2 text-left text-xs text-slate-600 pl-4">
+                                          Ghi chú
                                         </th>
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                      {p.payments.map((pay) => (
-                                        <tr key={pay.id}>
-                                          <td className="px-4 py-2 text-sm text-blue-600">
-                                            {pay.id}
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-slate-600">
-                                            {pay.date}
+                                      {p.payments.map((pm) => (
+                                        <tr key={pm.id}>
+                                          <td className="px-4 py-2 text-sm text-slate-900">
+                                            {formatDateStringDMY(
+                                              pm.date.split("T")[0]
+                                            )}
                                           </td>
                                           <td className="px-4 py-2 text-sm text-slate-900">
-                                            {pay.staffName}
+                                            {pm.staffName}
                                           </td>
-                                          <td className="px-4 py-2 text-sm text-slate-900 text-right">
-                                            {pay.amount.toLocaleString()}₫
+                                          <td className="px-4 py-2 text-sm text-slate-700">
+                                            {pm.method === "cash"
+                                              ? "Tiền mặt"
+                                              : "Chuyển khoản"}
                                           </td>
-                                          <td className="px-4 py-2 text-sm text-slate-600">
-                                            {pay.method === "transfer"
-                                              ? "Chuyển khoản"
-                                              : "Tiền mặt"}
+                                          <td className="px-4 py-2 text-sm text-right text-slate-900 font-medium">
+                                            {pm.amount.toLocaleString()}₫
+                                          </td>
+                                          <td className="px-4 py-2 text-sm text-slate-500 pl-4">
+                                            {pm.note || "-"}
                                           </td>
                                         </tr>
                                       ))}
@@ -928,7 +947,7 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
                                   </table>
                                 </div>
                               ) : (
-                                <div className="text-center py-4 text-sm text-slate-500">
+                                <div className="text-center py-8 text-slate-500 text-sm">
                                   Chưa có lịch sử thanh toán
                                 </div>
                               )}
@@ -946,58 +965,56 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
       </CardContent>
 
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Thêm bảng tính lương</DialogTitle>
+            <DialogTitle>Tạo bảng tính lương</DialogTitle>
           </DialogHeader>
-          <div className="space-y-6 pt-2">
+          <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Kỳ hạn trả lương</Label>
-              <Select
+              <Label>Loại kỳ lương</Label>
+              <RadioGroup
                 value={periodType}
-                onValueChange={(value) =>
-                  setPeriodType(value as "monthly" | "custom")
-                }
+                onValueChange={(v: string) => setPeriodType(v as "monthly" | "custom")}
+                className="flex gap-4"
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Chọn kỳ hạn" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Hằng tháng</SelectItem>
-                  <SelectItem value="custom">Tùy chọn</SelectItem>
-                </SelectContent>
-              </Select>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="monthly" id="monthly" />
+                  <Label htmlFor="monthly">Theo tháng</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="custom" id="custom" />
+                  <Label htmlFor="custom">Tùy chọn</Label>
+                </div>
+              </RadioGroup>
             </div>
-
             {periodType === "monthly" ? (
               <div className="space-y-2">
-                <Label>Kỳ làm việc</Label>
-                <Select
-                  value={selectedMonth}
-                  onValueChange={setSelectedMonth}
-                >
+                <Label>Chọn tháng</Label>
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Chọn tháng làm việc" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {monthlyOptions.map((m) => (
-                      <SelectItem key={m.value} value={m.value}>
-                        {m.range}
+                    {monthlyOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label} ({opt.range})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             ) : (
-              <div className="space-y-2">
-                <Label>Kỳ làm việc</Label>
-                <div className="flex items-center gap-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Từ ngày</Label>
                   <Input
                     type="date"
                     value={customFrom}
                     onChange={(e) => setCustomFrom(e.target.value)}
                   />
-                  <span className="text-sm text-slate-600">Đến</span>
+                </div>
+                <div className="space-y-2">
+                  <Label>Đến ngày</Label>
                   <Input
                     type="date"
                     value={customTo}
@@ -1006,24 +1023,9 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
                 </div>
               </div>
             )}
-
-            <div className="space-y-2">
-              <Label>Phạm vi áp dụng</Label>
-              <RadioGroup value="all" className="flex flex-row gap-6">
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem
-                    value="all"
-                    id="scope-all"
-                    className="border-slate-300"
-                  />
-                  <Label
-                    htmlFor="scope-all"
-                    className="text-sm text-slate-700 cursor-pointer"
-                  >
-                    Tất cả nhân viên
-                  </Label>
-                </div>
-              </RadioGroup>
+            <div className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">
+              <span className="font-medium">Kỳ làm việc: </span>
+              {workRangeText}
             </div>
           </div>
           <DialogFooter>
@@ -1031,344 +1033,292 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
               variant="outline"
               onClick={() => setCreateDialogOpen(false)}
             >
-              Bỏ qua
+              Hủy
             </Button>
             <Button
               className="bg-blue-600 hover:bg-blue-700"
               onClick={handleCreatePayroll}
               disabled={!workRangeText}
             >
-              Lưu
+              Tạo bảng lương
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={paymentDialogOpen}
-        onOpenChange={(open) => {
-          setPaymentDialogOpen(open);
-          if (!open) {
-            setPaymentPayrollId(null);
-            setSelectedPaymentStaffIds([]);
-          }
-        }}
-      >
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Thanh toán bảng lương</DialogTitle>
+      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+        <DialogContent className="max-h-[85vh] flex flex-col p-0">
+          <DialogHeader className="px-6 py-4 border-b">
+            <DialogTitle>Thanh toán lương</DialogTitle>
           </DialogHeader>
-          {(() => {
-            const payroll = payrolls.find((p) => p.id === paymentPayrollId);
-            if (!payroll) {
-              return (
-                <div className="text-sm text-slate-500">
-                  Chưa chọn bảng lương để thanh toán
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            <div className="space-y-2">
+              <Label>Ngày thanh toán</Label>
+              <Input
+                type="datetime-local"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Hình thức thanh toán</Label>
+              <Select
+                value={paymentMethod}
+                onValueChange={(v: string) =>
+                  setPaymentMethod(v as "cash" | "transfer")
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Tiền mặt</SelectItem>
+                  <SelectItem value="transfer">Chuyển khoản</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {paymentMethod === "transfer" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Ngân hàng</Label>
+                  <Input
+                    placeholder="Tên ngân hàng"
+                    value={paymentBankName}
+                    onChange={(e) => setPaymentBankName(e.target.value)}
+                  />
                 </div>
-              );
-            }
-            const unpaidDetails = payroll.details.filter(
-              (d) => d.totalAmount > d.paidAmount
-            );
-            const totalRemain = unpaidDetails.reduce(
-              (sum, d) => sum + (d.totalAmount - d.paidAmount),
-              0
-            );
-            return (
-              <div className="space-y-4">
-                <div className="flex justify-between text-sm">
-                  <div className="space-y-1">
-                    <div>
-                      <span className="font-medium text-slate-900">
-                        {payroll.name}
-                      </span>
-                      <span className="text-slate-500">
-                        {" "}
-                        | Kỳ làm việc: {payroll.workRange} | Trạng thái:{" "}
-                        {payroll.status === "draft"
-                          ? "Tạm tính"
-                          : "Đã chốt"}
-                      </span>
-                    </div>
-                    <div className="text-slate-600">
-                      Tiền cần trả nhân viên:{" "}
-                      <span className="font-semibold text-slate-900">
-                        {totalRemain.toLocaleString()}₫
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-2 text-sm w-60">
-                    <div className="space-y-1">
-                      <Label>Thời gian</Label>
-                      <Input
-                        type="datetime-local"
-                        value={paymentDate}
-                        onChange={(e) => setPaymentDate(e.target.value)}
-                      />
-                    </div>
-                  </div>
+                <div className="space-y-2">
+                  <Label>Số tài khoản</Label>
+                  <Input
+                    placeholder="Số tài khoản"
+                    value={paymentBankAccount}
+                    onChange={(e) => setPaymentBankAccount(e.target.value)}
+                  />
                 </div>
+              </>
+            )}
+            <div className="space-y-2">
+              <Label>Ghi chú</Label>
+              <Input
+                value={paymentNote}
+                onChange={(e) => setPaymentNote(e.target.value)}
+                placeholder="VD: Thanh toán lương tháng..."
+              />
+            </div>
 
-                <div className="grid grid-cols-[2fr,1fr] gap-6">
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <Label>Phương thức</Label>
-                        <Select
-                          value={paymentMethod}
-                          onValueChange={(v) =>
-                            setPaymentMethod(v as "cash" | "transfer")
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Chọn phương thức" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="cash">Tiền mặt</SelectItem>
-                            <SelectItem value="transfer">
-                              Chuyển khoản
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <Label>Ghi chú</Label>
-                        <Input
-                          value={paymentNote}
-                          onChange={(e) =>
-                            setPaymentNote(e.target.value)
-                          }
-                          placeholder="VD: Thanh toán lương tháng"
-                        />
-                      </div>
-                    </div>
-                    {paymentMethod === "transfer" && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <Label>Số tài khoản</Label>
-                          <Input
-                            value={paymentBankAccount}
-                            onChange={(e) =>
-                              setPaymentBankAccount(e.target.value)
-                            }
-                            placeholder="Nhập số tài khoản"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label>Ngân hàng</Label>
-                          <Input
-                            value={paymentBankName}
-                            onChange={(e) =>
-                              setPaymentBankName(e.target.value)
-                            }
-                            placeholder="Nhập tên ngân hàng"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2 text-sm border rounded-lg p-3 bg-slate-50">
-                    <div className="flex justify-between">
-                      <span>Tổng cần trả</span>
-                      <span className="font-semibold text-slate-900">
-                        {payroll.totalAmount.toLocaleString()}₫
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Đã trả nhân viên</span>
-                      <span className="font-semibold text-slate-900">
-                        {payroll.paidAmount.toLocaleString()}₫
-                      </span>
-                    </div>
-                    <div className="flex justify-between border-t pt-2 mt-1">
-                      <span>Còn cần trả</span>
-                      <span className="font-semibold text-blue-700">
-                        {totalRemain.toLocaleString()}₫
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-slate-100">
-                      <tr>
-                        <th className="px-4 py-2 text-center text-xs text-slate-600 w-10">
-                          <input
-                            type="checkbox"
-                            checked={
-                              unpaidDetails.length > 0 &&
-                              selectedPaymentStaffIds.length ===
-                                unpaidDetails.length
-                            }
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedPaymentStaffIds(
-                                  unpaidDetails.map((d) => d.staffId)
-                                );
-                              } else {
-                                setSelectedPaymentStaffIds([]);
-                              }
-                            }}
-                          />
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs text-slate-600">
-                          Nhân viên
-                        </th>
-                        <th className="px-4 py-2 text-right text-xs text-slate-600">
-                          Thành tiền
-                        </th>
-                        <th className="px-4 py-2 text-right text-xs text-slate-600">
-                          Đã trả nhân viên
-                        </th>
-                        <th className="px-4 py-2 text-right text-xs text-slate-600">
-                          Còn cần trả
-                        </th>
-                        <th className="px-4 py-2 text-right text-xs text-slate-600">
-                          Tiền trả nhân viên
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {unpaidDetails.map((d) => {
-                        const remainStaff =
-                          d.totalAmount - d.paidAmount;
-                        const checked = selectedPaymentStaffIds.includes(
-                          d.staffId
-                        );
-                        return (
-                          <tr key={d.staffId}
-                           className={!checked ? "opacity-50 " : ""}>
-                            <td className="px-4 py-2 text-center">
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedPaymentStaffIds((prev) => [
-                                      ...prev,
-                                      d.staffId,
-                                    ]);
-                                  } else {
-                                    setSelectedPaymentStaffIds((prev) =>
-                                      prev.filter(
-                                        (id) => id !== d.staffId
-                                      )
-                                    );
-                                  }
-                                }}
-                              />
-                            </td>
-                            <td className="px-4 py-2 text-sm text-slate-900">
-                              {d.staffName}
-                            </td>
-                            <td className="px-4 py-2 text-sm text-right text-slate-900">
-                              {d.totalAmount.toLocaleString()}₫
-                            </td>
-                            <td className="px-4 py-2 text-sm text-right text-slate-700">
-                              {d.paidAmount.toLocaleString()}₫
-                            </td>
-                            <td className="px-4 py-2 text-sm text-right text-slate-900">
-                              {remainStaff.toLocaleString()}₫
-                            </td>
-                            <td className="px-4 py-2 text-sm text-right text-slate-900">
-                              {remainStaff.toLocaleString()}₫
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            );
-          })()}
-          <DialogFooter>
+            <div className="space-y-2">
+               <Label>Danh sách nhân viên ({selectedPaymentStaffIds.length})</Label>
+               <div className="border rounded-lg max-h-60 overflow-y-auto">
+                 <Table>
+                   <TableHeader>
+                      <TableRow className="bg-slate-50">
+                        <TableHead className="w-[30px]"></TableHead>
+                        <TableHead>Nhân viên</TableHead>
+                        <TableHead className="text-right">Còn lại</TableHead>
+                        <TableHead className="text-right w-32">Thanh toán</TableHead>
+                      </TableRow>
+                   </TableHeader>
+                   <TableBody>
+                     {(() => {
+                        const currentPayroll = payrolls.find(p => p.id === paymentPayrollId);
+                        if (!currentPayroll) return null;
+                        
+                        return currentPayroll.details
+                          .filter(d => (d.finalAmount || d.totalAmount || 0) - (d.paidAmount || 0) > 0)
+                          .map(d => {
+                            const final = d.finalAmount || d.totalAmount || 0;
+                            const paid = d.paidAmount || 0;
+                            const remaining = final - paid;
+                            const isSelected = selectedPaymentStaffIds.includes(d.staffId);
+                            
+                            return (
+                               <TableRow key={d.staffId}>
+                                 <TableCell>
+                                   <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                            setSelectedPaymentStaffIds([...selectedPaymentStaffIds, d.staffId]);
+                                        } else {
+                                            setSelectedPaymentStaffIds(selectedPaymentStaffIds.filter(id => id !== d.staffId));
+                                        }
+                                      }}
+                                      className="rounded border-slate-300"
+                                   />
+                                 </TableCell>
+                                 <TableCell className="font-medium">{d.staffName}</TableCell>
+                                 <TableCell className="text-right text-slate-500">{remaining.toLocaleString()}₫</TableCell>
+                                 <TableCell>
+                                   <Input
+                                      type="text" 
+                                      className="h-8 text-right"
+                                      value={paymentAmounts[d.staffId] || "0"}
+                                      disabled={!isSelected}
+                                      onChange={(e) => {
+                                          const val = e.target.value;
+                                          // Format immediately
+                                          const cleanVal = val.replace(/[^\d.]/g, "");
+                                          if ((cleanVal.match(/\./g) || []).length > 1) return;
+                                          
+                                          const [intPart, decPart] = cleanVal.split(".");
+                                          const formattedInt = intPart ? Number(intPart).toLocaleString("en-US") : "";
+                                          let formatted = formattedInt;
+                                          if (decPart !== undefined) formatted += "." + decPart;
+                                          if (cleanVal === "") formatted = "";
+                                          
+                                          setPaymentAmounts({...paymentAmounts, [d.staffId]: formatted});
+                                      }}
+                                      onFocus={(e) => e.target.select()}
+                                   />
+                                 </TableCell>
+                               </TableRow>
+                            );
+                          });
+                     })()}
+                   </TableBody>
+                 </Table>
+               </div>
+            </div>
+          </div>
+          <DialogFooter className="px-6 py-4 border-t">
             <Button
               variant="outline"
               onClick={() => setPaymentDialogOpen(false)}
             >
-              Bỏ qua
+              Hủy
             </Button>
             <Button
               className="bg-blue-600 hover:bg-blue-700"
               onClick={() => {
-                const payroll = payrolls.find(
-                  (p) => p.id === paymentPayrollId
-                );
-                if (!payroll) return;
-                const now = new Date();
-                const formattedDate = now.toLocaleString();
-                const unpaidDetails = payroll.details.filter(
-                  (d) =>
-                    d.totalAmount > d.paidAmount &&
-                    selectedPaymentStaffIds.includes(d.staffId)
-                );
-                if (unpaidDetails.length === 0) {
-                  setPaymentDialogOpen(false);
-                  return;
-                }
-                const updates = unpaidDetails.map((d) => {
-                  const remainStaff =
-                    d.totalAmount - d.paidAmount;
-                  const payment: PayrollPayment = {
-                    id: `PC-${Date.now()}-${d.staffId}`,
-                    date: formattedDate,
-                    staffName: d.staffName,
-                    amount: remainStaff,
-                    note:
-                      paymentNote ||
-                      "Thanh toán bảng lương",
-                    method: paymentMethod,
-                    bankAccount:
-                      paymentMethod === "transfer"
-                        ? paymentBankAccount || undefined
-                        : undefined,
-                    bankName:
-                      paymentMethod === "transfer"
-                        ? paymentBankName || undefined
-                        : undefined,
-                  };
-                  return { detail: d, remainStaff, payment };
-                });
-                setPayrolls((prev) =>
-                  prev.map((item) => {
-                    if (item.id !== payroll.id) return item;
-                    let added = 0;
-                    const updatedDetails = item.details.map((d) => {
-                      const found = updates.find(
-                        (u) => u.detail.staffId === d.staffId
-                      );
-                      if (!found) return d;
-                      added += found.remainStaff;
+                if (!paymentPayrollId) return;
+
+                const currentPayroll = payrolls.find(p => p.id === paymentPayrollId);
+                if (!currentPayroll) return;
+
+                const newPayments: PayrollPayment[] = selectedPaymentStaffIds.map(
+                  (staffId) => {
+                      const detail = currentPayroll.details.find(d => d.staffId === staffId);
+                      const amountStr = paymentAmounts[staffId] || "0";
+                      const amount = Number(amountStr.replace(/,/g, ''));
+  
+                      return {
+                        id: `PAY${Date.now()}${staffId}`,
+                        date: paymentDate,
+                        staffName: detail?.staffName || "",
+                        amount,
+                        note: paymentNote,
+                        method: paymentMethod,
+                        bankAccount: paymentBankAccount,
+                        bankName: paymentBankName,
+                      };
+                    }
+                  );
+  
+                  const updatedDetails = currentPayroll.details.map((d) => {
+                    if (selectedPaymentStaffIds.includes(d.staffId)) {
+                      const amountStr = paymentAmounts[d.staffId] || "0";
+                      const amount = Number(amountStr.replace(/,/g, ''));
+                      
+                      const paid = d.paidAmount || 0;
+                      const final = d.finalAmount || d.totalAmount || 0;
+                      
+                      const newPaid = paid + amount;
+                      const newRemaining = final - newPaid;
+
                       return {
                         ...d,
-                        paidAmount:
-                          d.paidAmount + found.remainStaff,
+                        paidAmount: newPaid,
+                        remainingAmount: newRemaining
                       };
-                    });
-                    const payments = [
-                      ...(item.payments || []),
-                      ...updates.map((u) => u.payment),
-                    ];
-                    return {
-                      ...item,
-                      details: updatedDetails,
-                      paidAmount: item.paidAmount + added,
-                      payments,
-                    };
-                  })
+                    }
+                    return d;
+                  });
+
+                const updatedPayroll: PayrollItem = {
+                  ...currentPayroll,
+                  details: updatedDetails,
+                  paidAmount: updatedDetails.reduce((sum, d) => sum + d.paidAmount, 0),
+                  payments: [...(currentPayroll.payments || []), ...newPayments],
+                };
+
+                const nextPayrolls = payrolls.map((p) =>
+                  p.id === paymentPayrollId ? updatedPayroll : p
                 );
+                
+                persistPayrolls(nextPayrolls);
                 setPaymentDialogOpen(false);
-                setSelectedPaymentStaffIds([]);
               }}
             >
-              Tạo phiếu chi
+              Xác nhận thanh toán
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {selectedPayroll && (
+        <>
+          <PayrollDetailModal
+            open={detailModalOpen}
+            onOpenChange={setDetailModalOpen}
+            payrollName={selectedPayroll.name}
+            workRange={selectedPayroll.workRange}
+            details={selectedPayroll.details.map(d => ({
+              ...d,
+              overtimeAmount: d.overtimeAmount || 0,
+              bonus: d.bonus || 0,
+              penalty: d.penalty || 0,
+              finalAmount: d.finalAmount || d.totalAmount || 0,
+              paidAmount: d.paidAmount || 0,
+              remainingAmount: d.remainingAmount || ((d.finalAmount || d.totalAmount || 0) - (d.paidAmount || 0))
+            }))}
+            status={selectedPayroll.status}
+            onSave={(updatedDetails) => handleUpdateDetails(selectedPayroll.id, updatedDetails)}
+            onFinalize={() => handleFinalizePayroll(selectedPayroll.id)}
+            onViewBreakdown={(staffId) => {
+               setBreakdownStaffId(staffId);
+               setBreakdownModalOpen(true);
+            }}
+            readOnly={!canUpdate}
+          />
+
+          <SalaryBreakdownModal
+            open={breakdownModalOpen}
+            onOpenChange={setBreakdownModalOpen}
+            staff={staffMembers.find(s => s.id === breakdownStaffId) || null}
+            timekeepingData={timekeepingData}
+            shifts={shifts}
+            periodStart={(() => {
+              const parts = selectedPayroll.workRange.split(" - ");
+              return parseDMYToDate(parts[0]) || new Date();
+            })()}
+            periodEnd={(() => {
+               const parts = selectedPayroll.workRange.split(" - ");
+               return parseDMYToDate(parts[1]) || new Date();
+            })()}
+          />
+        </>
+      )}
+
+      <AlertDialog open={!!deleteData} onOpenChange={(open) => !open && setDeleteData(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xác nhận xóa bảng lương</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc chắn muốn xóa bảng lương này không? Hành động này không thể hoàn tác.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={handleDeletePayroll}
+            >
+              Xóa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

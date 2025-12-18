@@ -38,6 +38,7 @@ export interface StaffMember {
       holiday: string;
     };
   };
+  accountId?: string; // Link to Account ID
   account?: {
     username: string;
   };
@@ -80,30 +81,11 @@ export const staffMembers: StaffMember[] = [
     joinDate: "2023-03-20",
     salary: 0,
     salarySettings: {
-      salaryType: "shift",
-      salaryAmount: "200000",
-      advancedSetup: true,
+      salaryType: "fixed",
+      salaryAmount: "8000000", // 8 triệu/tháng
+      advancedSetup: false,
       overtimeEnabled: true,
-      shifts: [
-        {
-          id: "1",
-          name: "Ca sáng",
-          salaryPerShift: "200000",
-          saturdayCoeff: "150%",
-          sundayCoeff: "200%",
-          dayOffCoeff: "100%",
-          holidayCoeff: "300%",
-        },
-        {
-          id: "2",
-          name: "Ca chiều",
-          salaryPerShift: "200000",
-          saturdayCoeff: "150%",
-          sundayCoeff: "200%",
-          dayOffCoeff: "100%",
-          holidayCoeff: "300%",
-        },
-      ],
+      shifts: [],
       overtimeCoeffs: {
         weekday: "150%",
         saturday: "200%",

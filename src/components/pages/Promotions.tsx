@@ -1,5 +1,6 @@
 import { useState } from "react";
 import * as React from "react";
+import { useAuth } from "../../contexts/AuthContext";
 import {
   Plus,
   Pencil,
@@ -95,6 +96,11 @@ export interface Promotion {
 }
 
 export function Promotions() {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('promotions:create');
+  const canUpdate = hasPermission('promotions:update');
+  const canDelete = hasPermission('promotions:delete');
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
@@ -512,16 +518,18 @@ export function Promotions() {
                 <Printer className="w-4 h-4 mr-2" />
                 In danh sách
               </Button>
-              <Button
-                className="bg-blue-600 hover:bg-blue-700"
-                onClick={() => {
-                  setEditingPromotion(null);
-                  setDialogOpen(true);
-                }}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Tạo khuyến mại
-              </Button>
+              {canCreate && (
+                <Button
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={() => {
+                    setEditingPromotion(null);
+                    setDialogOpen(true);
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Tạo khuyến mại
+                </Button>
+              )}
             </div>
           </div>
 
@@ -704,43 +712,49 @@ export function Promotions() {
                         </TableCell>
                         <TableCell className="text-sm text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditDialog(promo)}
-                              className="hover:bg-blue-100"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeletePromotion(promo.id)}
-                              className="hover:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4 text-red-600" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleToggleStatus(promo.id)}
-                              className={
-                                promo.status === "active"
-                                  ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                              }
-                              title={
-                                promo.status === "active"
-                                  ? "Vô hiệu hóa"
-                                  : "Kích hoạt"
-                              }
-                            >
-                              {promo.status === "active" ? (
-                                <PowerOff className="w-4 h-4" />
-                              ) : (
-                                <Power className="w-4 h-4" />
-                              )}
-                            </Button>
+                            {canUpdate && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditDialog(promo)}
+                                className="hover:bg-blue-100"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeletePromotion(promo.id)}
+                                className="hover:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-600" />
+                              </Button>
+                            )}
+                            {canUpdate && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleStatus(promo.id)}
+                                className={
+                                  promo.status === "active"
+                                    ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                }
+                                title={
+                                  promo.status === "active"
+                                    ? "Vô hiệu hóa"
+                                    : "Kích hoạt"
+                                }
+                              >
+                                {promo.status === "active" ? (
+                                  <PowerOff className="w-4 h-4" />
+                                ) : (
+                                  <Power className="w-4 h-4" />
+                                )}
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "../../contexts/AuthContext";
 import {
   Plus,
   Search,
@@ -45,7 +46,7 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { CustomerFormDialog } from "../CustomerFormDialog";
 
 interface Customer {
@@ -70,6 +71,11 @@ interface CustomerGroup {
 }
 
 export function Customers() {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('customers:create');
+  const canUpdate = hasPermission('customers:update');
+  const canDelete = hasPermission('customers:delete');
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGroup, setSelectedGroup] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -569,16 +575,18 @@ export function Customers() {
                 <Printer className="w-4 h-4 mr-2" />
                 In danh sách
               </Button>
-              <Button
-                className="bg-blue-600 hover:bg-blue-700"
-                onClick={() => {
-                  setEditingCustomer(null);
-                  setDialogOpen(true);
-                }}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Thêm khách hàng
-              </Button>
+              {canCreate && (
+                <Button
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={() => {
+                    setEditingCustomer(null);
+                    setDialogOpen(true);
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Thêm khách hàng
+                </Button>
+              )}
             </div>
           </div>
 
@@ -693,44 +701,50 @@ export function Customers() {
                         <TableCell>{getStatusBadge(customer.status)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEdit(customer)}
-                              title="Chỉnh sửa"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(customer.id)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              title="Xóa"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleToggleStatus(customer.id)}
-                              className={
-                                customer.status === "active"
-                                  ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                              }
-                              title={
-                                customer.status === "active"
-                                  ? "Vô hiệu hóa"
-                                  : "Kích hoạt"
-                              }
-                            >
-                              {customer.status === "active" ? (
-                                <PowerOff className="w-4 h-4" />
-                              ) : (
-                                <Power className="w-4 h-4" />
-                              )}
-                            </Button>
+                            {canUpdate && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEdit(customer)}
+                                title="Chỉnh sửa"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(customer.id)}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                title="Xóa"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {canUpdate && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleStatus(customer.id)}
+                                className={
+                                  customer.status === "active"
+                                    ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                }
+                                title={
+                                  customer.status === "active"
+                                    ? "Vô hiệu hóa"
+                                    : "Kích hoạt"
+                                }
+                              >
+                                {customer.status === "active" ? (
+                                  <PowerOff className="w-4 h-4" />
+                                ) : (
+                                  <Power className="w-4 h-4" />
+                                )}
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

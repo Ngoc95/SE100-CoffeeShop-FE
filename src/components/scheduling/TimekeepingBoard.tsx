@@ -43,6 +43,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Calendar } from "../ui/calendar";
 import { toast } from "sonner@2.0.3";
 import { staffMembers, initialSchedule } from "../../data/staffData";
+import { BulkAttendanceDialog } from "./BulkAttendanceDialog";
 
 interface Shift {
   id: string;
@@ -120,6 +121,7 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
   const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [timekeepingDialogOpen, setTimekeepingDialogOpen] = useState(false);
@@ -417,7 +419,7 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
     shiftId: string,
     date: string
   ): TimekeepingEntry | null => {
-    return timekeepingData[staffId]?.[shiftId]?.[date] || null;
+    return value?.[date]?.[shiftId]?.[staffId] || null;
   };
 
   const handleOpenTimekeeping = (
@@ -489,24 +491,19 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
         note,
       };
 
-      setTimekeepingData((prev) => {
-        const next = {
-          ...prev,
-          [selectedTimekeeping.staffId]: {
-            ...(prev[selectedTimekeeping.staffId] || {}),
-            [selectedTimekeeping.shiftId]: {
-              ...(prev[selectedTimekeeping.staffId]?.[
-                selectedTimekeeping.shiftId
-              ] || {}),
-              [selectedTimekeeping.date]: entry,
-            },
+      const next = {
+        ...value,
+        [selectedTimekeeping.date]: {
+          ...(value?.[selectedTimekeeping.date] || {}),
+          [selectedTimekeeping.shiftId]: {
+            ...(value?.[selectedTimekeeping.date]?.[selectedTimekeeping.shiftId] || {}),
+            [selectedTimekeeping.staffId]: entry,
           },
-        };
-        if (onChange) {
-          onChange(next);
-        }
-        return next;
-      });
+        },
+      };
+      if (onChange) {
+        onChange(next);
+      }
 
       toast.success("Đã lưu chấm công");
       setTimekeepingDialogOpen(false);
@@ -532,24 +529,19 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
         note,
       };
 
-      setTimekeepingData((prev) => {
-        const next = {
-          ...prev,
-          [selectedTimekeeping.staffId]: {
-            ...(prev[selectedTimekeeping.staffId] || {}),
-            [selectedTimekeeping.shiftId]: {
-              ...(prev[selectedTimekeeping.staffId]?.[
-                selectedTimekeeping.shiftId
-              ] || {}),
-              [selectedTimekeeping.date]: entry,
-            },
+      const next = {
+        ...value,
+        [selectedTimekeeping.date]: {
+          ...(value?.[selectedTimekeeping.date] || {}),
+          [selectedTimekeeping.shiftId]: {
+            ...(value?.[selectedTimekeeping.date]?.[selectedTimekeeping.shiftId] || {}),
+            [selectedTimekeeping.staffId]: entry,
           },
-        };
-        if (onChange) {
-          onChange(next);
-        }
-        return next;
-      });
+        },
+      };
+      if (onChange) {
+        onChange(next);
+      }
 
       toast.success("Đã lưu chấm công");
       setTimekeepingDialogOpen(false);
@@ -645,24 +637,19 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
         early && checkOutEnabled ? calculatedEarlyMinutes : undefined,
     };
 
-    setTimekeepingData((prev) => {
-      const next = {
-        ...prev,
-        [selectedTimekeeping.staffId]: {
-          ...(prev[selectedTimekeeping.staffId] || {}),
-          [selectedTimekeeping.shiftId]: {
-            ...(prev[selectedTimekeeping.staffId]?.[
-              selectedTimekeeping.shiftId
-            ] || {}),
-            [selectedTimekeeping.date]: entry,
-          },
+    const next = {
+      ...value,
+      [selectedTimekeeping.date]: {
+        ...(value?.[selectedTimekeeping.date] || {}),
+        [selectedTimekeeping.shiftId]: {
+          ...(value?.[selectedTimekeeping.date]?.[selectedTimekeeping.shiftId] || {}),
+          [selectedTimekeeping.staffId]: entry,
         },
-      };
-      if (onChange) {
-        onChange(next);
-      }
-      return next;
-    });
+      },
+    };
+    if (onChange) {
+      onChange(next);
+    }
 
     toast.success("Đã lưu chấm công");
     setTimekeepingDialogOpen(false);
@@ -699,6 +686,43 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
 
   const goToCurrentWeek = () => {
     setCurrentWeek(normalizeToLocalDate(new Date()));
+  };
+
+  // Handle bulk attendance save
+  const handleBulkSave = (data: {
+    date: Date;
+    shiftId: string;
+    checkIn: string;
+    checkOut: string;
+    selectedStaff: string[];
+  }) => {
+    const { date, shiftId, checkIn, checkOut, selectedStaff } = data;
+    const dateStr = formatDateInput(date);
+
+    // Create timekeeping entries for all selected staff
+    const newData = { ...value };
+    
+    selectedStaff.forEach(staffId => {
+      if (!newData[dateStr]) {
+        newData[dateStr] = {};
+      }
+      if (!newData[dateStr][shiftId]) {
+        newData[dateStr][shiftId] = {};
+      }
+
+      newData[dateStr][shiftId][staffId] = {
+        staffId,
+        shiftId,
+        date: dateStr,
+        checkIn,
+        checkOut,
+        status: 'on-time',
+      };
+    });
+
+    if (onChange) {
+      onChange(newData);
+    }
   };
 
   // Chỉ lấy các ca đang hoạt động
@@ -836,6 +860,16 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
               </div>
             )}
           </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setBulkDialogOpen(true)}
+            className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Chấm công tất cả
+          </Button>
 
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={goToPreviousWeek}>
@@ -2087,6 +2121,22 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Attendance Dialog */}
+      <BulkAttendanceDialog
+        open={bulkDialogOpen}
+        onOpenChange={setBulkDialogOpen}
+        shifts={shifts}
+        staffList={staff.map(s => ({
+          id: s.id,
+          fullName: s.name,
+          staffCode: s.code,
+          position: s.role,
+          positionLabel: s.role,
+        }))}
+        schedule={schedule}
+        onSave={handleBulkSave}
+      />
     </div>
   );
 }
