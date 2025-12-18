@@ -116,7 +116,7 @@ export function Reports() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('all');
   const [viewType, setViewType] = useState<ViewType>('grid');
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Filter states
   const [selectedConcerns, setSelectedConcerns] = useState<string[]>(['sales', 'cashflow']);
 
@@ -146,7 +146,7 @@ export function Reports() {
   const [productsProductTypes, setProductsProductTypes] = useState<string[]>(['finished', 'composite', 'ingredient']);
   const [productsCategory, setProductsCategory] = useState('all');
   const [productCategorySearchOpen, setProductCategorySearchOpen] = useState(false);
-  
+
   // Customer report filters
   const [customerTimeRange, setCustomerTimeRange] = useState<TimeRange>('week');
   const [customerDateFrom, setCustomerDateFrom] = useState<Date | undefined>(new Date(2025, 10, 24));
@@ -196,7 +196,7 @@ export function Reports() {
   const [financePresetTimeRange, setFinancePresetTimeRange] = useState('this-week');
   const [financeDateFrom, setFinanceDateFrom] = useState<Date | undefined>(new Date(2025, 0, 13));
   const [financeDateTo, setFinanceDateTo] = useState<Date | undefined>(new Date(2025, 0, 19));
-  const [selectedFinanceConcerns, setSelectedFinanceConcerns] = useState<string[]>(['revenue', 'profit']);
+  const [selectedFinanceConcerns, setSelectedFinanceConcerns] = useState<string[]>(['revenue', 'expenses', 'profit']);
 
   // Sample data
   const employees: Employee[] = [
@@ -402,10 +402,10 @@ export function Reports() {
 
   // ============= DATA FOR TAB 3: EMPLOYEE REPORT =============
   const employeeData = [
-    { 
-      name: 'Nguyễn Văn A', 
+    {
+      name: 'Nguyễn Văn A',
       role: 'Thu ngân',
-      revenue: 18500000, 
+      revenue: 18500000,
       discounts: 920000,
       cost: 7400000,
       profit: 10180000,
@@ -414,10 +414,10 @@ export function Reports() {
       avgOrderValue: 75510,
       performance: 92
     },
-    { 
-      name: 'Trần Thị B', 
+    {
+      name: 'Trần Thị B',
       role: 'Thu ngân',
-      revenue: 16200000, 
+      revenue: 16200000,
       discounts: 810000,
       cost: 6480000,
       profit: 8910000,
@@ -426,10 +426,10 @@ export function Reports() {
       avgOrderValue: 76056,
       performance: 88
     },
-    { 
-      name: 'Lê Văn C', 
+    {
+      name: 'Lê Văn C',
       role: 'Pha chế',
-      revenue: 15800000, 
+      revenue: 15800000,
       discounts: 790000,
       cost: 6320000,
       profit: 8690000,
@@ -438,10 +438,10 @@ export function Reports() {
       avgOrderValue: 79798,
       performance: 85
     },
-    { 
-      name: 'Phạm Thị D', 
+    {
+      name: 'Phạm Thị D',
       role: 'Phục vụ',
-      revenue: 13500000, 
+      revenue: 13500000,
       discounts: 675000,
       cost: 5400000,
       profit: 7425000,
@@ -835,8 +835,8 @@ export function Reports() {
   ];
 
   const handleConcernToggle = (concern: string) => {
-    setSelectedConcerns(prev => 
-      prev.includes(concern) 
+    setSelectedConcerns(prev =>
+      prev.includes(concern)
         ? prev.filter(c => c !== concern)
         : [...prev, concern]
     );
@@ -846,7 +846,7 @@ export function Reports() {
   const handleCustomerTimeRangeChange = (range: TimeRange) => {
     setCustomerTimeRange(range);
     const today = new Date();
-    
+
     if (range === 'today') {
       setCustomerDateFrom(today);
       setCustomerDateTo(today);
@@ -869,7 +869,7 @@ export function Reports() {
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
-    
+
     switch (preset) {
       case 'today':
         setCustomerDateFrom(today);
@@ -951,7 +951,7 @@ export function Reports() {
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
-    
+
     switch (preset) {
       case 'today':
         setSupplierDateFrom(today);
@@ -1033,7 +1033,7 @@ export function Reports() {
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
-    
+
     switch (preset) {
       case 'today':
         setSalesDateFrom(today);
@@ -1148,7 +1148,7 @@ export function Reports() {
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="summary" id="concern-summary" className="border-slate-300" />
-                      <Label htmlFor="concern-summary" className="text-sm text-slate-700 cursor-pointer">
+                    <Label htmlFor="concern-summary" className="text-sm text-slate-700 cursor-pointer">
                       Tổng hợp
                     </Label>
                   </div>
@@ -1212,11 +1212,10 @@ export function Reports() {
                                       setPresetTimeRange(option.value);
                                       setDateRangeType('preset');
                                     }}
-                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                      presetTimeRange === option.value
-                                        ? 'bg-blue-600 text-white'
-                                        : 'text-blue-600 hover:bg-blue-50'
-                                    }`}
+                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
+                                      ? 'bg-blue-600 text-white'
+                                      : 'text-blue-600 hover:bg-blue-50'
+                                      }`}
                                   >
                                     {option.label}
                                   </button>
@@ -1243,11 +1242,10 @@ export function Reports() {
                                       setPresetTimeRange(option.value);
                                       setDateRangeType('preset');
                                     }}
-                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                      presetTimeRange === option.value
-                                        ? 'bg-blue-600 text-white'
-                                        : 'text-blue-600 hover:bg-blue-50'
-                                    }`}
+                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
+                                      ? 'bg-blue-600 text-white'
+                                      : 'text-blue-600 hover:bg-blue-50'
+                                      }`}
                                   >
                                     {option.label}
                                   </button>
@@ -1271,11 +1269,10 @@ export function Reports() {
                                       setPresetTimeRange(option.value);
                                       setDateRangeType('preset');
                                     }}
-                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                      presetTimeRange === option.value
-                                        ? 'bg-blue-600 text-white'
-                                        : 'text-blue-600 hover:bg-blue-50'
-                                    }`}
+                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${presetTimeRange === option.value
+                                      ? 'bg-blue-600 text-white'
+                                      : 'text-blue-600 hover:bg-blue-50'
+                                      }`}
                                   >
                                     {option.label}
                                   </button>
@@ -1897,14 +1894,14 @@ export function Reports() {
                     <PopoverTrigger asChild>
                       <button className="flex w-full items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm h-9 whitespace-nowrap transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-blue-500/50 focus-visible:border-blue-500 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50">
                         <span className={salesSelectedTable ? '' : 'text-muted-foreground'}>
-                          {salesSelectedTable === 'all' 
+                          {salesSelectedTable === 'all'
                             ? 'Tất cả phòng/bàn'
                             : salesSelectedTable === 'table1' ? 'Bàn 01'
-                            : salesSelectedTable === 'table2' ? 'Bàn 02'
-                            : salesSelectedTable === 'table3' ? 'Bàn 03'
-                            : salesSelectedTable === 'vip1' ? 'Bàn VIP 1'
-                            : salesSelectedTable === 'vip2' ? 'Bàn VIP 2'
-                            : 'Chọn phòng/bàn'}
+                              : salesSelectedTable === 'table2' ? 'Bàn 02'
+                                : salesSelectedTable === 'table3' ? 'Bàn 03'
+                                  : salesSelectedTable === 'vip1' ? 'Bàn VIP 1'
+                                    : salesSelectedTable === 'vip2' ? 'Bàn VIP 2'
+                                      : 'Chọn phòng/bàn'}
                         </span>
                         <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
                       </button>
@@ -1977,31 +1974,31 @@ export function Reports() {
               {/* Kiểu hiển thị - chỉ hiển thị khi không phải import-export hoặc write-off */}
               {(productsConcern !== 'import-export' && productsConcern !== 'write-off') && (
                 <>
-              <div>
-                <h3 className="text-sm text-slate-900 mb-3">Kiểu hiển thị</h3>
-                <div className="flex gap-2">
-                  <Button
-                    variant={productsViewType === 'chart' ? 'default' : 'outline'}
-                    size="sm"
-                    className={`flex-1 ${productsViewType === 'chart' ? 'bg-blue-600' : ''}`}
-                    onClick={() => setProductsViewType('chart')}
-                  >
-                    <BarChart3 className="w-4 h-4 mr-2" />
-                    Biểu đồ
-                  </Button>
-                  <Button
-                    variant={productsViewType === 'report' ? 'default' : 'outline'}
-                    size="sm"
-                    className={`flex-1 ${productsViewType === 'report' ? 'bg-blue-600' : ''}`}
-                    onClick={() => setProductsViewType('report')}
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    Báo cáo
-                  </Button>
-                </div>
-              </div>
+                  <div>
+                    <h3 className="text-sm text-slate-900 mb-3">Kiểu hiển thị</h3>
+                    <div className="flex gap-2">
+                      <Button
+                        variant={productsViewType === 'chart' ? 'default' : 'outline'}
+                        size="sm"
+                        className={`flex-1 ${productsViewType === 'chart' ? 'bg-blue-600' : ''}`}
+                        onClick={() => setProductsViewType('chart')}
+                      >
+                        <BarChart3 className="w-4 h-4 mr-2" />
+                        Biểu đồ
+                      </Button>
+                      <Button
+                        variant={productsViewType === 'report' ? 'default' : 'outline'}
+                        size="sm"
+                        className={`flex-1 ${productsViewType === 'report' ? 'bg-blue-600' : ''}`}
+                        onClick={() => setProductsViewType('report')}
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Báo cáo
+                      </Button>
+                    </div>
+                  </div>
 
-              <Separator />
+                  <Separator />
                 </>
               )}
 
@@ -2093,11 +2090,10 @@ export function Reports() {
                                       setProductsPresetTimeRange(option.value);
                                       setProductsDateRangeType('preset');
                                     }}
-                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                      productsPresetTimeRange === option.value
-                                        ? 'bg-blue-600 text-white'
-                                        : 'text-blue-600 hover:bg-blue-50'
-                                    }`}
+                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${productsPresetTimeRange === option.value
+                                      ? 'bg-blue-600 text-white'
+                                      : 'text-blue-600 hover:bg-blue-50'
+                                      }`}
                                   >
                                     {option.label}
                                   </button>
@@ -2124,11 +2120,10 @@ export function Reports() {
                                       setProductsPresetTimeRange(option.value);
                                       setProductsDateRangeType('preset');
                                     }}
-                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                      productsPresetTimeRange === option.value
-                                        ? 'bg-blue-600 text-white'
-                                        : 'text-blue-600 hover:bg-blue-50'
-                                    }`}
+                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${productsPresetTimeRange === option.value
+                                      ? 'bg-blue-600 text-white'
+                                      : 'text-blue-600 hover:bg-blue-50'
+                                      }`}
                                   >
                                     {option.label}
                                   </button>
@@ -2152,11 +2147,10 @@ export function Reports() {
                                       setProductsPresetTimeRange(option.value);
                                       setProductsDateRangeType('preset');
                                     }}
-                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                      productsPresetTimeRange === option.value
-                                        ? 'bg-blue-600 text-white'
-                                        : 'text-blue-600 hover:bg-blue-50'
-                                    }`}
+                                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${productsPresetTimeRange === option.value
+                                      ? 'bg-blue-600 text-white'
+                                      : 'text-blue-600 hover:bg-blue-50'
+                                      }`}
                                   >
                                     {option.label}
                                   </button>
@@ -2239,64 +2233,7 @@ export function Reports() {
                 </div>
               </div>
 
-              <Separator />
 
-              {/* Loại mặt hàng */}
-              <div>
-                <h3 className="text-sm text-slate-900 mb-3">Loại mặt hàng</h3>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="product-type-finished"
-                      checked={productsProductTypes.includes('finished')}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setProductsProductTypes([...productsProductTypes, 'finished']);
-                        } else {
-                          setProductsProductTypes(productsProductTypes.filter(t => t !== 'finished'));
-                        }
-                      }}
-                    />
-                    <Label htmlFor="product-type-finished" className="text-sm text-slate-700 cursor-pointer">
-                      Hàng hóa bán sẵn
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="product-type-composite"
-                      checked={productsProductTypes.includes('composite')}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setProductsProductTypes([...productsProductTypes, 'composite']);
-                        } else {
-                          setProductsProductTypes(productsProductTypes.filter(t => t !== 'composite'));
-                        }
-                      }}
-                    />
-                    <Label htmlFor="product-type-composite" className="text-sm text-slate-700 cursor-pointer">
-                      Hàng hóa cấu thành
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="product-type-ingredient"
-                      checked={productsProductTypes.includes('ingredient')}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setProductsProductTypes([...productsProductTypes, 'ingredient']);
-                        } else {
-                          setProductsProductTypes(productsProductTypes.filter(t => t !== 'ingredient'));
-                        }
-                      }}
-                    />
-                    <Label htmlFor="product-type-ingredient" className="text-sm text-slate-700 cursor-pointer">
-                      Nguyên liệu
-                    </Label>
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
 
               {/* Danh mục hàng hóa */}
               <div>
@@ -2354,15 +2291,14 @@ export function Reports() {
                   <Button
                     variant={
                       (activeTab === 'finance' && financeViewType === 'chart') ||
-                      (activeTab === 'employees' && employeesViewType === 'chart')
-                      ? 'default' : 'outline'
+                        (activeTab === 'employees' && employeesViewType === 'chart')
+                        ? 'default' : 'outline'
                     }
                     size="sm"
-                    className={`flex-1 ${
-                      (activeTab === 'finance' && financeViewType === 'chart') ||
+                    className={`flex-1 ${(activeTab === 'finance' && financeViewType === 'chart') ||
                       (activeTab === 'employees' && employeesViewType === 'chart')
                       ? 'bg-blue-600' : ''
-                    }`}
+                      }`}
                     onClick={() => {
                       if (activeTab === 'finance') setFinanceViewType('chart');
                       else if (activeTab === 'employees') setEmployeesViewType('chart');
@@ -2374,15 +2310,14 @@ export function Reports() {
                   <Button
                     variant={
                       (activeTab === 'finance' && financeViewType === 'report') ||
-                      (activeTab === 'employees' && employeesViewType === 'report')
-                      ? 'default' : 'outline'
+                        (activeTab === 'employees' && employeesViewType === 'report')
+                        ? 'default' : 'outline'
                     }
                     size="sm"
-                    className={`flex-1 ${
-                      (activeTab === 'finance' && financeViewType === 'report') ||
+                    className={`flex-1 ${(activeTab === 'finance' && financeViewType === 'report') ||
                       (activeTab === 'employees' && employeesViewType === 'report')
                       ? 'bg-blue-600' : ''
-                    }`}
+                      }`}
                     onClick={() => {
                       if (activeTab === 'finance') setFinanceViewType('report');
                       else if (activeTab === 'employees') setEmployeesViewType('report');
@@ -2403,21 +2338,22 @@ export function Reports() {
                     <h3 className="text-sm text-slate-900 mb-3">Mối quan tâm</h3>
                     <div className="space-y-2">
                       {concernsByTab['finance']?.map((concern) => (
-                        <label key={concern.id} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="rounded border-slate-300"
+                        <div key={concern.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`finance-concern-${concern.id}`}
                             checked={selectedFinanceConcerns.includes(concern.id)}
-                            onChange={() => {
-                              setSelectedFinanceConcerns(prev =>
-                                prev.includes(concern.id)
-                                  ? prev.filter(c => c !== concern.id)
-                                  : [...prev, concern.id]
-                              );
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedFinanceConcerns([...selectedFinanceConcerns, concern.id]);
+                              } else {
+                                setSelectedFinanceConcerns(selectedFinanceConcerns.filter(c => c !== concern.id));
+                              }
                             }}
                           />
-                          <span className="text-sm text-slate-700">{concern.label}</span>
-                        </label>
+                          <Label htmlFor={`finance-concern-${concern.id}`} className="text-sm text-slate-700 cursor-pointer">
+                            {concern.label}
+                          </Label>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -2467,11 +2403,10 @@ export function Reports() {
                                           setFinancePresetTimeRange(option.value);
                                           setFinanceDateRangeType('preset');
                                         }}
-                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                          financePresetTimeRange === option.value
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-blue-600 hover:bg-blue-50'
-                                        }`}
+                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${financePresetTimeRange === option.value
+                                          ? 'bg-blue-600 text-white'
+                                          : 'text-blue-600 hover:bg-blue-50'
+                                          }`}
                                       >
                                         {option.label}
                                       </button>
@@ -2491,11 +2426,10 @@ export function Reports() {
                                           setFinancePresetTimeRange(option.value);
                                           setFinanceDateRangeType('preset');
                                         }}
-                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                          financePresetTimeRange === option.value
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-blue-600 hover:bg-blue-50'
-                                        }`}
+                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${financePresetTimeRange === option.value
+                                          ? 'bg-blue-600 text-white'
+                                          : 'text-blue-600 hover:bg-blue-50'
+                                          }`}
                                       >
                                         {option.label}
                                       </button>
@@ -2642,11 +2576,10 @@ export function Reports() {
                                           setEmployeePresetTimeRange(option.value);
                                           setEmployeeDateRangeType('preset');
                                         }}
-                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                          employeePresetTimeRange === option.value
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-blue-600 hover:bg-blue-50'
-                                        }`}
+                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${employeePresetTimeRange === option.value
+                                          ? 'bg-blue-600 text-white'
+                                          : 'text-blue-600 hover:bg-blue-50'
+                                          }`}
                                       >
                                         {option.label}
                                       </button>
@@ -2673,11 +2606,10 @@ export function Reports() {
                                           setEmployeePresetTimeRange(option.value);
                                           setEmployeeDateRangeType('preset');
                                         }}
-                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                          employeePresetTimeRange === option.value
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-blue-600 hover:bg-blue-50'
-                                        }`}
+                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${employeePresetTimeRange === option.value
+                                          ? 'bg-blue-600 text-white'
+                                          : 'text-blue-600 hover:bg-blue-50'
+                                          }`}
                                       >
                                         {option.label}
                                       </button>
@@ -2701,11 +2633,10 @@ export function Reports() {
                                           setEmployeePresetTimeRange(option.value);
                                           setEmployeeDateRangeType('preset');
                                         }}
-                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                                          employeePresetTimeRange === option.value
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-blue-600 hover:bg-blue-50'
-                                        }`}
+                                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${employeePresetTimeRange === option.value
+                                          ? 'bg-blue-600 text-white'
+                                          : 'text-blue-600 hover:bg-blue-50'
+                                          }`}
                                       >
                                         {option.label}
                                       </button>
@@ -2783,7 +2714,7 @@ export function Reports() {
                     <div className="space-y-2">
                       {currentConcerns.map((concern) => (
                         <div key={concern.id} className="flex items-center space-x-2">
-                          <Checkbox 
+                          <Checkbox
                             id={`concern-${concern.id}`}
                             checked={selectedConcerns.includes(concern.id)}
                             onCheckedChange={() => handleConcernToggle(concern.id)}
@@ -2802,77 +2733,77 @@ export function Reports() {
                   <div>
                     <h3 className="text-sm text-slate-900 mb-3">Khoảng thời gian</h3>
                     <div className="space-y-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className={`w-full justify-start ${timeRange === 'today' ? 'bg-blue-50 border-blue-200 text-blue-900' : ''}`}
-                    onClick={() => setTimeRange('today')}
-                  >
-                    <Calendar className="w-4 h-4 mr-2" />
-                    Hôm nay
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className={`w-full justify-start ${timeRange === 'week' ? 'bg-blue-50 border-blue-200 text-blue-900' : ''}`}
-                    onClick={() => setTimeRange('week')}
-                  >
-                    Tuần này
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className={`w-full justify-start ${timeRange === 'month' ? 'bg-blue-50 border-blue-200 text-blue-900' : ''}`}
-                    onClick={() => setTimeRange('month')}
-                  >
-                    Tháng này
-                  </Button>
-                  <Button variant="outline" size="sm" className="w-full justify-start">
-                    Tùy chỉnh
-                  </Button>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Quick Search */}
-              <div>
-                <h3 className="text-sm text-slate-900 mb-3">Tìm kiếm nhanh</h3>
-                <div className="space-y-2">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <Input
-                      placeholder="Tìm khách hàng..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                    />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={`w-full justify-start ${timeRange === 'today' ? 'bg-blue-50 border-blue-200 text-blue-900' : ''}`}
+                        onClick={() => setTimeRange('today')}
+                      >
+                        <Calendar className="w-4 h-4 mr-2" />
+                        Hôm nay
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={`w-full justify-start ${timeRange === 'week' ? 'bg-blue-50 border-blue-200 text-blue-900' : ''}`}
+                        onClick={() => setTimeRange('week')}
+                      >
+                        Tuần này
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={`w-full justify-start ${timeRange === 'month' ? 'bg-blue-50 border-blue-200 text-blue-900' : ''}`}
+                        onClick={() => setTimeRange('month')}
+                      >
+                        Tháng này
+                      </Button>
+                      <Button variant="outline" size="sm" className="w-full justify-start">
+                        Tùy chỉnh
+                      </Button>
+                    </div>
                   </div>
-                  <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                    <SelectTrigger className="bg-white border-slate-300 shadow-none">
-                      <SelectValue placeholder="Nhân viên" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tất cả nhân viên</SelectItem>
-                      <SelectItem value="emp1">Nguyễn Văn A</SelectItem>
-                      <SelectItem value="emp2">Trần Thị B</SelectItem>
-                      <SelectItem value="emp3">Lê Văn C</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
-                    <SelectTrigger className="bg-white border-slate-300 shadow-none">
-                      <SelectValue placeholder="Phương thức TT" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tất cả</SelectItem>
-                      <SelectItem value="cash">Tiền mặt</SelectItem>
-                      <SelectItem value="transfer">Chuyển khoản</SelectItem>
-                      <SelectItem value="ewallet">Ví điện tử</SelectItem>
-                      <SelectItem value="card">Thẻ tín dụng</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+
+                  <Separator />
+
+                  {/* Quick Search */}
+                  <div>
+                    <h3 className="text-sm text-slate-900 mb-3">Tìm kiếm nhanh</h3>
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Input
+                          placeholder="Tìm khách hàng..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-9 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                        />
+                      </div>
+                      <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                        <SelectTrigger className="bg-white border-slate-300 shadow-none">
+                          <SelectValue placeholder="Nhân viên" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tất cả nhân viên</SelectItem>
+                          <SelectItem value="emp1">Nguyễn Văn A</SelectItem>
+                          <SelectItem value="emp2">Trần Thị B</SelectItem>
+                          <SelectItem value="emp3">Lê Văn C</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
+                        <SelectTrigger className="bg-white border-slate-300 shadow-none">
+                          <SelectValue placeholder="Phương thức TT" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tất cả</SelectItem>
+                          <SelectItem value="cash">Tiền mặt</SelectItem>
+                          <SelectItem value="transfer">Chuyển khoản</SelectItem>
+                          <SelectItem value="ewallet">Ví điện tử</SelectItem>
+                          <SelectItem value="card">Thẻ tín dụng</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </>
               )}
             </>
@@ -2904,50 +2835,50 @@ export function Reports() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
           <div className="bg-white border-b border-slate-200 px-8 overflow-x-auto">
             <TabsList className="bg-transparent border-0 p-0 h-auto inline-flex w-full min-w-max">
-              <TabsTrigger 
-                value="endofday" 
+              <TabsTrigger
+                value="endofday"
                 className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-900 px-4 py-3"
               >
                 <Moon className="w-4 h-4 mr-2" />
                 Cuối ngày
               </TabsTrigger>
-              <TabsTrigger 
-                value="sales" 
+              <TabsTrigger
+                value="sales"
                 className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-900 px-4 py-3"
               >
                 <BarChart3 className="w-4 h-4 mr-2" />
                 Bán hàng
               </TabsTrigger>
-              <TabsTrigger 
-                value="finance" 
+              <TabsTrigger
+                value="finance"
                 className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-900 px-4 py-3"
               >
                 <DollarSign className="w-4 h-4 mr-2" />
                 Tài chính
               </TabsTrigger>
-              <TabsTrigger 
-                value="products" 
+              <TabsTrigger
+                value="products"
                 className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-900 px-4 py-3"
               >
                 <Package className="w-4 h-4 mr-2" />
                 Hàng hóa
               </TabsTrigger>
-              <TabsTrigger 
-                value="employees" 
+              <TabsTrigger
+                value="employees"
                 className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-900 px-4 py-3"
               >
                 <Users className="w-4 h-4 mr-2" />
                 Nhân viên
               </TabsTrigger>
-              <TabsTrigger 
-                value="customers" 
+              <TabsTrigger
+                value="customers"
                 className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-900 px-4 py-3"
               >
                 <UserCheck className="w-4 h-4 mr-2" />
                 Khách hàng
               </TabsTrigger>
-              <TabsTrigger 
-                value="suppliers" 
+              <TabsTrigger
+                value="suppliers"
                 className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-900 px-4 py-3"
               >
                 <Building2 className="w-4 h-4 mr-2" />
@@ -2980,320 +2911,356 @@ export function Reports() {
                 />
               ) : productsConcern === 'sales' ? (
                 <>
-              {/* Sales Concern Charts */}
-              
-              {/* TOP 10 - Doanh số cao nhất */}
-              <Card className="border-blue-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-blue-900">
-                    <Award className="w-5 h-5" />
-                    TOP 10 sản phẩm doanh số cao nhất
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <BarChart data={topProductsData} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis 
-                        type="number"
-                        tick={{ fill: '#64748b', fontSize: 12 }}
-                        tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
-                      />
-                      <YAxis 
-                        type="category"
-                        dataKey="name" 
-                        tick={{ fill: '#64748b', fontSize: 11 }}
-                        width={150}
-                      />
-                      <Tooltip 
-                        formatter={(value: number) => `${value.toLocaleString()}₫`}
-                        contentStyle={{ 
-                          backgroundColor: '#eff6ff', 
-                          border: '1px solid #bfdbfe',
-                          borderRadius: '8px'
-                        }}
-                      />
-                      <Bar dataKey="revenue" fill="#2563eb" radius={[0, 8, 8, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+                  {/* Sales Concern Charts */}
 
-              {/* TOP 10 bán chạy (theo số lượng) */}
-              <Card className="border-emerald-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-emerald-900">
-                    <TrendingUp className="w-5 h-5" />
-                    TOP 10 sản phẩm bán chạy
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <BarChart data={topProductsData} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis type="number" tick={{ fill: '#64748b', fontSize: 12 }} />
-                      <YAxis 
-                        type="category"
-                        dataKey="name" 
-                        tick={{ fill: '#64748b', fontSize: 11 }}
-                        width={150}
-                      />
-                      <Tooltip contentStyle={{ backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px' }} />
-                      <Bar dataKey="sold" fill="#10b981" name="Số lượng bán" radius={[0, 8, 8, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+                  {/* TOP 10 - Doanh số cao nhất */}
+                  <Card className="border-blue-200">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-blue-900">
+                        <Award className="w-5 h-5" />
+                        TOP 10 sản phẩm doanh số cao nhất
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={400}>
+                        <PieChart>
+                          <Pie
+                            data={(() => {
+                              const top10 = topProductsData.slice(0, 10);
+                              const othersValue = topProductsData.slice(10).reduce((sum, item) => sum + item.revenue, 0);
+                              if (othersValue > 0) {
+                                return [...top10, { name: 'Khác', revenue: othersValue }];
+                              }
+                              return top10;
+                            })()}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={true}
+                            label={(entry) => {
+                              const total = topProductsData.reduce((sum, item) => sum + item.revenue, 0);
+                              const percent = ((entry.revenue / total) * 100).toFixed(1);
+                              return `${entry.name}: ${percent}%`;
+                            }}
+                            outerRadius={120}
+                            fill="#8884d8"
+                            dataKey="revenue"
+                          >
+                            {(() => {
+                              const COLORS = [
+                                '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981',
+                                '#06b6d4', '#6366f1', '#f97316', '#14b8a6', '#a855f7',
+                                '#94a3b8'
+                              ];
+                              const top10 = topProductsData.slice(0, 10);
+                              const othersValue = topProductsData.slice(10).reduce((sum, item) => sum + item.revenue, 0);
+                              const data = othersValue > 0 ? [...top10, { name: 'Khác', revenue: othersValue }] : top10;
+                              return data.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ));
+                            })()}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value: number) => `${value.toLocaleString()}₫`}
+                            contentStyle={{
+                              backgroundColor: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '8px'
+                            }}
+                          />
+                          <Legend
+                            layout="vertical"
+                            align="right"
+                            verticalAlign="middle"
+                            wrapperStyle={{ paddingLeft: '20px', fontSize: '14px', fontWeight: 'bold' }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
 
-              {/* Bán chậm */}
-              <Card className="border-orange-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-orange-900">
-                    <AlertTriangle className="w-5 h-5" />
-                    Sản phẩm bán chậm
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-slate-200">
-                          <th className="text-left py-3 px-4 text-sm text-slate-600">Sản phẩm</th>
-                          <th className="text-right py-3 px-4 text-sm text-slate-600">Đã bán</th>
-                          <th className="text-right py-3 px-4 text-sm text-slate-600">Số ngày không bán</th>
-                          <th className="text-center py-3 px-4 text-sm text-slate-600">Trạng thái</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {slowMovingProducts.map((product, index) => (
-                          <tr key={index} className="border-b border-slate-100">
-                            <td className="py-3 px-4 text-sm text-slate-900">{product.name}</td>
-                            <td className="text-right py-3 px-4 text-sm text-slate-900">{product.sold}</td>
-                            <td className="text-right py-3 px-4 text-sm text-orange-600">{product.daysNoSale} ngày</td>
-                            <td className="text-center py-3 px-4">
-                              <Badge className={product.status === 'very-slow' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}>
-                                {product.status === 'very-slow' ? 'Rất chậm' : 'Chậm'}
-                              </Badge>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
+                  {/* TOP 10 bán chạy (theo số lượng) */}
+                  <Card className="border-emerald-200">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-emerald-900">
+                        <TrendingUp className="w-5 h-5" />
+                        TOP 10 sản phẩm bán chạy
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={400}>
+                        <PieChart>
+                          <Pie
+                            data={(() => {
+                              const top10 = topProductsData.slice(0, 10);
+                              const othersValue = topProductsData.slice(10).reduce((sum, item) => sum + item.sold, 0);
+                              if (othersValue > 0) {
+                                return [...top10, { name: 'Khác', sold: othersValue }];
+                              }
+                              return top10;
+                            })()}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={true}
+                            label={(entry) => {
+                              const total = topProductsData.reduce((sum, item) => sum + item.sold, 0);
+                              const percent = ((entry.sold / total) * 100).toFixed(1);
+                              return `${entry.name}: ${percent}%`;
+                            }}
+                            outerRadius={120}
+                            fill="#8884d8"
+                            dataKey="sold"
+                          >
+                            {(() => {
+                              const COLORS = [
+                                '#10b981', '#059669', '#34d399', '#6ee7b7', '#a7f3d0',
+                                '#06b6d4', '#0891b2', '#06b6d4', '#22d3ee', '#67e8f9',
+                                '#94a3b8'
+                              ];
+                              const top10 = topProductsData.slice(0, 10);
+                              const othersValue = topProductsData.slice(10).reduce((sum, item) => sum + item.sold, 0);
+                              const data = othersValue > 0 ? [...top10, { name: 'Khác', sold: othersValue }] : top10;
+                              return data.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ));
+                            })()}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value: number) => `${value} sản phẩm`}
+                            contentStyle={{ backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px' }}
+                          />
+                          <Legend
+                            layout="vertical"
+                            align="right"
+                            verticalAlign="middle"
+                            wrapperStyle={{ paddingLeft: '20px', fontSize: '14px', fontWeight: 'bold' }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
 
-              {/* Không bán được */}
-              <Card className="border-red-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-red-900">
-                    <XCircle className="w-5 h-5" />
-                    Sản phẩm không bán được
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-slate-200">
-                          <th className="text-left py-3 px-4 text-sm text-slate-600">Sản phẩm</th>
-                          <th className="text-left py-3 px-4 text-sm text-slate-600">Lần bán cuối</th>
-                          <th className="text-center py-3 px-4 text-sm text-slate-600">Ghi chú</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {noSaleProducts.map((product, index) => (
-                          <tr key={index} className="border-b border-slate-100">
-                            <td className="py-3 px-4 text-sm text-slate-900">{product.name}</td>
-                            <td className="py-3 px-4 text-sm text-red-600">{product.lastSale}</td>
-                            <td className="text-center py-3 px-4">
-                              <Badge className="bg-red-100 text-red-700">Cần xem xét</Badge>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
+                  {/* Biến động số lượng bán theo thời gian */}
+                  <Card className="border-purple-200">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-purple-900">
+                        <LineChartIcon className="w-5 h-5" />
+                        Biến động số lượng bán theo thời gian (Top 10)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={400}>
+                        <LineChart
+                          data={(() => {
+                            // Generate time-based data for top 10 products
+                            // This is sample data - in real app, this would come from API based on date range
+                            const timePoints = [
+                              '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'
+                            ];
 
-              {/* System Suggestions */}
-              <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-blue-900">
-                    <Target className="w-5 h-5" />
-                    Gợi ý từ hệ thống
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {systemSuggestions.map((suggestion, index) => {
-                      const Icon = suggestion.icon;
-                      const colorClasses = {
-                        emerald: 'bg-emerald-50 border-emerald-200 text-emerald-900',
-                        red: 'bg-red-50 border-red-200 text-red-900',
-                        orange: 'bg-orange-50 border-orange-200 text-orange-900',
-                        blue: 'bg-blue-50 border-blue-300 text-blue-900',
-                      };
-                      
-                      return (
-                        <div 
-                          key={index} 
-                          className={`p-4 rounded-lg border ${colorClasses[suggestion.color as keyof typeof colorClasses]}`}
+                            return timePoints.map(time => {
+                              const dataPoint: any = { time };
+                              topProductsData.slice(0, 10).forEach(product => {
+                                // Generate random variation for demo
+                                dataPoint[product.name] = Math.floor(Math.random() * 50) + 10;
+                              });
+                              return dataPoint;
+                            });
+                          })()}
+                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                         >
-                          <div className="flex items-start gap-3">
-                            <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                            <div>
-                              <p className="text-sm font-medium">{suggestion.product}</p>
-                              <p className="text-xs mt-1 opacity-80">{suggestion.reason}</p>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                          <XAxis
+                            dataKey="time"
+                            tick={{ fill: '#64748b', fontSize: 12 }}
+                          />
+                          <YAxis
+                            tick={{ fill: '#64748b', fontSize: 12 }}
+                            label={{ value: 'Số lượng', angle: -90, position: 'insideLeft', style: { fill: '#64748b' } }}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: '#f8fafc',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '8px'
+                            }}
+                          />
+                          <Legend
+                            wrapperStyle={{ fontSize: '14px', fontWeight: 'bold' }}
+                            iconType="line"
+                          />
+                          {(() => {
+                            const COLORS = [
+                              '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981',
+                              '#06b6d4', '#6366f1', '#f97316', '#14b8a6', '#a855f7'
+                            ];
+                            return topProductsData.slice(0, 10).map((product, index) => (
+                              <Line
+                                key={product.name}
+                                type="monotone"
+                                dataKey={product.name}
+                                stroke={COLORS[index % COLORS.length]}
+                                strokeWidth={2}
+                                dot={{ r: 3 }}
+                                activeDot={{ r: 5 }}
+                              />
+                            ));
+                          })()}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
                 </>
               ) : (
                 <>
-              {/* Profit Concern Charts */}
-              
-              {/* TOP 10 lợi nhuận cao nhất */}
-              <Card className="border-emerald-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-emerald-900">
-                    <Award className="w-5 h-5" />
-                    TOP 10 sản phẩm lợi nhuận cao nhất
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <BarChart data={topProductsData} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis 
-                        type="number"
-                        tick={{ fill: '#64748b', fontSize: 12 }}
-                        tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
-                      />
-                      <YAxis 
-                        type="category"
-                        dataKey="name" 
-                        tick={{ fill: '#64748b', fontSize: 11 }}
-                        width={150}
-                      />
-                      <Tooltip 
-                        formatter={(value: number) => `${value.toLocaleString()}₫`}
-                        contentStyle={{ 
-                          backgroundColor: '#f0fdf4', 
-                          border: '1px solid #86efac',
-                          borderRadius: '8px'
-                        }}
-                      />
-                      <Bar dataKey="profit" fill="#10b981" radius={[0, 8, 8, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+                  {/* Profit Concern Charts */}
 
-              {/* TOP 10 theo tỷ suất lợi nhuận */}
-              <Card className="border-blue-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-blue-900">
-                    <TrendingUp className="w-5 h-5" />
-                    TOP 10 sản phẩm theo tỷ suất lợi nhuận
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <BarChart 
-                      data={[...topProductsData].sort((a, b) => 
-                        ((b.profit / b.revenue) * 100) - ((a.profit / a.revenue) * 100)
-                      )} 
-                      layout="vertical"
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis 
-                        type="number" 
-                        tick={{ fill: '#64748b', fontSize: 12 }}
-                        tickFormatter={(value) => `${value.toFixed(1)}%`}
-                      />
-                      <YAxis 
-                        type="category"
-                        dataKey="name" 
-                        tick={{ fill: '#64748b', fontSize: 11 }}
-                        width={150}
-                      />
-                      <Tooltip 
-                        formatter={(value: number, name: string, props: any) => {
-                          const profitMargin = (props.payload.profit / props.payload.revenue) * 100;
-                          return [`${profitMargin.toFixed(2)}%`, 'Tỷ suất LN'];
-                        }}
-                        contentStyle={{ 
-                          backgroundColor: '#eff6ff', 
-                          border: '1px solid #bfdbfe',
-                          borderRadius: '8px'
-                        }}
-                      />
-                      <Bar 
-                        dataKey={(item: any) => (item.profit / item.revenue) * 100} 
-                        fill="#3b82f6" 
-                        radius={[0, 8, 8, 0]} 
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+                  {/* TOP 10 lợi nhuận cao nhất */}
+                  <Card className="border-emerald-200">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-emerald-900">
+                        <Award className="w-5 h-5" />
+                        TOP 10 sản phẩm lợi nhuận cao nhất
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={400}>
+                        <PieChart>
+                          <Pie
+                            data={(() => {
+                              const top10 = topProductsData.slice(0, 10);
+                              const othersValue = topProductsData.slice(10).reduce((sum, item) => sum + item.profit, 0);
+                              if (othersValue > 0) {
+                                return [...top10, { name: 'Khác', profit: othersValue }];
+                              }
+                              return top10;
+                            })()}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={true}
+                            label={(entry) => {
+                              const total = topProductsData.reduce((sum, item) => sum + item.profit, 0);
+                              const percent = ((entry.profit / total) * 100).toFixed(1);
+                              return `${entry.name}: ${percent}%`;
+                            }}
+                            outerRadius={120}
+                            fill="#8884d8"
+                            dataKey="profit"
+                          >
+                            {(() => {
+                              const COLORS = [
+                                '#10b981', '#059669', '#34d399', '#6ee7b7', '#a7f3d0',
+                                '#06b6d4', '#0891b2', '#06b6d4', '#22d3ee', '#67e8f9',
+                                '#94a3b8'
+                              ];
+                              const top10 = topProductsData.slice(0, 10);
+                              const othersValue = topProductsData.slice(10).reduce((sum, item) => sum + item.profit, 0);
+                              const data = othersValue > 0 ? [...top10, { name: 'Khác', profit: othersValue }] : top10;
+                              return data.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ));
+                            })()}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value: number) => `${value.toLocaleString()}₫`}
+                            contentStyle={{
+                              backgroundColor: '#f0fdf4',
+                              border: '1px solid #86efac',
+                              borderRadius: '8px'
+                            }}
+                          />
+                          <Legend
+                            layout="vertical"
+                            align="right"
+                            verticalAlign="middle"
+                            wrapperStyle={{ paddingLeft: '20px' }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
 
-              {/* System Suggestions for Profit */}
-              <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-blue-900">
-                    <Target className="w-5 h-5" />
-                    Gợi ý từ hệ thống
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 rounded-lg border bg-emerald-50 border-emerald-200 text-emerald-900">
-                      <div className="flex items-start gap-3">
-                        <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium">Cà phê sữa đá</p>
-                          <p className="text-xs mt-1 opacity-80">Tỷ suất lợi nhuận cao (66.7%), nên duy trì</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="p-4 rounded-lg border bg-emerald-50 border-emerald-200 text-emerald-900">
-                      <div className="flex items-start gap-3">
-                        <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium">Trà đào cam sả</p>
-                          <p className="text-xs mt-1 opacity-80">Tỷ suất lợi nhuận 63.6%, cân nhắc tăng khuyến mãi</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="p-4 rounded-lg border bg-orange-50 border-orange-200 text-orange-900">
-                      <div className="flex items-start gap-3">
-                        <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium">Sinh tố dâu</p>
-                          <p className="text-xs mt-1 opacity-80">Tỷ suất lợi nhuận thấp (55%), cân nhắc tối ưu chi phí</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="p-4 rounded-lg border bg-blue-50 border-blue-300 text-blue-900">
-                      <div className="flex items-start gap-3">
-                        <TrendingUp className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium">Cà phê đen</p>
-                          <p className="text-xs mt-1 opacity-80">Lợi nhuận tốt (70%), dự báo tăng trưởng</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  {/* TOP 10 theo tỷ suất lợi nhuận */}
+                  <Card className="border-blue-200">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-blue-900">
+                        <TrendingUp className="w-5 h-5" />
+                        TOP 10 sản phẩm theo tỷ suất lợi nhuận
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={400}>
+                        <PieChart>
+                          <Pie
+                            data={(() => {
+                              const sortedData = [...topProductsData].sort((a, b) =>
+                                ((b.profit / b.revenue) * 100) - ((a.profit / a.revenue) * 100)
+                              );
+                              const top10 = sortedData.slice(0, 10).map(item => ({
+                                ...item,
+                                profitMargin: (item.profit / item.revenue) * 100
+                              }));
+                              const othersData = sortedData.slice(10);
+                              if (othersData.length > 0) {
+                                const othersAvgMargin = othersData.reduce((sum, item) => sum + (item.profit / item.revenue) * 100, 0) / othersData.length;
+                                return [...top10, { name: 'Khác', profitMargin: othersAvgMargin, profit: 0, revenue: 0 }];
+                              }
+                              return top10;
+                            })()}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={true}
+                            label={(entry) => {
+                              const total = (() => {
+                                const sortedData = [...topProductsData].sort((a, b) =>
+                                  ((b.profit / b.revenue) * 100) - ((a.profit / a.revenue) * 100)
+                                );
+                                return sortedData.slice(0, 10).reduce((sum, item) => sum + (item.profit / item.revenue) * 100, 0);
+                              })();
+                              const percent = ((entry.profitMargin / total) * 100).toFixed(1);
+                              return `${entry.name}: ${percent}%`;
+                            }}
+                            outerRadius={120}
+                            fill="#8884d8"
+                            dataKey="profitMargin"
+                          >
+                            {(() => {
+                              const COLORS = [
+                                '#3b82f6', '#2563eb', '#1d4ed8', '#1e40af', '#1e3a8a',
+                                '#60a5fa', '#3b82f6', '#2563eb', '#1d4ed8', '#1e40af',
+                                '#94a3b8'
+                              ];
+                              const sortedData = [...topProductsData].sort((a, b) =>
+                                ((b.profit / b.revenue) * 100) - ((a.profit / a.revenue) * 100)
+                              );
+                              const top10 = sortedData.slice(0, 10);
+                              const othersData = sortedData.slice(10);
+                              const data = othersData.length > 0 ? [...top10, { name: 'Khác' }] : top10;
+                              return data.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ));
+                            })()}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value: number, name: string, props: any) => {
+                              return [`${value.toFixed(2)}%`, 'Tỷ suất LN'];
+                            }}
+                            contentStyle={{
+                              backgroundColor: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '8px'
+                            }}
+                          />
+                          <Legend
+                            layout="vertical"
+                            align="right"
+                            verticalAlign="middle"
+                            wrapperStyle={{ paddingLeft: '20px' }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
                 </>
               )}
             </TabsContent>
@@ -3332,26 +3299,26 @@ export function Reports() {
                           <ResponsiveContainer width="100%" height={400}>
                             <BarChart data={getTop10EmployeesByProfit()} layout="vertical">
                               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                              <XAxis 
+                              <XAxis
                                 type="number"
                                 tick={{ fill: '#64748b', fontSize: 12 }}
                                 tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
                               />
-                              <YAxis 
+                              <YAxis
                                 type="category"
-                                dataKey="name" 
+                                dataKey="name"
                                 tick={{ fill: '#64748b', fontSize: 11 }}
                                 width={200}
                               />
-                              <Tooltip 
+                              <Tooltip
                                 formatter={(value: number) => `${value.toLocaleString()}₫`}
-                                contentStyle={{ 
-                                  backgroundColor: '#f0fdf4', 
+                                contentStyle={{
+                                  backgroundColor: '#f0fdf4',
                                   border: '1px solid #86efac',
                                   borderRadius: '8px'
                                 }}
                               />
-                              <Bar dataKey="profit" fill="#10b981" radius={[0, 8, 8, 0]} />
+                              <Bar dataKey="profit" fill="#10b981" radius={[0, 8, 8, 0]} label={{ position: 'right', fill: '#047857', fontWeight: 'bold', fontSize: 11, formatter: (value: number) => value.toLocaleString('vi-VN') }} />
                             </BarChart>
                           </ResponsiveContainer>
                         </CardContent>
@@ -3391,25 +3358,25 @@ export function Reports() {
                           <ResponsiveContainer width="100%" height={400}>
                             <BarChart data={getTop10EmployeesBySales()} layout="vertical">
                               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                              <XAxis 
+                              <XAxis
                                 type="number"
                                 tick={{ fill: '#64748b', fontSize: 12 }}
                               />
-                              <YAxis 
+                              <YAxis
                                 type="category"
-                                dataKey="name" 
+                                dataKey="name"
                                 tick={{ fill: '#64748b', fontSize: 11 }}
                                 width={200}
                               />
-                              <Tooltip 
+                              <Tooltip
                                 formatter={(value: number) => `${value.toLocaleString()} ${employeeSalesMode === 'invoice' ? 'hóa đơn' : 'mặt hàng'}`}
-                                contentStyle={{ 
-                                  backgroundColor: '#eff6ff', 
+                                contentStyle={{
+                                  backgroundColor: '#eff6ff',
                                   border: '1px solid #bfdbfe',
                                   borderRadius: '8px'
                                 }}
                               />
-                              <Bar dataKey="value" fill="#2563eb" radius={[0, 8, 8, 0]} />
+                              <Bar dataKey="value" fill="#2563eb" radius={[0, 8, 8, 0]} label={{ position: 'right', fill: '#1e40af', fontWeight: 'bold', fontSize: 11, formatter: (value: number) => value.toLocaleString('vi-VN') }} />
                             </BarChart>
                           </ResponsiveContainer>
                         </CardContent>
@@ -3423,7 +3390,7 @@ export function Reports() {
 
             {/* TAB 1: END OF DAY REPORT */}
             <TabsContent value="endofday" className="m-0 p-8">
-              <EndOfDayReport 
+              <EndOfDayReport
                 concern={eodConcern}
                 dateRangeType={dateRangeType}
                 selectedDate={selectedDate}
@@ -3451,7 +3418,7 @@ export function Reports() {
 
             {/* TAB 2: FINANCE REPORT */}
             <TabsContent value="finance" className="m-0 p-8">
-              <FinanceReport 
+              <FinanceReport
                 viewType={financeViewType}
                 selectedConcerns={selectedFinanceConcerns}
               />
@@ -3459,7 +3426,7 @@ export function Reports() {
 
             {/* TAB 6: CUSTOMER REPORT */}
             <TabsContent value="customers" className="m-0 p-8">
-              <CustomerReport 
+              <CustomerReport
                 dateFrom={customerDateFrom}
                 dateTo={customerDateTo}
                 customerSearch={customerSearchQuery}
@@ -3470,7 +3437,7 @@ export function Reports() {
 
             {/* TAB 7: SUPPLIER REPORT */}
             <TabsContent value="suppliers" className="m-0 p-8">
-              <SupplierReport 
+              <SupplierReport
                 viewType={supplierViewType}
                 concern={supplierConcern}
                 searchQuery={supplierSearchQuery}
@@ -3481,7 +3448,7 @@ export function Reports() {
 
             {/* TAB 8: SALES REPORT */}
             <TabsContent value="sales" className="m-0 h-full">
-              <SalesReport 
+              <SalesReport
                 viewType={salesViewType}
                 concern={salesConcern}
                 dateFrom={salesDateFrom}

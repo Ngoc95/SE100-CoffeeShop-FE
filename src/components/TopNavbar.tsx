@@ -168,9 +168,32 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                 </div>
               )}
               <div className="h-6 w-px bg-slate-200" />
-              <h1 className="text-blue-900">
-                {currentPage === 'pos' ? 'Bán hàng' : 'Pha chế'}
-              </h1>
+              
+              {/* Tabs for POS and Kitchen */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onNavigate('pos')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-sm font-medium ${
+                    currentPage === 'pos'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-slate-700 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  Bán hàng
+                </button>
+                <button
+                  onClick={() => onNavigate('kitchen')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-sm font-medium ${
+                    currentPage === 'kitchen'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-slate-700 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  <ChefHat className="w-4 h-4" />
+                  Pha chế
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">

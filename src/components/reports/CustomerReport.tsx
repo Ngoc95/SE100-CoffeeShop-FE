@@ -22,7 +22,7 @@ interface CustomerReportProps {
   concernType: 'sales' | 'debt' | 'products';
 }
 
-export function CustomerReport({ 
+export function CustomerReport({
   dateFrom,
   dateTo,
   customerSearch,
@@ -136,7 +136,7 @@ export function CustomerReport({
 
   const renderFilterSummary = () => {
     const filterLines: JSX.Element[] = [];
-    
+
     if (customerSearch) {
       filterLines.push(
         <p key="customer" className="text-sm text-slate-600">
@@ -151,10 +151,10 @@ export function CustomerReport({
       debt: 'Công nợ',
       products: 'Hàng bán theo khách'
     };
-  
-    
+
+
     if (filterLines.length === 0) return null;
-    
+
     return <>{filterLines}</>;
   };
 
@@ -199,7 +199,7 @@ export function CustomerReport({
               <ResponsiveContainer width="100%" height={400}>
                 <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 30 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis 
+                  <XAxis
                     type="number"
                     tick={{ fill: '#64748b', fontSize: 11 }}
                     tickFormatter={(value) => {
@@ -208,21 +208,21 @@ export function CustomerReport({
                       return value;
                     }}
                   />
-                  <YAxis 
+                  <YAxis
                     type="category"
-                    dataKey="name" 
+                    dataKey="name"
                     width={150}
                     tick={{ fill: '#64748b', fontSize: 11 }}
                   />
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value: number) => `${value.toLocaleString()}₫`}
-                    contentStyle={{ 
-                      backgroundColor: 'white', 
+                    contentStyle={{
+                      backgroundColor: 'white',
                       border: '1px solid #e2e8f0',
                       borderRadius: '8px'
                     }}
                   />
-                  <Bar dataKey="revenue" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Doanh thu" />
+                  <Bar dataKey="revenue" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Doanh thu" label={{ position: 'right', fill: '#1e40af', fontWeight: 'bold', fontSize: 11, formatter: (value: number) => value.toLocaleString('vi-VN') }} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -287,7 +287,7 @@ export function CustomerReport({
                         {totalRevenue.toLocaleString()}
                       </td>
                     </tr>
-                    
+
                     {/* Customer rows */}
                     {filteredCustomerData.map((item) => (
                       <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
