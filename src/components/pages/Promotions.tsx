@@ -75,7 +75,7 @@ interface Customer {
 }
 
 export interface Promotion {
-  id:string;
+  id: string;
   code: string;
   name: string;
   type: PromotionType;
@@ -881,11 +881,10 @@ export function Promotions() {
                                 className="hover:bg-slate-200"
                               >
                                 <ChevronDown
-                                  className={`w-5 h-5 transition-transform text-slate-600 ${
-                                    expandedRow === promo.id
-                                      ? "rotate-180"
-                                      : ""
-                                  }`}
+                                  className={`w-5 h-5 transition-transform text-slate-600 ${expandedRow === promo.id
+                                    ? "rotate-180"
+                                    : ""
+                                    }`}
                                 />
                               </Button>
                             </TableCell>
