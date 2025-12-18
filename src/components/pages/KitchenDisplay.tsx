@@ -726,7 +726,7 @@ export function KitchenDisplay() {
 
       {/* Recipe Modal */}
       <Dialog open={recipeModalOpen} onOpenChange={setRecipeModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <BookOpen className="w-5 h-5" />
@@ -801,7 +801,7 @@ export function KitchenDisplay() {
 
           <DialogFooter>
             <Button
-              className="w-full"
+              className="w-full bg-blue-600 hover:bg-blue-700"
               onClick={() => setRecipeModalOpen(false)}
             >
               Đóng

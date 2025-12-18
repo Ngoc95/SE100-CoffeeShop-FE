@@ -35,6 +35,7 @@ import {
   Tag,
   ChevronRight,
   ChevronsRight,
+  ChevronDown,
 } from "lucide-react";
 import { Card, CardContent } from "../ui/card";
 import { Input } from "../ui/input";
@@ -210,6 +211,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
   const [isTakeaway, setIsTakeaway] = useState(false);
   const [selectedArea, setSelectedArea] = useState("all");
   const [selectedTableStatus, setSelectedTableStatus] = useState("all");
+  const [isCartOpen, setIsCartOpen] = useState(false);
 
   // Customer data
   const [customers] = useState<Customer[]>([
@@ -2013,7 +2015,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
     return `${elapsed} phút`;
   };
 
-  const getItemStatusBadge = (status?: CartItem["status"]) => {
+  const getItemStatusBadge = (status?: string) => {
     switch (status) {
       case "pending":
         return (
@@ -2116,6 +2118,325 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
     );
   };
 
+  // Refactored Cart Panel Content
+  const renderCartPanel = (isMobile = false) => {
+    if (isMobile && !isCartOpen) {
+      // Don't render mobile cart when closed to avoid any display issues
+      return null;
+    }
+    
+    return (
+      <div
+        className={
+          isMobile
+            ? "bg-white border-l shadow-lg flex flex-col h-full fixed inset-0 z-50 transition-transform duration-300 lg:hidden translate-y-0"
+            : "bg-white border-l shadow-lg flex flex-col h-full hidden lg:flex lg:flex-none lg:w-[400px] xl:w-[450px]"
+        }
+      >
+      <div className="p-3 border-b bg-gradient-to-r from-blue-50 to-blue-100">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            {isMobile && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p-0 h-8 w-8 -ml-1 mr-1 text-slate-500"
+                onClick={() => setIsCartOpen(false)}
+              >
+                <ChevronDown className="w-6 h-6" />
+              </Button>
+            )}
+            <h2 className="text-blue-900 text-base">Đơn hàng</h2>
+            {selectedTable?.currentOrder && (
+              <Badge
+                variant="secondary"
+                className="bg-blue-600 text-white text-xs"
+              >
+                {selectedTable.currentOrder}
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Request notification icon */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 relative"
+              onClick={() => setRequestsDrawerOpen(true)}
+              title="Yêu cầu của tôi"
+            >
+              <Bell className="w-4 h-4 text-blue-600" />
+              {newItemRequests.filter((r) => r.status === "pending").length >
+                0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
+                  {
+                    newItemRequests.filter((r) => r.status === "pending")
+                      .length
+                  }
+                </span>
+              )}
+            </Button>
+            <Badge variant="secondary" className="bg-blue-100 text-blue-900">
+              <ShoppingCart className="w-3 h-3 mr-1" />
+              {totalItems}
+            </Badge>
+          </div>
+        </div>
+
+        {isTakeaway ? (
+          <div className="flex items-center gap-2 text-xs text-slate-600 mb-1">
+            <Package className="w-3 h-3" />
+            <span>Mang đi</span>
+          </div>
+        ) : selectedTable ? (
+          <div>
+            <div className="flex items-center gap-2 text-xs text-slate-600 mb-1">
+              <span>
+                Bàn {selectedTable.number} – {selectedTable.capacity} chỗ
+              </span>
+            </div>
+
+            {/* Order Actions & Customer Autocomplete - Same Row */}
+            <div className="flex gap-2 items-end">
+              {/* Order Actions */}
+              <div className="flex gap-1 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-1.5 p-0"
+                  title="Chuyển bàn"
+                  onClick={() => setMoveTableOpen(true)}
+                >
+                  <ArrowLeftRight className="w-3 h-3" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-1.5 p-0"
+                  title="Gộp bàn"
+                  onClick={() => setMergeTableOpen(true)}
+                >
+                  <GitMerge className="w-3 h-3" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-1.5 p-0"
+                  title="Tách đơn"
+                  onClick={() => setSplitOrderOpen(true)}
+                >
+                  <FileText className="w-3 h-3" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-1.5 p-0"
+                  title="Lịch sử"
+                  onClick={() => setOrderHistoryOpen(true)}
+                >
+                  <History className="w-3 h-3" />
+                </Button>
+              </div>
+
+              {/* Customer Autocomplete */}
+              <div className="flex-1">
+                <CustomerAutocomplete
+                  customers={customers}
+                  value={customerSearchCode}
+                  onChange={(code, customer) => {
+                    setCustomerSearchCode(code);
+                    if (customer) {
+                      setSelectedCustomer(customer);
+                    }
+                  }}
+                  onAddNew={(newCustomer) => {
+                    setSelectedCustomer(newCustomer);
+                    setCustomerSearchCode(newCustomer.code);
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500">Chưa chọn bàn</p>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-auto p-4 lg:p-6">
+        {cart.length === 0 ? (
+          <div className="text-center py-12">
+            <ShoppingCart className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500">Chưa có món nào</p>
+            <p className="text-xs text-slate-400 mt-1">
+              {!selectedTable && !isTakeaway
+                ? "Vui lòng chọn bàn hoặc mang đi"
+                : "Chọn món từ thực đơn"}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {/* Combo Suggestion Banner - will add later */}
+
+            {cart.map((item) => {
+              // Skip attached toppings in main loop - they'll be rendered under parent
+              if (item.parentItemId) return null;
+
+              return (
+                <div key={item.id}>
+                  {/* Main Item */}
+                  <CartItemDisplay
+                    item={item}
+                    onUpdateQuantity={updateQuantity}
+                    onRemove={removeFromCart}
+                    onCustomize={handleOpenCustomizationModal}
+                    onAddNote={handleOpenNoteDialog}
+                    onToggleComboExpansion={toggleComboExpansion}
+                    onCustomizeComboItem={handleCustomizeComboItem}
+                    getItemStatusBadge={getItemStatusBadge}
+                    restockedItems={restockedItems}
+                    glowingItems={glowingItems}
+                    appliedPromoCode={appliedPromoCode}
+                  />
+
+                  {/* Attached Toppings - Indented */}
+                  {item.attachedToppings &&
+                    item.attachedToppings.length > 0 && (
+                      <div className="ml-6 mt-1 space-y-1 border-l-2 border-amber-200 pl-3">
+                        {item.attachedToppings.map((topping) => (
+                          <div
+                            key={topping.id}
+                            className="bg-amber-50 rounded border border-amber-200 p-2 flex items-center justify-between gap-2"
+                          >
+                            <div className="flex-1">
+                              <p className="text-xs font-medium text-slate-900">
+                                + {topping.name}
+                              </p>
+                              <p className="text-xs text-amber-700">
+                                {topping.quantity} x{" "}
+                                {topping.price.toLocaleString("vi-VN")}đ ={" "}
+                                {(
+                                  topping.quantity * topping.price
+                                ).toLocaleString("vi-VN")}
+                                đ
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0 text-slate-400 hover:text-red-600"
+                                onClick={() =>
+                                  removeAttachedTopping(item.id, topping.id)
+                                }
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <Separator className="shadow-sm" />
+
+      <div className="p-3 space-y-2 bg-gradient-to-r from-blue-50 to-blue-100">
+        {/* Inline Promo Code Input */}
+        {!appliedPromoCode && cart.length > 0 && (
+          <div className="space-y-1"></div>
+        )}
+
+        <div className="space-y-1">
+          <div className="flex justify-between text-xs">
+            {/* <span className="text-slate-600">Tạm tính</span>
+              <span className="text-slate-900">
+                {totalAmount.toLocaleString()}₫
+              </span> */}
+          </div>
+          {discountAmount > 0 && (
+            <div className="flex justify-between text-xs items-center">
+              <span className="text-green-700">Giảm giá</span>
+              <div className="flex items-center gap-2">
+                <span className="text-green-700">
+                  –{discountAmount.toLocaleString()}₫
+                </span>
+                <button
+                  onClick={handleRemovePromo}
+                  className="text-slate-400 hover:text-red-600 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          )}
+          <Separator className="bg-blue-300 my-1" />
+          <div className="flex justify-between text-sm">
+            <span className="text-blue-950">Tổng cộng</span>
+            <span className="text-blue-900">
+              {(totalAmount - discountAmount).toLocaleString()}₫
+            </span>
+          </div>
+        </div>
+
+        {/* Demo: Simulate restock notification */}
+        {cart.some(
+          (item) =>
+            item.status === "waiting-ingredient" ||
+            item.status === "out-of-stock"
+        ) && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-xs border-emerald-300 text-emerald-600 hover:bg-emerald-50 h-7"
+            onClick={simulateRestockNotification}
+          >
+            <PackageCheck className="w-3 h-3 mr-1" />
+            Demo: Nhận thông báo đã bổ sung NL
+          </Button>
+        )}
+
+        {/* Send to Kitchen Button - Big Primary */}
+        <Button
+          className="w-full bg-orange-600 hover:bg-orange-700 h-8 shadow-lg text-base disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleSendToKitchen}
+          disabled={cart.length === 0 || !isKitchenUpdateNeeded}
+        >
+          <Bell className="w-5 h-5 mr-2" />
+          Gửi pha chế
+        </Button>
+
+        {/* Buttons Row */}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="border-2 border-blue-500 text-blue-700 hover:bg-blue-50 hover:text-blue-800 h-9 shadow-sm text-xs px-3"
+            onClick={() => setPromotionModalOpen(true)}
+            disabled={cart.length === 0}
+          >
+            <Percent className="w-3.5 h-3.5 mr-1" />
+            Khuyến mãi
+          </Button>
+
+          <Button
+            className="flex-1 bg-blue-600 hover:bg-blue-700 h-9 shadow-md text-sm"
+            disabled={cart.length === 0}
+            onClick={() => setPrintReceiptOpen(true)}
+          >
+            <CreditCard className="w-4 h-4 mr-1" />
+            Thanh toán
+          </Button>
+
+        </div>
+      </div>
+    </div>
+  );
+  };
+
   return (
     <div className="h-full flex flex-col lg:flex-row bg-slate-50">
       {/* Left Panel - Products & Tables */}
@@ -2203,7 +2524,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
           </TabsList>
 
           <TabsContent value="tables" className="flex-1 overflow-auto m-0">
-            <div className="p-4 lg:p-6">
+            <div className="p-4 lg:p-6 pb-24 lg:pb-6">
               {/* Order Type Tabs */}
               <div className="mb-4 flex gap-2 bg-slate-100 p-1 rounded-lg">
                 <Button
@@ -2392,7 +2713,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
           </TabsContent>
 
           <TabsContent value="menu" className="flex-1 overflow-auto m-0">
-            <div className="p-4 lg:p-6 space-y-4">
+            <div className="p-4 lg:p-6 space-y-4 pb-24 lg:pb-6">
               {/* Header with Categories and Add New Item button */}
               <div className="flex items-center justify-between gap-3">
                 {/* Categories */}
@@ -2485,7 +2806,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
 
           {/* Topping Tab */}
           <TabsContent value="topping" className="flex-1 overflow-auto m-0">
-            <div className="p-4 lg:p-6">
+            <div className="p-4 lg:p-6 pb-24 lg:pb-6">
               <div className="mb-4">
                 <h3 className="text-slate-900 font-semibold mb-4">
                   Topping & Phụ gia
@@ -2520,7 +2841,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
           </TabsContent>
 
           <TabsContent value="combo" className="flex-1 overflow-auto m-0">
-            <div className="p-4 lg:p-6 space-y-4">
+            <div className="p-4 lg:p-6 pb-24 lg:pb-6 space-y-4">
               {/* Combo Info Header */}
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
                 <div className="flex items-start gap-3">
@@ -2642,7 +2963,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
 
           {userRole === "waiter" && (
             <TabsContent value="ready" className="flex-1 overflow-auto m-0">
-              <div className="p-4 lg:p-6">
+              <div className="p-4 lg:p-6 pb-24 lg:pb-6">
                 <div className="space-y-3">
                   {readyItems.filter(
                     (item) =>
@@ -2748,324 +3069,23 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
       </div>
 
       {/* Right Panel - Cart */}
-      <div className="lg:flex-1 lg:max-w-6xl border-l bg-white flex flex-col max-h-[50vh] lg:max-h-full shadow-lg hidden lg:flex">
-        <div className="p-3 border-b bg-gradient-to-r from-blue-50 to-blue-100">
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2">
-              <h2 className="text-blue-900 text-base">Đơn hàng</h2>
-              {selectedTable?.currentOrder && (
-                <Badge
-                  variant="secondary"
-                  className="bg-blue-600 text-white text-xs"
-                >
-                  {selectedTable.currentOrder}
-                </Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {/* Request notification icon */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 p-0 relative"
-                onClick={() => setRequestsDrawerOpen(true)}
-                title="Yêu cầu của tôi"
-              >
-                <Bell className="w-4 h-4 text-blue-600" />
-                {newItemRequests.filter((r) => r.status === "pending").length >
-                  0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
-                    {
-                      newItemRequests.filter((r) => r.status === "pending")
-                        .length
-                    }
-                  </span>
-                )}
-              </Button>
-              <Badge variant="secondary" className="bg-blue-100 text-blue-900">
-                <ShoppingCart className="w-3 h-3 mr-1" />
-                {totalItems}
-              </Badge>
-            </div>
-          </div>
+      {renderCartPanel(false)}
+      {renderCartPanel(true)}
 
-          {isTakeaway ? (
-            <div className="flex items-center gap-2 text-xs text-slate-600 mb-1">
-              <Package className="w-3 h-3" />
-              <span>Mang đi</span>
-            </div>
-          ) : selectedTable ? (
-            <div>
-              <div className="flex items-center gap-2 text-xs text-slate-600 mb-1">
-                <span>
-                  Bàn {selectedTable.number} – {selectedTable.capacity} chỗ
-                </span>
-              </div>
-
-              {/* Order Actions & Customer Autocomplete - Same Row */}
-              <div className="flex gap-2 items-end">
-                {/* Order Actions */}
-                <div className="flex gap-1 pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 px-1.5 p-0"
-                    title="Chuyển bàn"
-                    onClick={() => setMoveTableOpen(true)}
-                  >
-                    <ArrowLeftRight className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 px-1.5 p-0"
-                    title="Gộp bàn"
-                    onClick={() => setMergeTableOpen(true)}
-                  >
-                    <GitMerge className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 px-1.5 p-0"
-                    title="Tách đơn"
-                    onClick={() => setSplitOrderOpen(true)}
-                  >
-                    <FileText className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 px-1.5 p-0"
-                    title="Lịch sử"
-                    onClick={() => setOrderHistoryOpen(true)}
-                  >
-                    <History className="w-3 h-3" />
-                  </Button>
-                </div>
-
-                {/* Customer Autocomplete */}
-                <div className="flex-1">
-                  <CustomerAutocomplete
-                    customers={customers}
-                    value={customerSearchCode}
-                    onChange={(code, customer) => {
-                      setCustomerSearchCode(code);
-                      if (customer) {
-                        setSelectedCustomer(customer);
-                      }
-                    }}
-                    onAddNew={(newCustomer) => {
-                      setSelectedCustomer(newCustomer);
-                      setCustomerSearchCode(newCustomer.code);
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <p className="text-xs text-slate-500">Chưa chọn bàn</p>
-          )}
-        </div>
-
-        <div className="flex-1 overflow-auto p-4 lg:p-6">
-          {cart.length === 0 ? (
-            <div className="text-center py-12">
-              <ShoppingCart className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500">Chưa có món nào</p>
-              <p className="text-xs text-slate-400 mt-1">
-                {!selectedTable && !isTakeaway
-                  ? "Vui lòng chọn bàn hoặc mang đi"
-                  : "Chọn món từ thực đơn"}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {/* Combo Suggestion Banner - will add later */}
-
-              {cart.map((item) => {
-                // Skip attached toppings in main loop - they'll be rendered under parent
-                if (item.parentItemId) return null;
-
-                return (
-                  <div key={item.id}>
-                    {/* Main Item */}
-                    <CartItemDisplay
-                      item={item}
-                      onUpdateQuantity={updateQuantity}
-                      onRemove={removeFromCart}
-                      onCustomize={handleOpenCustomizationModal}
-                      onAddNote={handleOpenNoteDialog}
-                      onToggleComboExpansion={toggleComboExpansion}
-                      onCustomizeComboItem={handleCustomizeComboItem}
-                      getItemStatusBadge={getItemStatusBadge}
-                      restockedItems={restockedItems}
-                      glowingItems={glowingItems}
-                      appliedPromoCode={appliedPromoCode}
-                    />
-
-                    {/* Attached Toppings - Indented */}
-                    {item.attachedToppings &&
-                      item.attachedToppings.length > 0 && (
-                        <div className="ml-6 mt-1 space-y-1 border-l-2 border-amber-200 pl-3">
-                          {item.attachedToppings.map((topping) => (
-                            <div
-                              key={topping.id}
-                              className="bg-amber-50 rounded border border-amber-200 p-2 flex items-center justify-between gap-2"
-                            >
-                              <div className="flex-1">
-                                <p className="text-xs font-medium text-slate-900">
-                                  + {topping.name}
-                                </p>
-                                <p className="text-xs text-amber-700">
-                                  {topping.quantity} x{" "}
-                                  {topping.price.toLocaleString("vi-VN")}đ ={" "}
-                                  {(
-                                    topping.quantity * topping.price
-                                  ).toLocaleString("vi-VN")}
-                                  đ
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-6 w-6 p-0 text-slate-400 hover:text-red-600"
-                                  onClick={() =>
-                                    removeAttachedTopping(item.id, topping.id)
-                                  }
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <Separator className="shadow-sm" />
-
-        <div className="p-3 space-y-2 bg-gradient-to-r from-blue-50 to-blue-100">
-          {/* Inline Promo Code Input */}
-          {!appliedPromoCode && cart.length > 0 && (
-            <div className="space-y-1"></div>
-          )}
-
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs">
-              {/* <span className="text-slate-600">Tạm tính</span>
-              <span className="text-slate-900">
-                {totalAmount.toLocaleString()}₫
-              </span> */}
-            </div>
-            {discountAmount > 0 && (
-              <div className="flex justify-between text-xs items-center">
-                <span className="text-green-700">Giảm giá</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-green-700">
-                    –{discountAmount.toLocaleString()}₫
-                  </span>
-                  <button
-                    onClick={handleRemovePromo}
-                    className="text-slate-400 hover:text-red-600 transition-colors"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              </div>
-            )}
-            <Separator className="bg-blue-300 my-1" />
-            <div className="flex justify-between text-sm">
-              <span className="text-blue-950">Tổng cộng</span>
-              <span className="text-blue-900">
-                {(totalAmount - discountAmount).toLocaleString()}₫
-              </span>
-            </div>
-          </div>
-
-          {/* Demo: Simulate out-of-stock notification */}
-          {/* {cart.some((item) => item.status === "preparing") && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full text-xs border-red-300 text-red-600 hover:bg-red-50 h-7"
-              onClick={simulateOutOfStockNotification}
-            >
-              <PackageX className="w-3 h-3 mr-1" />
-              Demo: Nhận cảnh báo hết NL từ bếp
-            </Button>
-          )} */}
-
-          {/* Demo: Simulate restock notification */}
-          {cart.some(
-            (item) =>
-              item.status === "waiting-ingredient" ||
-              item.status === "out-of-stock"
-          ) && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full text-xs border-emerald-300 text-emerald-600 hover:bg-emerald-50 h-7"
-              onClick={simulateRestockNotification}
-            >
-              <PackageCheck className="w-3 h-3 mr-1" />
-              Demo: Nhận thông báo đã bổ sung NL
-            </Button>
-          )}
-
-          {/* Send to Kitchen Button - Big Primary */}
-          <Button
-            className="w-full bg-orange-600 hover:bg-orange-700 h-8 shadow-lg text-base disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={handleSendToKitchen}
-            disabled={cart.length === 0 || !isKitchenUpdateNeeded}
-          >
-            <Bell className="w-5 h-5 mr-2" />
-            Gửi pha chế
-          </Button>
-
-          {/* Buttons Row */}
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              className="border-2 border-blue-500 text-blue-700 hover:bg-blue-50 hover:text-blue-800 h-9 shadow-sm text-xs px-3"
-              onClick={() => setPromotionModalOpen(true)}
-              disabled={cart.length === 0}
-            >
-              <Percent className="w-3.5 h-3.5 mr-1" />
-              Khuyến mãi
-            </Button>
-
-            <Button
-              className="flex-1 bg-blue-600 hover:bg-blue-700 h-9 shadow-md text-sm"
-              disabled={cart.length === 0}
-              onClick={() => setPrintReceiptOpen(true)}
-            >
-              <CreditCard className="w-4 h-4 mr-1" />
-              Thanh toán
-            </Button>
-            <PrintReceiptModal
-              open={printReceiptOpen}
-              onClose={() => setPrintReceiptOpen(false)}
-              items={cart.map((item) => ({
-                id: item.id,
-                name: item.name,
-                quantity: item.quantity,
-                price: item.price,
-              }))}
-              totalAmount={totalAmount}
-              orderNumber={selectedTable?.currentOrder || "TAKEAWAY"}
-              customerName={selectedCustomer?.name || "Khách hàng"}
-              paymentMethod="Tiền mặt"
-            />
-          </div>
-        </div>
-      </div>
+      <PrintReceiptModal
+        open={printReceiptOpen}
+        onClose={() => setPrintReceiptOpen(false)}
+        items={cart.map((item) => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+        }))}
+        totalAmount={totalAmount}
+        orderNumber={selectedTable?.currentOrder || "TAKEAWAY"}
+        customerName={selectedCustomer?.name || "Khách hàng"}
+        paymentMethod="Tiền mặt"
+      />
 
       {/* Out of Stock Warning Dialog */}
       <Dialog
@@ -4608,6 +4628,25 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
           animation: green-ripple 0.4s ease-out;
         }
       `}</style>
+      
+      {/* Mobile Cart Toggle Bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-40 lg:hidden flex items-center justify-between shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+        <div>
+          <p className="font-semibold text-slate-900 text-sm">
+            {totalItems} món đang chọn
+          </p>
+          <p className="text-blue-600 font-bold text-lg">
+            {totalAmount.toLocaleString()}đ
+          </p>
+        </div>
+        <Button
+          onClick={() => setIsCartOpen(true)}
+          className="bg-blue-600 hover:bg-blue-700 shadow-lg"
+        >
+          <ShoppingCart className="w-5 h-5 mr-2" />
+          Xem đơn hàng
+        </Button>
+      </div>
     </div>
   );
 }
