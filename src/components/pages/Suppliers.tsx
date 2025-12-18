@@ -39,6 +39,7 @@ import {
 } from "../ui/table";
 import { toast } from "sonner@2.0.3";
 import { SupplierFormDialog } from "../SupplierFormDialog";
+import { SupplierDetailDialog } from "../SupplierDetailDialog";
 
 interface Supplier {
   id: string;
@@ -63,6 +64,8 @@ export function Suppliers() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc" | "none">("none");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [viewingSupplier, setViewingSupplier] = useState<Supplier | null>(null);
 
   // Mock data
   const [suppliers, setSuppliers] = useState<Supplier[]>([
@@ -251,9 +254,20 @@ export function Suppliers() {
     );
   };
 
-  const openEditDialog = (supplier: Supplier) => {
+  const openEditDialog = (e: React.MouseEvent, supplier: Supplier) => {
+    e.stopPropagation();
     setEditingSupplier(supplier);
     setDialogOpen(true);
+  };
+
+  const openDetailDialog = (supplier: Supplier) => {
+    setViewingSupplier(supplier);
+    setDetailDialogOpen(true);
+  };
+  
+  const closeDetailDialog = () => {
+    setDetailDialogOpen(false);
+    setViewingSupplier(null);
   };
 
   const formatCurrency = (amount: number) => {
@@ -529,7 +543,10 @@ export function Suppliers() {
                     </TableRow>
                   ) : (
                     filteredSuppliers.map((supplier, index) => (
-                      <TableRow key={supplier.id}>
+                      <TableRow key={supplier.id} 
+                                onDoubleClick={() => openDetailDialog(supplier)}
+                                className="cursor-pointer hover:bg-slate-50"
+                      >
                         <TableCell className="text-sm text-slate-600 text-center">
                           {index + 1}
                         </TableCell>
@@ -594,7 +611,7 @@ export function Suppliers() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => openEditDialog(supplier)}
+                              onClick={(e) => openEditDialog(e, supplier)}
                               className="hover:bg-blue-100"
                             >
                               <Pencil className="w-4 h-4" />
@@ -602,7 +619,10 @@ export function Suppliers() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDeleteSupplier(supplier.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteSupplier(supplier.id);
+                              }}
                               className="hover:bg-red-50"
                             >
                               <Trash2 className="w-4 h-4 text-red-600" />
@@ -610,7 +630,10 @@ export function Suppliers() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleToggleStatus(supplier.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleStatus(supplier.id);
+                              }}
                               className={
                                 supplier.status === "active"
                                   ? "text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -650,6 +673,13 @@ export function Suppliers() {
         }}
         onSubmit={editingSupplier ? handleEditSupplier : handleAddSupplier}
         editingSupplier={editingSupplier}
+      />
+
+      {/* Detail Dialog */}
+      <SupplierDetailDialog
+        open={detailDialogOpen}
+        onClose={closeDetailDialog}
+        supplier={viewingSupplier}
       />
     </div>
   );
