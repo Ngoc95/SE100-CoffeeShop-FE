@@ -593,14 +593,14 @@ export function Promotions() {
             onClick={() => toast.info("Chức năng import đang phát triển")}
           >
             <Upload className="w-4 h-4 mr-2" />
-            Import Excel
+            Nhập file
           </Button>
           <Button
             variant="outline"
             onClick={() => toast.info("Chức năng export đang phát triển")}
           >
             <Download className="w-4 h-4 mr-2" />
-            Export Excel
+            Xuất file
           </Button>
           <Button
             variant="outline"
@@ -745,256 +745,256 @@ export function Promotions() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto rounded-xl">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-blue-100">
-                      <TableHead className="w-12"></TableHead>
-                      <TableHead className="w-16 text-sm text-center">
-                        STT
-                      </TableHead>
-                      <TableHead
-                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                        onClick={() => handleSort("code")}
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-blue-100">
+                  <TableHead className="w-12"></TableHead>
+                  <TableHead className="w-16 text-sm text-center">
+                    STT
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("code")}
+                  >
+                    <div className="flex items-center">
+                      Mã KM
+                      {getSortIcon("code")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("name")}
+                  >
+                    <div className="flex items-center">
+                      Tên KM
+                      {getSortIcon("name")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("type")}
+                  >
+                    <div className="flex items-center">
+                      Loại KM
+                      {getSortIcon("type")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("minOrderValue")}
+                  >
+                    <div className="flex items-center">
+                      Giá trị HĐ tối thiểu
+                      {getSortIcon("minOrderValue")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("promotionValue")}
+                  >
+                    <div className="flex items-center">
+                      Giá trị KM
+                      {getSortIcon("promotionValue")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("maxDiscountValue")}
+                  >
+                    <div className="flex items-center">
+                      Giá trị giảm tối đa
+                      {getSortIcon("maxDiscountValue")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("startDate")}
+                  >
+                    <div className="flex items-center">
+                      Ngày bắt đầu
+                      {getSortIcon("startDate")}
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-sm">Giờ bắt đầu</TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("endDate")}
+                  >
+                    <div className="flex items-center">
+                      Ngày kết thúc
+                      {getSortIcon("endDate")}
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-sm">Giờ kết thúc</TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("status")}
+                  >
+                    <div className="flex items-center">
+                      Trạng thái
+                      {getSortIcon("status")}
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-sm text-right">
+                    Thao tác
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredPromotions.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={14}
+                      className="text-center py-8 text-slate-500"
+                    >
+                      Không tìm thấy khuyến mại nào
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredPromotions.map((promo, index) => (
+                    <React.Fragment key={promo.id}>
+                      <TableRow
+                        className={
+                          expandedRow === promo.id
+                            ? "bg-slate-100"
+                            : "hover:bg-slate-50"
+                        }
                       >
-                        <div className="flex items-center">
-                          Mã KM
-                          {getSortIcon("code")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                        onClick={() => handleSort("name")}
-                      >
-                        <div className="flex items-center">
-                          Tên KM
-                          {getSortIcon("name")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                        onClick={() => handleSort("type")}
-                      >
-                        <div className="flex items-center">
-                          Loại KM
-                          {getSortIcon("type")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                        onClick={() => handleSort("minOrderValue")}
-                      >
-                        <div className="flex items-center">
-                          Giá trị HĐ tối thiểu
-                          {getSortIcon("minOrderValue")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                        onClick={() => handleSort("promotionValue")}
-                      >
-                        <div className="flex items-center">
-                          Giá trị KM
-                          {getSortIcon("promotionValue")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                        onClick={() => handleSort("maxDiscountValue")}
-                      >
-                        <div className="flex items-center">
-                          Giá trị giảm tối đa
-                          {getSortIcon("maxDiscountValue")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                        onClick={() => handleSort("startDate")}
-                      >
-                        <div className="flex items-center">
-                          Ngày bắt đầu
-                          {getSortIcon("startDate")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="text-sm">Giờ bắt đầu</TableHead>
-                      <TableHead
-                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                        onClick={() => handleSort("endDate")}
-                      >
-                        <div className="flex items-center">
-                          Ngày kết thúc
-                          {getSortIcon("endDate")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="text-sm">Giờ kết thúc</TableHead>
-                      <TableHead
-                        className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                        onClick={() => handleSort("status")}
-                      >
-                        <div className="flex items-center">
-                          Trạng thái
-                          {getSortIcon("status")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="text-sm text-right">
-                        Thao tác
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredPromotions.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={14}
-                          className="text-center py-8 text-slate-500"
-                        >
-                          Không tìm thấy khuyến mại nào
+                        <TableCell className="text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setExpandedRow(
+                                expandedRow === promo.id ? null : promo.id
+                              )
+                            }
+                            className="hover:bg-slate-200"
+                          >
+                            <ChevronDown
+                              className={`w-5 h-5 transition-transform text-slate-600 ${expandedRow === promo.id
+                                ? "rotate-180"
+                                : ""
+                                }`}
+                            />
+                          </Button>
                         </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredPromotions.map((promo, index) => (
-                        <React.Fragment key={promo.id}>
-                          <TableRow
+                        <TableCell className="text-sm text-slate-600 text-center">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-900">
+                          {promo.code}
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-900">
+                          {promo.name}
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-700">
+                          {getPromotionTypeLabel(promo.type)}
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-700">
+                          {formatCurrency(promo.minOrderValue)}
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-700">
+                          {formatPromotionValue(promo)}
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-700">
+                          {promo.maxDiscountValue
+                            ? formatCurrency(promo.maxDiscountValue)
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-700">
+                          {promo.startDate}
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-700">
+                          {promo.startTime}
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-700">
+                          {promo.endDate}
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-700">
+                          {promo.endTime}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          <Badge
+                            variant={
+                              promo.status === "active"
+                                ? "default"
+                                : "secondary"
+                            }
                             className={
-                              expandedRow === promo.id
-                                ? "bg-slate-100"
-                                : "hover:bg-slate-50"
+                              promo.status === "active"
+                                ? "bg-emerald-500"
+                                : "bg-red-500 text-white hover:bg-red-500"
                             }
                           >
-                            <TableCell className="text-center">
+                            {promo.status === "active"
+                              ? "Hoạt động"
+                              : "Không hoạt động"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {canUpdate && (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() =>
-                                  setExpandedRow(
-                                    expandedRow === promo.id ? null : promo.id
-                                  )
-                                }
-                                className="hover:bg-slate-200"
+                                onClick={() => openEditDialog(promo)}
+                                className="hover:bg-blue-100"
                               >
-                                <ChevronDown
-                                  className={`w-5 h-5 transition-transform text-slate-600 ${expandedRow === promo.id
-                                    ? "rotate-180"
-                                    : ""
-                                    }`}
-                                />
+                                <Pencil className="w-4 h-4" />
                               </Button>
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-600 text-center">
-                              {index + 1}
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-900">
-                              {promo.code}
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-900">
-                              {promo.name}
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-700">
-                              {getPromotionTypeLabel(promo.type)}
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-700">
-                              {formatCurrency(promo.minOrderValue)}
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-700">
-                              {formatPromotionValue(promo)}
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-700">
-                              {promo.maxDiscountValue
-                                ? formatCurrency(promo.maxDiscountValue)
-                                : "-"}
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-700">
-                              {promo.startDate}
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-700">
-                              {promo.startTime}
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-700">
-                              {promo.endDate}
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-700">
-                              {promo.endTime}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              <Badge
-                                variant={
-                                  promo.status === "active"
-                                    ? "default"
-                                    : "secondary"
-                                }
+                            )}
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeletePromotion(promo.id)}
+                                className="hover:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-600" />
+                              </Button>
+                            )}
+                            {canUpdate && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleStatus(promo.id)}
                                 className={
                                   promo.status === "active"
-                                    ? "bg-emerald-500"
-                                    : "bg-red-500 text-white hover:bg-red-500"
+                                    ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                }
+                                title={
+                                  promo.status === "active"
+                                    ? "Vô hiệu hóa"
+                                    : "Kích hoạt"
                                 }
                               >
-                                {promo.status === "active"
-                                  ? "Hoạt động"
-                                  : "Không hoạt động"}
-                              </Badge>
-                             </TableCell>
-                             <TableCell className="text-sm text-right">
-                               <div className="flex items-center justify-end gap-2">
-                                 {canUpdate && (
-                                   <Button
-                                     variant="ghost"
-                                     size="sm"
-                                     onClick={() => openEditDialog(promo)}
-                                     className="hover:bg-blue-100"
-                                   >
-                                     <Pencil className="w-4 h-4" />
-                                   </Button>
-                                 )}
-                                 {canDelete && (
-                                   <Button
-                                     variant="ghost"
-                                     size="sm"
-                                     onClick={() => handleDeletePromotion(promo.id)}
-                                     className="hover:bg-red-50"
-                                   >
-                                     <Trash2 className="w-4 h-4 text-red-600" />
-                                   </Button>
-                                 )}
-                                 {canUpdate && (
-                                   <Button
-                                     variant="ghost"
-                                     size="sm"
-                                     onClick={() => handleToggleStatus(promo.id)}
-                                     className={
-                                       promo.status === "active"
-                                         ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                         : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                                     }
-                                     title={
-                                       promo.status === "active"
-                                         ? "Vô hiệu hóa"
-                                         : "Kích hoạt"
-                                     }
-                                   >
-                                     {promo.status === "active" ? (
-                                       <PowerOff className="w-4 h-4" />
-                                     ) : (
-                                       <Power className="w-4 h-4" />
-                                     )}
-                                   </Button>
-                                 )}
-                               </div>
-                            </TableCell>
-                          </TableRow>
-                          {expandedRow === promo.id && (
-                            <TableRow className="bg-white">
-                              <TableCell colSpan={14} className="p-0">
-                                <PromotionDetails promotion={promo} />
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </React.Fragment>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+                                {promo.status === "active" ? (
+                                  <PowerOff className="w-4 h-4" />
+                                ) : (
+                                  <Power className="w-4 h-4" />
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {expandedRow === promo.id && (
+                        <TableRow className="bg-white">
+                          <TableCell colSpan={14} className="p-0">
+                            <PromotionDetails promotion={promo} />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
 
 
