@@ -353,10 +353,10 @@ export function Finance() {
     setSearchTerm('');
     setSearchCode('');
     setSearchNote('');
-    setDateFrom(null);
-    setDateTo(null);
+    setDateFrom(undefined);
+    setDateTo(undefined);
     setSelectedTypes([]);
-    setSelectedMethods([]);
+    setSelectedMethods(['cash', 'transfer']); // Default to "Tất cả"
     setStatusCompleted(false);
     setStatusCancelled(false);
     setSelectedCreators([]);
@@ -646,7 +646,7 @@ export function Finance() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-blue-900 text-2xl font-semibold mb-2">
-            Sổ quỹ {activeTab === 'cash' ? '- Tiền mặt' : activeTab === 'bank' ? '- Ngân hàng' : '- Tổng quỹ'}
+            Sổ quỹ
           </h1>
           <p className="text-slate-600 text-sm">
             Quản lý thu chi và dòng tiền
@@ -988,26 +988,29 @@ export function Finance() {
           </div>
         </CardContent>
       </Card>
-      {/* Tabs */}
+      {/* Payment Method Filter */}
       <div className="flex items-center gap-2">
         <Button 
-          variant={activeTab === 'total' ? 'default' : 'outline'}
-          onClick={() => { setActiveTab('total'); setSelectedMethods(['cash', 'transfer']); }}
-          className={activeTab === 'total' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-white border-slate-300'}
+          variant={selectedMethods.length === 2 ? 'default' : 'outline'}
+          onClick={() => setSelectedMethods(['cash', 'transfer'])}
+          className={selectedMethods.length === 2 ? 'bg-blue-600 hover:bg-blue-700' : 'bg-white border-slate-300'}
+          size="sm"
         >
           Tất cả
         </Button>
         <Button 
-          variant={activeTab === 'cash' ? 'default' : 'outline'}
-          onClick={() => { setActiveTab('cash'); setSelectedMethods(['cash']); }}
-          className={activeTab === 'cash' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-white border-slate-300'}
+          variant={selectedMethods.includes('cash') && selectedMethods.length === 1 ? 'default' : 'outline'}
+          onClick={() => setSelectedMethods(['cash'])}
+          className={selectedMethods.includes('cash') && selectedMethods.length === 1 ? 'bg-blue-600 hover:bg-blue-700' : 'bg-white border-slate-300'}
+          size="sm"
         >
           Tiền mặt
         </Button>
          <Button 
-          variant={activeTab === 'bank' ? 'default' : 'outline'}
-          onClick={() => { setActiveTab('bank'); setSelectedMethods(['transfer']); }}
-          className={activeTab === 'bank' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-white border-slate-300'}
+          variant={selectedMethods.includes('transfer') && selectedMethods.length === 1 ? 'default' : 'outline'}
+          onClick={() => setSelectedMethods(['transfer'])}
+          className={selectedMethods.includes('transfer') && selectedMethods.length === 1 ? 'bg-blue-600 hover:bg-blue-700' : 'bg-white border-slate-300'}
+          size="sm"
         >
           Ngân hàng
         </Button>
@@ -1109,7 +1112,7 @@ export function Finance() {
       <Dialog open={receiptDialogOpen} onOpenChange={setReceiptDialogOpen}>
         <DialogContent className="sm:max-w-[900px]">
           <DialogHeader>
-            <DialogTitle>Lập phiếu thu ({activeTab === 'bank' ? 'ngân hàng' : 'tiền mặt'})</DialogTitle>
+            <DialogTitle>Lập phiếu thu</DialogTitle>
             <button
               onClick={() => setReceiptDialogOpen(false)}
               className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-white transition-opacity hover:opacity-100"
@@ -1122,6 +1125,20 @@ export function Finance() {
           <div className="grid grid-cols-2 gap-6 py-4">
             {/* Left Column */}
             <div className="space-y-4">
+              {/* Kiểu thu - NEW: Added before Mã phiếu */}
+              <div className="space-y-2">
+                <Label htmlFor="receipt-payment-type">Kiểu thu</Label>
+                <Select value={receiptPaymentType} onValueChange={setReceiptPaymentType}>
+                  <SelectTrigger className="bg-white border border-slate-300 shadow-none">
+                    <SelectValue placeholder="Chọn kiểu thu" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Tiền mặt</SelectItem>
+                    <SelectItem value="bank">Ngân hàng</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="receipt-code">Mã phiếu</Label>
                 <Input 
@@ -1297,8 +1314,8 @@ export function Finance() {
                 )}
               </div>
 
-              {/* Bank fields - only show when activeTab is 'bank' */}
-              {activeTab === 'bank' && (
+              {/* Bank fields - only show when receiptPaymentType is 'bank' */}
+              {receiptPaymentType === 'bank' && (
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="receipt-payment-method">Phương thức</Label>
@@ -1373,7 +1390,7 @@ export function Finance() {
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
         <DialogContent className="sm:max-w-[900px]">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold">Lập phiếu chi ({activeTab === 'bank' ? 'ngân hàng' : 'tiền mặt'})</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Lập phiếu chi</DialogTitle>
             <button
               onClick={() => setPaymentDialogOpen(false)}
               className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-white transition-opacity hover:opacity-100"
@@ -1386,6 +1403,20 @@ export function Finance() {
           <div className="grid grid-cols-2 gap-6 py-4">
             {/* Left Column */}
             <div className="space-y-4">
+              {/* Kiểu chi - NEW: Added before Mã phiếu */}
+              <div className="space-y-2">
+                <Label htmlFor="payment-payment-type">Kiểu chi</Label>
+                <Select value={paymentPaymentType} onValueChange={setPaymentPaymentType}>
+                  <SelectTrigger className="bg-white border border-slate-300 shadow-none">
+                    <SelectValue placeholder="Chọn kiểu chi" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Tiền mặt</SelectItem>
+                    <SelectItem value="bank">Ngân hàng</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="payment-code">Mã phiếu</Label>
                 <Input 
@@ -1561,8 +1592,8 @@ export function Finance() {
                 )}
               </div>
 
-              {/* Bank fields - only show when activeTab is 'bank' */}
-              {activeTab === 'bank' && (
+              {/* Bank fields - only show when paymentPaymentType is 'bank' */}
+              {paymentPaymentType === 'bank' && (
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="payment-payment-method">Phương thức</Label>
