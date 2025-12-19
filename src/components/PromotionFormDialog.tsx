@@ -84,6 +84,16 @@ export function PromotionFormDialog({
     applicableCustomers: [],
     status: 'active',
   });
+  const [applicableItemSearch, setApplicableItemSearch] = useState('');
+  const [categorySearch, setCategorySearch] = useState('');
+  const [comboSearch, setComboSearch] = useState('');
+  const [customerGroupSearch, setCustomerGroupSearch] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [applicableItemSelections, setApplicableItemSelections] = useState<string[]>([]);
+  const [categorySelections, setCategorySelections] = useState<string[]>([]);
+  const [comboSelections, setComboSelections] = useState<string[]>([]);
+  const [customerGroupSelections, setCustomerGroupSelections] = useState<string[]>([]);
+  const [customerSelections, setCustomerSelections] = useState<string[]>([]);
 
   // Mock data
   const availableMenuItems: MenuItem[] = [
@@ -163,10 +173,129 @@ export function PromotionFormDialog({
   const showMaxDiscountValue = formData.type === 'percentage';
   const showPromotionValue = formData.type === 'percentage' || formData.type === 'amount' || formData.type === 'fixed-price';
   const showFreeItems = formData.type === 'free-item';
+  const remainingApplicableItems = availableMenuItems.filter(
+    (item) => !formData.applicableItems?.some((ai) => ai.id === item.id)
+  );
+  const filteredApplicableItems = remainingApplicableItems.filter((item) => {
+    const keyword = applicableItemSearch.trim().toLowerCase();
+    if (!keyword) return true;
+    return (
+      item.name.toLowerCase().includes(keyword) ||
+      item.code.toLowerCase().includes(keyword)
+    );
+  });
+  const remainingCategories = availableCategories.filter(
+    (cat) => !formData.applicableCategories?.some((ac) => ac.id === cat.id)
+  );
+  const filteredCategories = remainingCategories.filter((cat) => {
+    const keyword = categorySearch.trim().toLowerCase();
+    if (!keyword) return true;
+    return cat.name.toLowerCase().includes(keyword);
+  });
+  const remainingCombos = availableCombos.filter(
+    (combo) => !formData.applicableCombos?.some((ac) => ac.id === combo.id)
+  );
+  const filteredCombos = remainingCombos.filter((combo) => {
+    const keyword = comboSearch.trim().toLowerCase();
+    if (!keyword) return true;
+    return combo.name.toLowerCase().includes(keyword);
+  });
+  const remainingCustomerGroups = availableCustomerGroups.filter(
+    (group) => !formData.applicableCustomerGroups?.some((acg) => acg.id === group.id)
+  );
+  const filteredCustomerGroups = remainingCustomerGroups.filter((group) => {
+    const keyword = customerGroupSearch.trim().toLowerCase();
+    if (!keyword) return true;
+    return group.name.toLowerCase().includes(keyword);
+  });
+  const remainingCustomers = availableCustomers.filter(
+    (customer) => !formData.applicableCustomers?.some((ac) => ac.id === customer.id)
+  );
+  const filteredCustomers = remainingCustomers.filter((customer) => {
+    const keyword = customerSearch.trim().toLowerCase();
+    if (!keyword) return true;
+    return (
+      customer.name.toLowerCase().includes(keyword) ||
+      customer.code.toLowerCase().includes(keyword)
+    );
+  });
+
+  const addSelectedApplicableItems = () => {
+    if (!applicableItemSelections.length) return;
+    const selectedItems = remainingApplicableItems.filter((item) =>
+      applicableItemSelections.includes(item.id)
+    );
+    if (selectedItems.length) {
+      setFormData((prev) => ({
+        ...prev,
+        applicableItems: [...(prev.applicableItems || []), ...selectedItems],
+      }));
+    }
+    setApplicableItemSelections([]);
+  };
+
+  const addSelectedCategories = () => {
+    if (!categorySelections.length) return;
+    const selectedCategories = remainingCategories.filter((cat) =>
+      categorySelections.includes(cat.id)
+    );
+    if (selectedCategories.length) {
+      setFormData((prev) => ({
+        ...prev,
+        applicableCategories: [...(prev.applicableCategories || []), ...selectedCategories],
+      }));
+    }
+    setCategorySelections([]);
+  };
+
+  const addSelectedCombos = () => {
+    if (!comboSelections.length) return;
+    const selectedCombos = remainingCombos.filter((combo) =>
+      comboSelections.includes(combo.id)
+    );
+    if (selectedCombos.length) {
+      setFormData((prev) => ({
+        ...prev,
+        applicableCombos: [...(prev.applicableCombos || []), ...selectedCombos],
+      }));
+    }
+    setComboSelections([]);
+  };
+
+  const addSelectedCustomerGroups = () => {
+    if (!customerGroupSelections.length) return;
+    const selectedGroups = remainingCustomerGroups.filter((group) =>
+      customerGroupSelections.includes(group.id)
+    );
+    if (selectedGroups.length) {
+      setFormData((prev) => ({
+        ...prev,
+        applicableCustomerGroups: [
+          ...(prev.applicableCustomerGroups || []),
+          ...selectedGroups,
+        ],
+      }));
+    }
+    setCustomerGroupSelections([]);
+  };
+
+  const addSelectedCustomers = () => {
+    if (!customerSelections.length) return;
+    const selectedCustomers = remainingCustomers.filter((customer) =>
+      customerSelections.includes(customer.id)
+    );
+    if (selectedCustomers.length) {
+      setFormData((prev) => ({
+        ...prev,
+        applicableCustomers: [...(prev.applicableCustomers || []), ...selectedCustomers],
+      }));
+    }
+    setCustomerSelections([]);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+      <DialogContent className="min-w-[1100px] max-w-[1300px] w-[100vw] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
             {editingPromotion ? 'Chỉnh sửa khuyến mại' : 'Thêm khuyến mại mới'}
@@ -472,30 +601,60 @@ export function PromotionFormDialog({
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-full p-2" align="start">
-                    <div className="max-h-48 overflow-y-auto space-y-1">
-                      {availableMenuItems
-                        .filter(item => !formData.applicableItems?.some(ai => ai.id === item.id))
-                        .map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => {
-                              setFormData({
-                                ...formData,
-                                applicableItems: [...(formData.applicableItems || []), item]
-                              });
-                            }}
-                            className="w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
-                          >
-                            {item.name}
-                          </button>
-                        ))}
-                      {availableMenuItems.filter(item => !formData.applicableItems?.some(ai => ai.id === item.id)).length === 0 && (
-                        <div className="px-3 py-2 text-sm text-slate-500 text-center">
-                          Không còn mặt hàng nào
+                      <div className="space-y-2">
+                        <Input
+                          value={applicableItemSearch}
+                          onChange={(e) => setApplicableItemSearch(e.target.value)}
+                          placeholder="Tìm theo mã hoặc tên"
+                          className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                        />
+                        <div className="max-h-48 overflow-y-auto space-y-1">
+                          {filteredApplicableItems.map((item) => {
+                            const isChecked = applicableItemSelections.includes(item.id);
+                            return (
+                              <label
+                                key={item.id}
+                                className="flex items-center gap-3 px-3 py-2 text-sm rounded hover:bg-slate-100 cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => {
+                                    setApplicableItemSelections((prev) => {
+                                      if (checked === true) {
+                                        if (prev.includes(item.id)) return prev;
+                                        return [...prev, item.id];
+                                      }
+                                      return prev.filter((selectedId) => selectedId !== item.id);
+                                    });
+                                  }}
+                                />
+                                <span className="flex-1">
+                                  {item.name}
+                                  <span className="ml-2 text-xs text-slate-500">{item.code}</span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                          {filteredApplicableItems.length === 0 && (
+                            <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                              {remainingApplicableItems.length === 0
+                                ? 'Không còn mặt hàng nào'
+                                : 'Không tìm thấy kết quả'}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={addSelectedApplicableItems}
+                            disabled={!applicableItemSelections.length}
+                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+                          >
+                            Thêm đã chọn
+                          </Button>
+                        </div>
+                      </div>
                   </PopoverContent>
                 </Popover>
               </div>
@@ -534,29 +693,56 @@ export function PromotionFormDialog({
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-full p-2" align="start">
-                      <div className="max-h-48 overflow-y-auto space-y-1">
-                        {availableCategories
-                          .filter(cat => !formData.applicableCategories?.some(ac => ac.id === cat.id))
-                          .map((cat) => (
-                            <button
-                              key={cat.id}
-                              type="button"
-                              onClick={() => {
-                                setFormData({
-                                  ...formData,
-                                  applicableCategories: [...(formData.applicableCategories || []), cat]
-                                });
-                              }}
-                              className="w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
-                            >
-                              {cat.name}
-                            </button>
-                          ))}
-                        {availableCategories.filter(cat => !formData.applicableCategories?.some(ac => ac.id === cat.id)).length === 0 && (
-                          <div className="px-3 py-2 text-sm text-slate-500 text-center">
-                            Không còn danh mục nào
-                          </div>
-                        )}
+                      <div className="space-y-2">
+                        <Input
+                          value={categorySearch}
+                          onChange={(e) => setCategorySearch(e.target.value)}
+                          placeholder="Tìm theo tên danh mục"
+                          className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                        />
+                        <div className="max-h-48 overflow-y-auto space-y-1">
+                          {filteredCategories.map((cat) => {
+                            const isChecked = categorySelections.includes(cat.id);
+                            return (
+                              <label
+                                key={cat.id}
+                                className="flex items-center gap-3 px-3 py-2 text-sm rounded hover:bg-slate-100 cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => {
+                                    setCategorySelections((prev) => {
+                                      if (checked === true) {
+                                        if (prev.includes(cat.id)) return prev;
+                                        return [...prev, cat.id];
+                                      }
+                                      return prev.filter((selectedId) => selectedId !== cat.id);
+                                    });
+                                  }}
+                                />
+                                <span className="flex-1">{cat.name}</span>
+                              </label>
+                            );
+                          })}
+                          {filteredCategories.length === 0 && (
+                            <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                              {remainingCategories.length === 0
+                                ? 'Không còn danh mục nào'
+                                : 'Không tìm thấy kết quả'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={addSelectedCategories}
+                            disabled={!categorySelections.length}
+                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+                          >
+                            Thêm đã chọn
+                          </Button>
+                        </div>
                       </div>
                     </PopoverContent>
                   </Popover>
@@ -595,29 +781,56 @@ export function PromotionFormDialog({
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-full p-2" align="start">
-                      <div className="max-h-48 overflow-y-auto space-y-1">
-                        {availableCombos
-                          .filter(combo => !formData.applicableCombos?.some(ac => ac.id === combo.id))
-                          .map((combo) => (
-                            <button
-                              key={combo.id}
-                              type="button"
-                              onClick={() => {
-                                setFormData({
-                                  ...formData,
-                                  applicableCombos: [...(formData.applicableCombos || []), combo]
-                                });
-                              }}
-                              className="w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
-                            >
-                              {combo.name}
-                            </button>
-                          ))}
-                        {availableCombos.filter(combo => !formData.applicableCombos?.some(ac => ac.id === combo.id)).length === 0 && (
-                          <div className="px-3 py-2 text-sm text-slate-500 text-center">
-                            Không còn combo nào
-                          </div>
-                        )}
+                      <div className="space-y-2">
+                        <Input
+                          value={comboSearch}
+                          onChange={(e) => setComboSearch(e.target.value)}
+                          placeholder="Tìm theo tên combo"
+                          className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                        />
+                        <div className="max-h-48 overflow-y-auto space-y-1">
+                          {filteredCombos.map((combo) => {
+                            const isChecked = comboSelections.includes(combo.id);
+                            return (
+                              <label
+                                key={combo.id}
+                                className="flex items-center gap-3 px-3 py-2 text-sm rounded hover:bg-slate-100 cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => {
+                                    setComboSelections((prev) => {
+                                      if (checked === true) {
+                                        if (prev.includes(combo.id)) return prev;
+                                        return [...prev, combo.id];
+                                      }
+                                      return prev.filter((selectedId) => selectedId !== combo.id);
+                                    });
+                                  }}
+                                />
+                                <span className="flex-1">{combo.name}</span>
+                              </label>
+                            );
+                          })}
+                          {filteredCombos.length === 0 && (
+                            <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                              {remainingCombos.length === 0
+                                ? 'Không còn combo nào'
+                                : 'Không tìm thấy kết quả'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={addSelectedCombos}
+                            disabled={!comboSelections.length}
+                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+                          >
+                            Thêm đã chọn
+                          </Button>
+                        </div>
                       </div>
                     </PopoverContent>
                   </Popover>
@@ -656,29 +869,56 @@ export function PromotionFormDialog({
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-full p-2" align="start">
-                      <div className="max-h-48 overflow-y-auto space-y-1">
-                        {availableCustomerGroups
-                          .filter(group => !formData.applicableCustomerGroups?.some(acg => acg.id === group.id))
-                          .map((group) => (
-                            <button
-                              key={group.id}
-                              type="button"
-                              onClick={() => {
-                                setFormData({
-                                  ...formData,
-                                  applicableCustomerGroups: [...(formData.applicableCustomerGroups || []), group]
-                                });
-                              }}
-                              className="w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
-                            >
-                              {group.name}
-                            </button>
-                          ))}
-                        {availableCustomerGroups.filter(group => !formData.applicableCustomerGroups?.some(acg => acg.id === group.id)).length === 0 && (
-                          <div className="px-3 py-2 text-sm text-slate-500 text-center">
-                            Không còn nhóm nào
-                          </div>
-                        )}
+                      <div className="space-y-2">
+                        <Input
+                          value={customerGroupSearch}
+                          onChange={(e) => setCustomerGroupSearch(e.target.value)}
+                          placeholder="Tìm theo tên nhóm"
+                          className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                        />
+                        <div className="max-h-48 overflow-y-auto space-y-1">
+                          {filteredCustomerGroups.map((group) => {
+                            const isChecked = customerGroupSelections.includes(group.id);
+                            return (
+                              <label
+                                key={group.id}
+                                className="flex items-center gap-3 px-3 py-2 text-sm rounded hover:bg-slate-100 cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => {
+                                    setCustomerGroupSelections((prev) => {
+                                      if (checked === true) {
+                                        if (prev.includes(group.id)) return prev;
+                                        return [...prev, group.id];
+                                      }
+                                      return prev.filter((selectedId) => selectedId !== group.id);
+                                    });
+                                  }}
+                                />
+                                <span className="flex-1">{group.name}</span>
+                              </label>
+                            );
+                          })}
+                          {filteredCustomerGroups.length === 0 && (
+                            <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                              {remainingCustomerGroups.length === 0
+                                ? 'Không còn nhóm nào'
+                                : 'Không tìm thấy kết quả'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={addSelectedCustomerGroups}
+                            disabled={!customerGroupSelections.length}
+                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+                          >
+                            Thêm đã chọn
+                          </Button>
+                        </div>
                       </div>
                     </PopoverContent>
                   </Popover>
@@ -717,29 +957,59 @@ export function PromotionFormDialog({
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-full p-2" align="start">
-                      <div className="max-h-48 overflow-y-auto space-y-1">
-                        {availableCustomers
-                          .filter(customer => !formData.applicableCustomers?.some(ac => ac.id === customer.id))
-                          .map((customer) => (
-                            <button
-                              key={customer.id}
-                              type="button"
-                              onClick={() => {
-                                setFormData({
-                                  ...formData,
-                                  applicableCustomers: [...(formData.applicableCustomers || []), customer]
-                                });
-                              }}
-                              className="w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
-                            >
-                              {customer.name}
-                            </button>
-                          ))}
-                        {availableCustomers.filter(customer => !formData.applicableCustomers?.some(ac => ac.id === customer.id)).length === 0 && (
-                          <div className="px-3 py-2 text-sm text-slate-500 text-center">
-                            Không còn khách hàng nào
-                          </div>
-                        )}
+                      <div className="space-y-2">
+                        <Input
+                          value={customerSearch}
+                          onChange={(e) => setCustomerSearch(e.target.value)}
+                          placeholder="Tìm theo mã hoặc tên"
+                          className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                        />
+                        <div className="max-h-48 overflow-y-auto space-y-1">
+                          {filteredCustomers.map((customer) => {
+                            const isChecked = customerSelections.includes(customer.id);
+                            return (
+                              <label
+                                key={customer.id}
+                                className="flex items-center gap-3 px-3 py-2 text-sm rounded hover:bg-slate-100 cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => {
+                                    setCustomerSelections((prev) => {
+                                      if (checked === true) {
+                                        if (prev.includes(customer.id)) return prev;
+                                        return [...prev, customer.id];
+                                      }
+                                      return prev.filter((selectedId) => selectedId !== customer.id);
+                                    });
+                                  }}
+                                />
+                                <span className="flex-1">
+                                  {customer.name}
+                                  <span className="ml-2 text-xs text-slate-500">{customer.code}</span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                          {filteredCustomers.length === 0 && (
+                            <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                              {remainingCustomers.length === 0
+                                ? 'Không còn khách hàng nào'
+                                : 'Không tìm thấy kết quả'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={addSelectedCustomers}
+                            disabled={!customerSelections.length}
+                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+                          >
+                            Thêm đã chọn
+                          </Button>
+                        </div>
                       </div>
                     </PopoverContent>
                   </Popover>
