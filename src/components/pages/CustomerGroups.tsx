@@ -354,14 +354,14 @@ export function CustomerGroups() {
             onClick={() => toast.info("Chức năng import đang phát triển")}
           >
             <Upload className="w-4 h-4 mr-2" />
-            Import Excel
+            Nhập file
           </Button>
           <Button
             variant="outline"
             onClick={() => toast.info("Chức năng export đang phát triển")}
           >
             <Download className="w-4 h-4 mr-2" />
-            Export Excel
+            Xuất file
           </Button>
           <Button
             variant="outline"

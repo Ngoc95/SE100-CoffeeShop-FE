@@ -311,7 +311,7 @@ export function Suppliers() {
             }
           >
             <Upload className="w-4 h-4 mr-2" />
-            Import Excel
+            Nhập file
           </Button>
           <Button
             variant="outline"
@@ -320,7 +320,7 @@ export function Suppliers() {
             }
           >
             <Download className="w-4 h-4 mr-2" />
-            Export Excel
+            Xuất file
           </Button>
           <Button
             variant="outline"
