@@ -151,6 +151,7 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
     {
       label: 'Nhân viên',
       items: [
+        { id: 'accounts', label: 'Tài khoản', icon: Settings },
         { id: 'staff', label: 'Nhân viên', icon: Users },
         { id: 'scheduling', label: 'Lịch làm việc', icon: FileText },
         { id: 'staff-settings', label: 'Thiết lập', icon: Settings },
@@ -350,18 +351,6 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
 
         {/* Footer - User Profile */}
         <div className="p-3 border-t border-slate-200">
-          {hasAccess('accounts') && !collapsed && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onNavigate('accounts')}
-              className="w-full justify-start mb-2"
-            >
-              <Settings className="w-4 h-4 mr-2" />
-              Quản lý người dùng
-            </Button>
-          )}
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
