@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   DollarSign,
   TrendingUp,
@@ -8,8 +9,16 @@ import {
   BarChart3,
   PieChart as PieChartIcon,
   LineChart as LineChartIcon,
+  Filter,
+  ChevronDown,
+  ChevronUp,
+  X,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Checkbox } from '../ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import {
   Table,
   TableBody,
@@ -35,13 +44,45 @@ import {
   Legend,
   LabelList
 } from 'recharts';
+import { CustomerTimeFilter } from './CustomerTimeFilter';
 
-interface FinanceReportProps {
-  viewType: 'chart' | 'report';
-  selectedConcerns: string[];
-}
+export function FinanceReport() {
+  // Filter panel state
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  
+  // Filter states
+  const [viewType, setViewType] = useState<'chart' | 'report'>('chart');
+  const [selectedConcerns, setSelectedConcerns] = useState<string[]>(['revenue', 'expenses', 'profit']);
+  
+  // Time filter states
+  const [dateRangeType, setDateRangeType] = useState<'preset' | 'custom'>('preset');
+  const [timePreset, setTimePreset] = useState('this-week');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date(2025, 0, 15));
+  const [dateTo, setDateTo] = useState<Date | undefined>(new Date(2025, 0, 20));
 
-export function FinanceReport({ viewType, selectedConcerns }: FinanceReportProps) {
+  // Concern options
+  const concernOptions = [
+    { id: 'revenue', label: 'Doanh thu' },
+    { id: 'expenses', label: 'Chi phí' },
+    { id: 'profit', label: 'Lợi nhuận' },
+  ];
+
+  // Calculate active filter count
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (selectedConcerns.length > 0 && selectedConcerns.length < concernOptions.length) count++;
+    return count;
+  };
+
+  // Toggle concern selection
+  const toggleConcern = (concern: string) => {
+    setSelectedConcerns(prev =>
+      prev.includes(concern)
+        ? prev.filter(c => c !== concern)
+        : [...prev, concern]
+    );
+  };
+
   // Sample data
   const revenueData = [
     { date: '15/01', revenue: 8200000, expenses: 3500000, profit: 4700000, orders: 145 },
@@ -116,7 +157,118 @@ export function FinanceReport({ viewType, selectedConcerns }: FinanceReportProps
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full p-8 space-y-6">
+      {/* Filter Panel */}
+      <div className="bg-white rounded-lg border border-slate-200">
+        <div className="p-4 border-b border-slate-200">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className="gap-2"
+          >
+            <Filter className="w-4 h-4" />
+            Bộ lọc
+            {getActiveFilterCount() > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {getActiveFilterCount()}
+              </Badge>
+            )}
+            {isFilterOpen ? (
+              <ChevronUp className="w-4 h-4 ml-2" />
+            ) : (
+              <ChevronDown className="w-4 h-4 ml-2" />
+            )}
+          </Button>
+        </div>
+
+        {isFilterOpen && (
+          <div className="p-6 bg-slate-50">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+              {/* Mối quan tâm */}
+              <div>
+                <h3 className="text-sm text-slate-900 mb-3">Mối quan tâm</h3>
+                <div className="space-y-2">
+                  {concernOptions.map((option) => (
+                    <div key={option.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`concern-${option.id}`}
+                        checked={selectedConcerns.includes(option.id)}
+                        onCheckedChange={() => toggleConcern(option.id)}
+                      />
+                      <label
+                        htmlFor={`concern-${option.id}`}
+                        className="text-sm text-slate-700 cursor-pointer"
+                      >
+                        {option.label}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Thời gian */}
+              <div className="md:col-span-2 lg:col-span-3">
+                <CustomerTimeFilter
+                  dateRangeType={dateRangeType}
+                  timePreset={timePreset}
+                  dateFrom={dateFrom}
+                  dateTo={dateTo}
+                  onDateRangeTypeChange={setDateRangeType}
+                  onTimePresetChange={setTimePreset}
+                  onDateFromChange={setDateFrom}
+                  onDateToChange={setDateTo}
+                />
+              </div>
+            </div>
+
+            {/* Clear Filters Button */}
+            {getActiveFilterCount() > 0 && (
+              <div className="pt-4 border-t border-slate-200 mt-6">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setSelectedConcerns(['revenue', 'expenses', 'profit']);
+                  }}
+                >
+                  Xóa bộ lọc
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Loại hiển thị - Outside filter panel */}
+      <div>
+        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+          <button
+            onClick={() => setViewType('report')}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              viewType === 'report'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Báo cáo
+          </button>
+          <button
+            onClick={() => setViewType('chart')}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              viewType === 'chart'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Biểu đồ
+          </button>
+        </div>
+      </div>
+
+      {/* Report Content */}
+      <div className="space-y-6">
       {viewType === 'chart' ? (
         <>
           {/* Summary Cards */}
@@ -502,6 +654,7 @@ export function FinanceReport({ viewType, selectedConcerns }: FinanceReportProps
           )}
         </>
       )}
+      </div>
     </div>
   );
 }

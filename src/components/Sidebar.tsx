@@ -25,6 +25,7 @@ import {
   X,
   User,
   Utensils,
+  Moon,
 } from 'lucide-react';
 import { PageType } from '../App';
 import { Button } from './ui/button';
@@ -60,7 +61,7 @@ interface MenuGroup {
 
 export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<string[]>(['Hàng hóa', 'Đối tác', 'Nhân viên', 'Giao dịch']);
+  const [expandedGroups, setExpandedGroups] = useState<string[]>(['Hàng hóa', 'Đối tác', 'Nhân viên', 'Giao dịch', 'Báo cáo']);
   const [accountModalOpen, setAccountModalOpen] = useState(false);
   const { user, logout, hasPermission } = useAuth();
 
@@ -90,7 +91,13 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
       'suppliers': 'suppliers:view',
       'promotions': 'promotions:view',
       'finance': 'finance:view',
-      'reports': 'reports:view',
+      'reports-endofday': 'reports:view',
+      'reports-finance': 'reports:view',
+      'reports-products': 'reports:view',
+      'reports-sales': 'reports:view',
+      'reports-customers': 'reports:view',
+      'reports-suppliers': 'reports:view',
+      'reports-employees': 'reports:view',
       'invoices': 'invoices:view',
       'returns': 'returns:view',
       'purchase-orders': 'purchase_orders:view',
@@ -171,9 +178,18 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
     { id: 'finance', label: 'Sổ quỹ', icon: Wallet },
   ];
 
-  const reportItems: MenuItem[] = [
-    { id: 'reports', label: 'Báo cáo', icon: BarChart3 },
-  ];
+  const reportMenuGroup: MenuGroup = {
+    label: 'Báo cáo',
+    items: [
+      { id: 'reports-endofday', label: 'Cuối ngày', icon: Moon },
+      { id: 'reports-sales', label: 'Bán hàng', icon: ShoppingCart },
+      { id: 'reports-finance', label: 'Tài chính', icon: DollarSign },
+      { id: 'reports-products', label: 'Hàng hóa', icon: Package },
+      { id: 'reports-employees', label: 'Nhân viên', icon: Users },
+      { id: 'reports-customers', label: 'Khách hàng', icon: UserCircle },
+      { id: 'reports-suppliers', label: 'Nhà cung cấp', icon: Handshake },
+    ]
+  };
 
   const fullscreenItems: MenuItem[] = [
     { id: 'pos', label: 'Bán hàng', icon: ShoppingCart },
@@ -340,12 +356,8 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
             </div>
           )}
 
-          {/* Reports */}
-          {reportItems.some(item => hasAccess(item.id)) && (
-            <div className="space-y-1">
-              {reportItems.map(item => renderMenuItem(item))}
-            </div>
-          )}
+          {/* Reports Menu Group */}
+          {reportMenuGroup.items.some(item => hasAccess(item.id)) && renderMenuGroup(reportMenuGroup)}
 
           {/* Fullscreen Items */}
           {fullscreenItems.some(item => hasAccess(item.id)) && !collapsed && (

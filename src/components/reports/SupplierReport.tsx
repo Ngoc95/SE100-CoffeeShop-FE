@@ -1,4 +1,9 @@
 import { useState } from 'react';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Input } from '../ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Filter, ChevronDown, ChevronUp, X } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -8,6 +13,7 @@ import {
   TableRow,
 } from '../ui/table';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { CustomerTimeFilter } from './CustomerTimeFilter';
 
 interface Supplier {
   id: string;
@@ -167,20 +173,26 @@ const mockSuppliers: Supplier[] = [
   },
 ];
 
-interface SupplierReportProps {
-  viewType: 'chart' | 'report';
-  concern: 'sales' | 'debt';
-  searchQuery: string;
-  dateFrom?: Date;
-  dateTo?: Date;
-}
 
-export function SupplierReport({ viewType, concern, searchQuery, dateFrom, dateTo }: SupplierReportProps) {
+export function SupplierReport() {
+  // Filter panel state
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  
+  // Filter states
+  const [viewType, setViewType] = useState<'chart' | 'report'>('chart');
+  const [concern, setConcern] = useState<'sales' | 'debt'>('sales');
+  const [supplierSearch, setSupplierSearch] = useState('');
+  
+  // Time filter states
+  const [dateRangeType, setDateRangeType] = useState<'preset' | 'custom'>('preset');
+  const [timePreset, setTimePreset] = useState('this-month');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date(2025, 10, 1));
+  const [dateTo, setDateTo] = useState<Date | undefined>(new Date(2025, 10, 30));
   // Filter suppliers based on search query
   const filteredSuppliers = mockSuppliers.filter(
     (supplier) =>
-      supplier.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      supplier.code.toLowerCase().includes(searchQuery.toLowerCase())
+      supplier.name.toLowerCase().includes(supplierSearch.toLowerCase()) ||
+      supplier.code.toLowerCase().includes(supplierSearch.toLowerCase())
   );
 
   // Format currency
@@ -223,9 +235,120 @@ export function SupplierReport({ viewType, concern, searchQuery, dateFrom, dateT
       value: concern === 'sales' ? supplier.netImportValue : supplier.closingDebt,
     }));
 
-  if (viewType === 'chart') {
-    return (
-      <div className="h-full flex flex-col bg-white">
+
+  // Render with filter panel
+  return (
+    <div className="w-full p-8 space-y-6">
+      {/* Filter Panel */}
+      <div className="bg-white rounded-lg border border-slate-200">
+        <div className="p-4 border-b border-slate-200">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className="gap-2"
+          >
+            <Filter className="w-4 h-4" />
+            Bộ lọc
+            {supplierSearch && (
+              <Badge variant="secondary" className="ml-2">1</Badge>
+            )}
+            {isFilterOpen ? (
+              <ChevronUp className="w-4 h-4 ml-2" />
+            ) : (
+              <ChevronDown className="w-4 h-4 ml-2" />
+            )}
+          </Button>
+        </div>
+
+        {isFilterOpen && (
+          <div className="p-6 bg-slate-50">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Mối quan tâm */}
+              <div>
+                <h3 className="text-sm text-slate-900 mb-3">Mối quan tâm</h3>
+                <Select value={concern} onValueChange={(value) => setConcern(value as typeof concern)}>
+                  <SelectTrigger className="w-full bg-white border border-slate-300">
+                    <SelectValue placeholder="Chọn mối quan tâm" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sales">Nhập hàng</SelectItem>
+                    <SelectItem value="debt">Công nợ</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Thời gian */}
+              <div className="md:col-span-2 lg:col-span-3">
+                <CustomerTimeFilter
+                  dateRangeType={dateRangeType}
+                  timePreset={timePreset}
+                  dateFrom={dateFrom}
+                  dateTo={dateTo}
+                  onDateRangeTypeChange={setDateRangeType}
+                  onTimePresetChange={setTimePreset}
+                  onDateFromChange={setDateFrom}
+                  onDateToChange={setDateTo}
+                />
+              </div>
+
+              {/* Tìm kiếm nhà cung cấp */}
+              <div>
+                <h3 className="text-sm text-slate-900 mb-3">Tìm kiếm nhà cung cấp</h3>
+                <Input
+                  placeholder="Theo tên, mã NCC"
+                  value={supplierSearch}
+                  onChange={(e) => setSupplierSearch(e.target.value)}
+                  className="text-sm bg-white border border-slate-300"
+                />
+              </div>
+            </div>
+
+            {/* Clear Filters Button */}
+            {supplierSearch && (
+              <div className="pt-4 border-t border-slate-200 mt-6">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSupplierSearch('')}
+                >
+                  Xóa bộ lọc
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Loại hiển thị - Outside filter panel */}
+      <div>
+        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+          <button
+            onClick={() => setViewType('report')}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              viewType === 'report'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Báo cáo
+          </button>
+          <button
+            onClick={() => setViewType('chart')}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              viewType === 'chart'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Biểu đồ
+          </button>
+        </div>
+      </div>
+
+      {/* Report Content */}
+  {viewType === 'chart' ? (
+    <div className="h-full flex flex-col bg-white">
         <div className="flex-1 p-6">
           <div className="mb-4">
             <h3 className="text-lg text-slate-900">
@@ -251,12 +374,7 @@ export function SupplierReport({ viewType, concern, searchQuery, dateFrom, dateT
           </div>
         </div>
       </div>
-    );
-  }
-
-  // Report view
-  if (concern === 'sales') {
-    return (
+  ) : concern === 'sales' ? (
       <div className="h-full flex flex-col bg-white">
         {/* Report Header */}
         <div className="border-b bg-white px-6 py-4">
@@ -333,11 +451,7 @@ export function SupplierReport({ viewType, concern, searchQuery, dateFrom, dateT
           </Table>
         </div>
       </div>
-    );
-  }
-
-  // Debt concern - report view
-  return (
+  ) : (
     <div className="h-full flex flex-col bg-white">
       {/* Report Header */}
       <div className="border-b bg-white px-6 py-4">
@@ -408,6 +522,8 @@ export function SupplierReport({ viewType, concern, searchQuery, dateFrom, dateT
           </TableBody>
         </Table>
       </div>
+    </div>
+  )}
     </div>
   );
 }

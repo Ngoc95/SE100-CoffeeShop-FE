@@ -31,175 +31,178 @@ export function CustomerTimeFilter({
   return (
     <div>
       <h3 className="text-sm text-slate-900 mb-3">Thời gian</h3>
-      <RadioGroup value={dateRangeType} onValueChange={(value) => onDateRangeTypeChange(value as 'preset' | 'custom')}>
-        {/* Preset Time Ranges */}
-        <div className="flex items-center space-x-2 mb-3">
-          <RadioGroupItem value="preset" id="customer-date-preset" className="border-slate-300" />
-          <div className="flex-1">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-between text-left text-sm bg-white border-slate-300"
-                  onClick={() => onDateRangeTypeChange('preset')}
-                >
-                  <span>
-                    {timePreset === 'today' && 'Hôm nay'}
-                    {timePreset === 'yesterday' && 'Hôm qua'}
-                    {timePreset === 'this-week' && 'Tuần này'}
-                    {timePreset === 'last-week' && 'Tuần trước'}
-                    {timePreset === 'last-7-days' && '7 ngày qua'}
-                    {timePreset === 'this-month' && 'Tháng này'}
-                    {timePreset === 'last-month' && 'Tháng trước'}
-                    {timePreset === 'last-30-days' && '30 ngày qua'}
-                    {timePreset === 'this-quarter' && 'Quý này'}
-                    {timePreset === 'last-quarter' && 'Quý trước'}
-                    {timePreset === 'this-year' && 'Năm nay'}
-                    {timePreset === 'last-year' && 'Năm trước'}
-                  </span>
-                  <ChevronDown className="h-4 w-4 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[600px] p-4" align="start">
-                <div className="grid grid-cols-3 gap-6">
-                  {/* Column 1: Theo ngày và tuần */}
-                  <div>
-                    <h4 className="text-sm text-slate-700 mb-3">Theo ngày và tuần</h4>
-                    <div className="space-y-2">
-                      {[
-                        { value: 'today', label: 'Hôm nay' },
-                        { value: 'yesterday', label: 'Hôm qua' },
-                        { value: 'this-week', label: 'Tuần này' },
-                        { value: 'last-week', label: 'Tuần trước' },
-                        { value: 'last-7-days', label: '7 ngày qua' },
-                      ].map((option) => (
-                        <button
-                          key={option.value}
-                          onClick={() => {
-                            onTimePresetChange(option.value);
-                            onDateRangeTypeChange('preset');
-                          }}
-                          className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                            timePreset === option.value
-                              ? 'bg-blue-600 text-white'
-                              : 'text-blue-600 hover:bg-blue-50'
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
+      <RadioGroup value={dateRangeType} onValueChange={(value: string) => onDateRangeTypeChange(value as 'preset' | 'custom')}>
+        {/* Single row with both options */}
+        <div className="flex items-start gap-2">
+          {/* Preset Time Ranges */}
+          <div className="flex items-center space-x-2 flex-1">
+            <RadioGroupItem value="preset" id="customer-date-preset" className="border-slate-300 mt-2" />
+            <div className="flex-1">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between text-left text-sm bg-white border-slate-300"
+                    onClick={() => onDateRangeTypeChange('preset')}
+                  >
+                    <span>
+                      {timePreset === 'today' && 'Hôm nay'}
+                      {timePreset === 'yesterday' && 'Hôm qua'}
+                      {timePreset === 'this-week' && 'Tuần này'}
+                      {timePreset === 'last-week' && 'Tuần trước'}
+                      {timePreset === 'last-7-days' && '7 ngày qua'}
+                      {timePreset === 'this-month' && 'Tháng này'}
+                      {timePreset === 'last-month' && 'Tháng trước'}
+                      {timePreset === 'last-30-days' && '30 ngày qua'}
+                      {timePreset === 'this-quarter' && 'Quý này'}
+                      {timePreset === 'last-quarter' && 'Quý trước'}
+                      {timePreset === 'this-year' && 'Năm nay'}
+                      {timePreset === 'last-year' && 'Năm trước'}
+                    </span>
+                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[600px] p-4" align="start">
+                  <div className="grid grid-cols-3 gap-6">
+                    {/* Column 1: Theo ngày và tuần */}
+                    <div>
+                      <h4 className="text-sm text-slate-700 mb-3">Theo ngày và tuần</h4>
+                      <div className="space-y-2">
+                        {[
+                          { value: 'today', label: 'Hôm nay' },
+                          { value: 'yesterday', label: 'Hôm qua' },
+                          { value: 'this-week', label: 'Tuần này' },
+                          { value: 'last-week', label: 'Tuần trước' },
+                          { value: 'last-7-days', label: '7 ngày qua' },
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => {
+                              onTimePresetChange(option.value);
+                              onDateRangeTypeChange('preset');
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                              timePreset === option.value
+                                ? 'bg-blue-600 text-white'
+                                : 'text-blue-600 hover:bg-blue-50'
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Column 2: Theo tháng và quý */}
-                  <div>
-                    <h4 className="text-sm text-slate-700 mb-3">Theo tháng và quý</h4>
-                    <div className="space-y-2">
-                      {[
-                        { value: 'this-month', label: 'Tháng này' },
-                        { value: 'last-month', label: 'Tháng trước' },
-                        { value: 'last-30-days', label: '30 ngày qua' },
-                        { value: 'this-quarter', label: 'Quý này' },
-                        { value: 'last-quarter', label: 'Quý trước' },
-                      ].map((option) => (
-                        <button
-                          key={option.value}
-                          onClick={() => {
-                            onTimePresetChange(option.value);
-                            onDateRangeTypeChange('preset');
-                          }}
-                          className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                            timePreset === option.value
-                              ? 'bg-blue-600 text-white'
-                              : 'text-blue-600 hover:bg-blue-50'
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
+                    {/* Column 2: Theo tháng và quý */}
+                    <div>
+                      <h4 className="text-sm text-slate-700 mb-3">Theo tháng và quý</h4>
+                      <div className="space-y-2">
+                        {[
+                          { value: 'this-month', label: 'Tháng này' },
+                          { value: 'last-month', label: 'Tháng trước' },
+                          { value: 'last-30-days', label: '30 ngày qua' },
+                          { value: 'this-quarter', label: 'Quý này' },
+                          { value: 'last-quarter', label: 'Quý trước' },
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => {
+                              onTimePresetChange(option.value);
+                              onDateRangeTypeChange('preset');
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                              timePreset === option.value
+                                ? 'bg-blue-600 text-white'
+                                : 'text-blue-600 hover:bg-blue-50'
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Column 3: Theo năm */}
-                  <div>
-                    <h4 className="text-sm text-slate-700 mb-3">Theo năm</h4>
-                    <div className="space-y-2">
-                      {[
-                        { value: 'this-year', label: 'Năm nay' },
-                        { value: 'last-year', label: 'Năm trước' },
-                      ].map((option) => (
-                        <button
-                          key={option.value}
-                          onClick={() => {
-                            onTimePresetChange(option.value);
-                            onDateRangeTypeChange('preset');
-                          }}
-                          className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                            timePreset === option.value
-                              ? 'bg-blue-600 text-white'
-                              : 'text-blue-600 hover:bg-blue-50'
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
+                    {/* Column 3: Theo năm */}
+                    <div>
+                      <h4 className="text-sm text-slate-700 mb-3">Theo năm</h4>
+                      <div className="space-y-2">
+                        {[
+                          { value: 'this-year', label: 'Năm nay' },
+                          { value: 'last-year', label: 'Năm trước' },
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => {
+                              onTimePresetChange(option.value);
+                              onDateRangeTypeChange('preset');
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                              timePreset === option.value
+                                ? 'bg-blue-600 text-white'
+                                : 'text-blue-600 hover:bg-blue-50'
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </PopoverContent>
-            </Popover>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
-        </div>
 
-        {/* Custom Date Range */}
-        <div className="flex items-center space-x-2">
-          <RadioGroupItem value="custom" id="customer-date-custom" className="border-slate-300" />
-          <div className="flex-1">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-left text-sm bg-white border-slate-300"
-                  onClick={() => onDateRangeTypeChange('custom')}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateFrom && dateTo
-                    ? `${format(dateFrom, 'dd/MM', { locale: vi })} - ${format(dateTo, 'dd/MM/yyyy', { locale: vi })}`
-                    : 'Lựa chọn khác'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-4" align="start">
-                <div className="flex gap-4">
-                  <div>
-                    <Label className="text-xs text-slate-600 mb-2 block">Từ ngày</Label>
-                    <CalendarComponent
-                      mode="single"
-                      selected={dateFrom}
-                      onSelect={(date) => {
-                        if (date) {
-                          onDateFromChange(date);
-                          onDateRangeTypeChange('custom');
-                        }
-                      }}
-                    />
+          {/* Custom Date Range */}
+          <div className="flex items-center space-x-2 flex-1">
+            <RadioGroupItem value="custom" id="customer-date-custom" className="border-slate-300 mt-2" />
+            <div className="flex-1">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left text-sm bg-white border-slate-300"
+                    onClick={() => onDateRangeTypeChange('custom')}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateFrom && dateTo
+                      ? `${format(dateFrom, 'dd/MM', { locale: vi })} - ${format(dateTo, 'dd/MM/yyyy', { locale: vi })}`
+                      : 'Lựa chọn khác'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-4" align="start">
+                  <div className="flex gap-4">
+                    <div>
+                      <Label className="text-xs text-slate-600 mb-2 block">Từ ngày</Label>
+                      <CalendarComponent
+                        mode="single"
+                        selected={dateFrom}
+                        onSelect={(date) => {
+                          if (date) {
+                            onDateFromChange(date);
+                            onDateRangeTypeChange('custom');
+                          }
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-slate-600 mb-2 block">Đến ngày</Label>
+                      <CalendarComponent
+                        mode="single"
+                        selected={dateTo}
+                        onSelect={(date) => {
+                          if (date) {
+                            onDateToChange(date);
+                            onDateRangeTypeChange('custom');
+                          }
+                        }}
+                        disabled={(date) => dateFrom ? date < dateFrom : false}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <Label className="text-xs text-slate-600 mb-2 block">Đến ngày</Label>
-                    <CalendarComponent
-                      mode="single"
-                      selected={dateTo}
-                      onSelect={(date) => {
-                        if (date) {
-                          onDateToChange(date);
-                          onDateRangeTypeChange('custom');
-                        }
-                      }}
-                      disabled={(date) => dateFrom ? date < dateFrom : false}
-                    />
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
         </div>
       </RadioGroup>

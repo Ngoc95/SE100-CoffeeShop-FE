@@ -1,8 +1,12 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { Download } from 'lucide-react';
+import { Badge } from '../ui/badge';
+import { Input } from '../ui/input';
+import { Download, Filter, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { CustomerTimeFilter } from './CustomerTimeFilter';
 import {
   BarChart,
   Bar,
@@ -14,21 +18,21 @@ import {
   Legend
 } from 'recharts';
 
-interface CustomerReportProps {
-  dateFrom?: Date;
-  dateTo?: Date;
-  customerSearch: string;
-  viewType: 'chart' | 'report';
-  concernType: 'sales' | 'debt' | 'products';
-}
 
-export function CustomerReport({
-  dateFrom,
-  dateTo,
-  customerSearch,
-  viewType,
-  concernType
-}: CustomerReportProps) {
+export function CustomerReport() {
+  // Filter panel state
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  
+  // Filter states
+  const [viewType, setViewType] = useState<'chart' | 'report'>('chart');
+  const [concernType, setConcernType] = useState<'sales' | 'debt' | 'products'>('sales');
+  const [customerSearch, setCustomerSearch] = useState('');
+  
+  // Time filter states
+  const [dateRangeType, setDateRangeType] = useState<'preset' | 'custom'>('preset');
+  const [timePreset, setTimePreset] = useState('this-month');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date(2025, 10, 1));
+  const [dateTo, setDateTo] = useState<Date | undefined>(new Date(2025, 10, 30));
   // Sample customer data
   const allCustomerData = [
     {
@@ -178,59 +182,53 @@ export function CustomerReport({
     return 'Top 10 khách hàng mua nhiều nhất';
   };
 
-  // Render chart view
-  if (viewType === 'chart') {
-    return (
-      <div className="space-y-6">
-        {filteredCustomerData.length === 0 ? (
-          <Card>
-            <CardContent className="py-12">
-              <div className="text-center">
-                <p className="text-slate-600 italic">Báo cáo không có dữ liệu</p>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border-slate-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-slate-900">{getChartTitle()}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 30 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis
-                    type="number"
-                    tick={{ fill: '#64748b', fontSize: 11 }}
-                    tickFormatter={(value) => {
-                      if (value >= 1000000) return `${(value / 1000000).toFixed(0)} tr`;
-                      if (value >= 1000) return `${(value / 1000).toFixed(0)} k`;
-                      return value;
-                    }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={150}
-                    tick={{ fill: '#64748b', fontSize: 11 }}
-                  />
-                  <Tooltip
-                    formatter={(value: number) => `${value.toLocaleString()}₫`}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px'
-                    }}
-                  />
-                  <Bar dataKey="revenue" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Doanh thu" label={{ position: 'right', fill: '#1e40af', fontWeight: 'bold', fontSize: 11, formatter: (value: number) => value.toLocaleString('vi-VN') }} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    );
-  }
+  // Prepare chart content
+  const chartContent = filteredCustomerData.length === 0 ? (
+    <Card>
+      <CardContent className="py-12">
+        <div className="text-center">
+          <p className="text-slate-600 italic">Báo cáo không có dữ liệu</p>
+        </div>
+      </CardContent>
+    </Card>
+  ) : (
+    <Card className="border-slate-200">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-slate-900">{getChartTitle()}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={400}>
+          <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 30 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <XAxis
+              type="number"
+              tick={{ fill: '#64748b', fontSize: 11 }}
+              tickFormatter={(value) => {
+                if (value >= 1000000) return `${(value / 1000000).toFixed(0)} tr`;
+                if (value >= 1000) return `${(value / 1000).toFixed(0)} k`;
+                return value;
+              }}
+            />
+            <YAxis
+              type="category"
+              dataKey="name"
+              width={150}
+              tick={{ fill: '#64748b', fontSize: 11 }}
+            />
+            <Tooltip
+              formatter={(value: number) => `${value.toLocaleString()}₫`}
+              contentStyle={{
+                backgroundColor: 'white',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px'
+              }}
+            />
+            <Bar dataKey="revenue" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Doanh thu" label={{ position: 'right', fill: '#1e40af', fontWeight: 'bold', fontSize: 11, formatter: (value: number) => value.toLocaleString('vi-VN') }} />
+          </BarChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
 
   // Handle export functionality
   const handleExportAll = () => {
@@ -240,6 +238,104 @@ export function CustomerReport({
 
   // Render report view (table)
   return (
+    <div className="w-full p-8 space-y-6">
+      {/* Filter Panel */}
+      <div className="bg-white rounded-lg border border-slate-200">
+        <div className="p-4 border-b border-slate-200">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className="gap-2"
+          >
+            <Filter className="w-4 h-4" />
+            Bộ lọc
+            {customerSearch && (
+              <Badge variant="secondary" className="ml-2">1</Badge>
+            )}
+            {isFilterOpen ? (
+              <ChevronUp className="w-4 h-4 ml-2" />
+            ) : (
+              <ChevronDown className="w-4 h-4 ml-2" />
+            )}
+          </Button>
+        </div>
+
+        {isFilterOpen && (
+          <div className="p-6 bg-slate-50">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Thời gian */}
+              <div className="md:col-span-2 lg:col-span-3">
+                <CustomerTimeFilter
+                  dateRangeType={dateRangeType}
+                  timePreset={timePreset}
+                  dateFrom={dateFrom}
+                  dateTo={dateTo}
+                  onDateRangeTypeChange={setDateRangeType}
+                  onTimePresetChange={setTimePreset}
+                  onDateFromChange={setDateFrom}
+                  onDateToChange={setDateTo}
+                />
+              </div>
+
+              {/* Tìm kiếm khách hàng */}
+              <div>
+                <h3 className="text-sm text-slate-900 mb-3">Tìm kiếm khách hàng</h3>
+                <Input
+                  placeholder="Theo tên, SĐT"
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  className="text-sm bg-white border border-slate-300"
+                />
+              </div>
+            </div>
+
+            {/* Clear Filters Button */}
+            {customerSearch && (
+              <div className="pt-4 border-t border-slate-200 mt-6">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setCustomerSearch('')}
+                >
+                  Xóa bộ lọc
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Loại hiển thị - Outside filter panel */}
+      <div>
+        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+          <button
+            onClick={() => setViewType('report')}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              viewType === 'report'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Báo cáo
+          </button>
+          <button
+            onClick={() => setViewType('chart')}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              viewType === 'chart'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Biểu đồ
+          </button>
+        </div>
+      </div>
+
+      {/* Report Content */}
+      {viewType === 'chart' ? (
+        chartContent
+      ) : (
     <div className="space-y-4">
       <Card>
         <CardContent className="p-0">
@@ -312,6 +408,8 @@ export function CustomerReport({
           </div>
         </CardContent>
       </Card>
+    </div>
+      )}
     </div>
   );
 }

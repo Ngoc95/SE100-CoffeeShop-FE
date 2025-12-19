@@ -48,7 +48,13 @@ export type PageType =
   | "suppliers"
   | "promotions"
   | "finance"
-  | "reports"
+  | "reports-endofday"
+  | "reports-finance"
+  | "reports-products"
+  | "reports-sales"
+  | "reports-customers"
+  | "reports-suppliers"
+  | "reports-employees"
   | "invoices"
   | "returns"
   | "purchase-orders"
@@ -111,7 +117,13 @@ function AppContent() {
       'suppliers': 'suppliers:view',
       'promotions': 'promotions:view',
       'finance': 'finance:view',
-      'reports': 'reports:view',
+      'reports-endofday': 'reports:view',
+      'reports-finance': 'reports:view',
+      'reports-products': 'reports:view',
+      'reports-sales': 'reports:view',
+      'reports-customers': 'reports:view',
+      'reports-suppliers': 'reports:view',
+      'reports-employees': 'reports:view',
       'invoices': 'invoices:view',
       'returns': 'returns:view',
       'purchase-orders': 'purchase_orders:view',
@@ -198,8 +210,20 @@ function AppContent() {
         return <Promotions />;
       case "finance":
         return <Finance />;
-      case "reports":
-        return <Reports />;
+      case "reports-endofday":
+        return <Reports initialTab="endofday" />;
+      case "reports-finance":
+        return <Reports initialTab="finance" />;
+      case "reports-products":
+        return <Reports initialTab="products" />;
+      case "reports-sales":
+        return <Reports initialTab="sales" />;
+      case "reports-customers":
+        return <Reports initialTab="customers" />;
+      case "reports-suppliers":
+        return <Reports initialTab="suppliers" />;
+      case "reports-employees":
+        return <Reports initialTab="employees" />;
       case "invoices":
         return <Invoices />;
       case "returns":

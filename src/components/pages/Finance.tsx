@@ -160,6 +160,7 @@ export function Finance() {
   const [receiptPersonName, setReceiptPersonName] = useState('');
   const [receiptPaymentMethod, setReceiptPaymentMethod] = useState('');
   const [receiptBankAccount, setReceiptBankAccount] = useState('');
+  const [receiptPaymentType, setReceiptPaymentType] = useState<'cash' | 'bank'>('cash');
   
   const [paymentCode, setPaymentCode] = useState('PC000051');
   const [paymentDate, setPaymentDate] = useState<Date>(new Date());
@@ -170,6 +171,7 @@ export function Finance() {
   const [paymentPersonName, setPaymentPersonName] = useState('');
   const [paymentPaymentMethod, setPaymentPaymentMethod] = useState('');
   const [paymentBankAccount, setPaymentBankAccount] = useState('');
+  const [paymentPaymentType, setPaymentPaymentType] = useState<'cash' | 'bank'>('cash');
   
   // Add person form states
   const [newPersonName, setNewPersonName] = useState('');
@@ -189,6 +191,21 @@ export function Finance() {
   const [bankAccountOwner, setBankAccountOwner] = useState('');
   const [bankAccountNote, setBankAccountNote] = useState('');
   const [bankAccountSearchOpen, setBankAccountSearchOpen] = useState(false);
+
+  // Sidebar filter states
+  const [searchCode, setSearchCode] = useState('');
+  const [searchNote, setSearchNote] = useState('');
+  const [statusCompleted, setStatusCompleted] = useState(false);
+  const [statusCancelled, setStatusCancelled] = useState(false);
+  const [selectedCreators, setSelectedCreators] = useState<string[]>([]);
+  const [creatorSearchOpen, setCreatorSearchOpen] = useState(false);
+  const [personName, setPersonName] = useState('');
+  const [personPhone, setPersonPhone] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [categorySearchOpen, setCategorySearchOpen] = useState(false);
+  const [documentTypeReceipt, setDocumentTypeReceipt] = useState(false);
+  const [documentTypePayment, setDocumentTypePayment] = useState(false);
+  const [presetTimeRange, setPresetTimeRange] = useState('this-month');
 
   // Mock data
   const allCreators = [
@@ -260,9 +277,26 @@ export function Finance() {
   ];
 
   const paymentMethods = [
-    { id: 'card', name: 'Thẻ' },
+    { id: 'cash', name: 'Thẻ' },
     { id: 'transfer', name: 'Chuyển khoản' },
   ];
+
+  // Toggle functions for multiselect filters
+  const toggleCreator = (creatorId: string) => {
+    setSelectedCreators(prev =>
+      prev.includes(creatorId)
+        ? prev.filter(id => id !== creatorId)
+        : [...prev, creatorId]
+    );
+  };
+
+  const toggleCategory = (categoryName: string) => {
+    setSelectedCategories(prev =>
+      prev.includes(categoryName)
+        ? prev.filter(name => name !== categoryName)
+        : [...prev, categoryName]
+    );
+  };
 
   const cashbookStats = {
     openingBalance: 7887500,
@@ -314,12 +348,41 @@ export function Finance() {
     return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
   };
 
+  // Clear all filters function
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setSearchCode('');
+    setSearchNote('');
+    setDateFrom(null);
+    setDateTo(null);
+    setSelectedTypes([]);
+    setSelectedMethods([]);
+    setStatusCompleted(false);
+    setStatusCancelled(false);
+    setSelectedCreators([]);
+    setPersonName('');
+    setPersonPhone('');
+    setSelectedCategories([]);
+  };
+
   // Filtering logic
   const [activeTab, setActiveTab] = useState<'cash' | 'bank' | 'total'>('cash'); // Kept for Dialog compatibility
 
-  // Filtering logic
+  // Enhanced filtering logic with all new filters
   let filteredTransactions = allTransactions.filter(transaction => {
-    // Filter by Search Term (Code, Note, Person)
+    // Filter by Search Code
+    if (searchCode) {
+      const lowerCode = searchCode.toLowerCase();
+      if (!transaction.id.toLowerCase().includes(lowerCode)) return false;
+    }
+
+    // Filter by Search Note
+    if (searchNote) {
+      const lowerNote = searchNote.toLowerCase();
+      if (!transaction.note.toLowerCase().includes(lowerNote)) return false;
+    }
+
+    // Filter by Search Term (legacy - for general search)
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
       const matchesCode = transaction.id.toLowerCase().includes(lowerTerm);
@@ -348,15 +411,51 @@ export function Finance() {
     }
 
     // Filter by Type (Thu/Chi)
-    const isIncome = transaction.type === 'thu';
-    const isExpense = transaction.type === 'chi';
-    if (isIncome && !selectedTypes.includes('income')) return false;
-    if (isExpense && !selectedTypes.includes('expense')) return false;
+    if (selectedTypes.length > 0) {
+      const isIncome = transaction.type === 'thu';
+      const isExpense = transaction.type === 'chi';
+      if (isIncome && !selectedTypes.includes('income')) return false;
+      if (isExpense && !selectedTypes.includes('expense')) return false;
+    }
 
     // Filter by Method (Tien mat/Chuyen khoan)
-    // method: 'cash' | 'bank'
-    const method = transaction.method === 'cash' ? 'cash' : 'transfer'; // Map 'bank' to 'transfer' to match state
-    if (!selectedMethods.includes(method)) return false;
+    if (selectedMethods.length > 0) {
+      const method = transaction.method === 'cash' ? 'cash' : 'transfer';
+      if (!selectedMethods.includes(method)) return false;
+    }
+
+    // Filter by Status
+    // Note: Mock data doesn't have status field, so this is placeholder logic
+    // In real implementation, check transaction.status
+    if (statusCompleted || statusCancelled) {
+      // Placeholder: assume all transactions are completed for now
+      // In real app: if (statusCompleted && transaction.status !== 'completed') return false;
+      // In real app: if (statusCancelled && transaction.status !== 'cancelled') return false;
+    }
+
+    // Filter by Creator
+    if (selectedCreators.length > 0) {
+      // Placeholder: Mock data doesn't have creator field
+      // In real app: if (!selectedCreators.includes(transaction.creatorId)) return false;
+    }
+
+    // Filter by Person Name
+    if (personName) {
+      const lowerName = personName.toLowerCase();
+      if (!transaction.person.toLowerCase().includes(lowerName)) return false;
+    }
+
+    // Filter by Person Phone
+    if (personPhone) {
+      // Placeholder: Mock data doesn't have phone field
+      // In real app: if (!transaction.personPhone.includes(personPhone)) return false;
+    }
+
+    // Filter by Category
+    if (selectedCategories.length > 0) {
+      // Placeholder: Mock data doesn't have category field
+      // In real app: if (!selectedCategories.includes(transaction.category)) return false;
+    }
 
     return true;
   });
@@ -546,20 +645,28 @@ export function Finance() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-blue-900 text-2xl font-semibold mb-2">Sổ quỹ</h1>
+          <h1 className="text-blue-900 text-2xl font-semibold mb-2">
+            Sổ quỹ {activeTab === 'cash' ? '- Tiền mặt' : activeTab === 'bank' ? '- Ngân hàng' : '- Tổng quỹ'}
+          </h1>
           <p className="text-slate-600 text-sm">
             Quản lý thu chi và dòng tiền
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="gap-2" onClick={() => setReceiptDialogOpen(true)}>
-            <ArrowUpRight className="w-4 h-4 text-emerald-600" />
-            Lập phiếu thu
-          </Button>
-          <Button variant="outline" className="gap-2" onClick={() => setPaymentDialogOpen(true)}>
-            <ArrowDownLeft className="w-4 h-4 text-red-600" />
-            Lập phiếu chi
-          </Button>
+          {activeTab !== 'total' && (
+            <>
+              <Button size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setReceiptDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Lập phiếu thu
+              </Button>
+              <Button size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setPaymentDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Lập phiếu chi
+              </Button>
+            </>
+          )}
           <Button variant="outline" size="sm">
             <Download className="w-4 h-4 mr-2" />
             Xuất file
@@ -635,19 +742,198 @@ export function Finance() {
                 <Filter className="w-4 h-4" />
                 Bộ lọc
               </Button>
+              {showFilters && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={clearAllFilters}
+                  className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  <X className="w-4 h-4" />
+                  Xóa bộ lọc
+                </Button>
+              )}
             </div>
+
 
             {showFilters && (
                <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                   {/* 1. Tìm kiếm */}
+                   <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Tìm kiếm</Label>
+                    <div className="space-y-2">
+                      <Input
+                        placeholder="Theo mã phiếu"
+                        value={searchCode}
+                        onChange={(e) => setSearchCode(e.target.value)}
+                        className="h-9 bg-white border-slate-300"
+                      />
+                      <Input
+                        placeholder="Ghi chú"
+                        value={searchNote}
+                        onChange={(e) => setSearchNote(e.target.value)}
+                        className="h-9 bg-white border-slate-300"
+                      />
+                    </div>
+                   </div>
+
+                   {/* 2. Người nộp/nhận */}
+                   <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Người nộp/nhận</Label>
+                    <div className="space-y-2">
+                      <Input
+                        placeholder="Tên người nộp/nhận"
+                        value={personName}
+                        onChange={(e) => setPersonName(e.target.value)}
+                        className="h-9 bg-white border-slate-300"
+                      />
+                      <Input
+                        placeholder="Điện thoại"
+                        value={personPhone}
+                        onChange={(e) => setPersonPhone(e.target.value)}
+                        className="h-9 bg-white border-slate-300"
+                      />
+                    </div>
+                   </div>
+
+                   {/* 3. Người tạo */}
+                   <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Người tạo</Label>
+                    <Popover open={creatorSearchOpen} onOpenChange={setCreatorSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className="w-full justify-between h-9 text-sm bg-white border-slate-300"
+                        >
+                          <span className="text-slate-500 text-xs">
+                            {selectedCreators.length === 0
+                              ? 'Tất cả'
+                              : `Đã chọn ${selectedCreators.length}`}
+                          </span>
+                          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[240px] p-0">
+                        <Command>
+                          <CommandInput placeholder="Tìm người tạo..." />
+                          <CommandList>
+                            <CommandEmpty>Không tìm thấy.</CommandEmpty>
+                            <CommandGroup className="max-h-64 overflow-auto">
+                              {allCreators.map((creator) => (
+                                <CommandItem
+                                  key={creator.id}
+                                  onSelect={() => toggleCreator(creator.id)}
+                                >
+                                  <Checkbox
+                                    checked={selectedCreators.includes(creator.id)}
+                                    className="mr-2"
+                                  />
+                                  {creator.name}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    {selectedCreators.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {selectedCreators.map((creatorId) => {
+                          const creator = allCreators.find(c => c.id === creatorId);
+                          return (
+                            <div
+                              key={creatorId}
+                              className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs"
+                            >
+                              {creator?.name}
+                              <button
+                                onClick={() => toggleCreator(creatorId)}
+                                className="hover:bg-blue-200 rounded"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                   </div>
+                 </div>
+
+                 {/* Second Row */}
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                   {/* 4. Loại thu chi */}
+                   <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Loại thu chi</Label>
+                    <Popover open={categorySearchOpen} onOpenChange={setCategorySearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className="w-full justify-between h-9 text-sm bg-white border-slate-300"
+                        >
+                          <span className="text-slate-500 text-xs">
+                            {selectedCategories.length === 0
+                              ? 'Loại thu chi'
+                              : `Đã chọn ${selectedCategories.length}`}
+                          </span>
+                          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[240px] p-0">
+                        <Command>
+                          <CommandInput placeholder="Tìm loại thu chi..." />
+                          <CommandList>
+                            <CommandEmpty>Không tìm thấy.</CommandEmpty>
+                            <CommandGroup className="max-h-64 overflow-auto">
+                              {allCategories.map((category) => (
+                                <CommandItem
+                                  key={category.id}
+                                  onSelect={() => toggleCategory(category.name)}
+                                >
+                                  <Checkbox
+                                    checked={selectedCategories.includes(category.name)}
+                                    className="mr-2"
+                                  />
+                                  {category.name}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    {selectedCategories.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {selectedCategories.map((categoryName) => (
+                          <div
+                            key={categoryName}
+                            className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs"
+                          >
+                            {categoryName}
+                            <button
+                              onClick={() => toggleCategory(categoryName)}
+                              className="hover:bg-blue-200 rounded"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                   </div>
+
+                   {/* 5. Loại giao dịch */}
                    <div className="space-y-2">
                     <Label className="text-xs text-slate-600">Loại giao dịch</Label>
                     <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
-                       <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
                         <Checkbox
                           id="type-income"
                           checked={selectedTypes.includes('income')}
-                           onCheckedChange={() => {
+                          onCheckedChange={() => {
                             setSelectedTypes(prev => 
                               prev.includes('income') ? prev.filter(t => t !== 'income') : [...prev, 'income']
                             )
@@ -660,7 +946,7 @@ export function Finance() {
                         <Checkbox
                           id="type-expense"
                           checked={selectedTypes.includes('expense')}
-                           onCheckedChange={() => {
+                          onCheckedChange={() => {
                             setSelectedTypes(prev => 
                               prev.includes('expense') ? prev.filter(t => t !== 'expense') : [...prev, 'expense']
                             )
@@ -671,39 +957,32 @@ export function Finance() {
                       </div>
                     </div>
                    </div>
-                   
+
+                   {/* 6. Trạng thái */}
                    <div className="space-y-2">
-                    <Label className="text-xs text-slate-600">Phương thức</Label>
+                    <Label className="text-xs text-slate-600">Trạng thái</Label>
                     <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
                         <Checkbox
-                          id="method-cash"
-                          checked={selectedMethods.includes('cash')}
-                           onCheckedChange={() => {
-                            setSelectedMethods(prev => 
-                              prev.includes('cash') ? prev.filter(t => t !== 'cash') : [...prev, 'cash']
-                            )
-                          }}
+                          id="status-completed"
+                          checked={statusCompleted}
+                          onCheckedChange={(checked: boolean) => setStatusCompleted(!!checked)}
                           className="border-slate-300"
                         />
-                        <Label htmlFor="method-cash" className="text-sm text-slate-700 cursor-pointer font-normal">Tiền mặt</Label>
+                        <Label htmlFor="status-completed" className="text-sm text-slate-700 cursor-pointer font-normal">Đã thanh toán</Label>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Checkbox
-                          id="method-transfer"
-                          checked={selectedMethods.includes('transfer')}
-                           onCheckedChange={() => {
-                            setSelectedMethods(prev => 
-                              prev.includes('transfer') ? prev.filter(t => t !== 'transfer') : [...prev, 'transfer']
-                            )
-                          }}
+                          id="status-cancelled"
+                          checked={statusCancelled}
+                          onCheckedChange={(checked: boolean) => setStatusCancelled(!!checked)}
                           className="border-slate-300"
                         />
-                        <Label htmlFor="method-transfer" className="text-sm text-slate-700 cursor-pointer font-normal">Chuyển khoản</Label>
+                        <Label htmlFor="status-cancelled" className="text-sm text-slate-700 cursor-pointer font-normal">Đã hủy</Label>
                       </div>
                     </div>
                    </div>
-                </div>
+                 </div>
                </div>
             )}
           </div>
@@ -730,7 +1009,7 @@ export function Finance() {
           onClick={() => { setActiveTab('bank'); setSelectedMethods(['transfer']); }}
           className={activeTab === 'bank' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-white border-slate-300'}
         >
-          Chuyển khoản
+          Ngân hàng
         </Button>
       </div>
 

@@ -1,9 +1,22 @@
+import { useState } from 'react';
 import { Card, CardContent } from '../ui/card';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Checkbox } from '../ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Calendar as CalendarComponent } from '../ui/calendar';
+import { Filter, ChevronDown, ChevronUp, Calendar as CalendarIcon, CheckCircle2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { EmployeeFilter } from '../EmployeeFilter';
+import { CategoryFilter } from '../CategoryFilter';
+import { CustomerTimeFilter } from './CustomerTimeFilter';
 
 type ConcernType = 'sales' | 'cashflow' | 'products' | 'cancellations' | 'summary';
-type DateRangeType = 'single' | 'range';
 
 interface SelectableItem {
   id: string;
@@ -11,37 +24,101 @@ interface SelectableItem {
   code?: string;
 }
 
-interface EndOfDayReportProps {
-  concern: ConcernType;
-  dateRangeType: DateRangeType;
-  selectedDate: Date;
-  dateFrom?: Date;
-  dateTo?: Date;
-  customerSearch: string;
-  productSearch: string;
-  selectedCreators: SelectableItem[];
-  selectedReceivers: SelectableItem[];
-  selectedPaymentMethods: SelectableItem[];
-  selectedCashflowTypes: SelectableItem[];
-  selectedProductCategories: SelectableItem[];
-  selectedCancelers: SelectableItem[];
-}
+export function EndOfDayReport() {
+  // Filter panel state
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  
+  // Filter states
+  const [concern, setConcern] = useState<ConcernType>('cashflow');
+  const [dateRangeType, setDateRangeType] = useState<'preset' | 'custom'>('preset');
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date(2025, 9, 15));
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date(2025, 9, 1));
+  const [dateTo, setDateTo] = useState<Date | undefined>(new Date(2025, 9, 15));
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [productSearch, setProductSearch] = useState('');
+  const [selectedCreators, setSelectedCreators] = useState<string[]>([]);
+  const [selectedReceivers, setSelectedReceivers] = useState<SelectableItem[]>([]);
+  const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<SelectableItem[]>([]);
+  const [selectedCashflowTypes, setSelectedCashflowTypes] = useState<string[]>([]);
+  const [selectedProductCategories, setSelectedProductCategories] = useState<SelectableItem[]>([]);
+  const [selectedCancelers, setSelectedCancelers] = useState<SelectableItem[]>([]);
 
-export function EndOfDayReport({ 
-  concern,
-  dateRangeType,
-  selectedDate,
-  dateFrom,
-  dateTo,
-  customerSearch,
-  productSearch,
-  selectedCreators,
-  selectedReceivers,
-  selectedPaymentMethods,
-  selectedCashflowTypes,
-  selectedProductCategories,
-  selectedCancelers
-}: EndOfDayReportProps) {
+  // Calculate active filter count
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (customerSearch) count++;
+    if (productSearch) count++;
+    if (selectedCreators.length > 0) count++;
+    if (selectedReceivers.length > 0) count++;
+    if (selectedPaymentMethods.length > 0) count++;
+    if (selectedCashflowTypes.length > 0) count++;
+    if (selectedProductCategories.length > 0) count++;
+    if (selectedCancelers.length > 0) count++;
+    return count;
+  };
+
+  // Additional state for preset time range
+  const [presetTimeRange, setPresetTimeRange] = useState('this-week');
+
+  // Mock data arrays
+  const employees = [
+    { id: 'emp1', name: 'Nguyễn Văn A - Thu ngân', code: 'NV001' },
+    { id: 'emp2', name: 'Trần Thị B - Phục vụ', code: 'NV002' },
+    { id: 'emp3', name: 'Lê Văn C - Quản lý', code: 'NV003' },
+    { id: 'emp4', name: 'Hương - Kế Toán', code: 'NV004' },
+    { id: 'emp5', name: 'Hoàng - Kinh Doanh', code: 'NV005' },
+  ];
+
+  const receivers = [
+    { id: 'r1', name: 'Nguyễn Văn A' },
+    { id: 'r2', name: 'Trần Thị B' },
+    { id: 'r3', name: 'Công ty Cà phê' },
+    { id: 'r4', name: 'Công ty Điện lực' },
+  ];
+
+  const paymentMethods = [
+    { id: 'cash', name: 'Tiền mặt' },
+    { id: 'transfer', name: 'Chuyển khoản' },
+    { id: 'ewallet', name: 'Ví điện tử' },
+    { id: 'credit', name: 'Thẻ tín dụng' },
+  ];
+
+  const cashflowTypes = [
+    { id: 'receive-customer', name: 'Thu tiền khách trả' },
+    { id: 'pay-supplier', name: 'Chi tiền NCC' },
+    { id: 'utilities', name: 'Chi phí điện nước' },
+  ];
+
+  const productCategories = [
+    { id: 'cat1', name: 'Cà phê' },
+    { id: 'cat2', name: 'Trà sữa' },
+    { id: 'cat3', name: 'Sinh tố' },
+    { id: 'cat4', name: 'Đồ ăn nhẹ' },
+  ];
+
+  // Helper functions for multi-select
+  const handleMultiSelect = (
+    item: SelectableItem,
+    selectedItems: SelectableItem[],
+    setSelectedItems: (items: SelectableItem[]) => void
+  ) => {
+    const isSelected = selectedItems.some(s => s.id === item.id);
+    if (isSelected) {
+      setSelectedItems(selectedItems.filter(s => s.id !== item.id));
+    } else {
+      setSelectedItems([...selectedItems, item]);
+    }
+  };
+
+  const handleRemoveItem = (
+    id: string,
+    selectedItems: SelectableItem[],
+    setSelectedItems: (items: SelectableItem[]) => void
+  ) => {
+    setSelectedItems(selectedItems.filter(item => item.id !== id));
+  };
+
+
   // Sample data for cashflow report
   const allCashflowData = [
     {
@@ -1111,7 +1188,395 @@ export function EndOfDayReport({
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full p-8 space-y-6">
+      {/* Filter Panel */}
+      <div className="bg-white rounded-lg border border-slate-200">
+        <div className="p-4 border-b border-slate-200">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className="gap-2"
+          >
+            <Filter className="w-4 h-4" />
+            Bộ lọc
+            {getActiveFilterCount() > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {getActiveFilterCount()}
+              </Badge>
+            )}
+            {isFilterOpen ? (
+              <ChevronUp className="w-4 h-4 ml-2" />
+            ) : (
+              <ChevronDown className="w-4 h-4 ml-2" />
+            )}
+          </Button>
+        </div>
+
+        {isFilterOpen && (
+          <div className="p-6 bg-slate-50">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Mối quan tâm */}
+              <div>
+                <h3 className="text-sm text-slate-900 mb-3">Mối quan tâm</h3>
+                <Select value={concern} onValueChange={(value) => setConcern(value as ConcernType)}>
+                  <SelectTrigger className="w-full bg-white border border-slate-300">
+                    <SelectValue placeholder="Chọn mối quan tâm" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sales">Bán hàng</SelectItem>
+                    <SelectItem value="cashflow">Thu chi</SelectItem>
+                    <SelectItem value="products">Hàng hóa</SelectItem>
+                    <SelectItem value="cancellations">Hủy món</SelectItem>
+                    <SelectItem value="summary">Tổng hợp</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Thời gian - This will span full width when shown */}
+              <div className="md:col-span-2 lg:col-span-3">
+                <CustomerTimeFilter
+                  dateRangeType={dateRangeType}
+                  timePreset={presetTimeRange}
+                  dateFrom={dateFrom}
+                  dateTo={dateTo}
+                  onDateRangeTypeChange={setDateRangeType}
+                  onTimePresetChange={setPresetTimeRange}
+                  onDateFromChange={setDateFrom}
+                  onDateToChange={setDateTo}
+                />
+              </div>
+
+              {/* Conditional Filters based on Concern */}
+              {concern === 'products' && (
+                <>
+                  {/* Tìm kiếm hàng hóa */}
+                  <div>
+                    <h3 className="text-sm text-slate-900 mb-3">Tìm kiếm hàng hóa</h3>
+                    <Input
+                      placeholder="Theo tên, mã hàng"
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      className="text-sm bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                    />
+                  </div>
+
+                  {/* Chọn loại hàng */}
+                  <div>
+                    <h3 className="text-sm text-slate-900 mb-3">Chọn loại hàng</h3>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="w-full text-left border border-slate-300 rounded-lg px-3 py-2 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-auto min-h-[40px]">
+                          <div className="flex flex-wrap gap-1.5 items-center">
+                            {selectedProductCategories.length > 0 ? (
+                              selectedProductCategories.map((item) => (
+                                <Badge
+                                  key={item.id}
+                                  variant="secondary"
+                                  className="bg-slate-200 text-slate-900 pr-1 text-xs"
+                                >
+                                  {item.name}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveItem(item.id, selectedProductCategories, setSelectedProductCategories);
+                                    }}
+                                    className="ml-1 hover:bg-slate-300 rounded-sm p-0.5"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-slate-500 text-sm">Chọn loại hàng</span>
+                            )}
+                          </div>
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-72 p-3" align="start">
+                        <div className="space-y-2">
+                          {productCategories.map((cat) => (
+                            <div
+                              key={cat.id}
+                              className="flex items-center justify-between p-2 hover:bg-slate-100 rounded cursor-pointer"
+                              onClick={() => handleMultiSelect(cat, selectedProductCategories, setSelectedProductCategories)}
+                            >
+                              <span className="text-sm text-slate-900">{cat.name}</span>
+                              {selectedProductCategories.some(s => s.id === cat.id) && (
+                                <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </>
+              )}
+
+              {concern === 'cancellations' && (
+                <>
+                  {/* Tìm kiếm khách hàng */}
+                  <div>
+                    <h3 className="text-sm text-slate-900 mb-3">Tìm kiếm khách hàng</h3>
+                    <Input
+                      placeholder="Theo mã, tên, điện thoại"
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      className="text-sm bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                    />
+                  </div>
+
+                  {/* Tìm kiếm hàng hóa */}
+                  <div>
+                    <h3 className="text-sm text-slate-900 mb-3">Tìm kiếm hàng hóa</h3>
+                    <Input
+                      placeholder="Theo tên, mã hàng"
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      className="text-sm bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                    />
+                  </div>
+
+                  {/* Nhân viên hủy */}
+                  <div>
+                    <h3 className="text-sm text-slate-900 mb-3">Nhân viên hủy</h3>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="w-full text-left border border-slate-300 rounded-lg px-3 py-2 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-auto min-h-[40px]">
+                          <div className="flex flex-wrap gap-1.5 items-center">
+                            {selectedCancelers.length > 0 ? (
+                              selectedCancelers.map((item) => (
+                                <Badge
+                                  key={item.id}
+                                  variant="secondary"
+                                  className="bg-slate-200 text-slate-900 pr-1 text-xs"
+                                >
+                                  {item.name}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveItem(item.id, selectedCancelers, setSelectedCancelers);
+                                    }}
+                                    className="ml-1 hover:bg-slate-300 rounded-sm p-0.5"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-slate-500 text-sm">Chọn nhân viên</span>
+                            )}
+                          </div>
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-72 p-3" align="start">
+                        <div className="space-y-2">
+                          {employees.map((emp) => (
+                            <div
+                              key={emp.id}
+                              className="flex items-center justify-between p-2 hover:bg-slate-100 rounded cursor-pointer"
+                              onClick={() => handleMultiSelect(emp, selectedCancelers, setSelectedCancelers)}
+                            >
+                              <span className="text-sm text-slate-900">{emp.code ? `${emp.code} - ${emp.name}` : emp.name}</span>
+                              {selectedCancelers.some(s => s.id === emp.id) && (
+                                <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </>
+              )}
+
+              {concern === 'summary' && (
+                <>
+                  {/* Người nhận đơn */}
+                  <div>
+                    <h3 className="text-sm text-slate-900 mb-3">Người nhận đơn</h3>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="w-full text-left border border-slate-300 rounded-lg px-3 py-2 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-auto min-h-[40px]">
+                          <div className="flex flex-wrap gap-1.5 items-center">
+                            {selectedReceivers.length > 0 ? (
+                              selectedReceivers.map((item) => (
+                                <Badge
+                                  key={item.id}
+                                  variant="secondary"
+                                  className="bg-slate-200 text-slate-900 pr-1 text-xs"
+                                >
+                                  {item.name}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveItem(item.id, selectedReceivers, setSelectedReceivers);
+                                    }}
+                                    className="ml-1 hover:bg-slate-300 rounded-sm p-0.5"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-slate-500 text-sm">Chọn người nhận</span>
+                            )}
+                          </div>
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-72 p-3" align="start">
+                        <div className="space-y-2">
+                          {receivers.map((receiver) => (
+                            <div
+                              key={receiver.id}
+                              className="flex items-center justify-between p-2 hover:bg-slate-100 rounded cursor-pointer"
+                              onClick={() => handleMultiSelect(receiver, selectedReceivers, setSelectedReceivers)}
+                            >
+                              <span className="text-sm text-slate-900">{receiver.name}</span>
+                              {selectedReceivers.some(s => s.id === receiver.id) && (
+                                <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Người tạo */}
+                  <div>
+                    <EmployeeFilter
+                      employees={employees}
+                      selectedEmployeeIds={selectedCreators}
+                      onSelectionChange={setSelectedCreators}
+                      label="Người tạo"
+                      placeholder="Tìm người tạo..."
+                    />
+                  </div>
+                </>
+              )}
+
+              {(concern === 'sales' || concern === 'cashflow') && (
+                <>
+                  {/* Khách hàng */}
+                  <div>
+                    <h3 className="text-sm text-slate-900 mb-3">Khách hàng</h3>
+                    <Input
+                      placeholder="Theo mã, tên, điện thoại"
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      className="text-sm bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                    />
+                  </div>
+
+                  {/* Người tạo */}
+                  <div>
+                    <EmployeeFilter
+                      employees={employees}
+                      selectedEmployeeIds={selectedCreators}
+                      onSelectionChange={setSelectedCreators}
+                      label="Người tạo"
+                      placeholder="Tìm người tạo..."
+                    />
+                  </div>
+
+                  {/* Phương thức thanh toán */}
+                  <div>
+                    <h3 className="text-sm text-slate-900 mb-3">Phương thức thanh toán</h3>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="w-full text-left border border-slate-300 rounded-lg px-3 py-2 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-auto min-h-[40px]">
+                          <div className="flex flex-wrap gap-1.5 items-center">
+                            {selectedPaymentMethods.length > 0 ? (
+                              selectedPaymentMethods.map((item) => {
+                                const method = paymentMethods.find(m => m.id === item.id);
+                                return (
+                                  <Badge
+                                    key={item.id}
+                                    variant="secondary"
+                                    className="bg-slate-200 text-slate-900 pr-1 text-xs"
+                                  >
+                                    {method?.name || item.name}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRemoveItem(item.id, selectedPaymentMethods, setSelectedPaymentMethods);
+                                      }}
+                                      className="ml-1 hover:bg-slate-300 rounded-sm p-0.5"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </Badge>
+                                );
+                              })
+                            ) : (
+                              <span className="text-slate-500 text-sm">Chọn phương thức thanh toán</span>
+                            )}
+                          </div>
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-72 p-3" align="start">
+                        <div className="space-y-2">
+                          {paymentMethods.map((method) => (
+                            <div
+                              key={method.id}
+                              className="flex items-center justify-between p-2 hover:bg-slate-100 rounded cursor-pointer"
+                              onClick={() => handleMultiSelect(method, selectedPaymentMethods, setSelectedPaymentMethods)}
+                            >
+                              <span className="text-sm text-slate-900">{method.name}</span>
+                              {selectedPaymentMethods.some(s => s.id === method.id) && (
+                                <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {concern === 'cashflow' && (
+                    <>
+                      {/* Loại thu chi */}
+                      <div>
+                        <CategoryFilter
+                          categories={cashflowTypes}
+                          selectedCategoryNames={selectedCashflowTypes}
+                          onSelectionChange={setSelectedCashflowTypes}
+                        />
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Clear Filters Button */}
+            {getActiveFilterCount() > 0 && (
+              <div className="pt-4 border-t border-slate-200 mt-6">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setCustomerSearch('');
+                    setProductSearch('');
+                    setSelectedCreators([]);
+                    setSelectedReceivers([]);
+                    setSelectedPaymentMethods([]);
+                    setSelectedCashflowTypes([]);
+                    setSelectedProductCategories([]);
+                    setSelectedCancelers([]);
+                  }}
+                >
+                  Xóa bộ lọc
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Report Content */}
       {renderContent()}
     </div>
   );

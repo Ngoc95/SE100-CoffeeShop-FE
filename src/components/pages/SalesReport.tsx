@@ -1,31 +1,34 @@
-import { useState } from 'react';
-import { Download } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Download, Filter, ChevronDown, ChevronUp, ChevronRight, X, CheckCircle2 } from 'lucide-react';
 import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { CustomerTimeFilter } from '../reports/CustomerTimeFilter';
 
 type ViewType = 'chart' | 'report';
 type ConcernType = 'time' | 'profit' | 'discount' | 'return' | 'table' | 'category';
 
-interface SalesReportProps {
-  viewType: ViewType;
-  concern: ConcernType;
-  dateFrom?: Date;
-  dateTo?: Date;
-  selectedArea: string;
-  selectedTable: string;
-}
+export function SalesReport() {
+  // Filter panel state
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  
+  // Filter states
+  const [viewType, setViewType] = useState<ViewType>('chart');
+  const [concern, setConcern] = useState<ConcernType>('time');
+  const [selectedArea, setSelectedArea] = useState('all');
+  const [selectedTable, setSelectedTable] = useState('all');
+  
+  // Time filter states
+  const [dateRangeType, setDateRangeType] = useState<'preset' | 'custom'>('preset');
+  const [timePreset, setTimePreset] = useState('this-month');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date(2025, 11, 1));
+  const [dateTo, setDateTo] = useState<Date | undefined>(new Date(2025, 11, 2));
 
-export function SalesReport({
-  viewType,
-  concern,
-  dateFrom,
-  dateTo,
-  selectedArea,
-  selectedTable
-}: SalesReportProps) {
+  // Expandable rows state
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const toggleRow = (time: string) => {
@@ -37,6 +40,13 @@ export function SalesReport({
     }
     setExpandedRows(newExpanded);
   };
+
+  // Auto-set viewType to 'report' for concerns that don't have charts
+  useEffect(() => {
+    if (concern === 'discount' || concern === 'return' || concern === 'table' || concern === 'category') {
+      setViewType('report');
+    }
+  }, [concern]);
 
   // Chart data for time concern - by day (net revenue)
   const timeChartDataByDay = [
@@ -752,9 +762,162 @@ export function SalesReport({
     );
   };
 
+  // Calculate active filter count
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (selectedArea !== 'all') count++;
+    if (selectedTable !== 'all') count++;
+    return count;
+  };
+
   return (
-    <div className="p-8">
-      {viewType === 'chart' ? renderChart() : renderReport()}
+    <div className="w-full p-8 space-y-6">
+      {/* Filter Panel */}
+      <div className="bg-white rounded-lg border border-slate-200">
+        <div className="p-4 border-b border-slate-200">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className="gap-2"
+          >
+            <Filter className="w-4 h-4" />
+            Bộ lọc
+            {getActiveFilterCount() > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {getActiveFilterCount()}
+              </Badge>
+            )}
+            {isFilterOpen ? (
+              <ChevronUp className="w-4 h-4 ml-2" />
+            ) : (
+              <ChevronDown className="w-4 h-4 ml-2" />
+            )}
+          </Button>
+        </div>
+
+        {isFilterOpen && (
+          <div className="p-6 bg-slate-50">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Mối quan tâm */}
+              <div>
+                <h3 className="text-sm text-slate-900 mb-3">Mối quan tâm</h3>
+                <Select value={concern} onValueChange={(value) => setConcern(value as ConcernType)}>
+                  <SelectTrigger className="w-full bg-white border border-slate-300">
+                    <SelectValue placeholder="Chọn mối quan tâm" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="time">Thời gian</SelectItem>
+                    <SelectItem value="profit">Lợi nhuận</SelectItem>
+                    <SelectItem value="discount">Giảm giá HĐ</SelectItem>
+                    <SelectItem value="return">Trả hàng</SelectItem>
+                    <SelectItem value="table">Phòng/Bàn</SelectItem>
+                    <SelectItem value="category">Danh mục hàng hóa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Thời gian */}
+              <div className="md:col-span-2 lg:col-span-3">
+                <CustomerTimeFilter
+                  dateRangeType={dateRangeType}
+                  timePreset={timePreset}
+                  dateFrom={dateFrom}
+                  dateTo={dateTo}
+                  onDateRangeTypeChange={setDateRangeType}
+                  onTimePresetChange={setTimePreset}
+                  onDateFromChange={setDateFrom}
+                  onDateToChange={setDateTo}
+                />
+              </div>
+
+              {/* Phòng bàn - Khu vực */}
+              <div>
+                <h3 className="text-sm text-slate-900 mb-3">Khu vực</h3>
+                <Select value={selectedArea} onValueChange={setSelectedArea}>
+                  <SelectTrigger className="w-full bg-white border border-slate-300">
+                    <SelectValue placeholder="Chọn khu vực" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả</SelectItem>
+                    <SelectItem value="floor1">Tầng 1</SelectItem>
+                    <SelectItem value="floor2">Tầng 2</SelectItem>
+                    <SelectItem value="vip">VIP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Phòng bàn */}
+              <div>
+                <h3 className="text-sm text-slate-900 mb-3">Phòng bàn</h3>
+                <Select value={selectedTable} onValueChange={setSelectedTable}>
+                  <SelectTrigger className="w-full bg-white border border-slate-300">
+                    <SelectValue placeholder="Chọn phòng bàn" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả</SelectItem>
+                    <SelectItem value="table01">Bàn 01</SelectItem>
+                    <SelectItem value="table02">Bàn 02</SelectItem>
+                    <SelectItem value="table03">Bàn 03</SelectItem>
+                    <SelectItem value="vip1">Bàn VIP 1</SelectItem>
+                    <SelectItem value="vip2">Bàn VIP 2</SelectItem>
+                    <SelectItem value="table05">Bàn 05</SelectItem>
+                    <SelectItem value="table06">Bàn 06</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Clear Filters Button */}
+            {getActiveFilterCount() > 0 && (
+              <div className="pt-4 border-t border-slate-200 mt-6">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setSelectedArea('all');
+                    setSelectedTable('all');
+                  }}
+                >
+                  Xóa bộ lọc
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Loại hiển thị - Only show for time and profit concerns */}
+      {(concern === 'time' || concern === 'profit') && (
+        <div>
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+            <button
+              onClick={() => setViewType('report')}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                viewType === 'report'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Báo cáo
+            </button>
+            <button
+              onClick={() => setViewType('chart')}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                viewType === 'chart'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Biểu đồ
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Report Content */}
+      <div className="p-8">
+      {viewType === 'chart' ? renderChart() : renderReport()}\n      </div>
     </div>
   );
 }
