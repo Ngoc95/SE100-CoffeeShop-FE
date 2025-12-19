@@ -1,11 +1,7 @@
 import { useState } from 'react';
 import {
-  LayoutDashboard,
   ShoppingCart,
   ChefHat,
-  ArrowLeftRight,
-  DollarSign,
-  FileText,
   Menu,
   X,
   Settings,
@@ -17,7 +13,6 @@ import {
 } from 'lucide-react';
 import { PageType } from '../App';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -174,8 +169,8 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                 <button
                   onClick={() => onNavigate('pos')}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-sm font-medium ${currentPage === 'pos'
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'text-slate-700 hover:bg-slate-100 border border-slate-200'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-slate-700 hover:bg-slate-100 border border-slate-200'
                     }`}
                 >
                   <ShoppingCart className="w-4 h-4" />
@@ -184,8 +179,8 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                 <button
                   onClick={() => onNavigate('kitchen')}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-sm font-medium ${currentPage === 'kitchen'
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'text-slate-700 hover:bg-slate-100 border border-slate-200'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-slate-700 hover:bg-slate-100 border border-slate-200'
                     }`}
                 >
                   <ChefHat className="w-4 h-4" />

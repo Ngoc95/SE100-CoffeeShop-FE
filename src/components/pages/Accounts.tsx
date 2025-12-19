@@ -195,13 +195,23 @@ export function Accounts() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {canUpdate && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-slate-500 hover:text-blue-600"
+                            onClick={(e) => handleEditRole(role, e)}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        )}
                         {canDelete && (
                           <Button
                             variant="ghost"
                             size="sm"
                             className={`h-8 w-8 p-0 ${role.isSystem
-                                ? 'text-slate-300 cursor-not-allowed'
-                                : 'text-slate-500 hover:text-red-600'
+                              ? 'text-slate-300 cursor-not-allowed'
+                              : 'text-slate-500 hover:text-red-600'
                               }`}
                             onClick={(e) => !role.isSystem && handleDeleteRole(role, e)}
                             disabled={role.isSystem}
