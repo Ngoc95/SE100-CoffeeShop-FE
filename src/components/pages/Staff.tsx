@@ -154,7 +154,7 @@ export function Staff({
   // Account info state
   // Account info state
   // const [accountData, setAccountData] = useState({ ... }); // Removed as we only link existing accounts
-  const [selectedAccountId, setSelectedAccountId] = useState("");
+  const [selectedRoleId, setSelectedRoleId] = useState("");
 
   // Salary settings state
   const [salarySettings, setSalarySettings] = useState({
@@ -524,7 +524,7 @@ export function Staff({
       gender: "male",
       birthDate: "",
     });
-    setSelectedAccountId("");
+    setSelectedRoleId("");
     setSalarySettings({
       salaryType: "shift",
       salaryAmount: "",
@@ -576,8 +576,8 @@ export function Staff({
     }
 
     // Validate account info
-    if (!selectedAccountId) {
-      toast.error("Vui lòng chọn tài khoản để liên kết");
+    if (!selectedRoleId) {
+      toast.error("Vui lòng chọn loại tài khoản");
       return;
     }
 
@@ -621,18 +621,19 @@ export function Staff({
         ...salarySettings,
         salaryType: salarySettings.salaryType as "shift" | "fixed",
       },
-      accountId: selectedAccountId,
-      account: { username: initialAccounts.find(a => a.id === selectedAccountId)?.username || "" },
+      accountId: `acc_${Date.now()}`,
+      account: {
+        username: formData.username,
+        password: formData.password,
+        roleId: selectedRoleId
+      },
     };
 
     setStaffMembers([...staffMembers, newStaff]);
 
-    // Show success message with account info if created
-    setStaffMembers([...staffMembers, newStaff]);
-
-    const linkAcc = initialAccounts.find(a => a.id === selectedAccountId);
+    const roleName = initialRoles.find(r => r.id === selectedRoleId)?.name;
     toast.success(
-      `Đã thêm nhân viên mới và liên kết tài khoản "${linkAcc?.username || ''}" thành công`
+      `Đã thêm nhân viên mới và tạo tài khoản "${formData.username}" (${roleName}) thành công`
     );
 
     setAddDialogOpen(false);
@@ -653,6 +654,8 @@ export function Staff({
       addressDetail: staff.address.detail,
       gender: staff.gender,
       birthDate: staff.birthDate,
+      username: staff.account?.username || "", // Populate username for editing
+      password: "", // Password is not editable directly, leave blank
     });
     // Load salary settings if available, otherwise use defaults
     if (staff.salarySettings) {
@@ -685,16 +688,15 @@ export function Staff({
       });
     }
     // Reset account data when editing
-    // Reset account data when editing
-    if (staff.accountId) {
-      setSelectedAccountId(staff.accountId);
-      const acc = initialAccounts.find(a => a.id === staff.accountId);
+    if (staff.accountId || staff.account) {
+      const acc = staff.account; // Use staff.account directly if available
+      setSelectedRoleId(acc?.roleId || "staff"); // Default to "staff" if roleId is missing
       setAccountForm({
         username: acc?.username || "",
         password: ""
       });
     } else {
-      setSelectedAccountId("");
+      setSelectedRoleId("");
       setAccountForm({ username: "", password: "" });
     }
     setEditDialogOpen(true);
@@ -713,18 +715,14 @@ export function Staff({
       return;
     }
 
-    // Account validation if needed
-    if (!selectedAccountId) {
-      // Optional: or make it mandatory? Assuming mandatory based on context "chỗ này là chọn tài khoản..."
-      toast.error("Vui lòng chọn tài khoản liên kết");
+    // Account validation
+    if (!selectedRoleId) {
+      toast.error("Vui lòng chọn loại tài khoản");
       return;
     }
 
     const updatedStaff = staffMembers.map((staff) => {
       if (staff.id === editingStaff.id) {
-        // Construct new account object if not linking
-        const linkedAccount = initialAccounts.find(a => a.id === selectedAccountId);
-
         return {
           ...staff,
           fullName: formData.fullName,
@@ -736,18 +734,20 @@ export function Staff({
           positionLabel:
             positions.find((p) => p.value === formData.position)?.label || "",
           joinDate: formData.joinDate,
-          salary: Number(formData.salary) || 0,
+          salary: Number(formData.salary) || 0, // Keep existing logic for now
           address: {
             city: formData.city,
             ward: formData.ward,
             detail: formData.addressDetail,
           },
-          salarySettings: {
-            ...salarySettings,
-            salaryType: salarySettings.salaryType as 'shift' | 'fixed',
+          // details
+          salarySettings: salarySettings, // Ensure we save the complex settings
+          // Update account info
+          account: {
+            ...staff.account,
+            username: accountForm.username || staff.account?.username || "",
+            roleId: selectedRoleId
           },
-          accountId: selectedAccountId,
-          account: linkedAccount ? { username: accountForm.username || linkedAccount.username } : undefined,
         };
       }
       return staff;
@@ -1622,24 +1622,21 @@ export function Staff({
                         </div>
                         {/* Existing account select (optional) */}
                         <div className="space-y-4">
-                          <Label>Chọn tài khoản hệ thống <span className="text-red-500">*</span></Label>
-                          <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                          <Label>Loại tài khoản <span className="text-red-500">*</span></Label>
+                          <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
                             <SelectTrigger className="w-full bg-white border-slate-300 shadow-none">
-                              <SelectValue placeholder="Chọn tài khoản..." />
+                              <SelectValue placeholder="Chọn loại tài khoản..." />
                             </SelectTrigger>
                             <SelectContent>
-                              {initialAccounts.map(acc => {
-                                const roleName = initialRoles.find(r => r.id === acc.roleId)?.name || "Unknown";
-                                return (
-                                  <SelectItem key={acc.id} value={acc.id}>
-                                    {acc.username} - {acc.fullName} ({roleName})
-                                  </SelectItem>
-                                );
-                              })}
+                              {initialRoles.map(role => (
+                                <SelectItem key={role.id} value={role.id}>
+                                  {role.name}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                           <div className="bg-blue-50 p-3 rounded text-xs text-blue-700">
-                            Chọn tài khoản đã được tạo trước trong danh sách tài khoản hệ thống.
+                            Chọn loại phân quyền cho tài khoản này.
                           </div>
                         </div>
                       </div>
@@ -2650,54 +2647,51 @@ export function Staff({
 
             <TabsContent value="account" className="mt-6">
               <div className="space-y-6">
-                <div className="space-y-4">
-                  <Label>Chọn tài khoản hệ thống <span className="text-red-500">*</span></Label>
-                  <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-                    <SelectTrigger className="w-full bg-white border-slate-300 shadow-none">
-                      <SelectValue placeholder="Chọn tài khoản..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {initialAccounts.map(acc => {
-                        const roleName = initialRoles.find(r => r.id === acc.roleId)?.name || "Unknown";
-                        return (
-                          <SelectItem key={acc.id} value={acc.id}>
-                            {acc.username} - {acc.fullName} ({roleName})
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  {selectedAccountId && (
-                    <div className="bg-blue-50 p-3 rounded text-xs text-blue-700">
-                      Đang chỉnh sửa thông tin cho tài khoản: {initialAccounts.find(a => a.id === selectedAccountId)?.username}
-                    </div>
-                  )}
+                {/* Username */}
+                <div>
+                  <Label>Tên đăng nhập <span className="text-red-500">*</span></Label>
+                  <Input
+                    placeholder="Tên đăng nhập"
+                    value={accountForm.username}
+                    onChange={(e) => setAccountForm({ ...accountForm, username: e.target.value })}
+                    className="mt-1.5 bg-white border-slate-300 shadow-none"
+                  />
                 </div>
 
-                <div className="space-y-4 border-t pt-4">
-                  <h4 className="text-sm font-medium">Thông tin đăng nhập</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Tên đăng nhập</Label>
-                      <Input
-                        value={accountForm.username}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAccountForm({ ...accountForm, username: e.target.value })}
-                        placeholder="Nhập tên đăng nhập"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Mật khẩu mới</Label>
-                      <PasswordInput
-                        value={accountForm.password}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAccountForm({ ...accountForm, password: e.target.value })}
-                        placeholder="Nhập mật khẩu mới (nếu đổi)"
-                      />
-                    </div>
+                {/* Password */}
+                <div>
+                  <Label>Mật khẩu <span className="text-red-500">*</span></Label>
+                  <Input
+                    type="password"
+                    placeholder="Mật khẩu"
+                    value={accountForm.password}
+                    onChange={(e) => setAccountForm({ ...accountForm, password: e.target.value })}
+                    className="mt-1.5 bg-white border-slate-300 shadow-none"
+                  />
+                </div>
+
+                {/* Existing account select (optional) */}
+                <div className="space-y-4">
+                  <Label>Loại tài khoản <span className="text-red-500">*</span></Label>
+                  <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
+                    <SelectTrigger className="w-full bg-white border-slate-300 shadow-none">
+                      <SelectValue placeholder="Chọn loại tài khoản..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {initialRoles.map(role => (
+                        <SelectItem key={role.id} value={role.id}>
+                          {role.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="bg-blue-50 p-3 rounded text-xs text-blue-700">
+                    Chọn loại phân quyền cho tài khoản này.
                   </div>
                 </div>
               </div>
             </TabsContent>
-          </Tabs>
+          </Tabs >
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
@@ -2710,8 +2704,8 @@ export function Staff({
               Cập nhật
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        </DialogContent >
+      </Dialog >
+    </div >
   );
 }
