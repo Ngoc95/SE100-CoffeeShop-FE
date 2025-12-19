@@ -37,6 +37,8 @@ export function Accounts() {
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [expandedRoleId, setExpandedRoleId] = useState<string | null>(null);
+  const [editingPermissionsRoleId, setEditingPermissionsRoleId] = useState<string | null>(null);
+  const [tempPermissions, setTempPermissions] = useState<string[]>([]);
 
   const handleAddRole = () => {
     setEditingRole(null);
@@ -91,7 +93,30 @@ export function Accounts() {
   };
 
   const toggleExpand = (roleId: string) => {
-    setExpandedRoleId(expandedRoleId === roleId ? null : roleId);
+    if (expandedRoleId === roleId) {
+      setExpandedRoleId(null);
+      setEditingPermissionsRoleId(null);
+    } else {
+      setExpandedRoleId(roleId);
+      setEditingPermissionsRoleId(null);
+    }
+  };
+
+  const startEditPermissions = (role: Role) => {
+    setEditingPermissionsRoleId(role.id);
+    setTempPermissions(role.permissions);
+  };
+
+  const cancelEditPermissions = () => {
+    setEditingPermissionsRoleId(null);
+    setTempPermissions([]);
+  };
+
+  const saveEditPermissions = (role: Role) => {
+    setRoles(roles.map(r => r.id === role.id ? { ...r, permissions: tempPermissions, updatedAt: new Date().toISOString() } : r));
+    setEditingPermissionsRoleId(null);
+    setTempPermissions([]);
+    toast.success('Đã cập nhật quyền hạn');
   };
 
   return (
@@ -170,16 +195,6 @@ export function Accounts() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {canUpdate && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-slate-500 hover:text-slate-900"
-                            onClick={(e) => handleEditRole(role, e)}
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                        )}
                         {canDelete && (
                           <Button
                             variant="ghost"
@@ -229,20 +244,20 @@ export function Accounts() {
                             <div className="flex items-center justify-between mb-3">
                               <h3 className="font-medium text-blue-900">Danh sách quyền hạn</h3>
                               {canUpdate && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={(e) => handleEditRole(role, e)}
-                                >
-                                  <Pencil className="w-3.5 h-3.5 mr-1" />
-                                  Chỉnh sửa
-                                </Button>
+                                <div className="flex gap-2">
+                                  <Button size="sm" variant="default" onClick={() => saveEditPermissions(role)} disabled={JSON.stringify(tempPermissions) === JSON.stringify(role.permissions)}>
+                                    Lưu thay đổi
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={cancelEditPermissions}>
+                                    Hủy
+                                  </Button>
+                                </div>
                               )}
                             </div>
-                            <div className="bg-white rounded-lg border p-4 pointer-events-none opacity-90 select-none">
+                            <div className="bg-white rounded-lg border p-4">
                               <PermissionCheckboxTree
-                                selectedPermissions={role.permissions}
-                                onChange={() => { }} // Read-only
+                                selectedPermissions={tempPermissions.length && expandedRoleId === role.id ? tempPermissions : role.permissions}
+                                onChange={setTempPermissions}
                               />
                             </div>
                           </div>
