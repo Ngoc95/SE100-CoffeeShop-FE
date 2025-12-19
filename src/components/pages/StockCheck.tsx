@@ -10,6 +10,7 @@ import {
   Lightbulb,
   ArrowUp,
   ArrowDown,
+  Filter,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
@@ -756,7 +757,7 @@ export function StockCheck() {
                 onClick={() => setShowFilters(!showFilters)}
                 className="gap-2"
               >
-                <Search className="w-4 h-4" />
+                <Filter className="w-4 h-4" />
                 Bộ lọc
               </Button>
             </div>

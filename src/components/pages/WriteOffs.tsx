@@ -1254,16 +1254,6 @@ export function WriteOffs() {
                   className="pl-10 bg-white border-slate-300"
                 />
               </div>
-              <CustomerTimeFilter
-                dateRangeType={dateRangeType}
-                timePreset={presetTimeRange}
-                dateFrom={dateFrom}
-                dateTo={dateTo}
-                onDateRangeTypeChange={setDateRangeType}
-                onTimePresetChange={handleTimePresetChange}
-                onDateFromChange={setDateFrom}
-                onDateToChange={setDateTo}
-              />
               <Button
                 variant="outline"
                 onClick={() => setShowFilters(!showFilters)}
@@ -1276,7 +1266,23 @@ export function WriteOffs() {
 
             {showFilters && (
               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Time Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Thời gian</Label>
+                    <CustomerTimeFilter
+                      dateRangeType={dateRangeType}
+                      timePreset={presetTimeRange}
+                      dateFrom={dateFrom}
+                      dateTo={dateTo}
+                      onDateRangeTypeChange={setDateRangeType}
+                      onTimePresetChange={handleTimePresetChange}
+                      onDateFromChange={setDateFrom}
+                      onDateToChange={setDateTo}
+                    />
+                  </div>
+
+                  {/* Status Filter */}
                   <div className="space-y-2">
                     <Label className="text-xs text-slate-600">Trạng thái</Label>
                     <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
@@ -1305,6 +1311,7 @@ export function WriteOffs() {
                     </div>
                   </div>
 
+                  {/* Quick Filter */}
                   <div className="space-y-2">
                     <Label className="text-xs text-slate-600">Bộ lọc nhanh</Label>
                     <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">

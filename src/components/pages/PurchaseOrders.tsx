@@ -1313,16 +1313,6 @@ export function PurchaseOrders() {
                   className="pl-10 bg-white border-slate-300"
                 />
               </div>
-              <CustomerTimeFilter
-                dateRangeType={dateRangeType}
-                timePreset={timePreset}
-                dateFrom={dateFrom}
-                dateTo={dateTo}
-                onDateRangeTypeChange={setDateRangeType}
-                onTimePresetChange={handleTimePresetChange}
-                onDateFromChange={setDateFrom}
-                onDateToChange={setDateTo}
-              />
               <Button
                 variant="outline"
                 onClick={() => setShowFilters(!showFilters)}
@@ -1336,6 +1326,21 @@ export function PurchaseOrders() {
             {showFilters && (
               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Time Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Thời gian</Label>
+                    <CustomerTimeFilter
+                      dateRangeType={dateRangeType}
+                      timePreset={timePreset}
+                      dateFrom={dateFrom}
+                      dateTo={dateTo}
+                      onDateRangeTypeChange={setDateRangeType}
+                      onTimePresetChange={handleTimePresetChange}
+                      onDateFromChange={setDateFrom}
+                      onDateToChange={setDateTo}
+                    />
+                  </div>
+
                   {/* Status Filter */}
                   <div className="space-y-2">
                     <Label className="text-xs text-slate-600">Trạng thái</Label>
@@ -1413,26 +1418,6 @@ export function PurchaseOrders() {
                           Chưa thanh toán
                         </Label>
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Quick Filter */}
-                   <div className="space-y-2">
-                    <Label className="text-xs text-slate-600">Bộ lọc nhanh</Label>
-                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
-                       <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-start text-xs"
-                        onClick={() => {
-                          setSelectedStatuses([]);
-                          setSelectedPaymentStatuses([]);
-                          setSearchTerm('');
-                        }}
-                      >
-                       <X className="w-3 h-3 mr-2" />
-                        Xóa bộ lọc
-                      </Button>
                     </div>
                   </div>
                 </div>

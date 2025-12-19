@@ -819,6 +819,7 @@ export function SalesReport() {
 
               {/* Thời gian */}
               <div className="md:col-span-2 lg:col-span-3">
+                <h3 className="text-sm text-slate-900 mb-3">Thời gian</h3>
                 <CustomerTimeFilter
                   dateRangeType={dateRangeType}
                   timePreset={timePreset}

@@ -480,7 +480,6 @@ export function NewItemRequests() {
                               className="border-slate-300"
                             />
                             <Label htmlFor="status-pending" className="text-sm text-slate-700 cursor-pointer flex items-center gap-2 font-normal">
-                              <div className="w-2 h-2 rounded-full bg-amber-500" />
                               Chờ duyệt
                             </Label>
                           </div>
@@ -495,7 +494,6 @@ export function NewItemRequests() {
                               className="border-slate-300"
                             />
                             <Label htmlFor="status-approved" className="text-sm text-slate-700 cursor-pointer flex items-center gap-2 font-normal">
-                              <div className="w-2 h-2 rounded-full bg-emerald-500" />
                               Đã duyệt
                             </Label>
                           </div>
@@ -510,7 +508,6 @@ export function NewItemRequests() {
                               className="border-slate-300"
                             />
                             <Label htmlFor="status-rejected" className="text-sm text-slate-700 cursor-pointer flex items-center gap-2 font-normal">
-                              <div className="w-2 h-2 rounded-full bg-red-500" />
                               Từ chối
                             </Label>
                           </div>

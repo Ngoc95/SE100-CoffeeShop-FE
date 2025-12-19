@@ -29,7 +29,6 @@ import {
 } from 'lucide-react';
 import { PageType } from '../App';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -360,15 +359,6 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
           {/* Reports Menu Group */}
           {reportMenuGroup.items.some(item => hasAccess(item.id)) && renderMenuGroup(reportMenuGroup)}
 
-          {/* Fullscreen Items */}
-          {fullscreenItems.some(item => hasAccess(item.id)) && !collapsed && (
-            <div className="pt-3 border-t border-slate-200">
-              <p className="px-3 py-1 text-xs text-slate-500 font-medium">Bán hàng</p>
-              <div className="space-y-1">
-                {fullscreenItems.map(item => renderMenuItem(item))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Footer - User Profile */}

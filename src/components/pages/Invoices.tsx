@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Search, Eye, Download, ChevronDown, ChevronRight, Receipt, CreditCard, Calendar as CalendarIcon, ArrowUp, ArrowDown, Filter, X } from 'lucide-react';
+import { CustomerTimeFilter } from '../reports/CustomerTimeFilter';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
@@ -50,7 +51,7 @@ interface Invoice {
 export function Invoices() {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRangeType, setDateRangeType] = useState<'preset' | 'custom'>('preset');
-  const [presetTimeRange, setPresetTimeRange] = useState('today');
+  const [timePreset, setTimePreset] = useState('today');
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['completed', 'cancelled']);
@@ -311,146 +312,19 @@ export function Invoices() {
             {showFilters && (
               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Date Range Filter */}
+                  {/* Time Filter */}
                   <div className="space-y-2">
                     <Label className="text-xs text-slate-600">Thời gian</Label>
-                    <RadioGroup value={dateRangeType} onValueChange={(value) => setDateRangeType(value as 'preset' | 'custom')}>
-                      {/* Preset Time Ranges */}
-                      <div className="flex items-center space-x-2 mb-2">
-                        <RadioGroupItem value="preset" id="date-preset" className="border-slate-300" />
-                        <div className="flex-1">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className="w-full justify-between text-left text-sm bg-white border-slate-300 h-9"
-                                onClick={() => setDateRangeType('preset')}
-                              >
-                                <span className="text-xs">
-                                  {presetTimeRange === 'today' && 'Hôm nay'}
-                                  {presetTimeRange === 'yesterday' && 'Hôm qua'}
-                                  {presetTimeRange === 'this-week' && 'Tuần này'}
-                                  {presetTimeRange === 'last-week' && 'Tuần trước'}
-                                  {presetTimeRange === 'last-7-days' && '7 ngày qua'}
-                                  {presetTimeRange === 'this-month' && 'Tháng này'}
-                                  {presetTimeRange === 'last-month' && 'Tháng trước'}
-                                  {presetTimeRange === 'last-30-days' && '30 ngày qua'}
-                                </span>
-                                <ChevronDown className="h-3 w-3 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[500px] p-3" align="start">
-                              <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <h4 className="text-xs text-slate-700 mb-2">Theo ngày và tuần</h4>
-                                  <div className="space-y-1">
-                                    {[
-                                      { value: 'today', label: 'Hôm nay' },
-                                      { value: 'yesterday', label: 'Hôm qua' },
-                                      { value: 'this-week', label: 'Tuần này' },
-                                      { value: 'last-week', label: 'Tuần trước' },
-                                      { value: 'last-7-days', label: '7 ngày qua' },
-                                    ].map((option) => (
-                                      <button
-                                        key={option.value}
-                                        onClick={() => {
-                                          setPresetTimeRange(option.value);
-                                          setDateRangeType('preset');
-                                        }}
-                                        className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
-                                          presetTimeRange === option.value
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-blue-600 hover:bg-blue-100'
-                                        }`}
-                                      >
-                                        {option.label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                                <div>
-                                  <h4 className="text-xs text-slate-700 mb-2">Theo tháng</h4>
-                                  <div className="space-y-1">
-                                    {[
-                                      { value: 'this-month', label: 'Tháng này' },
-                                      { value: 'last-month', label: 'Tháng trước' },
-                                      { value: 'last-30-days', label: '30 ngày qua' },
-                                    ].map((option) => (
-                                      <button
-                                        key={option.value}
-                                        onClick={() => {
-                                          setPresetTimeRange(option.value);
-                                          setDateRangeType('preset');
-                                        }}
-                                        className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
-                                          presetTimeRange === option.value
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-blue-600 hover:bg-blue-100'
-                                        }`}
-                                      >
-                                        {option.label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-
-                      {/* Custom Date Range */}
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="custom" id="date-custom" className="border-slate-300" />
-                        <div className="flex-1">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className="w-full justify-start text-left text-xs bg-white border-slate-300 h-9"
-                                onClick={() => setDateRangeType('custom')}
-                              >
-                                <CalendarIcon className="mr-2 h-3 w-3" />
-                                {dateFrom && dateTo
-                                  ? `${format(dateFrom, 'dd/MM', { locale: vi })} - ${format(dateTo, 'dd/MM/yyyy', { locale: vi })}`
-                                  : 'Lựa chọn khác'}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-3" align="start">
-                              <div className="flex gap-3">
-                                <div>
-                                  <Label className="text-xs text-slate-600 mb-1 block">Từ ngày</Label>
-                                  <Calendar
-                                    mode="single"
-                                    selected={dateFrom}
-                                    onSelect={(date) => {
-                                      if (date) {
-                                        setDateFrom(date);
-                                        setDateRangeType('custom');
-                                      }
-                                    }}
-                                  />
-                                </div>
-                                <div>
-                                  <Label className="text-xs text-slate-600 mb-1 block">Đến ngày</Label>
-                                  <Calendar
-                                    mode="single"
-                                    selected={dateTo}
-                                    onSelect={(date) => {
-                                      if (date) {
-                                        setDateTo(date);
-                                        setDateRangeType('custom');
-                                      }
-                                    }}
-                                    disabled={(date) => dateFrom ? date < dateFrom : false}
-                                  />
-                                </div>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-                    </RadioGroup>
+                    <CustomerTimeFilter
+                      dateRangeType={dateRangeType}
+                      timePreset={timePreset}
+                      dateFrom={dateFrom}
+                      dateTo={dateTo}
+                      onDateRangeTypeChange={setDateRangeType}
+                      onTimePresetChange={setTimePreset}
+                      onDateFromChange={setDateFrom}
+                      onDateToChange={setDateTo}
+                    />
                   </div>
 
                   {/* Status & Payment Method Filters */}
@@ -537,7 +411,7 @@ export function Invoices() {
                       setSelectedPaymentMethods(['cash', 'transfer', 'momo']);
                       setSearchTerm("");
                       setDateRangeType('preset');
-                      setPresetTimeRange('today');
+                      setTimePreset('today');
                       setDateFrom(undefined);
                       setDateTo(undefined);
                     }}

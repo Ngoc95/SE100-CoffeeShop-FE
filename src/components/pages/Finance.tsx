@@ -724,16 +724,6 @@ export function Finance() {
                   className="pl-10 bg-white border-slate-300"
                 />
               </div>
-              <CustomerTimeFilter
-                dateRangeType={dateRangeType}
-                timePreset={timePreset}
-                dateFrom={dateFrom}
-                dateTo={dateTo}
-                onDateRangeTypeChange={setDateRangeType}
-                onTimePresetChange={handleTimePresetChange}
-                onDateFromChange={setDateFrom}
-                onDateToChange={setDateTo}
-              />
               <Button
                 variant="outline"
                 onClick={() => setShowFilters(!showFilters)}
@@ -758,8 +748,24 @@ export function Finance() {
 
             {showFilters && (
                <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                   {/* 1. Tìm kiếm */}
+                 {/* First Row - Time + Search + Person */}
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                   {/* Time Filter */}
+                   <div className="space-y-2">
+                     <Label className="text-xs text-slate-600">Thời gian</Label>
+                     <CustomerTimeFilter
+                       dateRangeType={dateRangeType}
+                       timePreset={timePreset}
+                       dateFrom={dateFrom}
+                       dateTo={dateTo}
+                       onDateRangeTypeChange={setDateRangeType}
+                       onTimePresetChange={handleTimePresetChange}
+                       onDateFromChange={setDateFrom}
+                       onDateToChange={setDateTo}
+                     />
+                   </div>
+
+                   {/* Tìm kiếm */}
                    <div className="space-y-2">
                     <Label className="text-xs text-slate-600">Tìm kiếm</Label>
                     <div className="space-y-2">
@@ -778,7 +784,7 @@ export function Finance() {
                     </div>
                    </div>
 
-                   {/* 2. Người nộp/nhận */}
+                   {/* Người nộp/nhận */}
                    <div className="space-y-2">
                     <Label className="text-xs text-slate-600">Người nộp/nhận</Label>
                     <div className="space-y-2">
@@ -796,8 +802,72 @@ export function Finance() {
                       />
                     </div>
                    </div>
+                 </div>
 
-                   {/* 3. Người tạo */}
+                 {/* Second Row */}
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                   {/* Loại thu chi */}
+                   <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Loại thu chi</Label>
+                    <Popover open={categorySearchOpen} onOpenChange={setCategorySearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className="w-full justify-between h-9 text-sm bg-white border-slate-300"
+                        >
+                          <span className="text-slate-500 text-xs">
+                            {selectedCategories.length === 0
+                              ? 'Loại thu chi'
+                              : `Đã chọn ${selectedCategories.length}`}
+                          </span>
+                          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[240px] p-0">
+                        <Command>
+                          <CommandInput placeholder="Tìm loại thu chi..." />
+                          <CommandList>
+                            <CommandEmpty>Không tìm thấy.</CommandEmpty>
+                            <CommandGroup className="max-h-64 overflow-auto">
+                              {allCategories.map((category) => (
+                                <CommandItem
+                                  key={category.id}
+                                  onSelect={() => toggleCategory(category.name)}
+                                >
+                                  <Checkbox
+                                    checked={selectedCategories.includes(category.name)}
+                                    className="mr-2"
+                                  />
+                                  {category.name}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    {selectedCategories.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {selectedCategories.map((categoryName) => (
+                          <div
+                            key={categoryName}
+                            className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs"
+                          >
+                            {categoryName}
+                            <button
+                              onClick={() => toggleCategory(categoryName)}
+                              className="hover:bg-blue-200 rounded"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                   </div>
+
+                   {/* Người tạo */}
                    <div className="space-y-2">
                     <Label className="text-xs text-slate-600">Người tạo</Label>
                     <Popover open={creatorSearchOpen} onOpenChange={setCreatorSearchOpen}>
@@ -860,72 +930,8 @@ export function Finance() {
                       </div>
                     )}
                    </div>
-                 </div>
 
-                 {/* Second Row */}
-                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                   {/* 4. Loại thu chi */}
-                   <div className="space-y-2">
-                    <Label className="text-xs text-slate-600">Loại thu chi</Label>
-                    <Popover open={categorySearchOpen} onOpenChange={setCategorySearchOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className="w-full justify-between h-9 text-sm bg-white border-slate-300"
-                        >
-                          <span className="text-slate-500 text-xs">
-                            {selectedCategories.length === 0
-                              ? 'Loại thu chi'
-                              : `Đã chọn ${selectedCategories.length}`}
-                          </span>
-                          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[240px] p-0">
-                        <Command>
-                          <CommandInput placeholder="Tìm loại thu chi..." />
-                          <CommandList>
-                            <CommandEmpty>Không tìm thấy.</CommandEmpty>
-                            <CommandGroup className="max-h-64 overflow-auto">
-                              {allCategories.map((category) => (
-                                <CommandItem
-                                  key={category.id}
-                                  onSelect={() => toggleCategory(category.name)}
-                                >
-                                  <Checkbox
-                                    checked={selectedCategories.includes(category.name)}
-                                    className="mr-2"
-                                  />
-                                  {category.name}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                    {selectedCategories.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {selectedCategories.map((categoryName) => (
-                          <div
-                            key={categoryName}
-                            className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs"
-                          >
-                            {categoryName}
-                            <button
-                              onClick={() => toggleCategory(categoryName)}
-                              className="hover:bg-blue-200 rounded"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                   </div>
-
-                   {/* 5. Loại giao dịch */}
+                   {/* Loại giao dịch */}
                    <div className="space-y-2">
                     <Label className="text-xs text-slate-600">Loại giao dịch</Label>
                     <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
@@ -958,7 +964,7 @@ export function Finance() {
                     </div>
                    </div>
 
-                   {/* 6. Trạng thái */}
+                   {/* Trạng thái */}
                    <div className="space-y-2">
                     <Label className="text-xs text-slate-600">Trạng thái</Label>
                     <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
