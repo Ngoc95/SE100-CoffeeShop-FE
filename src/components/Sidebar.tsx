@@ -151,6 +151,7 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
     {
       label: 'Nhân viên',
       items: [
+        { id: 'accounts', label: 'Tài khoản', icon: Settings },
         { id: 'staff', label: 'Nhân viên', icon: Users },
         { id: 'scheduling', label: 'Lịch làm việc', icon: FileText },
         { id: 'staff-settings', label: 'Thiết lập', icon: Settings },
@@ -253,14 +254,9 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
   // If fullscreen mode (POS/Kitchen), show minimal sidebar
   if (isFullscreen) {
     return (
-      <div className="w-16 bg-white border-r border-slate-200 flex flex-col">
-        <div className="p-3 border-b border-slate-200">
-          <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-            <ShoppingCart className="w-6 h-6 text-white" />
-          </div>
-        </div>
-
-        <div className="flex-1 p-2 space-y-2">
+      <div className="w-16 bg-white border-r border-slate-200 flex flex-col h-full">
+        {/* Only show POS & Kitchen tab buttons at the very top */}
+        <div className="flex flex-col gap-2 p-2 pt-4">
           {fullscreenItems.filter(item => hasAccess(item.id)).map(item => {
             const Icon = item.icon;
             const isActive = currentPage === item.id;
@@ -281,13 +277,13 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
             );
           })}
         </div>
-
-        <div className="p-2 border-t border-slate-200">
+        {/* Admin button at the bottom */}
+        <div className="mt-auto p-2 pb-4">
           {hasAccess('dashboard') && (
             <button
               onClick={() => onNavigate('dashboard')}
               className="w-full p-2.5 rounded-lg text-slate-600 hover:bg-slate-100 transition-all"
-              title="Về trang chủ"
+              title="Về trang admin"
             >
               <LayoutDashboard className="w-6 h-6 mx-auto" />
             </button>
@@ -325,6 +321,11 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
 
         {/* Menu Items */}
         <div className="flex-1 overflow-y-auto p-3 space-y-6">
+          {/* POS & Kitchen on Top */}
+          <div className="space-y-1">
+            {fullscreenItems.filter(item => hasAccess(item.id)).map(item => renderMenuItem(item))}
+          </div>
+
           {/* Main Items */}
           <div className="space-y-1">
             {mainItems.map(item => renderMenuItem(item))}
@@ -346,32 +347,10 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
               {reportItems.map(item => renderMenuItem(item))}
             </div>
           )}
-
-          {/* Fullscreen Items */}
-          {fullscreenItems.some(item => hasAccess(item.id)) && !collapsed && (
-            <div className="pt-3 border-t border-slate-200">
-              <p className="px-3 py-1 text-xs text-slate-500 font-medium">Bán hàng</p>
-              <div className="space-y-1">
-                {fullscreenItems.map(item => renderMenuItem(item))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Footer - User Profile */}
         <div className="p-3 border-t border-slate-200">
-          {hasAccess('accounts') && !collapsed && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onNavigate('accounts')}
-              className="w-full justify-start mb-2"
-            >
-              <Settings className="w-4 h-4 mr-2" />
-              Quản lý người dùng
-            </Button>
-          )}
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button

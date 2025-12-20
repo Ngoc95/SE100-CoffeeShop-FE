@@ -1,11 +1,7 @@
 import { useState } from 'react';
 import {
-  LayoutDashboard,
   ShoppingCart,
   ChefHat,
-  ArrowLeftRight,
-  DollarSign,
-  FileText,
   Menu,
   X,
   Settings,
@@ -17,7 +13,6 @@ import {
 } from 'lucide-react';
 import { PageType } from '../App';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,7 +45,7 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
   // Check permission for a specific page
   const hasAccess = (page: PageType) => {
     if (!user) return false;
-    
+
     // Admin/Manager bypass (optional, but good for safety if permissions strictly defined)
     // if (user.role === 'manager') return true; 
 
@@ -168,27 +163,25 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                 </div>
               )}
               <div className="h-6 w-px bg-slate-200" />
-              
+
               {/* Tabs for POS and Kitchen */}
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => onNavigate('pos')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-sm font-medium ${
-                    currentPage === 'pos'
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'text-slate-700 hover:bg-slate-100 border border-slate-200'
-                  }`}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-sm font-medium ${currentPage === 'pos'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-slate-700 hover:bg-slate-100 border border-slate-200'
+                    }`}
                 >
                   <ShoppingCart className="w-4 h-4" />
                   Bán hàng
                 </button>
                 <button
                   onClick={() => onNavigate('kitchen')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-sm font-medium ${
-                    currentPage === 'kitchen'
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'text-slate-700 hover:bg-slate-100 border border-slate-200'
-                  }`}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-sm font-medium ${currentPage === 'kitchen'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-slate-700 hover:bg-slate-100 border border-slate-200'
+                    }`}
                 >
                   <ChefHat className="w-4 h-4" />
                   Pha chế
@@ -198,19 +191,19 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
 
             <div className="flex items-center gap-2">
               {hasAccess('accounts') && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm">
-                    <Settings className="w-5 h-5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48 z-50" sideOffset={5}>
-                  <DropdownMenuItem onClick={() => onNavigate('accounts')}>
-                    <Users className="w-4 h-4 mr-2" />
-                    Quản lý người dùng
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm">
+                      <Settings className="w-5 h-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48 z-50" sideOffset={5}>
+                    <DropdownMenuItem onClick={() => onNavigate('accounts')}>
+                      <Users className="w-4 h-4 mr-2" />
+                      Quản lý vai trò
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
 
               <DropdownMenu>
@@ -273,197 +266,197 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
               {mainMenuItems
                 .filter(item => hasAccess(item.id))
                 .map((item) => {
-                const isActive = currentPage === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => onNavigate(item.id)}
-                    className={`px-4 py-2 rounded-lg transition-all text-sm ${isActive
+                  const isActive = currentPage === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => onNavigate(item.id)}
+                      className={`px-4 py-2 rounded-lg transition-all text-sm ${isActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
-                      }`}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
+                        }`}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
 
               {/* Hàng hóa Dropdown */}
               {goodsMenuItems.some(item => hasAccess(item.id)) && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all text-sm ${isGoodsActive
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all text-sm ${isGoodsActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
-                      }`}
-                  >
-                    Hàng hóa
-                    <ChevronDown className="w-4 h-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  {goodsMenuItems
-                    .filter(item => hasAccess(item.id))
-                    .map((item) => (
-                    <DropdownMenuItem
-                      key={item.id}
-                      onClick={() => onNavigate(item.id)}
-                      className={currentPage === item.id ? 'bg-blue-50' : ''}
+                        }`}
                     >
-                      {item.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                      Hàng hóa
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {goodsMenuItems
+                      .filter(item => hasAccess(item.id))
+                      .map((item) => (
+                        <DropdownMenuItem
+                          key={item.id}
+                          onClick={() => onNavigate(item.id)}
+                          className={currentPage === item.id ? 'bg-blue-50' : ''}
+                        >
+                          {item.label}
+                        </DropdownMenuItem>
+                      ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
 
               {/* Phòng bàn */}
               {tableMenuItems
                 .filter(item => hasAccess(item.id))
                 .map((item) => {
-                const isActive = currentPage === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => onNavigate(item.id)}
-                    className={`px-4 py-2 rounded-lg transition-all text-sm ${isActive
+                  const isActive = currentPage === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => onNavigate(item.id)}
+                      className={`px-4 py-2 rounded-lg transition-all text-sm ${isActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
-                      }`}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
+                        }`}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
 
               {/* Đối tác Dropdown */}
               {partnerMenuItems.some(item => hasAccess(item.id)) && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all text-sm ${isPartnerActive
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all text-sm ${isPartnerActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
-                      }`}
-                  >
-                    Đối tác
-                    <ChevronDown className="w-4 h-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  {partnerMenuItems
-                    .filter(item => hasAccess(item.id))
-                    .map((item) => (
-                    <DropdownMenuItem
-                      key={item.id}
-                      onClick={() => onNavigate(item.id)}
-                      className={currentPage === item.id ? 'bg-blue-50' : ''}
+                        }`}
                     >
-                      {item.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                      Đối tác
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {partnerMenuItems
+                      .filter(item => hasAccess(item.id))
+                      .map((item) => (
+                        <DropdownMenuItem
+                          key={item.id}
+                          onClick={() => onNavigate(item.id)}
+                          className={currentPage === item.id ? 'bg-blue-50' : ''}
+                        >
+                          {item.label}
+                        </DropdownMenuItem>
+                      ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
 
               {/* Nhân viên Dropdown */}
               {staffMenuItems.some(item => hasAccess(item.id)) && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all text-sm ${isStaffActive
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all text-sm ${isStaffActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
-                      }`}
-                  >
-                    Nhân viên
-                    <ChevronDown className="w-4 h-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  {staffMenuItems
-                    .filter(item => hasAccess(item.id))
-                    .map((item) => (
-                    <DropdownMenuItem
-                      key={item.id}
-                      onClick={() => onNavigate(item.id)}
-                      className={currentPage === item.id ? 'bg-blue-50' : ''}
+                        }`}
                     >
-                      {item.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                      Nhân viên
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {staffMenuItems
+                      .filter(item => hasAccess(item.id))
+                      .map((item) => (
+                        <DropdownMenuItem
+                          key={item.id}
+                          onClick={() => onNavigate(item.id)}
+                          className={currentPage === item.id ? 'bg-blue-50' : ''}
+                        >
+                          {item.label}
+                        </DropdownMenuItem>
+                      ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
 
               {/* Giao dịch Dropdown */}
               {transactionMenuItems.some(item => hasAccess(item.id)) && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all text-sm ${isTransactionActive
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-all text-sm ${isTransactionActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
-                      }`}
-                  >
-                    Giao dịch
-                    <ChevronDown className="w-4 h-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  {transactionMenuItems
-                    .filter(item => hasAccess(item.id))
-                    .map((item) => (
-                    <DropdownMenuItem
-                      key={item.id}
-                      onClick={() => onNavigate(item.id)}
-                      className={currentPage === item.id ? 'bg-blue-50' : ''}
+                        }`}
                     >
-                      {item.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                      Giao dịch
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {transactionMenuItems
+                      .filter(item => hasAccess(item.id))
+                      .map((item) => (
+                        <DropdownMenuItem
+                          key={item.id}
+                          onClick={() => onNavigate(item.id)}
+                          className={currentPage === item.id ? 'bg-blue-50' : ''}
+                        >
+                          {item.label}
+                        </DropdownMenuItem>
+                      ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
 
               {/* Tài chính */}
               {financeMenuItems
                 .filter(item => hasAccess(item.id))
                 .map((item) => {
-                const isActive = currentPage === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => onNavigate(item.id)}
-                    className={`px-4 py-2 rounded-lg transition-all text-sm ${isActive
+                  const isActive = currentPage === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => onNavigate(item.id)}
+                      className={`px-4 py-2 rounded-lg transition-all text-sm ${isActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
-                      }`}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
+                        }`}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
 
               {/* Báo cáo */}
               {reportMenuItems
                 .filter(item => hasAccess(item.id))
                 .map((item) => {
-                const isActive = currentPage === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => onNavigate(item.id)}
-                    className={`px-4 py-2 rounded-lg transition-all text-sm ${isActive
+                  const isActive = currentPage === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => onNavigate(item.id)}
+                      className={`px-4 py-2 rounded-lg transition-all text-sm ${isActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
-                      }`}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
+                        }`}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
 
               {/* Separator */}
               <div className="h-6 w-px bg-slate-200 mx-2" />
@@ -472,39 +465,39 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
               {fullscreenMenuItems
                 .filter(item => hasAccess(item.id))
                 .map((item) => {
-                const isActive = currentPage === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => onNavigate(item.id)}
-                    className={`px-4 py-2 rounded-lg transition-all text-sm ${isActive
+                  const isActive = currentPage === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => onNavigate(item.id)}
+                      className={`px-4 py-2 rounded-lg transition-all text-sm ${isActive
                         ? 'bg-emerald-600 text-white shadow-md'
                         : 'text-emerald-700 hover:bg-emerald-50 border border-emerald-200'
-                      }`}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
+                        }`}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
             </div>
           )}
 
           {/* Right Actions */}
           <div className="flex items-center gap-2">
             {hasAccess('accounts') && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <Settings className="w-5 h-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 z-50" sideOffset={5}>
-                <DropdownMenuItem onClick={() => onNavigate('accounts')}>
-                  <Users className="w-4 h-4 mr-2" />
-                  Quản lý người dùng
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Settings className="w-5 h-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 z-50" sideOffset={5}>
+                  <DropdownMenuItem onClick={() => onNavigate('accounts')}>
+                    <Users className="w-4 h-4 mr-2" />
+                    Quản lý vai trò
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
 
             <DropdownMenu>
@@ -556,31 +549,6 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
               {mainMenuItems
                 .filter(item => hasAccess(item.id))
                 .map((item) => {
-                const isActive = currentPage === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      onNavigate(item.id);
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'text-slate-700 hover:bg-slate-100'
-                      }`}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
-
-              {/* Hàng hóa section */}
-              {goodsMenuItems.some(item => hasAccess(item.id)) && (
-              <div className="pt-2">
-                <p className="px-3 py-1 text-xs text-slate-500">Hàng hóa</p>
-                {goodsMenuItems
-                  .filter(item => hasAccess(item.id))
-                  .map((item) => {
                   const isActive = currentPage === item.id;
                   return (
                     <button
@@ -590,200 +558,225 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                         setMobileMenuOpen(false);
                       }}
                       className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : 'text-slate-700 hover:bg-slate-100'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'text-slate-700 hover:bg-slate-100'
                         }`}
                     >
                       {item.label}
                     </button>
                   );
                 })}
-              </div>
+
+              {/* Hàng hóa section */}
+              {goodsMenuItems.some(item => hasAccess(item.id)) && (
+                <div className="pt-2">
+                  <p className="px-3 py-1 text-xs text-slate-500">Hàng hóa</p>
+                  {goodsMenuItems
+                    .filter(item => hasAccess(item.id))
+                    .map((item) => {
+                      const isActive = currentPage === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            onNavigate(item.id);
+                            setMobileMenuOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'text-slate-700 hover:bg-slate-100'
+                            }`}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                </div>
               )}
 
               {/* Phòng bàn */}
               {tableMenuItems.some(item => hasAccess(item.id)) && (
-              <div className="pt-2">
-                {tableMenuItems
-                  .filter(item => hasAccess(item.id))
-                  .map((item) => {
-                  const isActive = currentPage === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        onNavigate(item.id);
-                        setMobileMenuOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : 'text-slate-700 hover:bg-slate-100'
-                        }`}
-                    >
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
+                <div className="pt-2">
+                  {tableMenuItems
+                    .filter(item => hasAccess(item.id))
+                    .map((item) => {
+                      const isActive = currentPage === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            onNavigate(item.id);
+                            setMobileMenuOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'text-slate-700 hover:bg-slate-100'
+                            }`}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                </div>
               )}
 
               {/* Đối tác section */}
               {partnerMenuItems.some(item => hasAccess(item.id)) && (
-              <div className="pt-2">
-                <p className="px-3 py-1 text-xs text-slate-500">Đối tác</p>
-                {partnerMenuItems
-                  .filter(item => hasAccess(item.id))
-                  .map((item) => {
-                  const isActive = currentPage === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        onNavigate(item.id);
-                        setMobileMenuOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : 'text-slate-700 hover:bg-slate-100'
-                        }`}
-                    >
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
+                <div className="pt-2">
+                  <p className="px-3 py-1 text-xs text-slate-500">Đối tác</p>
+                  {partnerMenuItems
+                    .filter(item => hasAccess(item.id))
+                    .map((item) => {
+                      const isActive = currentPage === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            onNavigate(item.id);
+                            setMobileMenuOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'text-slate-700 hover:bg-slate-100'
+                            }`}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                </div>
               )}
 
               {/* Nhân viên section */}
               {staffMenuItems.some(item => hasAccess(item.id)) && (
-              <div className="pt-2">
-                <p className="px-3 py-1 text-xs text-slate-500">Nhân viên</p>
-                {staffMenuItems
-                  .filter(item => hasAccess(item.id))
-                  .map((item) => {
-                  const isActive = currentPage === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        onNavigate(item.id);
-                        setMobileMenuOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : 'text-slate-700 hover:bg-slate-100'
-                        }`}
-                    >
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
+                <div className="pt-2">
+                  <p className="px-3 py-1 text-xs text-slate-500">Nhân viên</p>
+                  {staffMenuItems
+                    .filter(item => hasAccess(item.id))
+                    .map((item) => {
+                      const isActive = currentPage === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            onNavigate(item.id);
+                            setMobileMenuOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'text-slate-700 hover:bg-slate-100'
+                            }`}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                </div>
               )}
 
               {/* Giao dịch section */}
               {transactionMenuItems.some(item => hasAccess(item.id)) && (
-              <div className="pt-2">
-                <p className="px-3 py-1 text-xs text-slate-500">Giao dịch</p>
-                {transactionMenuItems
-                  .filter(item => hasAccess(item.id))
-                  .map((item) => {
-                  const isActive = currentPage === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        onNavigate(item.id);
-                        setMobileMenuOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : 'text-slate-700 hover:bg-slate-100'
-                        }`}
-                    >
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
+                <div className="pt-2">
+                  <p className="px-3 py-1 text-xs text-slate-500">Giao dịch</p>
+                  {transactionMenuItems
+                    .filter(item => hasAccess(item.id))
+                    .map((item) => {
+                      const isActive = currentPage === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            onNavigate(item.id);
+                            setMobileMenuOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'text-slate-700 hover:bg-slate-100'
+                            }`}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                </div>
               )}
 
               {/* Tài chính */}
               {financeMenuItems.some(item => hasAccess(item.id)) && (
-              <div className="pt-2">
-                {financeMenuItems
-                  .filter(item => hasAccess(item.id))
-                  .map((item) => {
-                  const isActive = currentPage === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        onNavigate(item.id);
-                        setMobileMenuOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : 'text-slate-700 hover:bg-slate-100'
-                        }`}
-                    >
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
+                <div className="pt-2">
+                  {financeMenuItems
+                    .filter(item => hasAccess(item.id))
+                    .map((item) => {
+                      const isActive = currentPage === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            onNavigate(item.id);
+                            setMobileMenuOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'text-slate-700 hover:bg-slate-100'
+                            }`}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                </div>
               )}
 
               {/* Báo cáo */}
               {reportMenuItems.some(item => hasAccess(item.id)) && (
-              <div className="pt-2">
-                {reportMenuItems
-                  .filter(item => hasAccess(item.id))
-                  .map((item) => {
-                  const isActive = currentPage === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        onNavigate(item.id);
-                        setMobileMenuOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : 'text-slate-700 hover:bg-slate-100'
-                        }`}
-                    >
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
+                <div className="pt-2">
+                  {reportMenuItems
+                    .filter(item => hasAccess(item.id))
+                    .map((item) => {
+                      const isActive = currentPage === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            onNavigate(item.id);
+                            setMobileMenuOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'text-slate-700 hover:bg-slate-100'
+                            }`}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                </div>
               )}
 
               {/* Fullscreen items */}
               {fullscreenMenuItems.some(item => hasAccess(item.id)) && (
-              <div className="pt-4 border-t mt-2">
-                {fullscreenMenuItems
-                  .filter(item => hasAccess(item.id))
-                  .map((item) => {
-                  const isActive = currentPage === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        onNavigate(item.id);
-                        setMobileMenuOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
-                          ? 'bg-emerald-600 text-white shadow-md'
-                          : 'text-emerald-700 hover:bg-emerald-50 border border-emerald-200'
-                        }`}
-                    >
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
+                <div className="pt-4 border-t mt-2">
+                  {fullscreenMenuItems
+                    .filter(item => hasAccess(item.id))
+                    .map((item) => {
+                      const isActive = currentPage === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            onNavigate(item.id);
+                            setMobileMenuOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${isActive
+                            ? 'bg-emerald-600 text-white shadow-md'
+                            : 'text-emerald-700 hover:bg-emerald-50 border border-emerald-200'
+                            }`}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                </div>
               )}
             </div>
           </div>
