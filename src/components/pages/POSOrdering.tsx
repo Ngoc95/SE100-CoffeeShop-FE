@@ -36,6 +36,8 @@ import {
   ChevronRight,
   ChevronsRight,
   ChevronDown,
+  User,
+  LogOut,
 } from "lucide-react";
 import { Card, CardContent } from "../ui/card";
 import { Input } from "../ui/input";
@@ -59,6 +61,14 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Separator } from "../ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuItem,
+} from "../ui/dropdown-menu";
 import { CheckoutModal } from "../CheckoutModal";
 import {
   Sheet,
@@ -92,6 +102,8 @@ import { PrintReceiptModal } from "../PrintReceiptModal";
 import { combos, type Combo } from "../../data/combos";
 import { autoComboPromotions } from "../../data/combos";
 import { IngredientSelectionDialog } from "../IngredientSelectionDialog";
+import { AccountProfileModal } from "../AccountProfileModal";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface Customer {
   id: string;
@@ -204,11 +216,13 @@ interface POSOrderingProps {
 }
 
 export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
+  const { user, logout } = useAuth();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [isTakeaway, setIsTakeaway] = useState(false);
+  const [accountModalOpen, setAccountModalOpen] = useState(false);
   const [selectedArea, setSelectedArea] = useState("all");
   const [selectedTableStatus, setSelectedTableStatus] = useState("all");
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -2447,7 +2461,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
               <h2 className="text-blue-900 text-2xl font-semibold">Menu & Bàn</h2>
               <p className="text-sm text-slate-500">Chọn bàn và gọi món</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <Button
                 variant={viewMode === "grid" ? "default" : "outline"}
                 size="sm"
@@ -2468,6 +2482,39 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
               >
                 <List className="w-4 h-4" />
               </Button>
+              {/* Profile button for mobile */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="lg:hidden ml-2 p-2 hover:bg-blue-50"
+                    title="Tài khoản"
+                  >
+                    <User className="w-5 h-5 text-blue-600" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48" sideOffset={5}>
+                  <DropdownMenuLabel>
+                    <div>
+                      <p>{user?.fullName}</p>
+                      <p className="text-xs text-slate-500">{user?.roleLabel}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setAccountModalOpen(true)}>
+                    <User className="w-4 h-4 mr-2" />
+                    Tài khoản
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-red-600" onClick={() => {
+                    logout();
+                  }}>
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Đăng xuất
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
           <div className="relative">
@@ -2485,29 +2532,30 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
           defaultValue="tables"
           className="flex-1 flex flex-col overflow-hidden"
         >
-          <TabsList className="mx-4 lg:mx-6 mt-2 bg-blue-100">
+          <div className="mx-4 lg:mx-6 mt-2 overflow-x-auto lg:overflow-visible no-scrollbar">
+            <TabsList className="bg-blue-100 inline-flex w-max lg:w-auto whitespace-nowrap lg:flex-wrap">
             <TabsTrigger
               value="tables"
-              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white shrink-0"
             >
               Sơ đồ bàn
             </TabsTrigger>
             <TabsTrigger
               value="menu"
-              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white shrink-0"
             >
               Thực đơn
             </TabsTrigger>
             <TabsTrigger
               value="topping"
-              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white shrink-0"
             >
               <Package className="w-4 h-4 mr-1" />
               Topping
             </TabsTrigger>
             <TabsTrigger
               value="combo"
-              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white shrink-0"
             >
               <PackageCheck className="w-4 h-4 mr-1" />
               Combo
@@ -2515,13 +2563,14 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
             {userRole === "waiter" && (
               <TabsTrigger
                 value="ready"
-                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                  className="data-[state=active]:bg-blue-600 data-[state=active]:text-white shrink-0"
               >
                 <Bell className="w-4 h-4 mr-1" />
                 Chờ cung ứng ({readyItems.length})
               </TabsTrigger>
             )}
-          </TabsList>
+            </TabsList>
+          </div>
 
           <TabsContent value="tables" className="flex-1 overflow-auto m-0">
             <div className="p-4 lg:p-6 pb-24 lg:pb-6">
@@ -2742,10 +2791,11 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                   variant="outline"
                   size="sm"
                   onClick={() => setNewItemModalOpen(true)}
+                  aria-label="Thêm món mới"
                   className="border-blue-500 text-blue-600 hover:bg-blue-50 hover:text-blue-700 whitespace-nowrap flex-shrink-0"
                 >
-                  <Sparkles className="w-4 h-4 mr-1" />
-                  Thêm món mới
+                  <Sparkles className="w-4 h-4 lg:mr-1" />
+                  <span className="hidden md:inline">Thêm món mới</span>
                 </Button>
               </div>
 
@@ -4570,6 +4620,12 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
         detectedCombo={detectedComboData}
         onApplyCombo={handleApplyDetectedCombo}
         onContinueIndividual={handleContinueIndividual}
+      />
+
+      {/* Account Profile Modal */}
+      <AccountProfileModal
+        open={accountModalOpen}
+        onOpenChange={setAccountModalOpen}
       />
 
       {/* Animation Styles for Restock Notification */}
