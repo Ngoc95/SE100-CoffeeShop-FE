@@ -153,7 +153,7 @@ export function NewItemRequests() {
   const [formData, setFormData] = useState({
     name: '',
     code: '',
-    type: 'product',
+    type: 'composite',
     category: '',
     unit: 'ly',
     price: 0,
@@ -285,34 +285,39 @@ export function NewItemRequests() {
     setSelectedView('detail');
   };
 
-  const handleCreateNewItem = () => {
-    if (selectedRequest) {
-      // Pre-fill form with request data
-      setFormData({
-        name: selectedRequest.suggestedName,
-        code: 'AUTO',
-        category: selectedRequest.suggestedCategory || '',
-        unit: 'ly',
-        price: selectedRequest.suggestedPrice || 0,
-        description: selectedRequest.description || '',
-        status: 'active',
-      });
+  const prefillFormFromRequest = (request: NewItemRequest) => {
+    setSelectedRequest(request);
+    setFormData({
+      name: request.suggestedName,
+      code: 'AUTO',
+      type: 'composite',
+      category: request.suggestedCategory || '',
+      unit: 'ly',
+      price: request.suggestedPrice || 0,
+      description: request.description || '',
+      status: 'active',
+    });
 
-      // Populate ingredients from suggested recipe
-      if (selectedRequest.suggestedRecipe) {
-        setIngredients(
-          selectedRequest.suggestedRecipe.map((ing, index) => ({
-            id: `auto-${Date.now()}-${index}`,
-            name: ing.name,
-            unit: ing.unit,
-            quantity: ing.quantity,
-            cost: 0 // Default cost
-          }))
-        );
-      } else {
-        setIngredients([]);
-      }
+    if (request.suggestedRecipe && request.suggestedRecipe.length > 0) {
+      setIngredients(
+        request.suggestedRecipe.map((ing, index) => ({
+          id: `${request.id}-ing-${index}`,
+          name: ing.name,
+          unit: ing.unit,
+          quantity: ing.quantity,
+          cost: 0,
+        }))
+      );
+    } else {
+      setIngredients([
+        { id: `${request.id}-blank`, name: '', unit: 'g', quantity: 0, cost: 0 },
+      ]);
     }
+  };
+
+  const handleCreateNewItem = () => {
+    if (!selectedRequest) return;
+    prefillFormFromRequest(selectedRequest);
     setSelectedView('create');
   };
 
@@ -829,16 +834,7 @@ export function NewItemRequests() {
                                           className="bg-blue-600 hover:bg-blue-700"
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            setSelectedRequest(request);
-                                            setFormData({
-                                              name: request.suggestedName,
-                                              code: 'AUTO',
-                                              category: request.suggestedCategory || '',
-                                              unit: 'ly',
-                                              price: request.suggestedPrice || 0,
-                                              description: request.description || '',
-                                              status: 'active',
-                                            });
+                                            prefillFormFromRequest(request);
                                             setCreateItemDialogOpen(true);
                                           }}
                                         >
@@ -872,26 +868,11 @@ export function NewItemRequests() {
               {/* Loại mặt hàng */}
               <div>
                 <Label>Loại mặt hàng <span className="text-red-500">*</span></Label>
-                <Select value={formData.type || 'composite'} onValueChange={(value) => setFormData({ ...formData, type: value })}>
-                  <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="composite">
-                      <div className="flex items-center gap-2">
-                        <Package className="w-4 h-4 text-purple-600" />
-                        Hàng hóa cấu thành
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="ready-made">
-                      <div className="flex items-center gap-2">
-                        <Package className="w-4 h-4 text-blue-600" />
-                        Hàng hóa bán sẵn
-                      </div>
-                    </SelectItem>
-                    {/* Add more types if needed to match Inventory exactly, but keeping relevant ones */}
-                  </SelectContent>
-                </Select>
+                <div className="mt-1.5 flex items-center gap-2 rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <Package className="w-4 h-4 text-purple-600" />
+                  Hàng hóa cấu thành
+                </div>
+                <p className="text-xs text-slate-500 mt-1.5">Yêu cầu mới chỉ tạo được hàng hóa cấu thành và không thể thay đổi loại.</p>
               </div>
 
               <Separator />

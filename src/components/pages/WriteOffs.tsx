@@ -131,6 +131,7 @@ interface WriteOff {
   reason: string;
   status: "completed" | "draft" | "cancelled"; // Hoàn thành, Phiếu tạm, Đã huỷ
   note?: string;
+  staff?: string;
   details?: {
     items: WriteOffDetail[];
   };
@@ -225,6 +226,7 @@ export function WriteOffs() {
     date: "",
     reason: "",
     note: "",
+    staff: user?.fullName || "",
   });
 
   // State for write-off items
@@ -549,6 +551,7 @@ export function WriteOffs() {
         totalValue: 450000,
         reason: "het-han",
         status: "completed",
+        staff: "Nguyễn Văn A",
         details: {
           items: [
             {
@@ -589,6 +592,7 @@ export function WriteOffs() {
         totalValue: 280000,
         reason: "hu-hong",
         status: "completed",
+        staff: "Trần Thị B",
         details: {
           items: [
             {
@@ -620,6 +624,7 @@ export function WriteOffs() {
         totalValue: 108000,
         reason: "mat-mat",
         status: "draft",
+        staff: "Lê Văn C",
         details: {
           items: [
             {
@@ -642,6 +647,7 @@ export function WriteOffs() {
         totalValue: 174000,
         reason: "hu-hong",
         status: "completed",
+        staff: "Phạm Thị D",
         details: {
           items: [
             {
@@ -673,6 +679,7 @@ export function WriteOffs() {
         totalValue: 84000,
         reason: "het-han",
         status: "completed",
+        staff: "Nguyễn Văn A",
         details: {
           items: [
             {
@@ -695,6 +702,7 @@ export function WriteOffs() {
         totalValue: 560000,
         reason: "mat-mat",
         status: "draft",
+        staff: "Trần Thị B",
         details: {
           items: [
             {
@@ -970,12 +978,14 @@ export function WriteOffs() {
   const handleOpenCreateDialog = () => {
     const nextCode = generateNextWriteOffCode();
     const writeOffDate = formatDateTime(new Date());
+    const staffName = user?.fullName || "";
     setEditingWriteOffId(null);
     setFormData({
       code: nextCode,
       date: writeOffDate.split(" ")[0],
       reason: "",
       note: "",
+      staff: staffName,
     });
     setWriteOffItems([]);
     setShowCreateDialog(true);
@@ -1011,6 +1021,7 @@ export function WriteOffs() {
       date: datePart,
       reason: wo.reason,
       note: wo.note || "",
+      staff: wo.staff || user?.fullName || "",
     });
     setShowCreateDialog(true);
   };
@@ -1025,6 +1036,8 @@ export function WriteOffs() {
       (sum, item) => sum + item.total,
       0
     );
+
+    const staffName = formData.staff || user?.fullName || "";
 
     const writeOffDate = formatDateTime(
       formData.date
@@ -1046,6 +1059,7 @@ export function WriteOffs() {
               reason: formData.reason,
               status: status,
               note: formData.note,
+              staff: staffName,
               details: {
                 items: writeOffItems.map((item) => ({
                   name: item.productName,
@@ -1080,6 +1094,7 @@ export function WriteOffs() {
         reason: formData.reason,
         status: status,
         note: formData.note,
+        staff: staffName,
         details: {
           items: writeOffItems.map((item) => ({
             name: item.productName,
@@ -1110,6 +1125,7 @@ export function WriteOffs() {
       date: "",
       reason: "",
       note: "",
+      staff: user?.fullName || "",
     });
     setWriteOffItems([]);
   };
@@ -1890,6 +1906,14 @@ export function WriteOffs() {
                     <SelectItem value="khac">Khác</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Nhân viên xử lý</Label>
+                <Input
+                  value={formData.staff || user?.fullName || ""}
+                  disabled
+                  className="bg-slate-100 border-slate-300 shadow-none"
+                />
               </div>
             </div>
 
