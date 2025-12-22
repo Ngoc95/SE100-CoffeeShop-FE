@@ -269,42 +269,66 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
   // If fullscreen mode (POS/Kitchen), show minimal sidebar
   if (isFullscreen) {
     return (
-      <div className="w-16 bg-white border-r border-slate-200 flex flex-col h-full">
-        {/* Only show POS & Kitchen tab buttons at the very top */}
-        <div className="flex flex-col gap-2 p-2 pt-4">
-          {fullscreenItems.filter(item => hasAccess(item.id)).map(item => {
-            const Icon = item.icon;
-            const isActive = currentPage === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onNavigate(item.id)}
-                className={cn(
-                  'w-full p-2.5 rounded-lg transition-all',
-                  isActive
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-600 hover:bg-slate-100'
-                )}
-                title={item.label}
-              >
-                <Icon className="w-6 h-6 mx-auto" />
-              </button>
-            );
-          })}
+      <>
+        <div className="w-16 bg-white border-r border-slate-200 flex flex-col h-full">
+          {/* Only show POS & Kitchen tab buttons at the very top */}
+          <div className="flex flex-col gap-2 p-2 pt-4">
+            {fullscreenItems.filter(item => hasAccess(item.id)).map(item => {
+              const Icon = item.icon;
+              const isActive = currentPage === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onNavigate(item.id)}
+                  className={cn(
+                    'w-full p-2.5 rounded-lg transition-all',
+                    isActive
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  )}
+                  title={item.label}
+                >
+                  <Icon className="w-6 h-6 mx-auto" />
+                </button>
+              );
+            })}
+          </div>
+          {/* Footer - User profile */}
+          <div className="mt-auto p-2 pb-4 border-t border-slate-200">
+            {/* User Profile Button */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="w-full p-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all">
+                  <User className="w-6 h-6 mx-auto" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48" sideOffset={5}>
+                <DropdownMenuLabel>
+                  <div>
+                    <p>{user?.fullName}</p>
+                    <p className="text-xs text-slate-500">{user?.roleLabel}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setAccountModalOpen(true)}>
+                  <User className="w-4 h-4 mr-2" />
+                  Tài khoản
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Đăng xuất
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
-        {/* Admin button at the bottom */}
-        <div className="mt-auto p-2 pb-4">
-          {hasAccess('dashboard') && (
-            <button
-              onClick={() => onNavigate('dashboard')}
-              className="w-full p-2.5 rounded-lg text-slate-600 hover:bg-slate-100 transition-all"
-              title="Về trang admin"
-            >
-              <LayoutDashboard className="w-6 h-6 mx-auto" />
-            </button>
-          )}
-        </div>
-      </div>
+
+        <AccountProfileModal
+          open={accountModalOpen}
+          onOpenChange={setAccountModalOpen}
+        />
+      </>
     );
   }
 

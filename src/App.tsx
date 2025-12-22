@@ -245,13 +245,22 @@ function AppContent() {
     }
   };
 
+  // Hide sidebar on mobile for waiter/cashier/barista roles
+  const shouldHideSidebarOnMobile = 
+    user?.role === "server" || 
+    user?.role === "barista" || 
+    user?.role === "cashier";
+
   return (
     <div className="flex h-screen bg-slate-50">
-      <Sidebar
-        currentPage={currentPage}
-        onNavigate={handleNavigate}
-        isFullscreen={isFullscreen}
-      />
+      {/* Sidebar - hidden on mobile for waiter/cashier/barista roles */}
+      <div className={shouldHideSidebarOnMobile ? "hidden lg:block" : ""}>
+        <Sidebar
+          currentPage={currentPage}
+          onNavigate={handleNavigate}
+          isFullscreen={isFullscreen}
+        />
+      </div>
       <main className="flex-1 overflow-auto">{renderPage()}</main>
     </div>
   );
