@@ -17,7 +17,7 @@ export function EmployeesReportTable() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   
   // Filter states
-  const [viewType, setViewType] = useState<'chart' | 'report'>('chart');
+  const [viewType, setViewType] = useState<'chart' | 'report'>('report');
   const [concern, setConcern] = useState<'profit' | 'sales'>('profit');
   const [salesMode, setSalesMode] = useState<'invoice' | 'items'>('invoice');
   
@@ -177,13 +177,13 @@ export function EmployeesReportTable() {
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={chartData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis type="number" tick={{ fill: '#64748b', fontSize: 12 }} />
-                <YAxis type="category" dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} width={200} />
+                <XAxis type="number" tick={{ fill: '#64748b', fontSize: 12 }} tickFormatter={(value) => value.toLocaleString('vi-VN')} />
+                <YAxis type="category" dataKey="name" tick={{ fill: '#64748b', fontSize: 12 }} width={200} />
                 <Tooltip
                   formatter={(value: number) => concern === 'profit' ? `${value.toLocaleString()}₫` : `${value.toLocaleString()} ${salesMode === 'invoice' ? 'hóa đơn' : 'mặt hàng'}`}
                   contentStyle={{ backgroundColor: concern === 'profit' ? '#f0fdf4' : '#eff6ff', border: `1px solid ${concern === 'profit' ? '#86efac' : '#bfdbfe'}`, borderRadius: '8px' }}
                 />
-                <Bar dataKey="value" fill={concern === 'profit' ? '#10b981' : '#2563eb'} radius={[0, 8, 8, 0]} label={{ position: 'right', fill: concern === 'profit' ? '#047857' : '#1e40af', fontWeight: 'bold', fontSize: 11, formatter: (value: number) => value.toLocaleString('vi-VN') }} />
+                <Bar dataKey="value" fill={concern === 'profit' ? '#10b981' : '#2563eb'} radius={[0, 8, 8, 0]} label={{ position: 'right', fill: concern === 'profit' ? '#047857' : '#1e40af', fontWeight: 'bold', fontSize: 12, formatter: (value: number) => value.toLocaleString('vi-VN') }} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

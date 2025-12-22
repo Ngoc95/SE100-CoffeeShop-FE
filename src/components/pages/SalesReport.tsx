@@ -17,7 +17,7 @@ export function SalesReport() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   
   // Filter states
-  const [viewType, setViewType] = useState<ViewType>('chart');
+  const [viewType, setViewType] = useState<ViewType>('report');
   const [concern, setConcern] = useState<ConcernType>('time');
   const [selectedArea, setSelectedArea] = useState('all');
   const [selectedTable, setSelectedTable] = useState('all');

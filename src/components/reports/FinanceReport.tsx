@@ -51,7 +51,7 @@ export function FinanceReport() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   
   // Filter states
-  const [viewType, setViewType] = useState<'chart' | 'report'>('chart');
+  const [viewType, setViewType] = useState<'chart' | 'report'>('report');
   const [selectedConcerns, setSelectedConcerns] = useState<string[]>(['revenue', 'expenses', 'profit']);
   
   // Time filter states

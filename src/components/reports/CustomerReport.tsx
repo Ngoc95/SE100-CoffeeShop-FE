@@ -24,7 +24,7 @@ export function CustomerReport() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   
   // Filter states
-  const [viewType, setViewType] = useState<'chart' | 'report'>('chart');
+  const [viewType, setViewType] = useState<'chart' | 'report'>('report');
   const [concernType, setConcernType] = useState<'sales' | 'debt' | 'products'>('sales');
   const [customerSearch, setCustomerSearch] = useState('');
   
@@ -202,7 +202,7 @@ export function CustomerReport() {
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
             <XAxis
               type="number"
-              tick={{ fill: '#64748b', fontSize: 11 }}
+              tick={{ fill: '#64748b', fontSize: 12 }}
               tickFormatter={(value) => {
                 if (value >= 1000000) return `${(value / 1000000).toFixed(0)} tr`;
                 if (value >= 1000) return `${(value / 1000).toFixed(0)} k`;
@@ -213,7 +213,7 @@ export function CustomerReport() {
               type="category"
               dataKey="name"
               width={150}
-              tick={{ fill: '#64748b', fontSize: 11 }}
+              tick={{ fill: '#64748b', fontSize: 12 }}
             />
             <Tooltip
               formatter={(value: number) => `${value.toLocaleString()}₫`}
@@ -223,7 +223,7 @@ export function CustomerReport() {
                 borderRadius: '8px'
               }}
             />
-            <Bar dataKey="revenue" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Doanh thu" label={{ position: 'right', fill: '#1e40af', fontWeight: 'bold', fontSize: 11, formatter: (value: number) => value.toLocaleString('vi-VN') }} />
+            <Bar dataKey="revenue" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Doanh thu" label={{ position: 'right', fill: '#1e40af', fontWeight: 'bold', fontSize: 12, formatter: (value: number) => value.toLocaleString('vi-VN') }} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

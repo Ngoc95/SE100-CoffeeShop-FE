@@ -26,6 +26,7 @@ import {
   User,
   Utensils,
   Moon,
+  Home,
 } from 'lucide-react';
 import { PageType } from '../App';
 import { Button } from './ui/button';
@@ -270,9 +271,21 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
   if (isFullscreen) {
     return (
       <>
-        <div className="w-16 bg-white border-r border-slate-200 flex flex-col h-full">
-          {/* Only show POS & Kitchen tab buttons at the very top */}
-          <div className="flex flex-col gap-2 p-2 pt-4">
+        <div className="w-16 bg-white border-r border-slate-200 flex flex-col h-screen">
+          {/* Home button at the top */}
+          <div className="p-2 pt-4 border-b border-slate-200">
+            {hasAccess('dashboard') && (
+              <button
+                onClick={() => onNavigate('dashboard')}
+                className="w-full p-2.5 rounded-lg text-slate-600 hover:bg-slate-100 transition-all"
+                title="Về trang chủ"
+              >
+                <Home className="w-6 h-6 mx-auto" />
+              </button>
+            )}
+          </div>
+          {/* POS & Kitchen tab buttons */}
+          <div className="flex flex-col gap-2 p-2 pt-2">
             {fullscreenItems.filter(item => hasAccess(item.id)).map(item => {
               const Icon = item.icon;
               const isActive = currentPage === item.id;
@@ -336,7 +349,7 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
     <>
       <div
         className={cn(
-          'bg-white border-r border-slate-200 flex flex-col transition-all duration-300',
+          'bg-white border-r border-slate-200 flex flex-col h-screen transition-all duration-300',
           collapsed ? 'w-16' : 'w-64'
         )}
       >
@@ -359,7 +372,7 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
         </div>
 
         {/* Menu Items */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-6">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-6">
           {/* POS & Kitchen on Top */}
           <div className="space-y-1">
             {fullscreenItems.filter(item => hasAccess(item.id)).map(item => renderMenuItem(item))}

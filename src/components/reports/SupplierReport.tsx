@@ -179,7 +179,7 @@ export function SupplierReport() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   
   // Filter states
-  const [viewType, setViewType] = useState<'chart' | 'report'>('chart');
+  const [viewType, setViewType] = useState<'chart' | 'report'>('report');
   const [concern, setConcern] = useState<'sales' | 'debt'>('sales');
   const [supplierSearch, setSupplierSearch] = useState('');
   
@@ -352,7 +352,7 @@ export function SupplierReport() {
     <div className="h-full flex flex-col bg-white">
         <div className="flex-1 p-6">
           <div className="mb-4">
-            <h3 className="text-lg text-slate-900">
+            <h3 className="text-md text-slate-900">
               {concern === 'sales'
                 ? 'Top 10 nhà cung cấp nhập hàng nhiều nhất'
                 : 'Top 10 nhà cung cấp có công nợ cao nhất'}
@@ -363,13 +363,13 @@ export function SupplierReport() {
               <BarChart
                 data={chartData}
                 layout="vertical"
-                margin={{ top: 5, right: 30, left: 150, bottom: 5 }}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis type="category" dataKey="name" width={140} />
+                <XAxis type="number" tickFormatter={(value) => value.toLocaleString('vi-VN')} fontSize={12} />
+                <YAxis type="category" dataKey="name" width={140} fontSize={12} />
                 <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                <Bar dataKey="value" fill="#2563eb" name={concern === 'sales' ? 'Giá trị nhập' : 'Công nợ'} label={{ position: 'right', fill: '#1e40af', fontWeight: 'bold', fontSize: 11, formatter: (value: number) => value.toLocaleString('vi-VN') }} />
+                <Bar dataKey="value" fill="#2563eb" name={concern === 'sales' ? 'Giá trị nhập' : 'Công nợ'} label={{ position: 'right', fill: '#1e40af', fontWeight: 'bold', fontSize: 12, formatter: (value: number) => value.toLocaleString('vi-VN') }} />
               </BarChart>
             </ResponsiveContainer>
           </div>
