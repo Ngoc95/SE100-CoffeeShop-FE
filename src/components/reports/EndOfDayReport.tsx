@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar as CalendarComponent } from '../ui/calendar';
-import { Filter, ChevronDown, ChevronUp, Calendar as CalendarIcon, CheckCircle2, X } from 'lucide-react';
+import { Filter, ChevronDown, ChevronRight, Calendar as CalendarIcon, CheckCircle2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { EmployeeFilter } from '../EmployeeFilter';
@@ -42,6 +42,7 @@ export function EndOfDayReport() {
   const [selectedCashflowTypes, setSelectedCashflowTypes] = useState<string[]>([]);
   const [selectedProductCategories, setSelectedProductCategories] = useState<SelectableItem[]>([]);
   const [selectedCancelers, setSelectedCancelers] = useState<SelectableItem[]>([]);
+  const [expandedSalesRows, setExpandedSalesRows] = useState<Set<string>>(new Set());
 
   // Calculate active filter count
   const getActiveFilterCount = () => {
@@ -311,7 +312,7 @@ export function EndOfDayReport() {
                 item.receiver === 'Lê Văn D' ? 'emp3' : 'other',
   }));
 
-  // Sample data for sales report
+  // Sample data for sales report with product details
   const allSalesData = [
     {
       id: 'HD-001',
@@ -324,6 +325,10 @@ export function EndOfDayReport() {
       paymentId: 'cash',
       staff: 'Nguyễn Văn A - Thu ngân',
       staffId: 'emp1',
+      orderDetails: [
+        { productCode: 'CF-001', productName: 'Cà phê sữa đá', quantity: 2, unitPrice: 60000, amount: 120000 },
+        { productCode: 'BM-001', productName: 'Bánh mì', quantity: 1, unitPrice: 30000, amount: 30000 },
+      ],
     },
     {
       id: 'HD-002',
@@ -336,6 +341,10 @@ export function EndOfDayReport() {
       paymentId: 'transfer',
       staff: 'Trần Thị B - Phục vụ',
       staffId: 'emp2',
+      orderDetails: [
+        { productCode: 'TR-001', productName: 'Trà sữa trân châu', quantity: 1, unitPrice: 60000, amount: 60000 },
+        { productCode: 'BF-001', productName: 'Bánh flan', quantity: 1, unitPrice: 25000, amount: 25000 },
+      ],
     },
     {
       id: 'HD-003',
@@ -348,6 +357,11 @@ export function EndOfDayReport() {
       paymentId: 'ewallet',
       staff: 'Nguyễn Văn A - Thu ngân',
       staffId: 'emp1',
+      orderDetails: [
+        { productCode: 'CF-002', productName: 'Bạc xỉu', quantity: 2, unitPrice: 50000, amount: 100000 },
+        { productCode: 'CF-003', productName: 'Cà phê đen', quantity: 1, unitPrice: 45000, amount: 45000 },
+        { productCode: 'BF-001', productName: 'Bánh flan', quantity: 1, unitPrice: 25000, amount: 25000 },
+      ],
     },
     {
       id: 'HD-004',
@@ -360,8 +374,24 @@ export function EndOfDayReport() {
       paymentId: 'cash',
       staff: 'Trần Thị B - Phục vụ',
       staffId: 'emp2',
+      orderDetails: [
+        { productCode: 'TR-002', productName: 'Trà đào cam sả', quantity: 2, unitPrice: 55000, amount: 110000 },
+      ],
     },
   ];
+
+  // Toggle expand/collapse sales row
+  const toggleSalesRow = (id: string) => {
+    setExpandedSalesRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
 
   // Filter cashflow data
   const filteredCashflowData = allCashflowData.filter(item => {
@@ -679,6 +709,7 @@ export function EndOfDayReport() {
                   <table className="w-full">
                     <thead className="bg-blue-100">
                       <tr>
+                        <th className="w-10 py-3 px-2"></th>
                         <th className="text-left py-3 px-4 text-sm text-slate-900">Mã hóa đơn</th>
                         <th className="text-left py-3 px-4 text-sm text-slate-900">Thời gian</th>
                         <th className="text-left py-3 px-4 text-sm text-slate-900">Khách hàng</th>
@@ -690,6 +721,7 @@ export function EndOfDayReport() {
                     </thead>
                     <tbody>
                       <tr className="bg-amber-50 border-b border-slate-200">
+                        <td></td>
                         <td colSpan={4} className="py-3 px-4 text-sm text-slate-900 font-medium">Tổng cộng ({filteredSalesData.length} hóa đơn)</td>
                         <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">
                           {filteredSalesData.reduce((sum, item) => sum + item.total, 0).toLocaleString()}₫
@@ -697,15 +729,62 @@ export function EndOfDayReport() {
                         <td colSpan={2}></td>
                       </tr>
                       {filteredSalesData.map((item) => (
-                        <tr key={item.id} className="border-b border-slate-200 hover:bg-slate-50">
-                          <td className="py-3 px-4 text-sm text-slate-900">{item.id}</td>
-                          <td className="py-3 px-4 text-sm text-slate-700">{item.time}</td>
-                          <td className="py-3 px-4 text-sm text-slate-700">{item.customer}</td>
-                          <td className="py-3 px-4 text-sm text-slate-700">{item.items}</td>
-                          <td className="text-right py-3 px-4 text-sm text-slate-900">{item.total.toLocaleString()}₫</td>
-                          <td className="py-3 px-4 text-sm text-slate-700">{item.payment}</td>
-                          <td className="py-3 px-4 text-sm text-slate-700">{item.staff}</td>
-                        </tr>
+                        <React.Fragment key={item.id}>
+                          <tr 
+                            className={`border-b border-slate-200 hover:bg-slate-50 cursor-pointer ${expandedSalesRows.has(item.id) ? 'bg-blue-50' : ''}`}
+                            onClick={() => toggleSalesRow(item.id)}
+                          >
+                            <td className="py-3 px-2 text-center">
+                              {expandedSalesRows.has(item.id) ? (
+                                <ChevronDown className="w-4 h-4 text-slate-500 inline" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4 text-slate-500 inline" />
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-sm text-slate-900">{item.id}</td>
+                            <td className="py-3 px-4 text-sm text-slate-700">{item.time}</td>
+                            <td className="py-3 px-4 text-sm text-slate-700">{item.customer}</td>
+                            <td className="py-3 px-4 text-sm text-slate-700">{item.items}</td>
+                            <td className="text-right py-3 px-4 text-sm text-slate-900">{item.total.toLocaleString()}₫</td>
+                            <td className="py-3 px-4 text-sm text-slate-700">{item.payment}</td>
+                            <td className="py-3 px-4 text-sm text-slate-700">{item.staff}</td>
+                          </tr>
+                          {expandedSalesRows.has(item.id) && (
+                            <tr key={`${item.id}-details`} className="bg-slate-50">
+                              <td colSpan={8} className="p-0">
+                                <div className="px-8 py-4 border-l-4 border-blue-400 ml-4">
+                                  <h4 className="text-sm font-medium text-slate-900 mb-3">Chi tiết hóa đơn</h4>
+                                  <table className="w-full">
+                                    <thead>
+                                      <tr className="bg-slate-200">
+                                        <th className="text-left py-2 px-3 text-xs text-slate-700">Mã SP</th>
+                                        <th className="text-left py-2 px-3 text-xs text-slate-700">Tên sản phẩm</th>
+                                        <th className="text-right py-2 px-3 text-xs text-slate-700">SL</th>
+                                        <th className="text-right py-2 px-3 text-xs text-slate-700">Đơn giá</th>
+                                        <th className="text-right py-2 px-3 text-xs text-slate-700">Thành tiền</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {item.orderDetails.map((detail, idx) => (
+                                        <tr key={idx} className="border-b border-slate-200">
+                                          <td className="py-2 px-3 text-xs text-slate-600">{detail.productCode}</td>
+                                          <td className="py-2 px-3 text-xs text-slate-700">{detail.productName}</td>
+                                          <td className="text-right py-2 px-3 text-xs text-slate-700">{detail.quantity}</td>
+                                          <td className="text-right py-2 px-3 text-xs text-slate-700">{detail.unitPrice.toLocaleString()}₫</td>
+                                          <td className="text-right py-2 px-3 text-xs text-slate-900 font-medium">{detail.amount.toLocaleString()}₫</td>
+                                        </tr>
+                                      ))}
+                                      <tr className="bg-slate-100">
+                                        <td colSpan={4} className="py-2 px-3 text-xs text-slate-900 font-medium text-right">Tổng cộng:</td>
+                                        <td className="text-right py-2 px-3 text-xs text-slate-900 font-bold">{item.total.toLocaleString()}₫</td>
+                                      </tr>
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       ))}
                     </tbody>
                   </table>
@@ -760,9 +839,15 @@ export function EndOfDayReport() {
                     </thead>
                     <tbody>
                       <tr className="bg-amber-50 border-b border-slate-200">
-                        <td colSpan={5} className="py-3 px-4 text-sm text-slate-900 font-medium">Tổng cộng ({filteredProductsData.length} sản phẩm)</td>
+                        <td colSpan={4} className="py-3 px-4 text-sm text-slate-900 font-medium">Tổng cộng ({filteredProductsData.length} sản phẩm)</td>
+                        <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">
+                          {filteredProductsData.reduce((sum, item) => sum + item.soldQuantity, 0).toLocaleString()}
+                        </td>
                         <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">
                           {filteredProductsData.reduce((sum, item) => sum + item.soldAmount, 0).toLocaleString()}₫
+                        </td>
+                        <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">
+                          {filteredProductsData.reduce((sum, item) => sum + item.returnQuantity, 0).toLocaleString()}
                         </td>
                         <td className="text-right py-3 px-4 text-sm text-slate-900 font-medium">
                           {filteredProductsData.reduce((sum, item) => sum + item.returnAmount, 0).toLocaleString()}₫
@@ -1206,7 +1291,7 @@ export function EndOfDayReport() {
               </Badge>
             )}
             {isFilterOpen ? (
-              <ChevronUp className="w-4 h-4 ml-2" />
+              <ChevronRight className="w-4 h-4 ml-2" />
             ) : (
               <ChevronDown className="w-4 h-4 ml-2" />
             )}
