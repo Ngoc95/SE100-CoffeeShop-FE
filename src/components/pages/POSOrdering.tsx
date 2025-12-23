@@ -340,6 +340,10 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
 
   // Print receipt modal state
   const [printReceiptOpen, setPrintReceiptOpen] = useState(false);
+  // Checkout modal state
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  // Track last payment method for receipt
+  const [lastPaymentMethod, setLastPaymentMethod] = useState<string>("Tiền mặt");
 
   // Restock notification states
   const [restockedItems, setRestockedItems] = useState<string[]>([]);
@@ -2439,7 +2443,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
           <Button
             className="flex-1 bg-blue-600 hover:bg-blue-700 h-9 shadow-md text-sm"
             disabled={cart.length === 0}
-            onClick={() => setPrintReceiptOpen(true)}
+            onClick={() => setCheckoutOpen(true)}
           >
             <CreditCard className="w-4 h-4 mr-1" />
             Thanh toán
@@ -3131,12 +3135,49 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
           id: item.id,
           name: item.name,
           quantity: item.quantity,
-          price: item.price,
+          price: getItemPrice(item),
         }))}
         totalAmount={totalAmount}
         orderNumber={selectedTable?.currentOrder || "TAKEAWAY"}
         customerName={selectedCustomer?.name || "Khách hàng"}
-        paymentMethod="Tiền mặt"
+        paymentMethod={lastPaymentMethod}
+        tableNumber={selectedTable ? String(selectedTable.number) : undefined}
+        waiterName={user?.fullName}
+      />
+
+      {/* Checkout Modal */}
+      <CheckoutModal
+        open={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+        items={cart
+          .filter((item) => !item.parentItemId)
+          .map((item) => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            price: getItemPrice(item),
+            basePrice: item.basePrice ?? item.price,
+          }))}
+        totalAmount={totalAmount}
+        discountAmount={discountAmount}
+        tableNumber={selectedTable?.number}
+        tableArea={selectedTable ? areas.find((a) => a.id === selectedTable.area)?.name : undefined}
+        isTakeaway={isTakeaway}
+        orderCode={selectedTable?.currentOrder || "TAKEAWAY"}
+        bankAccounts={bankAccounts}
+        onAddBankAccount={(bank, owner, account) => {
+          setBankAccounts((prev) => [...prev, { bank, owner, account }]);
+        }}
+        onConfirmPayment={(paymentMethod, _paymentDetails) => {
+          const methodLabelMap: Record<string, string> = {
+            cash: "Tiền mặt",
+            card: "Thẻ",
+            transfer: "Chuyển khoản",
+            combined: "Kết hợp",
+          };
+          setLastPaymentMethod(methodLabelMap[paymentMethod] || "Tiền mặt");
+          setPrintReceiptOpen(true);
+        }}
       />
 
       {/* Out of Stock Warning Dialog */}
