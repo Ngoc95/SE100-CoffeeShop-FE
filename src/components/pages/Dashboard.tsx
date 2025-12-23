@@ -47,10 +47,10 @@ export function Dashboard() {
 
   // Mock data for today's results
   const todayStats = {
-    revenue: { today: 0, yesterday: 0 },
-    orders: { today: 0, yesterday: 0 },
-    customers: { today: 0, yesterday: 0 },
-    avgOrderValue: { today: 0, yesterday: 0 }
+    revenue: { today: 15850000, yesterday: 12450000 },
+    orders: { today: 47, yesterday: 38 },
+    customers: { today: 42, yesterday: 35 },
+    avgOrderValue: { today: 337234, yesterday: 327631 }
   };
 
   // Sales chart data
