@@ -183,10 +183,10 @@ export function PurchaseOrders() {
         const lastYear = subYears(now, 1);
         from = startOfYear(lastYear); to = endOfYear(lastYear); break;
     }
-
+    
     if (value !== 'custom') {
-      setDateFrom(from);
-      setDateTo(to);
+        setDateFrom(from);
+        setDateTo(to);
     }
   };
 
@@ -224,7 +224,7 @@ export function PurchaseOrders() {
   ]);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [selectedPaymentStatuses, setSelectedPaymentStatuses] = useState<string[]>(['paid', 'partial', 'unpaid']);
-
+  
   const togglePaymentStatus = (status: string) => {
     setSelectedPaymentStatuses((prev) =>
       prev.includes(status)
@@ -240,7 +240,7 @@ export function PurchaseOrders() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
-
+  
   // Payment Dialog State
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedOrderToPay, setSelectedOrderToPay] = useState<PurchaseOrder | null>(null);
@@ -1426,739 +1426,731 @@ export function PurchaseOrders() {
           </div>
         </CardContent>
       </Card>
-      <div className="bg-white rounded-xl border border-blue-200 flex-1 overflow-hidden flex flex-col">
-        <div className="overflow-x-auto rounded-xl">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-blue-100">
-                <TableHead className="w-12 text-sm text-center"></TableHead>
-                <TableHead className="w-16 text-sm text-center">STT</TableHead>
-                <TableHead
-                  className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                  onClick={() => handleSort("code")}
-                >
-                  <div className="flex items-center">
-                    Mã phiếu
-                    {getSortIcon("code")}
-                  </div>
-                </TableHead>
-                <TableHead
-                  className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                  onClick={() => handleSort("date")}
-                >
-                  <div className="flex items-center">
-                    Ngày giờ
-                    {getSortIcon("date")}
-                  </div>
-                </TableHead>
-                <TableHead
-                  className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                  onClick={() => handleSort("supplier")}
-                >
-                  <div className="flex items-center">
-                    Nhà cung cấp
-                    {getSortIcon("supplier")}
-                  </div>
-                </TableHead>
-                <TableHead
-                  className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
-                  onClick={() => handleSort("items")}
-                >
-                  <div className="flex items-center justify-center">
-                    Số mặt hàng
-                    {getSortIcon("items")}
-                  </div>
-                </TableHead>
-                <TableHead
-                  className="text-sm text-right cursor-pointer hover:bg-blue-100 transition-colors"
-                  onClick={() => handleSort("totalAmount")}
-                >
-                  <div className="flex items-center justify-end">
-                    Tổng giá trị
-                    {getSortIcon("totalAmount")}
-                  </div>
-                </TableHead>
-                <TableHead
-                  className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                  onClick={() => handleSort("staff")}
-                >
-                  <div className="flex items-center">
-                    Nhân viên
-                    {getSortIcon("staff")}
-                  </div>
-                </TableHead>
-                <TableHead
-                  className="text-sm text-right cursor-pointer hover:bg-blue-100 transition-colors"
-                  onClick={() => handleSort("paidAmount")}
-                >
-                  <div className="flex items-center justify-end">
-                    Đã trả NCC
-                    {getSortIcon("paidAmount")}
-                  </div>
-                </TableHead>
-                <TableHead
-                  className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
-                  onClick={() => handleSort("status")}
-                >
-                  <div className="flex items-center justify-center">
-                    Trạng thái
-                    {getSortIcon("status")}
-                  </div>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedOrders.map((order, index) => (
-                <>
-                  <TableRow
-                    key={order.id}
-                    className="hover:bg-blue-100/50 cursor-pointer"
-                    onClick={() =>
-                      setExpandedRow(
-                        expandedRow === order.id ? null : order.id
-                      )
-                    }
+        <div className="bg-white rounded-xl border border-blue-200 flex-1 overflow-hidden flex flex-col">
+          <div className="overflow-x-auto rounded-xl">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-blue-100">
+                  <TableHead className="w-12 text-sm text-center"></TableHead>
+                  <TableHead className="w-16 text-sm text-center">STT</TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("code")}
                   >
-                    <TableCell className="text-sm text-center">
-                      {expandedRow === order.id ? (
-                        <ChevronDown className="w-4 h-4 text-slate-600" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4 text-slate-600" />
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-600 text-center">
-                      {index + 1}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      <span className="text-blue-600">{order.code}</span>
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-700">
-                      {order.date}
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-900">
-                      {order.supplier}
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-700 text-center">
-                      {order.items}
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-900 text-right">
-                      {order.totalAmount.toLocaleString("vi-VN")}đ
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-700">
-                      {order.staff}
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-900 text-right">
-                      {order.paidAmount.toLocaleString("vi-VN")}đ
-                    </TableCell>
-                    <TableCell className="text-sm text-center">
-                      <span
-                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${order.status === "completed"
-                          ? "bg-green-50 text-green-700"
-                          : order.status === "draft"
-                            ? "bg-orange-50 text-orange-700"
-                            : "bg-slate-100 text-slate-600"
-                          }`}
-                      >
-                        {order.status === "completed"
-                          ? "Đã nhập hàng"
-                          : order.status === "draft"
-                            ? "Phiếu tạm"
-                            : "Đã hủy"}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                  {/* Expanded Row */}
-                  {expandedRow === order.id && order.details && (
-                    <TableRow>
-                      <TableCell colSpan={8} className="bg-slate-50 px-4 py-4">
-                        <Tabs defaultValue="info" className="w-full">
-                          <TabsList>
-                            <TabsTrigger value="info">Thông tin</TabsTrigger>
-                            <TabsTrigger value="payment-history">
-                              Lịch sử thanh toán
-                            </TabsTrigger>
-                          </TabsList>
-                          <TabsContent
-                            value="info"
-                            className="space-y-4 mt-4"
-                          >
-                            {/* Order Info */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                              <div className="space-y-2">
-                                <div>
-                                  <span className="font-medium text-slate-600">
-                                    Mã phiếu nhập:
-                                  </span>{" "}
-                                  <span className="text-slate-900">
-                                    {order.code}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="font-medium text-slate-600">
-                                    Trạng thái:
-                                  </span>{" "}
-                                  <span
-                                    className={`px-2 py-1 rounded-full text-xs ${order.status === "completed"
-                                      ? "bg-green-50 text-green-700"
-                                      : order.status === "draft"
-                                        ? "bg-orange-50 text-orange-700"
-                                        : "bg-slate-100 text-slate-600"
-                                      }`}
-                                  >
-                                    {order.status === "completed"
-                                      ? "Đã nhập hàng"
-                                      : order.status === "draft"
-                                        ? "Phiếu tạm"
-                                        : "Đã hủy"}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="font-medium text-slate-600">
-                                    Thời gian:
-                                  </span>{" "}
-                                  <span className="text-slate-900">
-                                    {order.date}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="font-medium text-slate-600">
-                                    Nhà cung cấp:
-                                  </span>{" "}
-                                  <span className="text-blue-600 hover:underline cursor-pointer">
-                                    {order.supplier}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <div>
-                                  <span className="font-medium text-slate-600">
-                                    Nhân viên:
-                                  </span>{" "}
-                                  <span className="text-slate-900">
-                                    {order.staff}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Items Table */}
-                            <div className="border rounded-lg overflow-hidden">
-                              <table className="w-full">
-                                <thead className="bg-slate-100">
-                                  <tr>
-                                    <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                      STT
-                                    </th>
-                                    <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                      Mã lô
-                                    </th>
-                                    <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                      Tên hàng hóa
-                                    </th>
-                                    <th className="px-4 py-2 text-center text-xs text-slate-600">
-                                      Hạn sử dụng
-                                    </th>
-                                    <th className="px-4 py-2 text-center text-xs text-slate-600">
-                                      Số lượng
-                                    </th>
-                                    <th className="px-4 py-2 text-center text-xs text-slate-600">
-                                      Đơn vị
-                                    </th>
-                                    <th className="px-4 py-2 text-right text-xs text-slate-600">
-                                      Đơn giá
-                                    </th>
-                                    <th className="px-4 py-2 text-right text-xs text-slate-600">
-
-                                    </th>
-                                    <th className="px-4 py-2 text-right text-xs text-slate-600">
-                                      Thành tiền
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                  {order.details.items.map((item, idx) => (
-                                    <tr key={idx}>
-                                      <td className="px-4 py-2 text-sm text-slate-600">
-                                        {idx + 1}
-                                      </td>
-                                      <td className="px-4 py-2 text-sm text-slate-600">
-                                        {item.batchCode}
-                                      </td>
-                                      <td className="px-4 py-2 text-sm text-slate-900">
-                                        {item.name}
-                                      </td>
-                                      <td className="px-4 py-2 text-sm text-slate-600 text-center">
-                                        {item.expiryDate ? item.expiryDate : "-"}
-                                      </td>
-                                      <td className="px-4 py-2 text-sm text-slate-600 text-center">
-                                        {item.quantity}
-                                      </td>
-                                      <td className="px-4 py-2 text-sm text-slate-600 text-center">
-                                        {item.unit}
-                                      </td>
-                                      <td className="px-4 py-2 text-sm text-slate-600 text-right">
-                                        {item.unitPrice.toLocaleString(
-                                          "vi-VN"
-                                        )}
-                                        đ
-                                      </td>
-                                      <td className="px-4 py-2 text-sm text-slate-600 text-right">
-
-                                      </td>
-                                      <td className="px-4 py-2 text-sm text-slate-900 text-right font-medium">
-                                        {item.total.toLocaleString("vi-VN")}đ
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-
-                            {/* Summary */}
-                            <div className="flex justify-end pt-4">
-                              <div className="space-y-3 text-sm min-w-[400px] bg-slate-50 rounded-lg p-6">
-                                <div className="flex items-center py-1">
-                                  <span className="text-slate-600 text-right w-[180px] pr-4">
-                                    Tổng số lượng:
-                                  </span>
-                                  <span className="text-slate-900 font-medium text-right flex-1">
-                                    {order.details.items.reduce(
-                                      (sum, item) => sum + item.quantity,
-                                      0
-                                    )}
-                                  </span>
-                                </div>
-                                <div className="flex items-center py-1">
-                                  <span className="text-slate-600 text-right w-[180px] pr-4">
-                                    Tổng số mặt hàng:
-                                  </span>
-                                  <span className="text-slate-900 font-medium text-right flex-1">
-                                    {order.details.items.length}
-                                  </span>
-                                </div>
-                                <div className="flex items-center py-1">
-                                  <span className="text-slate-600 text-right w-[180px] pr-4">
-                                    Tổng tiền hàng:
-                                  </span>
-                                  <span className="text-slate-900 font-medium text-right flex-1">
-                                    {order.details.items
-                                      .reduce(
-                                        (sum, item) => sum + item.total,
-                                        0
-                                      )
-                                      .toLocaleString("vi-VN")}
-                                    đ
-                                  </span>
-                                </div>
-                                <div className="flex items-center py-1">
-                                  <span className="text-slate-600 text-right w-[180px] pr-4">
-                                    Giảm giá phiếu nhập:
-                                  </span>
-                                  <span className="text-slate-900 font-medium text-right flex-1">
-                                    0đ
-                                  </span>
-                                </div>
-                                <div className="flex items-center border-t border-slate-300 pt-3 mt-2">
-                                  <span className="text-slate-900 font-semibold text-base text-right w-[180px] pr-4">
-                                    Tổng cộng:
-                                  </span>
-                                  <span className="text-blue-600 font-semibold text-base text-right flex-1">
-                                    {order.totalAmount.toLocaleString(
-                                      "vi-VN"
-                                    )}
-                                    đ
-                                  </span>
-                                </div>
-                                <div className="flex items-center py-1">
-                                  <span className="text-slate-600 text-right w-[180px] pr-4">
-                                    Tiền đã trả NCC:
-                                  </span>
-                                  <span className="text-slate-900 font-medium text-right flex-1">
-                                    {order.paidAmount.toLocaleString("vi-VN")}
-                                    đ
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex items-center justify-end gap-2 pt-2 border-t">
-                              {order.totalAmount > order.paidAmount && (
-                                <Button
-                                  className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
-                                  onClick={(e: any) => {
-                                    e.stopPropagation();
-                                    handleOpenPaymentDialog(order);
-                                  }}
-                                >
-                                  <DollarSign className="w-4 h-4" />
-                                  Thanh toán
-                                </Button>
-                              )}
-
-                              {order.status === "draft" ? (
-                                <>
-                                  <Button
-                                    variant="outline"
-                                    className="gap-2"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleEditOrder(order);
-                                    }}
-                                  >
-                                    <Pencil className="w-4 h-4" />
-                                    Chỉnh sửa
-                                  </Button>
-                                  <Button
-                                    className="bg-green-600 hover:bg-green-700 gap-2"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      // Hoàn thành phiếu tạm
-                                      if (
-                                        !order.details?.items ||
-                                        order.details.items.length === 0
-                                      ) {
-                                        toast.error(
-                                          "Phiếu nhập không có hàng hóa"
-                                        );
-                                        return;
-                                      }
-
-                                      // 1. Cập nhật số lượng hàng hóa trong inventory
-                                      updateInventoryItems(
-                                        order.details.items
-                                      );
-
-                                      // 2. Thêm vào sổ quỹ nếu có số tiền phải trả
-                                      let paymentHistoryEntry = null;
-                                      if (order.paidAmount > 0) {
-                                        // Tạo phiếu chi "Chi tiền trả NCC"
-                                        const cashflowCode = `PCPN${order.code.replace(
-                                          "PN",
-                                          ""
-                                        )}`;
-                                        const cashflowEntry = {
-                                          id: `CF-${Date.now()}`,
-                                          code: cashflowCode,
-                                          date: order.date,
-                                          type: "expense",
-                                          category: "pay-supplier", // Chi tiền NCC
-                                          amount: order.paidAmount,
-                                          paymentMethod: "cash", // Default, có thể lưu trong order sau
-                                          description: `Chi tiền trả NCC - Phiếu nhập ${order.code}`,
-                                          staff: order.staff,
-                                          supplier: order.supplier,
-                                          status: "completed",
-                                        };
-
-                                        // Lưu vào localStorage để Finance có thể đọc
-                                        saveCashflowEntry(cashflowEntry);
-
-                                        // Create payment history entry
-                                        paymentHistoryEntry = {
-                                          id: cashflowCode,
-                                          date: order.date,
-                                          amount: order.paidAmount,
-                                          note: `Thanh toán tiền mặt`,
-                                        } as any;
-
-                                        toast.success(
-                                          `Đã thêm phiếu chi ${order.paidAmount.toLocaleString(
-                                            "vi-VN"
-                                          )}đ vào sổ quỹ`
-                                        );
-                                      }
-
-                                      // 3. Cập nhật status của order thành "completed"
-                                      setPurchaseOrders(
-                                        purchaseOrders.map((o) =>
-                                          o.id === order.id
-                                            ? {
-                                              ...o,
-                                              status: "completed" as const,
-                                              paymentHistory:
-                                                paymentHistoryEntry
-                                                  ? [
-                                                    ...(o.paymentHistory ||
-                                                      []),
-                                                    paymentHistoryEntry,
-                                                  ]
-                                                  : o.paymentHistory || [],
-                                            }
-                                            : o
-                                        )
-                                      );
-
-                                      toast.success(
-                                        "Đã hoàn thành phiếu nhập hàng"
-                                      );
-                                    }}
-                                  >
-                                    <Check className="w-4 h-4" />
-                                    Hoàn thành
-                                  </Button>
-                                </>
-                              ) : (
-                                <>
-                                  <Button
-                                    variant="outline"
-                                    className="gap-2"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      // Trả hàng
-                                      toast.info(
-                                        "Tính năng trả hàng đang được phát triển"
-                                      );
-                                    }}
-                                  >
-                                    <RotateCcw className="w-4 h-4" />
-                                    Trả hàng
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    className="gap-2"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      // In phiếu nhập
-                                      window.print();
-                                    }}
-                                  >
-                                    <Printer className="w-4 h-4" />
-                                    In
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    className="text-red-600 hover:text-red-700 gap-2"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      // Huỷ phiếu nhập
-                                      if (
-                                        confirm(
-                                          "Bạn có chắc chắn muốn huỷ phiếu nhập này?"
-                                        )
-                                      ) {
-                                        setPurchaseOrders(
-                                          purchaseOrders.filter(
-                                            (o) => o.id !== order.id
-                                          )
-                                        );
-                                        if (expandedRow === order.id) {
-                                          setExpandedRow(null);
-                                        }
-                                        // Xóa khỏi editingDates nếu có
-                                        const newEditingDates = {
-                                          ...editingDates,
-                                        };
-                                        delete newEditingDates[order.id];
-                                        setEditingDates(newEditingDates);
-                                        toast.success("Đã huỷ phiếu nhập");
-                                      }
-                                    }}
-                                  >
-                                    <X className="w-4 h-4" />
-                                    Huỷ bỏ
-                                  </Button>
-                                </>
-                              )}
-                            </div>
-                          </TabsContent>
-                          <TabsContent
-                            value="payment-history"
-                            className="space-y-4 mt-4"
-                          >
-                            {/* Payment History Table */}
-                            {(() => {
-                              // Load cashflow entries from localStorage
-                              let paymentHistory: any[] = [];
-
-                              // Only look for external payment history if the order has been paid partially or fully
-                              if (order.paidAmount > 0) {
-                                try {
-                                  const stored =
-                                    localStorage.getItem("cashflowEntries");
-                                  if (stored) {
-                                    const cashflowEntries = JSON.parse(stored);
-                                    // Filter entries related to this purchase order
-                                    paymentHistory = cashflowEntries.filter(
-                                      (entry: any) =>
-                                        entry.category === "pay-supplier" &&
-                                        (
-                                          // Match by specific description pattern
-                                          entry.description?.includes(`Phiếu nhập ${order.code}`) ||
-                                          // Or match by direct payment history ID if present
-                                          (order.paymentHistory?.some(ph => ph.id === entry.code))
-                                        )
-                                    );
-                                  }
-                                } catch (error) {
-                                  console.error(
-                                    "Error loading payment history:",
-                                    error
-                                  );
-                                }
-                              }
-
-                              // Also include paymentHistory from order if exists
-                              if (order.paymentHistory) {
-                                const orderHistory = order.paymentHistory.map((ph) => ({
-                                  id: ph.id, // Usually matches code
-                                  code: ph.id,
-                                  date: ph.date,
-                                  amount: ph.amount,
-                                  note: ph.note,
-                                  paymentMethod: "cash",
-                                  type: "order-history"
-                                }));
-
-                                // Merge and deduplicate
-                                // Priority: Cashflow entries (more detailed) > Order history
-                                const combined = [...paymentHistory, ...orderHistory];
-                                const uniqueMap = new Map();
-
-                                combined.forEach(item => {
-                                  // If we haven't seen this code yet, add it.
-                                  // If we HAVE seen it, we generally prefer the one from cashflow (already in paymentHistory array) 
-                                  // unless the new one provides something missing? 
-                                  // Actually, since we put paymentHistory (cashflow) FIRST in the spread above? No, we put `...paymentHistory` first.
-                                  // Wait: The code snippet I'm replacing ends with `...paymentHistory` being appended to `order.paymentHistory`.
-                                  // In my replacement: `[...paymentHistory, ...orderHistory]`.
-                                  // Iterating: 
-                                  // 1. cashflow item (Code A) -> added directly.
-                                  // 2. order item (Code A) -> ignored (duplicate).
-                                  if (!uniqueMap.has(item.code)) {
-                                    uniqueMap.set(item.code, item);
-                                  }
-                                });
-
-                                paymentHistory = Array.from(uniqueMap.values());
-                              }
-
-                              // Sort by date descending
-                              paymentHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-                              return paymentHistory.length > 0 ? (
-                                <div className="border rounded-lg overflow-hidden">
-                                  <table className="w-full">
-                                    <thead className="bg-slate-100">
-                                      <tr>
-                                        <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                          Mã phiếu
-                                        </th>
-                                        <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                          Thời gian
-                                        </th>
-                                        <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                          Người tạo
-                                        </th>
-                                        <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                          Phương thức
-                                        </th>
-                                        <th className="px-4 py-2 text-center text-xs text-slate-600">
-                                          Trạng thái
-                                        </th>
-                                        <th className="px-4 py-2 text-right text-xs text-slate-600">
-                                          Tiền chi
-                                        </th>
-                                        <th className="px-4 py-2 text-center text-xs text-slate-600">
-                                          Thao tác
-                                        </th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                      {paymentHistory.map((payment, idx) => (
-                                        <tr key={payment.id || idx}>
-                                          <td className="px-4 py-2 text-sm text-blue-600">
-                                            {payment.code || payment.id}
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-slate-600">
-                                            {payment.date}
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-slate-900">
-                                            {payment.staff || order.staff}
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-slate-600">
-                                            {payment.paymentMethod ===
-                                              "transfer"
-                                              ? "Chuyển khoản"
-                                              : "Tiền mặt"}
-                                          </td>
-                                          <td className="px-4 py-2 text-center">
-                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-50 text-green-700">
-                                              Đã thanh toán
-                                            </span>
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-slate-900 text-right">
-                                            {payment.amount.toLocaleString(
-                                              "vi-VN"
-                                            )}
-                                            đ
-                                          </td>
-                                          <td className="px-4 py-2 text-center">
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (confirm("Chắc chắn xóa lịch sử thanh toán này?")) {
-                                                  // 1. Update purchaseOrders state
-                                                  const updatedOrders = purchaseOrders.map(o => {
-                                                    if (o.id === order.id) {
-                                                      const newHistory = (o.paymentHistory || []).filter(ph => ph.id !== payment.id);
-                                                      // Decrease paidAmount
-                                                      const newPaidAmount = Math.max(0, o.paidAmount - payment.amount);
-                                                      return { ...o, paidAmount: newPaidAmount, paymentHistory: newHistory };
-                                                    }
-                                                    return o;
-                                                  });
-                                                  setPurchaseOrders(updatedOrders);
-
-                                                  // 2. Remove from localStorage cashflowEntries
-                                                  try {
-                                                    const stored = localStorage.getItem("cashflowEntries");
-                                                    if (stored) {
-                                                      const cashflowEntries = JSON.parse(stored);
-                                                      const newCashflow = cashflowEntries.filter((entry: any) => entry.code !== payment.id && entry.code !== payment.code);
-                                                      localStorage.setItem("cashflowEntries", JSON.stringify(newCashflow));
-                                                      toast.success("Đã xóa lịch sử thanh toán");
-                                                    }
-                                                  } catch (err) {
-                                                    console.error("Error deleting from storage", err);
-                                                  }
-                                                }
-                                              }}
-                                              className="text-slate-400 hover:text-red-600 transition-colors"
-                                              title="Xóa thanh toán"
-                                            >
-                                              <Trash2 className="w-4 h-4" />
-                                            </button>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              ) : (
-                                <div className="text-center py-8 text-sm text-slate-500">
-                                  Chưa có lịch sử thanh toán
-                                </div>
-                              );
-                            })()}
-                          </TabsContent>
-                        </Tabs>
+                    <div className="flex items-center">
+                      Mã phiếu
+                      {getSortIcon("code")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("date")}
+                  >
+                    <div className="flex items-center">
+                      Ngày giờ
+                      {getSortIcon("date")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("supplier")}
+                  >
+                    <div className="flex items-center">
+                      Nhà cung cấp
+                      {getSortIcon("supplier")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("items")}
+                  >
+                    <div className="flex items-center justify-center">
+                      Số mặt hàng
+                      {getSortIcon("items")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm text-right cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("totalAmount")}
+                  >
+                    <div className="flex items-center justify-end">
+                      Tổng giá trị
+                      {getSortIcon("totalAmount")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("staff")}
+                  >
+                    <div className="flex items-center">
+                      Nhân viên
+                      {getSortIcon("staff")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm text-right cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("paidAmount")}
+                  >
+                    <div className="flex items-center justify-end">
+                      Đã trả NCC
+                      {getSortIcon("paidAmount")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("status")}
+                  >
+                    <div className="flex items-center justify-center">
+                      Trạng thái
+                      {getSortIcon("status")}
+                    </div>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedOrders.map((order, index) => (
+                  <>
+                    <TableRow
+                      key={order.id}
+                      className="hover:bg-blue-100/50 cursor-pointer"
+                      onClick={() =>
+                        setExpandedRow(
+                          expandedRow === order.id ? null : order.id
+                        )
+                      }
+                    >
+                      <TableCell className="text-sm text-center">
+                        {expandedRow === order.id ? (
+                          <ChevronDown className="w-4 h-4 text-slate-600" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-slate-600" />
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-600 text-center">
+                        {index + 1}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        <span className="text-blue-600">{order.code}</span>
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700">
+                        {order.date}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-900">
+                        {order.supplier}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700 text-center">
+                        {order.items}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-900 text-right">
+                        {order.totalAmount.toLocaleString("vi-VN")}đ
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700">
+                        {order.staff}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-900 text-right">
+                        {order.paidAmount.toLocaleString("vi-VN")}đ
+                      </TableCell>
+                      <TableCell className="text-sm text-center">
+                        <span
+                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${order.status === "completed"
+                            ? "bg-green-50 text-green-700"
+                            : order.status === "draft"
+                              ? "bg-orange-50 text-orange-700"
+                              : "bg-slate-100 text-slate-600"
+                            }`}
+                        >
+                          {order.status === "completed"
+                            ? "Đã nhập hàng"
+                            : order.status === "draft"
+                              ? "Phiếu tạm"
+                              : "Đã hủy"}
+                        </span>
                       </TableCell>
                     </TableRow>
-                  )}
-                </>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                    {/* Expanded Row */}
+                    {expandedRow === order.id && order.details && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="bg-slate-50 px-4 py-4">
+                          <Tabs defaultValue="info" className="w-full">
+                            <TabsList>
+                              <TabsTrigger value="info">Thông tin</TabsTrigger>
+                              <TabsTrigger value="payment-history">
+                                Lịch sử thanh toán
+                              </TabsTrigger>
+                            </TabsList>
+                            <TabsContent
+                              value="info"
+                              className="space-y-4 mt-4"
+                            >
+                              {/* Order Info */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div className="space-y-2">
+                                  <div>
+                                    <span className="font-medium text-slate-600">
+                                      Mã phiếu nhập:
+                                    </span>{" "}
+                                    <span className="text-slate-900">
+                                      {order.code}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium text-slate-600">
+                                      Trạng thái:
+                                    </span>{" "}
+                                    <span
+                                      className={`px-2 py-1 rounded-full text-xs ${order.status === "completed"
+                                        ? "bg-green-50 text-green-700"
+                                        : order.status === "draft"
+                                          ? "bg-orange-50 text-orange-700"
+                                          : "bg-slate-100 text-slate-600"
+                                        }`}
+                                    >
+                                      {order.status === "completed"
+                                        ? "Đã nhập hàng"
+                                        : order.status === "draft"
+                                          ? "Phiếu tạm"
+                                          : "Đã hủy"}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <Label className="text-sm text-slate-600 mb-1 block">
+                                      Thời gian
+                                    </Label>
+                                    <Input
+                                      type="datetime-local"
+                                      value={
+                                        editingDates[order.id] !== undefined
+                                          ? editingDates[order.id]
+                                          : order.date.includes("T")
+                                            ? order.date
+                                            : order.date.replace(" ", "T")
+                                      }
+                                      onChange={(e) => {
+                                        setEditingDates({
+                                          ...editingDates,
+                                          [order.id]: e.target.value,
+                                        });
+                                      }}
+                                      className="text-sm bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                                    />
+                                  </div>
+                                  <div>
+                                    <span className="font-medium text-slate-600">
+                                      Nhà cung cấp:
+                                    </span>{" "}
+                                    <span className="text-blue-600 hover:underline cursor-pointer">
+                                      {order.supplier}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <div>
+                                    <span className="font-medium text-slate-600">
+                                      Nhân viên:
+                                    </span>{" "}
+                                    <span className="text-slate-900">
+                                      {order.staff}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
 
-        {/* Footer */}
-        <div className="px-4 py-3 border-t border-slate-200 bg-slate-50">
-          <p className="text-sm text-slate-600">
-            Hiển thị {sortedOrders.length} phiếu nhập
-          </p>
+                              {/* Items Table */}
+                              <div className="border rounded-lg overflow-hidden">
+                                <table className="w-full">
+                                  <thead className="bg-slate-100">
+                                    <tr>
+                                      <th className="px-4 py-2 text-left text-xs text-slate-600">
+                                        STT
+                                      </th>
+                                      <th className="px-4 py-2 text-left text-xs text-slate-600">
+                                        Mã lô
+                                      </th>
+                                      <th className="px-4 py-2 text-left text-xs text-slate-600">
+                                        Tên hàng hóa
+                                      </th>
+                                      <th className="px-4 py-2 text-center text-xs text-slate-600">
+                                        Hạn sử dụng
+                                      </th>
+                                      <th className="px-4 py-2 text-center text-xs text-slate-600">
+                                        Số lượng
+                                      </th>
+                                      <th className="px-4 py-2 text-center text-xs text-slate-600">
+                                        Đơn vị
+                                      </th>
+                                      <th className="px-4 py-2 text-right text-xs text-slate-600">
+                                        Đơn giá
+                                      </th>
+                                      <th className="px-4 py-2 text-right text-xs text-slate-600">
+                                        
+                                      </th>
+                                      <th className="px-4 py-2 text-right text-xs text-slate-600">
+                                        Thành tiền
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {order.details.items.map((item, idx) => (
+                                      <tr key={idx}>
+                                        <td className="px-4 py-2 text-sm text-slate-600">
+                                          {idx + 1}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-600">
+                                          {item.batchCode}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-900">
+                                          {item.name}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-600 text-center">
+                                          {item.expiryDate ? item.expiryDate : "-"}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-600 text-center">
+                                          {item.quantity}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-600 text-center">
+                                          {item.unit}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-600 text-right">
+                                          {item.unitPrice.toLocaleString(
+                                            "vi-VN"
+                                          )}
+                                          đ
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-600 text-right">
+                                          
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-900 text-right font-medium">
+                                          {item.total.toLocaleString("vi-VN")}đ
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+
+                              {/* Summary */}
+                              <div className="flex justify-end pt-4">
+                                <div className="space-y-3 text-sm min-w-[400px] bg-slate-50 rounded-lg p-6">
+                                  <div className="flex items-center py-1">
+                                    <span className="text-slate-600 text-right w-[180px] pr-4">
+                                      Tổng số lượng:
+                                    </span>
+                                    <span className="text-slate-900 font-medium text-right flex-1">
+                                      {order.details.items.reduce(
+                                        (sum, item) => sum + item.quantity,
+                                        0
+                                      )}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center py-1">
+                                    <span className="text-slate-600 text-right w-[180px] pr-4">
+                                      Tổng số mặt hàng:
+                                    </span>
+                                    <span className="text-slate-900 font-medium text-right flex-1">
+                                      {order.details.items.length}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center py-1">
+                                    <span className="text-slate-600 text-right w-[180px] pr-4">
+                                      Tổng tiền hàng:
+                                    </span>
+                                    <span className="text-slate-900 font-medium text-right flex-1">
+                                      {order.details.items
+                                        .reduce(
+                                          (sum, item) => sum + item.total,
+                                          0
+                                        )
+                                        .toLocaleString("vi-VN")}
+                                      đ
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center py-1">
+                                    <span className="text-slate-600 text-right w-[180px] pr-4">
+                                      Giảm giá phiếu nhập:
+                                    </span>
+                                    <span className="text-slate-900 font-medium text-right flex-1">
+                                      0đ
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center border-t border-slate-300 pt-3 mt-2">
+                                    <span className="text-slate-900 font-semibold text-base text-right w-[180px] pr-4">
+                                      Tổng cộng:
+                                    </span>
+                                    <span className="text-blue-600 font-semibold text-base text-right flex-1">
+                                      {order.totalAmount.toLocaleString(
+                                        "vi-VN"
+                                      )}
+                                      đ
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center py-1">
+                                    <span className="text-slate-600 text-right w-[180px] pr-4">
+                                      Tiền đã trả NCC:
+                                    </span>
+                                    <span className="text-slate-900 font-medium text-right flex-1">
+                                      {order.paidAmount.toLocaleString("vi-VN")}
+                                      đ
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                                {order.totalAmount > order.paidAmount && (
+                                  <Button
+                                    className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                                    onClick={(e: any) => {
+                                      e.stopPropagation();
+                                      handleOpenPaymentDialog(order);
+                                    }}
+                                  >
+                                    <DollarSign className="w-4 h-4" />
+                                    Thanh toán
+                                  </Button>
+                                )}
+
+                                {order.status === "draft" ? (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      className="gap-2"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEditOrder(order);
+                                      }}
+                                    >
+                                      <Pencil className="w-4 h-4" />
+                                      Chỉnh sửa
+                                    </Button>
+                                    <Button
+                                      className="bg-green-600 hover:bg-green-700 gap-2"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (
+                                          !order.details?.items ||
+                                          order.details.items.length === 0
+                                        ) {
+                                          toast.error(
+                                            "Phiếu nhập không có hàng hóa"
+                                          );
+                                          return;
+                                        }
+
+                                        updateInventoryItems(
+                                          order.details.items
+                                        );
+
+                                        let paymentHistoryEntry = null;
+                                        if (order.paidAmount > 0) {
+                                          const cashflowCode = `PCPN${order.code.replace(
+                                            "PN",
+                                            ""
+                                          )}`;
+                                          const cashflowEntry = {
+                                            id: `CF-${Date.now()}`,
+                                            code: cashflowCode,
+                                            date: order.date,
+                                            type: "expense",
+                                            category: "pay-supplier",
+                                            amount: order.paidAmount,
+                                            paymentMethod: "cash",
+                                            description: `Chi tiền trả NCC - Phiếu nhập ${order.code}`,
+                                            staff: order.staff,
+                                            supplier: order.supplier,
+                                            status: "completed",
+                                          };
+
+                                          saveCashflowEntry(cashflowEntry);
+
+                                          paymentHistoryEntry = {
+                                            id: cashflowCode,
+                                            date: order.date,
+                                            amount: order.paidAmount,
+                                            note: `Thanh toán tiền mặt`,
+                                          } as any;
+
+                                          toast.success(
+                                            `Đã thêm phiếu chi ${order.paidAmount.toLocaleString(
+                                              "vi-VN"
+                                            )}đ vào sổ quỹ`
+                                          );
+                                        }
+
+                                        setPurchaseOrders(
+                                          purchaseOrders.map((o) =>
+                                            o.id === order.id
+                                              ? {
+                                                  ...o,
+                                                  status: "completed" as const,
+                                                  paymentHistory:
+                                                    paymentHistoryEntry
+                                                      ? [
+                                                          ...(o.paymentHistory ||
+                                                            []),
+                                                          paymentHistoryEntry,
+                                                        ]
+                                                      : o.paymentHistory || [],
+                                                }
+                                              : o
+                                          )
+                                        );
+
+                                        toast.success(
+                                          "Đã hoàn thành phiếu nhập hàng"
+                                        );
+                                      }}
+                                    >
+                                      <Check className="w-4 h-4" />
+                                      Hoàn thành
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      className="text-red-600 hover:text-red-700 gap-2"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (
+                                          confirm(
+                                            "Bạn có chắc chắn muốn huỷ phiếu nhập này?"
+                                          )
+                                        ) {
+                                          setPurchaseOrders(
+                                            purchaseOrders.filter(
+                                              (o) => o.id !== order.id
+                                            )
+                                          );
+                                          if (expandedRow === order.id) {
+                                            setExpandedRow(null);
+                                          }
+                                          const newEditingDates = {
+                                            ...editingDates,
+                                          };
+                                          delete newEditingDates[order.id];
+                                          setEditingDates(newEditingDates);
+                                          toast.success("Đã huỷ phiếu nhập");
+                                        }
+                                      }}
+                                    >
+                                      <X className="w-4 h-4" />
+                                      Huỷ bỏ
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button
+                                      className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (editingDates[order.id]) {
+                                          const newDate = editingDates[
+                                            order.id
+                                          ].replace("T", " ");
+                                          setPurchaseOrders(
+                                            purchaseOrders.map((o) =>
+                                              o.id === order.id
+                                                ? { ...o, date: newDate }
+                                                : o
+                                            )
+                                          );
+                                          const newEditingDates = {
+                                            ...editingDates,
+                                          };
+                                          delete newEditingDates[order.id];
+                                          setEditingDates(newEditingDates);
+                                        }
+                                        toast.success(
+                                          "Đã lưu thông tin phiếu nhập"
+                                        );
+                                      }}
+                                    >
+                                      <Save className="w-4 h-4" />
+                                      Lưu
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      className="gap-2"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toast.info(
+                                          "Tính năng trả hàng đang được phát triển"
+                                        );
+                                      }}
+                                    >
+                                      <RotateCcw className="w-4 h-4" />
+                                      Trả hàng
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      className="gap-2"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        window.print();
+                                      }}
+                                    >
+                                      <Printer className="w-4 h-4" />
+                                      In
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </TabsContent>
+                            <TabsContent
+                              value="payment-history"
+                              className="space-y-4 mt-4"
+                            >
+                              {/* Payment History Table */}
+                              {(() => {
+                                // Load cashflow entries from localStorage
+                                let paymentHistory: any[] = [];
+                                
+                                // Only look for external payment history if the order has been paid partially or fully
+                                if (order.paidAmount > 0) {
+                                  try {
+                                    const stored =
+                                      localStorage.getItem("cashflowEntries");
+                                    if (stored) {
+                                      const cashflowEntries = JSON.parse(stored);
+                                      // Filter entries related to this purchase order
+                                      paymentHistory = cashflowEntries.filter(
+                                        (entry: any) =>
+                                          entry.category === "pay-supplier" &&
+                                          (
+                                            // Match by specific description pattern
+                                            entry.description?.includes(`Phiếu nhập ${order.code}`) ||
+                                            // Or match by direct payment history ID if present
+                                            (order.paymentHistory?.some(ph => ph.id === entry.code))
+                                          )
+                                      );
+                                    }
+                                  } catch (error) {
+                                    console.error(
+                                      "Error loading payment history:",
+                                      error
+                                    );
+                                  }
+                                }
+
+                                // Also include paymentHistory from order if exists
+                                if (order.paymentHistory) {
+                                  const orderHistory = order.paymentHistory.map((ph) => ({
+                                    id: ph.id, // Usually matches code
+                                    code: ph.id,
+                                    date: ph.date,
+                                    amount: ph.amount,
+                                    note: ph.note,
+                                    paymentMethod: "cash",
+                                    type: "order-history"
+                                  }));
+                                  
+                                  // Merge and deduplicate
+                                  // Priority: Cashflow entries (more detailed) > Order history
+                                  const combined = [...paymentHistory, ...orderHistory];
+                                  const uniqueMap = new Map();
+                                  
+                                  combined.forEach(item => {
+                                      // If we haven't seen this code yet, add it.
+                                      // If we HAVE seen it, we generally prefer the one from cashflow (already in paymentHistory array) 
+                                      // unless the new one provides something missing? 
+                                      // Actually, since we put paymentHistory (cashflow) FIRST in the spread above? No, we put `...paymentHistory` first.
+                                      // Wait: The code snippet I'm replacing ends with `...paymentHistory` being appended to `order.paymentHistory`.
+                                      // In my replacement: `[...paymentHistory, ...orderHistory]`.
+                                      // Iterating: 
+                                      // 1. cashflow item (Code A) -> added directly.
+                                      // 2. order item (Code A) -> ignored (duplicate).
+                                      if (!uniqueMap.has(item.code)) {
+                                          uniqueMap.set(item.code, item);
+                                      }
+                                  });
+                                  
+                                  paymentHistory = Array.from(uniqueMap.values());
+                                }
+                                
+                                // Sort by date descending
+                                paymentHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                                return paymentHistory.length > 0 ? (
+                                  <div className="border rounded-lg overflow-hidden">
+                                    <table className="w-full">
+                                      <thead className="bg-slate-100">
+                                        <tr>
+                                          <th className="px-4 py-2 text-left text-xs text-slate-600">
+                                            Mã phiếu
+                                          </th>
+                                          <th className="px-4 py-2 text-left text-xs text-slate-600">
+                                            Thời gian
+                                          </th>
+                                          <th className="px-4 py-2 text-left text-xs text-slate-600">
+                                            Người tạo
+                                          </th>
+                                          <th className="px-4 py-2 text-left text-xs text-slate-600">
+                                            Phương thức
+                                          </th>
+                                          <th className="px-4 py-2 text-center text-xs text-slate-600">
+                                            Trạng thái
+                                          </th>
+                                          <th className="px-4 py-2 text-right text-xs text-slate-600">
+                                            Tiền chi
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100">
+                                        {paymentHistory.map((payment, idx) => (
+                                          <tr key={payment.id || idx}>
+                                            <td className="px-4 py-2 text-sm text-blue-600">
+                                              {payment.code || payment.id}
+                                            </td>
+                                            <td className="px-4 py-2 text-sm text-slate-600">
+                                              {payment.date}
+                                            </td>
+                                            <td className="px-4 py-2 text-sm text-slate-900">
+                                              {payment.staff || order.staff}
+                                            </td>
+                                            <td className="px-4 py-2 text-sm text-slate-600">
+                                              {payment.paymentMethod ===
+                                                "transfer"
+                                                ? "Chuyển khoản"
+                                                : "Tiền mặt"}
+                                            </td>
+                                            <td className="px-4 py-2 text-center">
+                                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-50 text-green-700">
+                                                Đã thanh toán
+                                              </span>
+                                            </td>
+                                            <td className="px-4 py-2 text-sm text-slate-900 text-right">
+                                              {payment.amount.toLocaleString(
+                                                "vi-VN"
+                                              )}
+                                              đ
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                ) : (
+                                  <div className="text-center py-8 text-sm text-slate-500">
+                                    Chưa có lịch sử thanh toán
+                                  </div>
+                                );
+                              })()}
+                            </TabsContent>
+                          </Tabs>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Footer */}
+          <div className="px-4 py-3 border-t border-slate-200 bg-slate-50">
+            <p className="text-sm text-slate-600">
+              Hiển thị {sortedOrders.length} phiếu nhập
+            </p>
+          </div>
         </div>
-      </div>
 
 
       {/* Create Purchase Order Dialog */}
@@ -2416,7 +2408,7 @@ export function PurchaseOrders() {
                                 />
                               </td>
                               <td className="px-2 py-2">
-
+                                
                               </td>
                               <td className="px-2 py-2 text-sm text-slate-900 text-right">
                                 {item.total.toLocaleString("vi-VN")}đ
@@ -2678,7 +2670,7 @@ export function PurchaseOrders() {
                       )
                     );
                     toast.success("Đã cập nhật phiếu nhập hàng");
-                  } else {
+                    } else {
                     // Create new draft order
                     const draftOrder: PurchaseOrder = {
                       id: Date.now(),
@@ -2706,9 +2698,9 @@ export function PurchaseOrders() {
 
                   handleCreateOrder();
                 }}
-              >
-                Lưu nháp
-              </Button>
+            >
+              Lưu nháp
+            </Button>
               <Button
                 className="bg-blue-600 hover:bg-blue-700"
                 disabled={addedItems.length === 0}
