@@ -69,8 +69,6 @@ role_permissions.permission_id > permissions.id
 categories [icon: folder, color: green] {
   id int pk auto_increment
   name varchar
-  description text
-  display_order int
   created_at timestamp
   updated_at timestamp
   deleted_at timestamp
@@ -80,7 +78,6 @@ units [icon: ruler, color: green] {
   id int pk auto_increment
   name varchar
   symbol varchar
-  description text
   created_at timestamp
   updated_at timestamp
   deleted_at timestamp
@@ -89,9 +86,10 @@ units [icon: ruler, color: green] {
 // Bảng loại hàng hóa (thay cho type varchar)
 item_types [icon: tag, color: green] {
   id int pk auto_increment
-  code varchar unique  // 'ready_made' | 'composite' | 'ingredient'
-  name varchar
-  description text
+  name varchar unique  // 'ready_made' | 'composite' | 'ingredient'
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
 }
 
 // Bảng thống nhất cho cả 3 loại hàng hóa
@@ -194,10 +192,19 @@ customers.group_id > customer_groups.id
 // 4. BÁN HÀNG & ĐƠN HÀNG
 // ===========================================
 
+// Khu vực bàn (Tầng 1, Tầng 2, Sân vườn...)
+table_areas [icon: map-pin, color: orange] {
+  id int pk auto_increment
+  name varchar
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
+}
+
 tables [icon: layout, color: orange] {
   id int pk auto_increment
   table_number int
-  area varchar
+  area_id int fk  // FK đến table_areas
   capacity int
   status varchar
   current_order_id int fk
@@ -205,6 +212,8 @@ tables [icon: layout, color: orange] {
   updated_at timestamp
   deleted_at timestamp
 }
+
+tables.area_id > table_areas.id
 
 orders [icon: shopping-cart, color: orange] {
   id int pk auto_increment
@@ -260,13 +269,11 @@ order_items.parent_item_id > order_items.id
 promotion_types [icon: tag, color: pink] {
   id int pk auto_increment
   name varchar
-  description text
 }
 
 promotions [icon: percent, color: pink] {
   id int pk auto_increment
   name varchar
-  description text
   type_id int fk
   discount_value decimal
   min_order_value decimal
@@ -276,7 +283,6 @@ promotions [icon: percent, color: pink] {
   start_time time
   end_time time
   is_active boolean
-  usage_limit int
   usage_count int
   created_at timestamp
   updated_at timestamp
@@ -695,12 +701,12 @@ activity_logs.user_id > users.id
 
 ---
 
-## Danh sách Tables (49 bảng)
+## Danh sách Tables (50 bảng)
 
 1. **Users & Auth**: `users`, `roles`, `permissions`, `role_permissions`
 2. **Inventory**: `categories`, `units`, `item_types`, `inventory_items`, `inventory_batches`, `item_ingredients`, `item_toppings`
 3. **Customers**: `customer_groups`, `customers`
-4. **Sales**: `tables`, `orders`, `order_items`
+4. **Sales**: `table_areas`, `tables`, `orders`, `order_items`
 5. **Promotions**: `promotion_types`, `promotions`, `promotion_applicable_items`, `promotion_applicable_categories`, `promotion_applicable_combos`, `promotion_applicable_customers`, `promotion_applicable_customer_groups`, `combos`, `combo_items`
 6. **Purchasing**: `suppliers`, `purchase_orders`, `purchase_order_items`
 7. **Staff**: `staff`, `staff_salary_settings`, `shifts`, `staff_schedules`, `timekeeping`, `payroll`, `payslips`
