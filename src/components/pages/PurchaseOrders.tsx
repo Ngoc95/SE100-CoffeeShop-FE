@@ -246,6 +246,8 @@ export function PurchaseOrders() {
   const [selectedOrderToPay, setSelectedOrderToPay] = useState<PurchaseOrder | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentNote, setPaymentNote] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer">("cash");
+  const [selectedPaymentBankId, setSelectedPaymentBankId] = useState("");
   const [showAddItemDialog, setShowAddItemDialog] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
   const [addedItems, setAddedItems] = useState<PurchaseOrderItem[]>([]);
@@ -275,6 +277,48 @@ export function PurchaseOrders() {
     { id: "ABBank", name: "ABBank - Ngân hàng TMCP An Bình" },
     { id: "ICB", name: "ICB - Ngân hàng TMCP Công Thương Việt Nam" },
   ];
+
+  // Tài khoản ngân hàng của quán (bank_accounts trong database)
+  const [allBankAccounts, setAllBankAccounts] = useState([
+    { id: '1', name: 'TK Vietcombank', accountNumber: '1234567890', bank: 'VCB', bankFull: 'VCB - Ngân hàng TMCP Ngoại thương Việt Nam', owner: 'Công ty Café ABC' },
+    { id: '2', name: 'TK Techcombank', accountNumber: '0987654321', bank: 'TCB', bankFull: 'TCB - Ngân hàng TMCP Kỹ Thương Việt Nam', owner: 'Công ty Café ABC' },
+  ]);
+
+  // Add bank account dialog states
+  const [addBankAccountDialogOpen, setAddBankAccountDialogOpen] = useState(false);
+  const [newBankAccountName, setNewBankAccountName] = useState("");
+  const [newBankAccountNumber, setNewBankAccountNumber] = useState("");
+  const [newBankAccountBank, setNewBankAccountBank] = useState("");
+  const [newBankAccountOwner, setNewBankAccountOwner] = useState("");
+  const [bankAccountSearchOpen, setBankAccountSearchOpen] = useState(false);
+
+  const handleOpenAddBankAccount = () => {
+    setNewBankAccountName("");
+    setNewBankAccountNumber("");
+    setNewBankAccountBank("");
+    setNewBankAccountOwner("");
+    setAddBankAccountDialogOpen(true);
+  };
+
+  const handleSaveBankAccount = () => {
+    if (!newBankAccountName || !newBankAccountNumber || !newBankAccountBank) {
+      toast.error("Vui lòng điền đầy đủ thông tin");
+      return;
+    }
+    const bankInfo = vietnameseBanks.find(b => b.id === newBankAccountBank);
+    const newAccount = {
+      id: `bank-${Date.now()}`,
+      name: newBankAccountName,
+      accountNumber: newBankAccountNumber,
+      bank: newBankAccountBank,
+      bankFull: bankInfo?.name || "",
+      owner: newBankAccountOwner,
+    };
+    setAllBankAccounts([...allBankAccounts, newAccount]);
+    setSelectedPaymentBankId(newAccount.id);
+    setAddBankAccountDialogOpen(false);
+    toast.success("Đã thêm tài khoản ngân hàng mới");
+  };
 
   // Form state for creating purchase order
   const [formData, setFormData] = useState({
@@ -1030,6 +1074,8 @@ export function PurchaseOrders() {
     const remaining = order.totalAmount - order.paidAmount;
     setPaymentAmount(formatNumberWithCommas(remaining));
     setPaymentNote(`Thanh toán nợ - Phiếu nhập ${order.code}`);
+    setPaymentMethod("cash");
+    setSelectedPaymentBankId("");
     setPaymentDialogOpen(true);
   };
 
@@ -1048,23 +1094,39 @@ export function PurchaseOrders() {
       return;
     }
 
-    // Create cashflow entry
-    const cashflowCode = `PC${selectedOrderToPay.code.replace("PN", "")}-${Date.now().toString().slice(-4)}`;
-    const cashflowEntry = {
-      id: `CF-${Date.now()}`,
-      code: cashflowCode,
-      date: new Date().toISOString(),
-      type: "expense",
-      category: "pay-supplier",
+    // Validate bank account if transfer method selected
+    if (paymentMethod === "transfer" && !selectedPaymentBankId) {
+      toast.error("Vui lòng chọn tài khoản ngân hàng");
+      return;
+    }
+
+    // Get bank info if transfer
+    const selectedBankAccount = paymentMethod === "transfer" 
+      ? allBankAccounts.find(b => b.id === selectedPaymentBankId)
+      : null;
+
+    // Create finance transaction entry (phiếu chi)
+    const transactionCode = `PC${selectedOrderToPay.code.replace("PN", "")}-${Date.now().toString().slice(-4)}`;
+    const financeTransaction = {
+      id: `FT-${Date.now()}`,
+      code: transactionCode,
+      transaction_date: new Date().toISOString(),
+      category_id: "pay-supplier", // Thanh toán nhà cung cấp
       amount: amount,
-      paymentMethod: "cash",
+      payment_method: paymentMethod,
+      bank_account_id: selectedPaymentBankId || null,
+      bank_name: selectedBankAccount?.bankFull || null,
+      person_type: "supplier",
+      person_id: selectedOrderToPay.supplierId || null,
+      person_name: selectedOrderToPay.supplier,
       description: paymentNote || `Thanh toán nợ - Phiếu nhập ${selectedOrderToPay.code}`,
-      staff: user?.fullName || "Staff",
-      supplier: selectedOrderToPay.supplier,
+      reference_type: "purchase_order",
+      reference_id: selectedOrderToPay.id,
+      created_by: user?.fullName || "Staff",
       status: "completed"
     };
 
-    saveCashflowEntry(cashflowEntry);
+    saveCashflowEntry(financeTransaction);
 
     // Update order
     setPurchaseOrders(
@@ -1076,10 +1138,12 @@ export function PurchaseOrders() {
             paymentHistory: [
               ...(o.paymentHistory || []),
               {
-                id: cashflowCode,
+                id: transactionCode,
                 date: formatDateTime(new Date()),
                 amount: amount,
-                note: paymentNote || "Thanh toán nợ"
+                note: paymentNote || "Thanh toán nợ",
+                paymentMethod: paymentMethod,
+                bankName: selectedBankAccount?.bankFull
               }
             ]
           }
@@ -1092,6 +1156,8 @@ export function PurchaseOrders() {
     setSelectedOrderToPay(null);
     setPaymentAmount("");
     setPaymentNote("");
+    setPaymentMethod("cash");
+    setSelectedPaymentBankId("");
   };
 
   // Mock inventory items (ingredients and ready-made only, no composite)
@@ -3091,75 +3157,226 @@ export function PurchaseOrders() {
         title="Xuất danh sách phiếu nhập hàng"
       />
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[800px]">
           <DialogHeader>
-            <DialogTitle>Thanh toán cho nhà cung cấp</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Lập phiếu chi - Thanh toán nhà cung cấp</DialogTitle>
           </DialogHeader>
           {selectedOrderToPay && (
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-slate-500">Mã phiếu:</span>
-                  <span className="ml-2 font-medium text-slate-900">{selectedOrderToPay.code}</span>
+            <div className="grid grid-cols-2 gap-6 py-4">
+              {/* Left Column - Purchase Order Info */}
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h4 className="font-medium text-blue-900 mb-3">Thông tin phiếu nhập</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Mã phiếu:</span>
+                      <span className="font-medium text-blue-700">{selectedOrderToPay.code}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Ngày nhập:</span>
+                      <span className="font-medium">{selectedOrderToPay.date}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Nhà cung cấp:</span>
+                      <span className="font-medium text-blue-600">{selectedOrderToPay.supplier}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Tổng giá trị:</span>
+                      <span className="font-medium">{formatNumberWithCommas(selectedOrderToPay.totalAmount)}đ</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Đã thanh toán:</span>
+                      <span className="font-medium text-green-600">{formatNumberWithCommas(selectedOrderToPay.paidAmount)}đ</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t border-blue-200 mt-2">
+                      <span className="text-slate-600 font-medium">Còn nợ:</span>
+                      <span className="font-bold text-red-600 text-lg">
+                        {formatNumberWithCommas(selectedOrderToPay.totalAmount - selectedOrderToPay.paidAmount)}đ
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-slate-500">Nhà cung cấp:</span>
-                  <span className="ml-2 font-medium text-blue-600">{selectedOrderToPay.supplier}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500">Tổng tiền:</span>
-                  <span className="ml-2 font-medium text-slate-900">{formatNumberWithCommas(selectedOrderToPay.totalAmount)}đ</span>
-                </div>
-                <div>
-                  <span className="text-slate-500">Đã trả:</span>
-                  <span className="ml-2 font-medium text-green-600">{formatNumberWithCommas(selectedOrderToPay.paidAmount)}đ</span>
-                </div>
-                <div className="col-span-2 border-t pt-2 mt-2">
-                  <span className="text-slate-500">Số tiền còn nợ:</span>
-                  <span className="ml-2 font-bold text-red-600 text-lg">
-                    {formatNumberWithCommas(selectedOrderToPay.totalAmount - selectedOrderToPay.paidAmount)}đ
-                  </span>
-                </div>
+
+                {/* Payment History */}
+                {selectedOrderToPay.paymentHistory && selectedOrderToPay.paymentHistory.length > 0 && (
+                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h4 className="font-medium text-slate-700 mb-3">Lịch sử thanh toán</h4>
+                    <div className="space-y-2 text-sm max-h-32 overflow-y-auto">
+                      {selectedOrderToPay.paymentHistory.map((payment, idx) => (
+                        <div key={idx} className="flex justify-between items-center py-1 border-b border-slate-100 last:border-0">
+                          <div>
+                            <span className="text-slate-600">{payment.date}</span>
+                            {payment.note && <span className="text-slate-400 text-xs ml-2">({payment.note})</span>}
+                          </div>
+                          <span className="font-medium text-green-600">+{formatNumberWithCommas(payment.amount)}đ</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="payment-amount">Số tiền thanh toán</Label>
-                <div className="relative">
-                  <Input
-                    id="payment-amount"
-                    value={paymentAmount}
-                    onChange={(e) => {
-                      // Allow only numbers and format immediately
-                      const rawVal = e.target.value.replace(/,/g, "");
-                      if (!isNaN(Number(rawVal)) || rawVal === "") {
-                        setPaymentAmount(formatNumberWithCommas(rawVal));
-                      }
-                    }}
-                    placeholder="Nhập số tiền..."
-                    className="pr-10 font-medium text-lg"
+              {/* Right Column - Payment Form */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Phương thức thanh toán</Label>
+                  <Select
+                    value={paymentMethod}
+                    onValueChange={(value: string) => setPaymentMethod(value as "cash" | "transfer")}
+                  >
+                    <SelectTrigger className="bg-white border-slate-300">
+                      <SelectValue placeholder="Chọn phương thức" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">💵 Tiền mặt</SelectItem>
+                      <SelectItem value="transfer">🏦 Chuyển khoản</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {paymentMethod === "transfer" && (
+                  <div className="space-y-2">
+                    <Label>Tài khoản ngân hàng</Label>
+                    <div className="flex gap-2">
+                      <Select
+                        value={selectedPaymentBankId}
+                        onValueChange={setSelectedPaymentBankId}
+                      >
+                        <SelectTrigger className="flex-1 bg-white border-slate-300">
+                          <SelectValue placeholder="Chọn tài khoản" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {allBankAccounts.map((account) => (
+                            <SelectItem key={account.id} value={account.id}>
+                              <div className="flex w-full flex-col items-start text-left">
+                                <span>{account.name}</span>
+                                <span className="text-xs text-slate-500">{account.accountNumber} - {account.bankFull}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={handleOpenAddBankAccount}
+                        title="Thêm tài khoản mới"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="payment-amount">Số tiền thanh toán</Label>
+                  <div className="relative">
+                    <Input
+                      id="payment-amount"
+                      value={paymentAmount}
+                      onChange={(e) => {
+                        const rawVal = e.target.value.replace(/,/g, "");
+                        if (!isNaN(Number(rawVal)) || rawVal === "") {
+                          setPaymentAmount(formatNumberWithCommas(rawVal));
+                        }
+                      }}
+                      placeholder="Nhập số tiền..."
+                      className="pr-10 font-medium text-lg bg-white border-slate-300"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">đ</span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Số nợ còn lại: <span className="font-medium text-red-600">{formatNumberWithCommas(selectedOrderToPay.totalAmount - selectedOrderToPay.paidAmount)}đ</span>
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="payment-note">Ghi chú</Label>
+                  <Textarea
+                    id="payment-note"
+                    value={paymentNote}
+                    onChange={(e) => setPaymentNote(e.target.value)}
+                    placeholder="Ghi chú cho phiếu chi..."
+                    className="bg-white border-slate-300 min-h-[80px]"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">đ</span>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="payment-note">Ghi chú</Label>
-                <Textarea
-                  id="payment-note"
-                  value={paymentNote}
-                  onChange={(e) => setPaymentNote(e.target.value)}
-                  placeholder="Ghi chú cho phiếu chi..."
-                />
               </div>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>
               Hủy bỏ
             </Button>
             <Button onClick={handlePaymentSubmit} className="bg-blue-600 hover:bg-blue-700 text-white">
               <Check className="w-4 h-4 mr-2" />
               Xác nhận thanh toán
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Bank Account Dialog */}
+      <Dialog open={addBankAccountDialogOpen} onOpenChange={setAddBankAccountDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">Thêm tài khoản ngân hàng</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>
+                Tên tài khoản <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                value={newBankAccountName}
+                onChange={(e) => setNewBankAccountName(e.target.value)}
+                placeholder="VD: TK Vietcombank công ty"
+                className="bg-white border-slate-300"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>
+                Số tài khoản <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                value={newBankAccountNumber}
+                onChange={(e) => setNewBankAccountNumber(e.target.value)}
+                placeholder="VD: 1234567890"
+                className="bg-white border-slate-300"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>
+                Ngân hàng <span className="text-red-500">*</span>
+              </Label>
+              <Select value={newBankAccountBank} onValueChange={setNewBankAccountBank}>
+                <SelectTrigger className="bg-white border-slate-300">
+                  <SelectValue placeholder="Chọn ngân hàng" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {vietnameseBanks.map((bank) => (
+                    <SelectItem key={bank.id} value={bank.id}>
+                      {bank.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Chủ tài khoản</Label>
+              <Input
+                value={newBankAccountOwner}
+                onChange={(e) => setNewBankAccountOwner(e.target.value)}
+                placeholder="VD: Công ty ABC"
+                className="bg-white border-slate-300"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setAddBankAccountDialogOpen(false)}>
+              Hủy
+            </Button>
+            <Button onClick={handleSaveBankAccount} className="bg-blue-600 hover:bg-blue-700 text-white">
+              Lưu tài khoản
             </Button>
           </DialogFooter>
         </DialogContent>
