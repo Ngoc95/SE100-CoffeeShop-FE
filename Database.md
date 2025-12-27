@@ -31,6 +31,7 @@ users [icon: user, color: blue] {
   custom_permissions jsonb
   created_at timestamp
   updated_at timestamp
+  deleted_at timestamp  // Soft delete
   last_login timestamp
 }
 
@@ -41,6 +42,7 @@ roles [icon: shield, color: blue] {
   is_system boolean
   created_at timestamp
   updated_at timestamp
+  deleted_at timestamp
 }
 
 permissions [icon: key, color: blue] {
@@ -52,7 +54,7 @@ permissions [icon: key, color: blue] {
 }
 
 role_permissions [icon: link, color: blue] {
-  role_id int pk auto_increment, fk
+  role_id int pk, fk
   permission_id varchar pk, fk
 }
 
@@ -71,9 +73,9 @@ categories [icon: folder, color: green] {
   display_order int
   created_at timestamp
   updated_at timestamp
+  deleted_at timestamp
 }
 
-// Đơn vị tính (kg, g, L, ml, chai, hộp, cái, ly...)
 units [icon: ruler, color: green] {
   id int pk auto_increment
   name varchar
@@ -81,13 +83,22 @@ units [icon: ruler, color: green] {
   description text
   created_at timestamp
   updated_at timestamp
+  deleted_at timestamp
 }
 
-// Bảng thống nhất cho cả 3 loại: ready_made, composite, ingredient
+// Bảng loại hàng hóa (thay cho type varchar)
+item_types [icon: tag, color: green] {
+  id int pk auto_increment
+  code varchar unique  // 'ready_made' | 'composite' | 'ingredient'
+  name varchar
+  description text
+}
+
+// Bảng thống nhất cho cả 3 loại hàng hóa
 inventory_items [icon: package, color: green] {
   id int pk auto_increment
   name varchar
-  type varchar  // 'ready_made' | 'composite' | 'ingredient'
+  item_type_id int fk  // FK thay cho type varchar
   category_id int fk
   unit_id int fk
   current_stock decimal
@@ -102,9 +113,9 @@ inventory_items [icon: package, color: green] {
   image_url varchar
   created_at timestamp
   updated_at timestamp
+  deleted_at timestamp
 }
 
-// Lô hàng - dùng cho cả ready_made VÀ ingredient
 inventory_batches [icon: box, color: green] {
   id int pk auto_increment
   item_id int fk
@@ -119,7 +130,6 @@ inventory_batches [icon: box, color: green] {
   purchase_order_id int fk
 }
 
-// Công thức - chỉ dùng cho composite
 item_ingredients [icon: list, color: green] {
   id int pk auto_increment
   composite_item_id int fk
@@ -128,13 +138,13 @@ item_ingredients [icon: list, color: green] {
   unit varchar
 }
 
-// Sản phẩm topping liên kết
 item_toppings [icon: plus-circle, color: green] {
   id int pk auto_increment
   product_id int fk
   topping_id int fk
 }
 
+inventory_items.item_type_id > item_types.id
 inventory_items.category_id > categories.id
 inventory_items.unit_id > units.id
 inventory_batches.item_id > inventory_items.id
@@ -155,6 +165,7 @@ customer_groups [icon: users, color: purple] {
   min_points int
   created_at timestamp
   updated_at timestamp
+  deleted_at timestamp
 }
 
 customers [icon: user-check, color: purple] {
@@ -174,6 +185,7 @@ customers [icon: user-check, color: purple] {
   status varchar
   created_at timestamp
   updated_at timestamp
+  deleted_at timestamp
 }
 
 customers.group_id > customer_groups.id
@@ -191,6 +203,7 @@ tables [icon: layout, color: orange] {
   current_order_id int fk
   created_at timestamp
   updated_at timestamp
+  deleted_at timestamp
 }
 
 orders [icon: shopping-cart, color: orange] {
@@ -244,24 +257,68 @@ order_items.parent_item_id > order_items.id
 // 5. KHUYẾN MÃI & COMBO
 // ===========================================
 
+promotion_types [icon: tag, color: pink] {
+  id int pk auto_increment
+  name varchar
+  description text
+}
+
 promotions [icon: percent, color: pink] {
   id int pk auto_increment
   name varchar
   description text
-  type varchar
+  type_id int fk
   discount_value decimal
   min_order_value decimal
   max_discount decimal
-  applicable_to varchar
-  applicable_ids jsonb
-  start_date timestamp
-  end_date timestamp
+  start_date date
+  end_date date
+  start_time time
+  end_time time
   is_active boolean
   usage_limit int
   usage_count int
   created_at timestamp
   updated_at timestamp
+  deleted_at timestamp
 }
+
+promotion_applicable_items [icon: link, color: pink] {
+  promotion_id int fk
+  item_id int fk
+}
+
+promotion_applicable_categories [icon: link, color: pink] {
+  promotion_id int fk
+  category_id int fk
+}
+
+promotion_applicable_combos [icon: link, color: pink] {
+  promotion_id int fk
+  combo_id int fk
+}
+
+promotion_applicable_customers [icon: link, color: pink] {
+  promotion_id int fk
+  customer_id int fk
+}
+
+promotion_applicable_customer_groups [icon: link, color: pink] {
+  promotion_id int fk
+  customer_group_id int fk
+}
+
+promotions.type_id > promotion_types.id
+promotion_applicable_items.promotion_id > promotions.id
+promotion_applicable_items.item_id > inventory_items.id
+promotion_applicable_categories.promotion_id > promotions.id
+promotion_applicable_categories.category_id > categories.id
+promotion_applicable_combos.promotion_id > promotions.id
+promotion_applicable_combos.combo_id > combos.id
+promotion_applicable_customers.promotion_id > promotions.id
+promotion_applicable_customers.customer_id > customers.id
+promotion_applicable_customer_groups.promotion_id > promotions.id
+promotion_applicable_customer_groups.customer_group_id > customer_groups.id
 
 combos [icon: gift, color: pink] {
   id int pk auto_increment
@@ -276,6 +333,7 @@ combos [icon: gift, color: pink] {
   end_date timestamp
   created_at timestamp
   updated_at timestamp
+  deleted_at timestamp
 }
 
 combo_items [icon: list, color: pink] {
@@ -311,6 +369,7 @@ suppliers [icon: truck, color: cyan] {
   notes text
   created_at timestamp
   updated_at timestamp
+  deleted_at timestamp
 }
 
 purchase_orders [icon: file-text, color: cyan] {
@@ -348,8 +407,7 @@ purchase_order_items [icon: list, color: cyan] {
   expiry_date date
 }
 
-// purchase_payments đã được loại bỏ - sử dụng finance_transactions thay thế
-// Khi thanh toán NCC: tạo finance_transaction với reference_type='purchase_order'
+// Thanh toán NCC: tạo finance_transaction với reference_type='purchase_order'
 
 purchase_orders.supplier_id > suppliers.id
 purchase_order_items.purchase_order_id > purchase_orders.id
@@ -380,6 +438,7 @@ staff [icon: user, color: yellow] {
   avatar_url varchar
   created_at timestamp
   updated_at timestamp
+  deleted_at timestamp
 }
 
 staff_salary_settings [icon: settings, color: yellow] {
@@ -468,19 +527,27 @@ payslips.staff_id > staff.id
 orders.staff_id > staff.id
 purchase_orders.staff_id > staff.id
 
-
 // ===========================================
 // 8. TÀI CHÍNH
 // ===========================================
 
+// Loại thu chi (thu / chi)
+finance_types [icon: tag, color: red] {
+  id int pk auto_increment
+  name varchar  // 'Thu' | 'Chi'
+}
+
+// Danh mục thu chi
 finance_categories [icon: folder, color: red] {
   id int pk auto_increment
   name varchar
-  type varchar  // 'receipt' | 'payment'
-  is_system boolean
+  type_id int fk  // FK đến finance_types
   created_at timestamp
   updated_at timestamp
+  deleted_at timestamp
 }
+
+finance_categories.type_id > finance_types.id
 
 bank_accounts [icon: credit-card, color: red] {
   id int pk auto_increment
@@ -492,6 +559,7 @@ bank_accounts [icon: credit-card, color: red] {
   is_active boolean
   created_at timestamp
   updated_at timestamp
+  deleted_at timestamp
 }
 
 finance_transactions [icon: activity, color: red] {
@@ -517,7 +585,6 @@ finance_transactions [icon: activity, color: red] {
 finance_transactions.category_id > finance_categories.id
 finance_transactions.bank_account_id > bank_accounts.id
 finance_transactions.created_by > staff.id
-
 
 // ===========================================
 // 9. QUẢN LÝ KHO
@@ -628,40 +695,15 @@ activity_logs.user_id > users.id
 
 ---
 
-## Giải thích thiết kế
-
-### Điểm khác biệt chính so với schema cũ:
-
-| Vấn đề cũ | Giải pháp mới |
-|-----------|---------------|
-| Tách riêng `products` và `ingredients` | Gộp thành `inventory_items` với field `type` |
-| `inventory_batches` chỉ link `ingredients` | Giờ link với `inventory_items` (cả ready_made và ingredient) |
-| `product_ingredients` chỉ cho products | Đổi thành `item_ingredients` cho composite items |
-
-### Phân biệt `type` vs `category`:
-
-- **type**: Xác định cách quản lý (`ready_made` / `composite` / `ingredient`)
-- **category_id**: Phân loại danh mục sản phẩm (`coffee`, `dairy`, `syrup`...)
-
-### Logic theo type:
-
-| Type | Có Batches? | Có Recipe? | Có Selling Price? |
-|------|-------------|------------|-------------------|
-| `ready_made` | ✅ Có | ❌ Không | ✅ Có |
-| `composite` | ❌ Không | ✅ Có | ✅ Có |
-| `ingredient` | ✅ Có | ❌ Không | ⚠️ Tùy chọn |
-
----
-
-## Danh sách Tables (42 bảng)
+## Danh sách Tables (49 bảng)
 
 1. **Users & Auth**: `users`, `roles`, `permissions`, `role_permissions`
-2. **Inventory**: `categories`, `units`, `inventory_items`, `inventory_batches`, `item_ingredients`, `item_toppings`
+2. **Inventory**: `categories`, `units`, `item_types`, `inventory_items`, `inventory_batches`, `item_ingredients`, `item_toppings`
 3. **Customers**: `customer_groups`, `customers`
 4. **Sales**: `tables`, `orders`, `order_items`
-5. **Promotions**: `promotions`, `combos`, `combo_items`
+5. **Promotions**: `promotion_types`, `promotions`, `promotion_applicable_items`, `promotion_applicable_categories`, `promotion_applicable_combos`, `promotion_applicable_customers`, `promotion_applicable_customer_groups`, `combos`, `combo_items`
 6. **Purchasing**: `suppliers`, `purchase_orders`, `purchase_order_items`
 7. **Staff**: `staff`, `staff_salary_settings`, `shifts`, `staff_schedules`, `timekeeping`, `payroll`, `payslips`
-8. **Finance**: `finance_categories`, `bank_accounts`, `finance_transactions`
+8. **Finance**: `finance_types`, `finance_categories`, `bank_accounts`, `finance_transactions`
 9. **Stock**: `stock_checks`, `stock_check_items`, `write_offs`, `write_off_items`, `new_item_requests`
 10. **System**: `activity_logs`, `system_settings`

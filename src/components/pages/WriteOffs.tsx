@@ -1524,24 +1524,10 @@ export function WriteOffs() {
                                       </span>
                                     </div>
                                     <div>
-                                      <Label className="text-sm text-slate-600 mb-1 block">
-                                        Thời gian
-                                      </Label>
-                                      <Input
-                                        type="datetime-local"
-                                        value={
-                                          editingDates[wo.id] ||
-                                          wo.date.replace(" ", "T").slice(0, 16)
-                                        }
-                                        onChange={(e) =>
-                                          setEditingDates({
-                                            ...editingDates,
-                                            [wo.id]: e.target.value,
-                                          })
-                                        }
-                                        className="text-sm bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                                        onClick={(e) => e.stopPropagation()}
-                                      />
+                                      <span className="font-medium text-slate-600">
+                                        Thời gian:
+                                      </span>{" "}
+                                      <span className="text-slate-900">{wo.date}</span>
                                     </div>
                                     <div>
                                       <span className="font-medium text-slate-600">
@@ -1682,7 +1668,6 @@ export function WriteOffs() {
                                         size="sm"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          // Hoàn thành phiếu tạm
                                           if (
                                             !wo.details?.items ||
                                             wo.details.items.length === 0
@@ -1692,20 +1677,16 @@ export function WriteOffs() {
                                             );
                                             return;
                                           }
-
-                                          // Cập nhật status của write-off thành "completed"
                                           setWriteOffs(
                                             writeOffs.map((w) =>
                                               w.id === wo.id
                                                 ? {
                                                   ...w,
-                                                  status:
-                                                    "completed" as const,
+                                                  status: "completed" as const,
                                                 }
                                                 : w
                                             )
                                           );
-
                                           toast.success(
                                             "Đã hoàn thành phiếu xuất hủy"
                                           );
@@ -1713,31 +1694,6 @@ export function WriteOffs() {
                                       >
                                         <Check className="w-4 h-4" />
                                         Hoàn thành
-                                      </Button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Button
-                                        className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleSaveWriteOff(wo.id);
-                                        }}
-                                      >
-                                        <Save className="w-4 h-4" />
-                                        Lưu
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handlePrintWriteOff();
-                                        }}
-                                      >
-                                        <Printer className="w-4 h-4 mr-2" />
-                                        In
                                       </Button>
                                       <Button
                                         variant="outline"
@@ -1750,6 +1706,20 @@ export function WriteOffs() {
                                       >
                                         <Trash2 className="w-4 h-4 mr-2" />
                                         Huỷ bỏ
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handlePrintWriteOff();
+                                        }}
+                                      >
+                                        <Printer className="w-4 h-4 mr-2" />
+                                        In
                                       </Button>
                                     </>
                                   )}

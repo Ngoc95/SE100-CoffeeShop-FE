@@ -1124,7 +1124,7 @@ export function StockCheck() {
                                     <>
                                       <Button
                                         variant="outline"
-                                        className="bg-slate-700 text-white hover:bg-slate-800 px-4"
+                                        className="bg-slate-700 text-black px-4"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           // TODO: mở popup chỉnh sửa phiếu với dữ liệu hiện tại
