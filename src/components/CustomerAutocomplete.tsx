@@ -15,10 +15,16 @@ import { Textarea } from "./ui/textarea";
 import { toast } from "sonner";
 
 interface Customer {
-  id: string;
-  name: string;
-  code: string;
-  phone?: string;
+  id: number
+  code: string        // 👈 BẮT BUỘC
+  name: string
+  phone?: string
+  gender?: string
+  city?: string
+  groupName?: string
+  totalOrders?: number
+  totalSpent?: number
+  isActive?: boolean
 }
 
 interface CustomerAutocompleteProps {
@@ -93,7 +99,7 @@ export function CustomerAutocomplete({
     }
 
     const newCustomer: Customer = {
-      id: `cust-${Date.now()}`,
+      id: Date.now(), // Temporary 
       code: code.toUpperCase(),
       name: name,
       phone: phone || undefined,

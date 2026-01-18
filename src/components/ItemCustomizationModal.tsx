@@ -86,8 +86,12 @@ export function ItemCustomizationModal({
   };
 
   const calculateTotalPrice = () => {
-    const toppingsTotal = selectedToppings.reduce((sum, t) => sum + t.price, 0);
-    return basePrice + toppingsTotal;
+    const base = typeof basePrice === "number" ? basePrice : Number(basePrice) || 0;
+    const toppingsTotal = selectedToppings.reduce(
+      (sum, t) => sum + (Number(t.price) || 0) * (t.quantity ?? 1),
+      0
+    );
+    return base + toppingsTotal;
   };
 
   const handleUpdate = () => {
@@ -192,7 +196,7 @@ export function ItemCustomizationModal({
                       {topping.name}
                     </div>
                     <div className="text-xs text-blue-600 mb-2">
-                      +{topping.price.toLocaleString()}₫
+                      +{Number(topping.price).toLocaleString("vi-VN")}₫
                     </div>
 
                     {selected ? (

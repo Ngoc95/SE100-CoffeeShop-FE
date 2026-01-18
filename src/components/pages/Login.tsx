@@ -5,38 +5,52 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { useAuth } from '../../contexts/AuthContext';
-import { toast } from 'sonner';
+import { toast } from 'sonner'; 
+import { login as loginApi } from '../../api/authApi';
 
 export function Login() {
+
+  const handleLogin = async () => {
+    try {
+      await login(username, password); // 👈 CHỈ DÒNG NÀY
+
+      toast.success('Đăng nhập thành công');
+      window.location.href = '/pos';
+    } catch (err) {
+      console.error(err);
+      toast.error('Đăng nhập thất bại');
+    }
+  };
+
   const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // const handleSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault();
     
-    if (!username || !password) {
-      toast.error('Vui lòng nhập đầy đủ thông tin');
-      return;
-    }
+  //   if (!username || !password) {
+  //     toast.error('Vui lòng nhập đầy đủ thông tin');
+  //     return;
+  //   }
 
-    setIsLoading(true);
+  //   setIsLoading(true);
 
-    // Simulate API call delay
-    setTimeout(() => {
-      const success = login(username, password);
+  //   // Simulate API call delay
+  //   setTimeout(() => {
+  //     const success = login(username, password);
       
-      if (success) {
-        toast.success('Đăng nhập thành công!');
-      } else {
-        toast.error('Tên đăng nhập hoặc mật khẩu không đúng');
-      }
+  //     if (success) {
+  //       toast.success('Đăng nhập thành công!');
+  //     } else {
+  //       toast.error('Tên đăng nhập hoặc mật khẩu không đúng');
+  //     }
       
-      setIsLoading(false);
-    }, 500);
-  };
+  //     setIsLoading(false);
+  //   }, 500);
+  // };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50 p-4">
@@ -53,7 +67,10 @@ export function Login() {
           </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={(e) => {
+  e.preventDefault();
+  handleLogin();
+}} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="username">Tên đăng nhập</Label>
               <Input

@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { SetStateAction, useEffect, useState } from "react";
+import { getInventoryItems, getToppingItems } from "../../api/inventoryItem";
+import { getTables } from "../../api/table";
 import {
   Search,
   Plus,
@@ -70,14 +72,7 @@ import {
   DropdownMenuItem,
 } from "../ui/dropdown-menu";
 import { CheckoutModal } from "../CheckoutModal";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetTrigger,
-} from "../ui/sheet";
+// Removed requests drawer (Sheet) related imports
 import { Textarea } from "../ui/textarea";
 import { toast } from "sonner";
 import {
@@ -99,18 +94,42 @@ import { ComboDetectionPopup } from "../ComboDetectionPopup";
 import { CartItemDisplay } from "../CartItemDisplay";
 import { CustomerAutocomplete } from "../CustomerAutocomplete";
 import { PrintReceiptModal } from "../PrintReceiptModal";
-import { combos, type Combo } from "../../data/combos";
 import { autoComboPromotions } from "../../data/combos";
-import { IngredientSelectionDialog } from "../IngredientSelectionDialog";
+import { getActiveCombos } from "../../api/combo";
+// Removed IngredientSelectionDialog (no longer used)
 import { AccountProfileModal } from "../AccountProfileModal";
 import { useAuth } from "../../contexts/AuthContext";
+import { getCategories } from "../../api/category";
+import { getOrderByTable, getOrders, sendOrderToKitchen, checkoutOrder, mapOrderToCartItems, mapOrdersToReadyItems } from "../../api/order";
+import { getAreas } from "../../api/area";
+import { getCustomers } from "../../api/customer";
+import { create } from "domain";
+// Helper to safely extract array items from various API response shapes
+const extractItems = (res: any): any[] => {
+  const data = res?.data ?? res;
+  // Common shapes: { metaData: { items: [] } } | { items: [] } | { data: [] } | []
+  let items = data?.metaData?.items ?? data?.items ?? data?.data;
+  if (Array.isArray(items)) return items;
+  // Some APIs may return array directly under metaData
+  if (Array.isArray(data?.metaData)) return data.metaData;
+  // Or the body itself might be an array
+  if (Array.isArray(data)) return data;
+  return [];
+};
 
 interface Customer {
-  id: string;
-  name: string;
-  code: string;
-  phone?: string;
+  id: number
+  code: string      
+  name: string
+  phone?: string
+  gender?: string
+  city?: string
+  groupName?: string
+  totalOrders?: number
+  totalSpent?: number
+  isActive?: boolean
 }
+
 
 interface CartItem {
   id: string;
@@ -146,22 +165,34 @@ interface CartItem {
 }
 
 interface Table {
-  id: string;
-  number: number;
+  id: number;
+  name: string;
   capacity: number;
   status: "available" | "occupied";
   currentOrder?: string;
-  area: string;
-  startTime?: number; // timestamp when table was occupied
+  area: number;
+  createdAt?: number; // timestamp when table was occupied
+  updatedAt?: number; // timestamp of last update
+  deletedAt?: number; // timestamp when table was freed
+  isActive: boolean;
+  order_id: number;
 }
 
 interface TableOrders {
   [tableId: string]: CartItem[];
 }
 
+interface Category {
+  id: string
+  name: string
+}
+
 interface Area {
-  id: string;
+  id: number;
   name: string;
+  createdAt?: string;
+  updatedAt?: string;
+  deletedAt?: string;
 }
 
 interface OrderHistoryEntry {
@@ -184,6 +215,44 @@ interface InventoryIngredient {
   category: string;
   unit: string;
   avgUnitCost: number;
+}
+
+// Topping item shape fetched from backend
+interface Topping {
+  id: string;
+  name: string;
+  price: number;
+  category?: string;
+  isTopping: boolean;
+}
+
+// Combo types for POS (mapped from backend)
+interface PosComboItem {
+  id: string;
+  name: string;
+  price: number;
+  extraPrice?: number;
+  category?: string;
+  stock: number;
+}
+
+interface PosComboGroup {
+  id: string;
+  name: string;
+  required: boolean;
+  minSelect: number;
+  maxSelect: number;
+  items: PosComboItem[];
+}
+
+interface PosCombo {
+  id: string;
+  name: string;
+  description: string;
+  price: number; // comboPrice from backend
+  groups: PosComboGroup[];
+  image?: string;
+  discount?: number;
 }
 
 interface NewItemRequest {
@@ -223,32 +292,54 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [isTakeaway, setIsTakeaway] = useState(false);
   const [accountModalOpen, setAccountModalOpen] = useState(false);
-  const [selectedArea, setSelectedArea] = useState("all");
+  const [selectedArea, setSelectedArea] = useState<number | 'all'>('all')
   const [selectedTableStatus, setSelectedTableStatus] = useState("all");
   const [isCartOpen, setIsCartOpen] = useState(false);
+  // Helper to map table from BE format
+  const mapTableFromBE = (t: {
+  id: number
+  tableName: string
+  capacity: number
+  currentStatus: string
+  area?: { id: number }
+  createdAt?: string
+  updatedAt?: string
+  deletedAt?: string
+  isActive: boolean
+  order_id: number
+}) => ({
+  id: t.id,
+  name: t.tableName ?? String(t.id),
+  number: Number(t.tableName.replace(/\D/g, '')),
+  capacity: t.capacity,
+  status: (t.currentStatus === 'OCCUPIED' ? 'occupied' : 'available') as Table['status'],
+  area: (t.area?.id ?? (t as any).areaId) as number,
+  createdAt: t.createdAt ? new Date(t.createdAt).getTime() : undefined,
+  updatedAt: t.updatedAt ? new Date(t.updatedAt).getTime() : undefined,
+  deletedAt: t.deletedAt ? new Date(t.deletedAt).getTime() : undefined,
+  isActive: t.isActive,
+  order_id: t.order_id
+})
 
   // Customer data
-  const [customers] = useState<Customer[]>([
-    { id: "1", name: "Nguyễn Văn Hải", code: "KH000001", phone: "0912345678" },
-    {
-      id: "2",
-      name: "Anh Giang - Kim Mã",
-      code: "KH000005",
-      phone: "0987654321",
-    },
-    {
-      id: "3",
-      name: "Anh Hoàng - Sài Gòn",
-      code: "KH000004",
-      phone: "0912345679",
-    },
-    { id: "4", name: "Tuấn - Hà Nội", code: "KH000003", phone: "0987654322" },
-    { id: "5", name: "Phạm Thu Hương", code: "KH000002", phone: "0912345680" },
-  ]);
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
 
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
-    null
-  );
+useEffect(() => {
+  const fetchCustomers = async () => {
+    try {
+      const res = await getCustomers();
+      setCustomers(extractItems(res));
+    } catch (err: any) {
+      toast.error("Không tải được danh sách khách hàng", {
+        description: err?.message || "Lỗi kết nối API",
+      });
+    }
+  };
+
+  fetchCustomers();
+}, [])
+
   const [customerSearchCode, setCustomerSearchCode] = useState("");
 
   // Bank accounts state
@@ -309,17 +400,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
   const [splitDestinationTable, setSplitDestinationTable] =
     useState<Table | null>(null);
 
-  // New item request states
-  const [newItemModalOpen, setNewItemModalOpen] = useState(false);
-  const [requestsDrawerOpen, setRequestsDrawerOpen] = useState(false);
-  const [newItemName, setNewItemName] = useState("");
-  const [newItemCategory, setNewItemCategory] = useState("");
-  const [newItemDescription, setNewItemDescription] = useState("");
-  const [newItemNotes, setNewItemNotes] = useState("");
-  const [addIngredientDialogOpen, setAddIngredientDialogOpen] = useState(false);
-  const [selectedIngredients, setSelectedIngredients] = useState<
-    CompositeIngredient[]
-  >([]);
+  // Removed: New item request states
 
   // Customization states
   const [customizationModalOpen, setCustomizationModalOpen] = useState(false);
@@ -351,7 +432,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
 
   // Combo states
   const [comboSelectionOpen, setComboSelectionOpen] = useState(false);
-  const [selectedCombo, setSelectedCombo] = useState<Combo | null>(null);
+  const [selectedCombo, setSelectedCombo] = useState<PosCombo | null>(null);
   const [dismissedComboSuggestions, setDismissedComboSuggestions] = useState<
     string[]
   >([]);
@@ -360,410 +441,219 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
   const [pendingItemToAdd, setPendingItemToAdd] = useState<
     (typeof products)[0] | null
   >(null);
+  const [posCombos, setPosCombos] = useState<PosCombo[]>([]);
 
   // Topping states
-  const [selectedTopping, setSelectedTopping] = useState<
-    (typeof toppingProducts)[0] | null
-  >(null);
+  const [selectedTopping, setSelectedTopping] = useState<Topping | null>(null);
   const [toppingActionModalOpen, setToppingActionModalOpen] = useState(false); // "Attach or standalone" modal
   const [toppingQuantity, setToppingQuantity] = useState(1);
   const [selectItemToAttachOpen, setSelectItemToAttachOpen] = useState(false); // Modal to select which item to attach to
   const [selectedItemToAttachTopping, setSelectedItemToAttachTopping] =
     useState<CartItem | null>(null);
 
-  // Ready items from kitchen (waiter monitoring)
-  const [readyItems, setReadyItems] = useState<ReadyItem[]>([
-    {
-      id: "r1",
-      itemName: "Cà phê sữa đá",
-      totalQuantity: 0,
-      completedQuantity: 3,
-      servedQuantity: 3,
-      table: "Bàn 2",
-      timestamp: new Date(Date.now() - 5 * 60000),
-    },
-    {
-      id: "r2",
-      itemName: "Trà đào cam sả",
-      totalQuantity: 1,
-      completedQuantity: 1,
-      servedQuantity: 1,
-      table: "Bàn 7",
-      timestamp: new Date(Date.now() - 3 * 60000),
-      notes: "Extra trân châu",
-    },
-    {
-      id: "r3",
-      itemName: "Cappuccino",
-      totalQuantity: 0,
-      completedQuantity: 1,
-      servedQuantity: 1,
-      table: "Bàn 4",
-      timestamp: new Date(Date.now() - 1 * 60000),
-    },
-  ]);
-
-  // Mock inventory ingredients for adding to formula
-  const inventoryIngredients: InventoryIngredient[] = [
-    {
-      id: "ing1",
-      name: "Cà phê hạt Arabica",
-      category: "coffee",
-      unit: "g",
-      avgUnitCost: 350,
-    },
-    {
-      id: "ing2",
-      name: "Sữa tươi",
-      category: "dairy",
-      unit: "ml",
-      avgUnitCost: 28,
-    },
-    {
-      id: "ing3",
-      name: "Đường trắng",
-      category: "syrup",
-      unit: "g",
-      avgUnitCost: 22,
-    },
-    {
-      id: "ing4",
-      name: "Kem tươi",
-      category: "dairy",
-      unit: "ml",
-      avgUnitCost: 85,
-    },
-    {
-      id: "ing5",
-      name: "Trà Ô Long",
-      category: "tea",
-      unit: "g",
-      avgUnitCost: 280,
-    },
-    {
-      id: "ing6",
-      name: "Đào tươi",
-      category: "fruit",
-      unit: "g",
-      avgUnitCost: 50,
-    },
-    {
-      id: "ing7",
-      name: "Trân châu đen",
-      category: "brewing-ingredients",
-      unit: "g",
-      avgUnitCost: 35,
-    },
-    {
-      id: "ing8",
-      name: "Siro vani",
-      category: "syrup",
-      unit: "ml",
-      avgUnitCost: 45,
-    },
-    {
-      id: "ing9",
-      name: "Đá viên",
-      category: "brewing-ingredients",
-      unit: "g",
-      avgUnitCost: 2,
-    },
-    {
-      id: "ing10",
-      name: "Chocolate bột",
-      category: "brewing-ingredients",
-      unit: "g",
-      avgUnitCost: 120,
-    },
-  ];
-
-  const [newItemRequests, setNewItemRequests] = useState<NewItemRequest[]>([
-    {
-      id: "req1",
-      name: "Trà đào mix phúc bồn tử",
-      category: "tea",
-      description: "Trà đào kết hợp với phúc bồn tử tươi",
-      notes: "Khách yêu cầu",
-      status: "pending",
-      createdAt: "14:15",
-    },
-    {
-      id: "req2",
-      name: "Cà phê trứng",
-      category: "coffee",
-      description: "Cà phê đen với lớp kem trứng béo ngậy",
-      notes: "",
-      status: "approved",
-      createdAt: "10:20",
-      isNew: true,
-    },
-    {
-      id: "req3",
-      name: "Sinh tố xoài dừa",
-      category: "smoothie",
-      description: "Sinh tố xoài với nước cốt dừa",
-      notes: "",
-      status: "rejected",
-      createdAt: "09:50",
-      rejectionReason: "Thiếu thông tin chi tiết",
-    },
-  ]);
+  // Ready items from backend (completed items across orders)
+  const [readyItems, setReadyItems] = useState<ReadyItem[]>([]);
+  useEffect(() => {
+    const fetchReady = async () => {
+      try {
+        const res = await getOrders();
+        const data = extractItems(res);
+        const d: any = data;
+        const ordersArray: any[] = Array.isArray(d)
+          ? d
+          : (Array.isArray(d?.items) ? d.items : []);
+        const ready = mapOrdersToReadyItems(ordersArray);
+        setReadyItems(ready);
+      } catch (err: any) {
+        // Silently ignore if endpoint/shape not available, but surface toast for visibility
+        toast.error("Không tải được danh sách món đã hoàn thành", {
+          description: err?.message || "Lỗi kết nối API",
+        });
+      }
+    };
+    fetchReady();
+  }, []);
 
   // Lưu đơn hàng cho từng bàn
-  const [tableOrders, setTableOrders] = useState<TableOrders>({
-    // Mock data cho bàn đang có khách
-    t2: [
-      {
-        id: "1",
-        name: "Cà phê sữa đá",
-        price: 35000,
-        quantity: 2,
-        status: "preparing",
-      },
-      {
-        id: "5",
-        name: "Trà đào cam sả",
-        price: 40000,
-        quantity: 1,
-        status: "completed",
-        toppings: ["Đá", "Ít đường"],
-      },
-      {
-        id: "8",
-        name: "Sinh tố dâu",
-        price: 40000,
-        quantity: 1,
-        status: "pending",
-      },
-    ],
-    t4: [
-      {
-        id: "2",
-        name: "Bạc xỉu",
-        price: 30000,
-        quantity: 1,
-        status: "completed",
-      },
-      {
-        id: "9",
-        name: "Bánh tiramisu",
-        price: 50000,
-        quantity: 2,
-        status: "served",
-      },
-    ],
-    t7: [
-      {
-        id: "4",
-        name: "Cappuccino",
-        price: 45000,
-        quantity: 1,
-        status: "preparing",
-        toppings: ["Shot thêm"],
-      },
-      {
-        id: "10",
-        name: "Bánh croissant",
-        price: 35000,
-        quantity: 1,
-        status: "completed",
-      },
-      {
-        id: "7",
-        name: "Sinh tố bơ",
-        price: 42000,
-        quantity: 2,
-        status: "pending",
-      },
-    ],
-  });
+  const [tableOrders, setTableOrders] = useState<TableOrders>({});
   const [takeawayOrders, setTakeawayOrders] = useState<CartItem[]>([]);
 
-  // Convert tables to state so we can update them
-  const [tables, setTables] = useState<Table[]>([
-    { id: "t1", number: 1, capacity: 2, status: "available", area: "tang1" },
-    {
-      id: "t2",
-      number: 2,
-      capacity: 2,
-      status: "occupied",
-      currentOrder: "ORD-001",
-      area: "tang1",
-      startTime: Date.now() - 720000,
-    },
-    { id: "t3", number: 3, capacity: 4, status: "available", area: "tang1" },
-    {
-      id: "t4",
-      number: 4,
-      capacity: 4,
-      status: "occupied",
-      currentOrder: "ORD-002",
-      area: "tang1",
-      startTime: Date.now() - 1800000,
-    },
-    { id: "t5", number: 5, capacity: 6, status: "available", area: "tang2" },
-    { id: "t6", number: 6, capacity: 4, status: "available", area: "tang2" },
-    {
-      id: "t7",
-      number: 7,
-      capacity: 2,
-      status: "occupied",
-      currentOrder: "ORD-003",
-      area: "tang2",
-      startTime: Date.now() - 360000,
-    },
-    { id: "t8", number: 8, capacity: 4, status: "available", area: "tang2" },
-    { id: "t9", number: 9, capacity: 2, status: "available", area: "vip" },
-    { id: "t10", number: 10, capacity: 4, status: "available", area: "vip" },
-    {
-      id: "t11",
-      number: 11,
-      capacity: 6,
-      status: "available",
-      area: "rooftop",
-    },
-    {
-      id: "t12",
-      number: 12,
-      capacity: 4,
-      status: "available",
-      area: "rooftop",
-    },
-  ]);
+  const [tables, setTables] = useState<Table[]>([])
+  useEffect(() => {
+    const fetchTables = async () => {
+      try {
+        const res = await getTables();
+        const items = extractItems(res);
+        setTables(items.map(mapTableFromBE));
+      } catch (err: any) {
+        toast.error("Không tải được danh sách bàn", {
+          description: err?.message || "Lỗi kết nối API",
+        });
+      }
+    };
 
-  const areas: Area[] = [
-    { id: "tang1", name: "Tầng 1" },
-    { id: "tang2", name: "Tầng 2" },
-    { id: "vip", name: "Phòng VIP" },
-    { id: "rooftop", name: "Sân thượng" },
-  ];
+    fetchTables();
+  }, [])
 
-  const categories = [
-    { id: "all", name: "Tất cả" },
-    { id: "coffee", name: "Cà phê" },
-    { id: "tea", name: "Trà" },
-    { id: "smoothie", name: "Sinh tố" },
-    { id: "pastry", name: "Bánh ngọt" },
-  ];
 
-  const products = [
-    {
-      id: "1",
-      name: "Cà phê sữa đá",
-      category: "coffee",
-      price: 35000,
-      image: "☕",
-    },
-    { id: "2", name: "Bạc xỉu", category: "coffee", price: 30000, image: "☕" },
-    {
-      id: "3",
-      name: "Cà phê đen",
-      category: "coffee",
-      price: 25000,
-      image: "☕",
-    },
-    {
-      id: "4",
-      name: "Cappuccino",
-      category: "coffee",
-      price: 45000,
-      image: "☕",
-    },
-    {
-      id: "5",
-      name: "Trà đào cam sả",
-      category: "tea",
-      price: 40000,
-      image: "🍵",
-    },
-    {
-      id: "6",
-      name: "Trà sữa trân châu",
-      category: "tea",
-      price: 38000,
-      image: "🍵",
-    },
-    {
-      id: "7",
-      name: "Sinh tố bơ",
-      category: "smoothie",
-      price: 42000,
-      image: "🥤",
-    },
-    {
-      id: "8",
-      name: "Sinh tố dâu",
-      category: "smoothie",
-      price: 40000,
-      image: "🥤",
-    },
-    {
-      id: "9",
-      name: "Bánh tiramisu",
-      category: "pastry",
-      price: 50000,
-      image: "🍰",
-    },
-    {
-      id: "10",
-      name: "Bánh croissant",
-      category: "pastry",
-      price: 35000,
-      image: "🥐",
-    },
-    {
-      id: "11",
-      name: "Cà phê trứng",
-      category: "coffee",
-      price: 40000,
-      image: "☕",
-      isNew: true,
-    },
-  ];
+  const [areas, setAreas] = useState<Area[]>([])
+  const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null)
+
+  useEffect(() => {
+    const fetchAreas = async () => {
+      try {
+        const res = await getAreas();
+        setAreas(extractItems(res));
+      } catch (err: any) {
+        toast.error("Không tải được khu vực", {
+          description: err?.message || "Lỗi kết nối API",
+        });
+      }
+    };
+
+    fetchAreas();
+  }, [])
+
+
+  const [categories, setCategories] = useState<Category[]>([])
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await getCategories();
+        const items = extractItems(res);
+        const desiredNames = [
+          'Bánh ngọt',
+          'Cà phê',
+          'Trà',
+          'Nước ngọt',
+          'Đồ uống đóng chai',
+        ];
+        const mapped = (items as any[]).map((c: any) => ({
+          id: String(c.id),
+          name: String(c.name),
+        }));
+        const filtered = mapped.filter((c) =>
+          desiredNames.some((n) => n.toLowerCase() === c.name.toLowerCase())
+        );
+        const sorted = filtered.sort(
+          (a, b) =>
+            desiredNames.findIndex((n) => n.toLowerCase() === a.name.toLowerCase()) -
+            desiredNames.findIndex((n) => n.toLowerCase() === b.name.toLowerCase())
+        );
+        // Prepend a synthetic "Tất cả" category for convenience
+        setCategories([{ id: 'all', name: 'Tất cả' }, ...sorted]);
+      } catch (err: any) {
+        toast.error("Không tải được danh mục", {
+          description: err?.message || "Lỗi kết nối API",
+        });
+      }
+    };
+
+    fetchCategories();
+  }, [])
+
+  const [products, setProducts] = useState<any[]>([])
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const res = await getInventoryItems();
+        const items = extractItems(res);
+        setProducts(
+          items.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            category: String(item?.category?.id ?? item.category),
+            // Ensure sellingPrice is numeric to avoid string concatenation issues
+            price: Number(item.sellingPrice),
+            image: '☕'
+          }))
+        );
+      } catch (err: any) {
+        toast.error("Không tải được sản phẩm/menu", {
+          description: err?.message || "Lỗi kết nối API",
+        });
+      }
+    };
+
+    fetchProducts();
+  }, [])
+
+  // Fetch active combos for POS and map to UI shape
+  useEffect(() => {
+    const fetchCombos = async () => {
+      try {
+        const res = await getActiveCombos();
+        const items = extractItems(res);
+        const mapped: PosCombo[] = (items as any[]).map((c: any) => {
+          const groups: PosComboGroup[] = (c.groups || []).map((g: any, idx: number) => {
+            const groupItems: PosComboItem[] = (g.items || []).map((gi: any) => {
+              const itemId = String(gi.itemId ?? gi.inventoryItemId ?? gi.id ?? gi.item?.id);
+              const product = products.find(p => String(p.id) === itemId);
+              return {
+                id: itemId,
+                name: gi.itemName ?? gi.name ?? product?.name ?? 'Món',
+                price: Number(product?.price ?? gi.price ?? 0),
+                extraPrice: gi.extraPrice != null ? Number(gi.extraPrice) : undefined,
+                category: product?.category,
+                stock: Number(gi.stock ?? 999),
+              };
+            });
+            return {
+              id: String(g.id ?? g.groupId ?? `${c.id}-g${idx}`),
+              name: g.name ?? g.groupName ?? `Nhóm ${idx + 1}`,
+              required: Boolean(g.required ?? (g.minSelect ?? 0) > 0),
+              minSelect: Number(g.minSelect ?? (g.required ? 1 : 0)),
+              maxSelect: Number(g.maxSelect ?? (groupItems.length || 1)),
+              items: groupItems,
+            };
+          });
+          return {
+            id: String(c.id),
+            name: c.name,
+            description: c.description ?? '',
+            price: Number(c.comboPrice ?? c.price ?? 0),
+            groups,
+            image: c.image ?? undefined,
+            discount: typeof c.discount === 'number' ? c.discount : undefined,
+          };
+        });
+        setPosCombos(mapped);
+      } catch (err: any) {
+        toast.error('Không tải được combo', { description: err?.message || 'Lỗi kết nối API' });
+      }
+    };
+
+    // Fetch combos regardless of product load; product enrichment happens when available
+    fetchCombos();
+  }, [products]);
 
   // Topping SKUs (independent products)
-  const toppingProducts = [
-    {
-      id: "t1",
-      name: "Trân châu đen",
-      category: "topping",
-      price: 8000,
-      image: "●",
-      compatibleWith: ["coffee", "tea", "smoothie"], // Can attach to drinks
-    },
-    {
-      id: "t2",
-      name: "Thạch xoài",
-      category: "topping",
-      price: 10000,
-      image: "🟨",
-      compatibleWith: ["tea", "smoothie"],
-    },
-    {
-      id: "t3",
-      name: "Sương sáo",
-      category: "topping",
-      price: 5000,
-      image: "❄️",
-      compatibleWith: ["coffee", "tea", "smoothie"],
-    },
-    {
-      id: "t4",
-      name: "Kem tươi",
-      category: "topping",
-      price: 12000,
-      image: "🍦",
-      compatibleWith: ["coffee", "smoothie"],
-    },
-    {
-      id: "t5",
-      name: "Choco chip",
-      category: "topping",
-      price: 7000,
-      image: "🍫",
-      compatibleWith: ["coffee", "smoothie"],
-    },
-  ];
+  // Toppings fetched from backend
+  const [toppings, setToppings] = useState<Topping[]>([]);
+  useEffect(() => {
+    const fetchToppings = async () => {
+      try {
+        const res = await getToppingItems();
+        const items = extractItems(res);
+        // Prefer backend's isTopping flag; fallback to itemTypeId === 'TOPPING'
+        const mapped = (items as any[])
+          .filter((item: any) => item?.isTopping === true || item?.itemTypeId === 'TOPPING')
+          .map((item: any) => ({
+            id: String(item.id),
+            name: item.name,
+            price: Number(item.sellingPrice),
+            category: String(item?.category?.id ?? item.category ?? 'topping'),
+            isTopping: Boolean(item?.isTopping ?? (item?.itemTypeId === 'TOPPING')),
+          }));
+        setToppings(mapped);
+      } catch (err: any) {
+        toast.error("Không tải được topping", {
+          description: err?.message || "Lỗi kết nối API",
+        });
+      }
+    };
+    fetchToppings();
+  }, []);
 
   const filteredProducts = products.filter((p) => {
     const matchesCategory =
@@ -774,7 +664,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
     return matchesCategory && matchesSearch && selectedCategory !== "combo";
   });
 
-  const filteredCombos = combos.filter((c) => {
+  const filteredCombos = posCombos.filter((c) => {
     const matchesCategory =
       selectedCategory === "all" || selectedCategory === "combo";
     const matchesSearch = c.name
@@ -889,7 +779,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
     setDismissedComboSuggestions([...dismissedComboSuggestions, comboId]);
   };
 
-  const handleComboClick = (combo: Combo) => {
+  const handleComboClick = (combo: PosCombo) => {
     if (selectedTable && selectedTable.status === "occupied") {
       toast.error("Bàn này đang có khách, không thể thêm món mới");
       return;
@@ -901,25 +791,26 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
 
   const handleConfirmCombo = (
     selectedItems: { [groupId: string]: string[] },
-    combo: Combo
+    combo: any
   ) => {
+    const comboData = combo as PosCombo;
     const cart = getCurrentCart();
 
     // Create combo cart item with nested items
     const comboCartItem: CartItem = {
-      id: `combo-${combo.id}-${Date.now()}`,
-      name: combo.name,
-      price: combo.price,
+      id: `combo-${comboData.id}-${Date.now()}`,
+      name: comboData.name,
+      price: comboData.price,
       quantity: 1,
       status: "pending",
       isCombo: true,
-      comboId: combo.id,
+      comboId: comboData.id,
       comboExpanded: false,
       comboItems: [],
     };
 
     // Add selected items as nested items
-    combo.groups.forEach((group) => {
+    comboData.groups.forEach((group) => {
       const selections = selectedItems[group.id] || [];
       selections.forEach((itemId) => {
         const groupItem = group.items.find((i) => i.id === itemId);
@@ -936,8 +827,8 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
     });
 
     // Calculate final price (base + extras)
-    let finalPrice = combo.price;
-    combo.groups.forEach((group) => {
+    let finalPrice = comboData.price;
+    comboData.groups.forEach((group) => {
       const selections = selectedItems[group.id] || [];
       selections.forEach((itemId) => {
         const item = group.items.find((i) => i.id === itemId);
@@ -1336,11 +1227,39 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
       });
     updateCurrentCart(updatedCart);
   };
+  const handleSelectArea = (areaId: number | null) => {
+  setSelectedAreaId(areaId)
 
+  getTables({
+    areaId: areaId ?? undefined,
+    isActive: true
+  }).then(res => {
+    const items = extractItems(res);
+    setTables(items.map(mapTableFromBE))
+  }).catch((err: any) => {
+    toast.error("Không tải được danh sách bàn", {
+      description: err?.message || "Lỗi kết nối API",
+    });
+  })
+}
   const handleSelectTable = (table: Table) => {
     // Cho phép xem tất cả các bàn, kể cả bàn có khách
     setSelectedTable(table);
     setIsTakeaway(false);
+    // Fetch current order items from backend
+    getOrderByTable(table.id)
+      .then((res: any) => {
+        const payload = res?.data?.metaData?.order ?? res?.data?.metaData ?? res?.data?.order ?? res?.data;
+        const items = mapOrderToCartItems(payload ?? {});
+        setTableOrders((prev) => ({ ...prev, [table.id]: items }));
+      })
+      .catch((err: any) => {
+        toast.error("Không tải được đơn hàng của bàn", {
+          description: err?.message || "Lỗi kết nối API",
+        });
+        // Ensure key exists even if empty so UI renders predictably
+        setTableOrders((prev) => ({ ...prev, [table.id]: [] }));
+      });
   };
 
   const handleSelectTakeaway = () => {
@@ -1407,7 +1326,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
 
     const orderInfo = isTakeaway
       ? "Đơn mang về"
-      : `Bàn ${selectedTable?.number}`;
+      : `Bàn ${selectedTable?.id}`;
 
     // Add to order history
     const historyEntry = {
@@ -1419,6 +1338,14 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
       staff: "Thu ngân Lan",
     };
     setOrderHistory((prev) => [historyEntry, ...prev]);
+
+    // Attempt backend send-to-kitchen if we have current order id
+    const orderId = selectedTable?.order_id;
+    if (orderId) {
+      sendOrderToKitchen(Number(orderId)).catch((err: any) => {
+        toast.error("Gửi bếp thất bại", { description: err?.message || "API lỗi" });
+      });
+    }
 
     // Reset kitchen update flag after sending
     setIsKitchenUpdateNeeded(false);
@@ -1653,48 +1580,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
     setOutOfStockWarningOpen(false);
   };
 
-  const handleSubmitNewItemRequest = () => {
-    if (!newItemName.trim()) {
-      toast.error("Vui lòng nhập tên món");
-      return;
-    }
-
-    if (!newItemCategory) {
-      toast.error("Vui lòng chọn danh mục");
-      return;
-    }
-
-    // Create new request
-    const newRequest: NewItemRequest = {
-      id: `req${Date.now()}`,
-      name: newItemName,
-      category: newItemCategory,
-      description: newItemDescription,
-      notes: newItemNotes,
-      status: "pending",
-      createdAt: new Date().toLocaleTimeString("vi-VN", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      ingredients:
-        selectedIngredients.length > 0 ? selectedIngredients : undefined,
-    };
-
-    setNewItemRequests([newRequest, ...newItemRequests]);
-
-    // Reset form
-    setNewItemName("");
-    setNewItemCategory("");
-    setNewItemDescription("");
-    setNewItemNotes("");
-    setSelectedIngredients([]);
-    setNewItemModalOpen(false);
-
-    // Show toast
-    toast.success("Đã gửi yêu cầu món mới đến Quản lý", {
-      description: "Vui lòng chờ phê duyệt.",
-    });
-  };
+  // Removed: handler for submitting new item requests
 
   const handleOpenCustomizationModal = (item: CartItem) => {
     setSelectedItemForCustomization(item);
@@ -1907,26 +1793,21 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
 
   // Helper function to get compatible items from cart for topping attachment
   const getCompatibleItemsForTopping = (
-    topping: (typeof toppingProducts)[0]
+    topping: Topping
   ): CartItem[] => {
     const cart = getCurrentCart();
     return cart.filter((item) => {
       // Only show main items (not toppings, not combos)
       if (item.isTopping || item.isCombo || item.parentItemId) return false;
-
-      // Find the product to check its category
-      const product = products.find((p) => p.id === item.id.split("-")[0]);
-      if (!product) return false;
-
-      // Check if topping is compatible with this item's category
-      return topping.compatibleWith.includes(product.category);
+      // If needed, restrict by category; by default allow attaching to all main items
+      return true;
     });
   };
 
   // Helper function to attach topping to item
   const attachToppingToItem = (
     parentItemId: string,
-    topping: (typeof toppingProducts)[0],
+    topping: Topping,
     quantity: number
   ) => {
     const cart = getCurrentCart();
@@ -1982,12 +1863,16 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
 
   // Helper function to calculate item price with customization and attached toppings
   const getItemPrice = (item: CartItem): number => {
-    const basePrice = item.price;
+    // Coerce base price to number to prevent string concatenation (e.g., "42000" + 8000)
+    const basePrice = Number(item.price) || 0;
     const customizationToppingsPrice =
-      item.customization?.toppings.reduce((sum, t) => sum + t.price, 0) || 0;
+      item.customization?.toppings.reduce(
+        (sum, t) => sum + (Number(t.price) || 0) * (t.quantity ?? 1),
+        0
+      ) || 0;
     const attachedToppingsPrice =
       item.attachedToppings?.reduce(
-        (sum, t) => sum + t.price * t.quantity,
+        (sum, t) => sum + (Number(t.price) || 0) * t.quantity,
         0
       ) || 0;
     return basePrice + customizationToppingsPrice + attachedToppingsPrice;
@@ -2175,25 +2060,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {/* Request notification icon */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0 relative"
-              onClick={() => setRequestsDrawerOpen(true)}
-              title="Yêu cầu của tôi"
-            >
-              <Bell className="w-4 h-4 text-blue-600" />
-              {newItemRequests.filter((r) => r.status === "pending").length >
-                0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
-                  {
-                    newItemRequests.filter((r) => r.status === "pending")
-                      .length
-                  }
-                </span>
-              )}
-            </Button>
+            {/* Removed: request notification icon for new item requests */}
             <Badge variant="secondary" className="bg-blue-100 text-blue-900">
               <ShoppingCart className="w-3 h-3 mr-1" />
               {totalItems}
@@ -2210,7 +2077,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
           <div>
             <div className="flex items-center gap-2 text-xs text-slate-600 mb-1">
               <span>
-                Bàn {selectedTable.number} – {selectedTable.capacity} chỗ
+                Bàn {selectedTable.name} – {selectedTable.capacity} chỗ
               </span>
             </div>
 
@@ -2535,6 +2402,15 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
         <Tabs
           defaultValue="tables"
           className="flex-1 flex flex-col overflow-hidden"
+          onValueChange={(value: string) => {
+            // Ensure combos are not hidden by a lingering category filter
+            if (value === 'combo') {
+              setSelectedCategory('combo');
+            } else if (value !== 'menu') {
+              // Reset to all when leaving menu/combo tabs
+              setSelectedCategory('all');
+            }
+          }}
         >
           <div className="mx-4 lg:mx-6 mt-2 overflow-x-auto lg:overflow-visible no-scrollbar">
             <TabsList className="bg-blue-100 inline-flex w-max lg:w-auto whitespace-nowrap lg:flex-wrap">
@@ -2612,7 +2488,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
               <Tabs
                 defaultValue="all"
                 className="mb-4"
-                onValueChange={(value) => setSelectedArea(value)}
+                onValueChange={(value: string) => setSelectedArea(value === 'all' ? 'all' : Number(value))}
               >
                 <TabsList className="bg-slate-100 flex-wrap h-auto">
                   <TabsTrigger
@@ -2624,7 +2500,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                   {areas.map((area) => (
                     <TabsTrigger
                       key={area.id}
-                      value={area.id}
+                      value={String(area.id)}
                       className="data-[state=active]:bg-white"
                     >
                       {area.name}
@@ -2735,10 +2611,10 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                               : "bg-red-500"
                           }`}
                         >
-                          <span className="text-white">{table.number}</span>
+                          <span className="text-white">{table.name.replace(/\D/g, '')}</span>
                         </div>
                         <p className="text-sm text-neutral-900">
-                          Bàn {table.number}
+                          Bàn {table.name}
                         </p>
                         <p className="text-xs text-neutral-500 mb-1">
                           {areas.find((a) => a.id === table.area)?.name}
@@ -2753,9 +2629,9 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                             {table.currentOrder}
                           </Badge>
                         )}
-                        {table.startTime && (
+                        {table.createdAt && (
                           <Badge variant="outline" className="mt-1 text-xs">
-                            {getElapsedTime(table.startTime)}
+                            {getElapsedTime(table.createdAt)}
                           </Badge>
                         )}
                       </CardContent>
@@ -2790,17 +2666,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                   ))}
                 </div>
 
-                {/* Add New Item Button */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setNewItemModalOpen(true)}
-                  aria-label="Thêm món mới"
-                  className="border-blue-500 text-blue-600 hover:bg-blue-50 hover:text-blue-700 whitespace-nowrap flex-shrink-0"
-                >
-                  <Sparkles className="w-4 h-4 lg:mr-1" />
-                  <span className="hidden md:inline">Thêm món mới</span>
-                </Button>
+                {/* Removed: Add New Item Button */}
               </div>
 
               {/* Products Grid */}
@@ -2867,7 +2733,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                 </h3>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                {toppingProducts.map((topping) => (
+                {toppings.map((topping) => (
                   <Card
                     key={topping.id}
                     className="cursor-pointer hover:shadow-md transition-all border border-slate-200 hover:border-amber-400"
@@ -2878,9 +2744,6 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                     }}
                   >
                     <CardContent className="p-3">
-                      <div className="text-3xl mb-2 text-center">
-                        {topping.image}
-                      </div>
                       <h4 className="font-semibold text-sm text-slate-900 text-center mb-1">
                         {topping.name}
                       </h4>
@@ -2926,30 +2789,21 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                     0
                   );
 
-                  // Calculate discount percentage if original price exists
-                  let discountPercent = 0;
-                  if (combo.originalPrice) {
-                    discountPercent = Math.round(
-                      ((combo.originalPrice - combo.price) /
-                        combo.originalPrice) *
-                        100
-                    );
-                  }
+                  // Show discount badge if provided in data
+                  const hasDiscount = typeof combo.discount === 'number' && combo.discount > 0;
 
                   return (
                     <Card
                       key={combo.id}
-                      className={`transition-shadow border-blue-200 relative cursor-pointer hover:shadow-lg hover:border-blue-400 ${
-                        combo.popular ? "ring-2 ring-blue-400" : ""
-                      }`}
+                      className={`transition-shadow border-blue-200 relative cursor-pointer hover:shadow-lg hover:border-blue-400`}
                       onClick={() => handleComboClick(combo)}
                     >
                       <CardContent className="p-4">
-                        {/* Popular badge */}
-                        {combo.popular && (
+                        {/* Discount badge */}
+                        {hasDiscount && (
                           <Badge className="absolute top-2 right-2 bg-amber-500 text-white text-xs">
                             <Sparkles className="w-3 h-3 mr-1" />
-                            Phổ biến
+                            Giảm {combo.discount?.toLocaleString()}₫
                           </Badge>
                         )}
 
@@ -2978,18 +2832,8 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                           </Badge>
                         </div>
 
-                        {/* Price and discount */}
+                        {/* Price */}
                         <div className="text-center">
-                          {combo.originalPrice && (
-                            <div className="flex items-center justify-center gap-2 mb-1">
-                              <span className="text-xs text-slate-400 line-through">
-                                {combo.originalPrice.toLocaleString()}₫
-                              </span>
-                              <Badge className="bg-red-500 text-white text-xs">
-                                -{discountPercent}%
-                              </Badge>
-                            </div>
-                          )}
                           <p className="text-blue-700">
                             {combo.price.toLocaleString()}₫
                           </p>
@@ -3141,7 +2985,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
         orderNumber={selectedTable?.currentOrder || "TAKEAWAY"}
         customerName={selectedCustomer?.name || "Khách hàng"}
         paymentMethod={lastPaymentMethod}
-        tableNumber={selectedTable ? String(selectedTable.number) : undefined}
+        tableNumber={selectedTable ? String(selectedTable.id) : undefined}
         waiterName={user?.fullName}
       />
 
@@ -3160,7 +3004,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
           }))}
         totalAmount={totalAmount}
         discountAmount={discountAmount}
-        tableNumber={selectedTable?.number}
+        tableNumber={selectedTable?.id}
         tableArea={selectedTable ? areas.find((a) => a.id === selectedTable.area)?.name : undefined}
         isTakeaway={isTakeaway}
         orderCode={selectedTable?.currentOrder || "TAKEAWAY"}
@@ -3176,6 +3020,17 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
             combined: "Kết hợp",
           };
           setLastPaymentMethod(methodLabelMap[paymentMethod] || "Tiền mặt");
+          // Best-effort backend checkout before printing
+          const orderId = selectedTable?.order_id;
+          if (orderId) {
+            checkoutOrder(Number(orderId), {
+              paymentMethod,
+              discountAmount,
+              totalAmount,
+            }).catch((err: any) => {
+              toast.error("Thanh toán backend thất bại", { description: err?.message || "API lỗi" });
+            });
+          }
           setPrintReceiptOpen(true);
         }}
       />
@@ -3388,7 +3243,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                 {selectedTable?.currentOrder}
               </span>{" "}
               từ{" "}
-              <span className="text-blue-700">Bàn {selectedTable?.number}</span>{" "}
+              <span className="text-blue-700">Bàn {selectedTable?.name}</span>{" "}
               sang bàn nào?
             </p>
 
@@ -3419,11 +3274,11 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                         }`}
                       >
                         <span className="text-white text-sm">
-                          {table.number}
+                          {table.name}
                         </span>
                       </div>
                       <p className="text-sm text-neutral-900">
-                        Bàn {table.number}
+                        Bàn {table.name}
                       </p>
                       <p className="text-xs text-neutral-500 mb-1">
                         {areas.find((a) => a.id === table.area)?.name}
@@ -3504,15 +3359,15 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                     ...orderHistory,
                     {
                       time: timeString,
-                      action: `Chuyển đơn ${currentOrder} từ Bàn ${selectedTable.number} sang Bàn ${targetTable.number}`,
+                      action: `Chuyển đơn ${currentOrder} từ Bàn ${selectedTable?.name} sang Bàn ${targetTable.name}`,
                       staff: "NV Minh",
                     },
                   ]);
 
                   toast.success(
-                    `Đã chuyển đơn ${currentOrder} sang Bàn ${targetTable.number}`,
+                    `Đã chuyển đơn ${currentOrder} sang Bàn ${targetTable.name}`,
                     {
-                      description: `Bàn ${selectedTable.number} đã trống`,
+                      description: `Bàn ${selectedTable.name} đã trống`,
                     }
                   );
                 }
@@ -3542,7 +3397,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
               Chọn bàn muốn gộp với{" "}
-              <span className="text-blue-700">Bàn {selectedTable?.number}</span>
+              <span className="text-blue-700">Bàn {selectedTable?.name}</span>
               . Đơn của 2 bàn sẽ nhập chung thành một phiếu.
             </p>
 
@@ -3579,11 +3434,11 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                           }`}
                         >
                           <span className="text-white text-sm">
-                            {table.number}
+                            {table.name}
                           </span>
                         </div>
                         <p className="text-sm text-neutral-900">
-                          Bàn {table.number}
+                          Bàn {table.name}
                         </p>
                         <p className="text-xs text-neutral-500 mb-1">
                           {areas.find((a) => a.id === table.area)?.name}
@@ -3600,9 +3455,9 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                             {table.currentOrder}
                           </Badge>
                         )}
-                        {table.startTime && (
+                        {table.createdAt && (
                           <Badge variant="outline" className="text-xs">
-                            {getElapsedTime(table.startTime)}
+                            {getElapsedTime(table.createdAt)}
                           </Badge>
                         )}
                       </CardContent>
@@ -3680,15 +3535,15 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                     ...orderHistory,
                     {
                       time: timeString,
-                      action: `Gộp đơn: Bàn ${selectedTable.number} → Bàn ${mergeTargetTable.number} (${sourceOrder} + ${targetOrder})`,
+                      action: `Gộp đơn: Bàn ${selectedTable?.name} → Bàn ${mergeTargetTable.name} (${sourceOrder} + ${targetOrder})`,
                       staff: "NV Minh",
                     },
                   ]);
 
                   toast.success(
-                    `Đã gộp đơn Bàn ${selectedTable.number} vào Bàn ${mergeTargetTable.number} thành công`,
+                    `Đã gộp đơn Bàn ${selectedTable?.name} vào Bàn ${mergeTargetTable.name} thành công`,
                     {
-                      description: `Bàn ${selectedTable.number} đã trống`,
+                      description: `Bàn ${selectedTable?.name} đã trống`,
                     }
                   );
                 }
@@ -3716,7 +3571,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
             <div className="bg-blue-50 p-4 rounded-lg">
               <div className="flex justify-between mb-4">
                 <span className="text-sm text-slate-600">
-                  Bàn {selectedTable?.number}
+                  Bàn {selectedTable?.name}
                 </span>
                 <Badge className="bg-blue-600 text-white">
                   {selectedTable?.currentOrder}
@@ -3765,7 +3620,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
       {/* Split Order Dialog */}
       <Dialog
         open={splitOrderOpen}
-        onOpenChange={(open) => {
+        onOpenChange={(open: boolean | ((prevState: boolean) => boolean)) => {
           setSplitOrderOpen(open);
           if (!open) {
             setSplitItems({});
@@ -3793,7 +3648,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
               </Label>
               <Select
                 value={splitDestinationTable?.id || ""}
-                onValueChange={(value) => {
+                onValueChange={(value: number) => {
                   const table = tables.find((t) => t.id === value);
                   setSplitDestinationTable(table || null);
                 }}
@@ -3806,7 +3661,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                     .filter((table) => table.status === "available")
                     .map((table) => (
                       <SelectItem key={table.id} value={table.id}>
-                        Bàn {table.number} -{" "}
+                        Bàn {table.name} -{" "}
                         {areas.find((a) => a.id === table.area)?.name} (
                         {table.capacity} chỗ)
                       </SelectItem>
@@ -3822,7 +3677,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                 <div className="mb-3">
                   <h3 className="text-sm text-slate-900 mb-1">Đơn hiện tại</h3>
                   <p className="text-xs text-slate-500">
-                    Bàn {selectedTable?.number} - {selectedTable?.currentOrder}
+                    Bàn {selectedTable?.name} - {selectedTable?.currentOrder}
                   </p>
                 </div>
 
@@ -4089,7 +3944,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                   ...orderHistory,
                   {
                     time: timeString,
-                    action: `Tách đơn: ${itemNames} sang Bàn ${splitDestinationTable.number} → tạo ${newOrderCode}`,
+                    action: `Tách đơn: ${itemNames} sang Bàn ${splitDestinationTable?.name} → tạo ${newOrderCode}`,
                     staff: "NV Minh",
                   },
                 ]);
@@ -4098,7 +3953,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
                 toast.success(
                   `Đã tách đơn thành công: tạo đơn mới ${newOrderCode}`,
                   {
-                    description: `Bàn ${splitDestinationTable.number} đã có ${splitItemsArray.length} món`,
+                    description: `Bàn ${splitDestinationTable?.name} đã có ${splitItemsArray.length} món`,
                   }
                 );
 
@@ -4114,293 +3969,11 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
         </DialogContent>
       </Dialog>
 
-      {/* New Item Request Modal */}
-      <Dialog open={newItemModalOpen} onOpenChange={setNewItemModalOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-blue-600" />
-              Gửi yêu cầu món mới
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-              <p className="text-xs text-blue-700">
-                <strong>Lưu ý:</strong> Thu ngân chỉ có thể gửi yêu cầu. Quản lý
-                sẽ xem xét và tạo món chính thức trong hệ thống.
-              </p>
-            </div>
+      {/* Removed: New Item Request Modal */}
 
-            <div>
-              <Label htmlFor="item-name">
-                Tên món đề xuất <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="item-name"
-                placeholder="Ví dụ: Trà đào mix phúc bồn tử"
-                value={newItemName}
-                onChange={(e) => setNewItemName(e.target.value)}
-                className="mt-2 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-              />
-            </div>
+      {/* Removed: IngredientSelectionDialog */}
 
-            <div>
-              <Label htmlFor="item-category">
-                Danh mục đề xuất <span className="text-red-500">*</span>
-              </Label>
-              <Select
-                value={newItemCategory}
-                onValueChange={setNewItemCategory}
-              >
-                <SelectTrigger className="mt-2 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2">
-                  <SelectValue placeholder="Chọn danh mục..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="coffee">Cà phê</SelectItem>
-                  <SelectItem value="tea">Trà</SelectItem>
-                  <SelectItem value="smoothie">Sinh tố</SelectItem>
-                  <SelectItem value="pastry">Bánh ngọt</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Công thức nguyên liệu */}
-            <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-              <div className="flex items-center justify-between mb-3">
-                <Label className="text-sm">Công thức nguyên liệu</Label>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                  onClick={() => setAddIngredientDialogOpen(true)}
-                >
-                  <Plus className="w-3 h-3 mr-1" />
-                  Thêm nguyên liệu
-                </Button>
-              </div>
-              {selectedIngredients.length === 0 ? (
-                <p className="text-xs text-slate-500">
-                  Nhấn "Thêm nguyên liệu" để xây dựng công thức cho món này
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-purple-100">
-                        <TableHead className="w-12">STT</TableHead>
-                        <TableHead>Mã</TableHead>
-                        <TableHead>Tên nguyên liệu</TableHead>
-                        <TableHead>Đơn vị</TableHead>
-                        <TableHead>Số lượng</TableHead>
-                        <TableHead className="w-12"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedIngredients.map((ing, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{index + 1}</TableCell>
-                          <TableCell>{ing.ingredientId}</TableCell>
-                          <TableCell>{ing.ingredientName}</TableCell>
-                          <TableCell>{ing.unit}</TableCell>
-                          <TableCell>{ing.quantity}</TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0"
-                              onClick={() => {
-                                setSelectedIngredients((prev) =>
-                                  prev.filter((_, i) => i !== index)
-                                );
-                              }}
-                            >
-                              <X className="w-3 h-3" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="item-image" className="flex items-center gap-2">
-                <Upload className="w-4 h-4" />
-                Ảnh minh họa (tuỳ chọn)
-              </Label>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2 w-full bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Tải ảnh lên
-              </Button>
-              <p className="text-xs text-slate-500 mt-1">Chưa chọn ảnh</p>
-            </div>
-
-            <div>
-              <Label htmlFor="item-notes">Ghi chú thêm</Label>
-              <Input
-                id="item-notes"
-                placeholder="Ví dụ: Khách yêu cầu đặc biệt..."
-                value={newItemNotes}
-                onChange={(e) => setNewItemNotes(e.target.value)}
-                className="mt-2 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setNewItemModalOpen(false);
-                setNewItemName("");
-                setNewItemCategory("");
-                setNewItemDescription("");
-                setNewItemNotes("");
-                setSelectedIngredients([]);
-              }}
-            >
-              Hủy
-            </Button>
-            <Button
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={handleSubmitNewItemRequest}
-            >
-              Gửi yêu cầu
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Ingredient Dialog - Using new IngredientSelectionDialog */}
-      <IngredientSelectionDialog
-        open={addIngredientDialogOpen}
-        onOpenChange={setAddIngredientDialogOpen}
-        availableIngredients={inventoryIngredients.map((ing, idx) => ({
-          code: ing.id,
-          name: ing.name,
-          category: ing.category,
-          unit: ing.unit,
-          stock: 100 + idx * 10, // Mock stock value
-        }))}
-        onAddIngredients={(ingredients) => {
-          const newIngredients = ingredients.map((ing) => ({
-            ingredientId: ing.code,
-            ingredientName: ing.name,
-            unit: ing.unit,
-            quantity: ing.quantity,
-            unitCost:
-              inventoryIngredients.find((inv) => inv.id === ing.code)
-                ?.avgUnitCost || 0,
-          }));
-          setSelectedIngredients((prev) => [...prev, ...newIngredients]);
-          toast.success(`Đã thêm ${newIngredients.length} nguyên liệu`);
-        }}
-      />
-
-      {/* Requests Drawer */}
-      <Sheet open={requestsDrawerOpen} onOpenChange={setRequestsDrawerOpen}>
-        <SheetContent
-          side="right"
-          className="w-[420px] sm:max-w-[420px] overflow-y-auto"
-        >
-          <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              <Bell className="w-5 h-5 text-blue-600" />
-              Yêu cầu của tôi
-            </SheetTitle>
-            <SheetDescription>
-              Quản lý các yêu cầu bổ sung nguyên liệu từ bộ phận pha chế
-            </SheetDescription>
-          </SheetHeader>
-          <div className="mt-6 space-y-3">
-            {newItemRequests.length === 0 ? (
-              <div className="text-center py-12">
-                <Bell className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500 text-sm">Chưa có yêu cầu nào</p>
-              </div>
-            ) : (
-              newItemRequests.map((request) => (
-                <Card key={request.id} className="border-slate-200 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <h4 className="text-sm text-slate-900 mb-1">
-                          {request.name}
-                        </h4>
-                        <p className="text-xs text-slate-500">
-                          Danh mục:{" "}
-                          {categories.find((c) => c.id === request.category)
-                            ?.name || request.category}
-                        </p>
-                        {request.description && (
-                          <p className="text-xs text-slate-600 mt-2">
-                            {request.description}
-                          </p>
-                        )}
-                        {request.notes && (
-                          <div className="flex items-start gap-1 mt-2">
-                            <MessageSquare className="w-3 h-3 text-slate-400 mt-0.5 flex-shrink-0" />
-                            <span className="text-xs text-slate-500 italic">
-                              {request.notes}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between mt-3">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-3 h-3 text-slate-400" />
-                        <span className="text-xs text-slate-500">
-                          {request.createdAt}
-                        </span>
-                      </div>
-
-                      {request.status === "pending" && (
-                        <Badge className="bg-blue-100 text-blue-700 text-xs">
-                          Đang chờ duyệt
-                        </Badge>
-                      )}
-                      {request.status === "approved" && (
-                        <Badge className="bg-green-100 text-green-700 text-xs">
-                          Đã duyệt
-                        </Badge>
-                      )}
-                      {request.status === "rejected" && (
-                        <Badge className="bg-red-100 text-red-700 text-xs">
-                          Từ chối
-                        </Badge>
-                      )}
-                    </div>
-
-                    {request.status === "rejected" &&
-                      request.rejectionReason && (
-                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
-                          <p className="text-xs text-red-700">
-                            <strong>Lý do:</strong> {request.rejectionReason}
-                          </p>
-                        </div>
-                      )}
-
-                    {request.status === "approved" && (
-                      <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
-                        <p className="text-xs text-green-700">
-                          ✓ Món đã được thêm vào menu. Bạn có thể bán ngay.
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
+      {/* Removed: Requests Drawer */}
 
       {/* Item Customization Modal */}
       {selectedItemForCustomization && (
@@ -4414,7 +3987,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
           basePrice={selectedItemForCustomization.price}
           onUpdate={handleUpdateCustomization}
           initialCustomization={selectedItemForCustomization.customization}
-          availableToppings={toppingProducts.map((t) => ({
+          availableToppings={toppings.map((t) => ({
             id: t.id,
             name: t.name,
             price: t.price,
@@ -4556,7 +4129,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
           {selectedTopping && (
             <div className="space-y-4">
               <div className="text-center py-4 bg-slate-50 rounded-lg">
-                <div className="text-5xl mb-2">{selectedTopping.image}</div>
+                <p className="text-lg text-slate-700">Giá topping</p>
                 <p className="text-2xl font-bold text-amber-600">
                   {selectedTopping.price.toLocaleString("vi-VN")}đ
                 </p>

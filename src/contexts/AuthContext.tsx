@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Permission } from '../types/account';
 import { initialAccounts } from '../data/accountData';
 import { initialRoles } from '../data/roleData';
+import { login as loginApi } from '../api/authApi';
 
 export type UserRole = 'manager' | 'barista' | 'cashier' | 'server';
 
@@ -15,9 +16,20 @@ export interface User {
   permissions: Permission[];
 }
 
+// interface AuthContextType {
+//   user: User | null;
+//   login: (username: string, password: string) => Promise<void>;
+//   logout: () => void;
+//   isAuthenticated: boolean;
+//   hasPermission: (permission: Permission) => boolean;
+//   canView: (module: string) => boolean;
+//   canCreate: (module: string) => boolean;
+//   canUpdate: (module: string) => boolean;
+//   canDelete: (module: string) => boolean;
+// }
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => boolean;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
   hasPermission: (permission: Permission) => boolean;
@@ -26,7 +38,6 @@ interface AuthContextType {
   canUpdate: (module: string) => boolean;
   canDelete: (module: string) => boolean;
 }
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Mock users database (in real app, this would be from backend/Supabase)
@@ -74,46 +85,66 @@ const MOCK_USERS: Array<User & { password: string }> = [
 ];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  useEffect(() => {
+  const storedUser = localStorage.getItem('user');
+  if (storedUser) {
+    setUser(JSON.parse(storedUser));
+  }
+}, []);
+
   const [user, setUser] = useState<User | null>(null);
 
-  const login = (username: string, password: string): boolean => {
-    const foundUser = MOCK_USERS.find(
-      (u) => u.username === username && u.password === password
-    );
+  // const login = (username: string, password: string): boolean => {
+  //   const foundUser = MOCK_USERS.find(
+  //     (u) => u.username === username && u.password === password
+  //   );
 
-    if (foundUser) {
-      // Find account in account data
-      const account = initialAccounts.find((acc) => acc.username === username);
+  //   if (foundUser) {
+  //     // Find account in account data
+  //     const account = initialAccounts.find((acc) => acc.username === username);
       
-      let permissions: Permission[] = [];
+  //     let permissions: Permission[] = [];
       
-      if (account) {
-        // Use custom permissions if available, otherwise use role permissions
-        if (account.customPermissions) {
-          permissions = account.customPermissions;
-        } else {
-          const role = initialRoles.find((r) => r.id === account.roleId);
-          permissions = role?.permissions || [];
-        }
-      }
+  //     if (account) {
+  //       // Use custom permissions if available, otherwise use role permissions
+  //       if (account.customPermissions) {
+  //         permissions = account.customPermissions;
+  //       } else {
+  //         const role = initialRoles.find((r) => r.id === account.roleId);
+  //         permissions = role?.permissions || [];
+  //       }
+  //     }
 
-      const { password: _, ...userWithoutPassword } = foundUser;
-      const userWithPermissions = {
-        ...userWithoutPassword,
-        permissions,
-      };
+  //     const { password: _, ...userWithoutPassword } = foundUser;
+  //     const userWithPermissions = {
+  //       ...userWithoutPassword,
+  //       permissions,
+  //     };
       
-      setUser(userWithPermissions);
-      localStorage.setItem('user', JSON.stringify(userWithPermissions));
-      return true;
-    }
+  //     setUser(userWithPermissions);
+  //     localStorage.setItem('user', JSON.stringify(userWithPermissions));
+  //     return true;
+  //   }
 
-    return false;
-  };
+  //   return false;
+  // };
+  const login = async (username: string, password: string) => {
+  const res = await loginApi(username, password);
+
+  const { accessToken, user } = res.data.metaData;
+
+  // Lưu token
+  localStorage.setItem('accessToken', accessToken);
+  localStorage.setItem('user', JSON.stringify(user));
+
+  // Set state
+  setUser(user);
+};
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('user');
+    // localStorage.removeItem('user');
+    localStorage.removeItem('accessToken');
   };
 
   // Permission helper functions
@@ -146,6 +177,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return hasPermission(deletePermission);
   };
 
+  // return (
+  //   <AuthContext.Provider
+  //     value={{
+  //       user,
+  //       login,
+  //       logout,
+  //       isAuthenticated: !!user,
+  //       hasPermission,
+  //       canView,
+  //       canCreate,
+  //       canUpdate,
+  //       canDelete,
+  //     }}
+  //   >
+  //     {children}
+  //   </AuthContext.Provider>
+  // );
   return (
     <AuthContext.Provider
       value={{
