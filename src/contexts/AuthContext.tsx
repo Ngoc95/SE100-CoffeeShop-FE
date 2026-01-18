@@ -86,11 +86,11 @@ const MOCK_USERS: Array<User & { password: string }> = [
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
-  const storedUser = localStorage.getItem('user');
-  if (storedUser) {
-    setUser(JSON.parse(storedUser));
-  }
-}, []);
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
 
   const [user, setUser] = useState<User | null>(null);
 
@@ -102,9 +102,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   //   if (foundUser) {
   //     // Find account in account data
   //     const account = initialAccounts.find((acc) => acc.username === username);
-      
+
   //     let permissions: Permission[] = [];
-      
+
   //     if (account) {
   //       // Use custom permissions if available, otherwise use role permissions
   //       if (account.customPermissions) {
@@ -120,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   //       ...userWithoutPassword,
   //       permissions,
   //     };
-      
+
   //     setUser(userWithPermissions);
   //     localStorage.setItem('user', JSON.stringify(userWithPermissions));
   //     return true;
@@ -129,21 +129,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   //   return false;
   // };
   const login = async (username: string, password: string) => {
-  const res = await loginApi(username, password);
+    const res = await loginApi(username, password);
 
-  const { accessToken, user } = res.data.metaData;
+    const { accessToken, user } = res.data.metaData;
 
-  // Lưu token
-  localStorage.setItem('accessToken', accessToken);
-  localStorage.setItem('user', JSON.stringify(user));
+    // Lưu token
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('user', JSON.stringify(user));
 
-  // Set state
-  setUser(user);
-};
+    // Set state
+    setUser(user);
+  };
 
   const logout = () => {
     setUser(null);
-    // localStorage.removeItem('user');
+    localStorage.removeItem('user');
     localStorage.removeItem('accessToken');
   };
 
