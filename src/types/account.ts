@@ -17,6 +17,7 @@ export type Permission =
   | 'customer_groups:view' | 'customer_groups:create' | 'customer_groups:update' | 'customer_groups:delete'
   | 'suppliers:view' | 'suppliers:create' | 'suppliers:update' | 'suppliers:delete'
   | 'promotions:view' | 'promotions:create' | 'promotions:update' | 'promotions:delete'
+  | 'promotions:apply'
   // Nhân viên
   | 'staff:view' | 'staff:create' | 'staff:update' | 'staff:delete'
   | 'staff_scheduling:view' | 'staff_scheduling:update'

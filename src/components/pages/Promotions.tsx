@@ -40,6 +40,7 @@ import {
 } from "../ui/table";
 import { toast } from "sonner";
 import { PromotionFormDialog } from "../PromotionFormDialog";
+import { getPromotions as fetchPromotions, createPromotion, updatePromotion, deletePromotion } from "../../api/promotions";
 
 export type PromotionType =
   | "percentage"
@@ -302,63 +303,76 @@ export function Promotions() {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("none");
 
-  const [promotions, setPromotions] = useState<Promotion[]>([
-    {
-      id: "1",
-      code: "KM001",
-      name: "Giảm 20% cho hóa đơn trên 200k",
-      type: "percentage",
-      minOrderValue: 200000,
-      maxDiscountValue: 50000,
-      promotionValue: 20,
-      startDate: "01/12/2024",
-      startTime: "00:00",
-      endDate: "31/12/2024",
-      endTime: "23:59",
-      applicableItems: [],
-      applicableCategories: [{ id: "1", name: "Cà phê" }],
-      applicableCombos: [],
-      applicableCustomerGroups: [],
-      applicableCustomers: [],
-      status: "active",
-    },
-    {
-      id: "2",
-      code: "KM002",
-      name: "Giảm 50k cho đơn từ 300k",
-      type: "amount",
-      minOrderValue: 300000,
-      promotionValue: 50000,
-      startDate: "15/11/2024",
-      startTime: "08:00",
-      endDate: "15/12/2024",
-      endTime: "22:00",
-      applicableItems: [],
-      applicableCategories: [],
-      applicableCombos: [],
-      applicableCustomerGroups: [],
-      applicableCustomers: [],
-      status: "active",
-    },
-    {
-      id: "3",
-      code: "KM003",
-      name: "Tặng cà phê sữa cho HĐ trên 150k",
-      type: "free-item",
-      minOrderValue: 150000,
-      startDate: "01/11/2024",
-      startTime: "00:00",
-      endDate: "30/11/2024",
-      endTime: "23:59",
-      freeItems: [{ id: "1", code: "CF001", name: "Cà phê sữa", quantity: 1 }],
-      applicableItems: [],
-      applicableCategories: [],
-      applicableCombos: [],
-      applicableCustomerGroups: [],
-      applicableCustomers: [],
-      status: "inactive",
-    },
-  ]);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Map backend promotion to UI shape
+  const mapBEToUI = (p: any): Promotion => {
+    const typeMap: Record<string, PromotionType> = {
+      percentage: "percentage",
+      fixed: "amount",
+      amount: "amount",
+      item: "free-item",
+      "fixed-price": "fixed-price",
+      "free-item": "free-item",
+    };
+    const start = p.startDate || p.startTime || p.startAt;
+    const end = p.endDate || p.endTime || p.endAt;
+    const parseDate = (dt: any) => {
+      if (!dt) return { d: "", t: "" };
+      const dateObj = typeof dt === "string" ? new Date(dt) : dt;
+      const d = dateObj.toLocaleDateString("vi-VN");
+      const t = dateObj.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+      return { d, t };
+    };
+    const sd = parseDate(start);
+    const ed = parseDate(end);
+    return {
+      id: String(p.id ?? p.code ?? Math.random()),
+      code: String(p.code ?? p.promotionCode ?? p.id ?? ""),
+      name: String(p.name ?? p.title ?? "Khuyến mãi"),
+      type: typeMap[String(p.type ?? p.typeId ?? "percentage").toLowerCase()] ?? "percentage",
+      minOrderValue: Number(p.minOrderValue ?? 0),
+      maxDiscountValue: p.maxDiscountValue != null ? Number(p.maxDiscountValue) : undefined,
+      promotionValue: p.value != null ? Number(p.value) : (p.promotionValue != null ? Number(p.promotionValue) : undefined),
+      startDate: sd.d,
+      startTime: sd.t,
+      endDate: ed.d,
+      endTime: ed.t,
+      freeItems: Array.isArray(p.freeItems) ? p.freeItems : [],
+      applicableItems: Array.isArray(p.applicableItems) ? p.applicableItems : [],
+      applicableCategories: Array.isArray(p.applicableCategories) ? p.applicableCategories : [],
+      applicableCombos: Array.isArray(p.applicableCombos) ? p.applicableCombos : [],
+      applicableCustomerGroups: Array.isArray(p.applicableCustomerGroups) ? p.applicableCustomerGroups : [],
+      applicableCustomers: Array.isArray(p.applicableCustomers) ? p.applicableCustomers : [],
+      status: Boolean(p.isActive ?? p.status === "active") ? "active" : "inactive",
+    };
+  };
+
+  const loadPromotions = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetchPromotions();
+      const data = (res as any)?.data ?? res;
+      const items =
+        data?.metaData?.items ??
+        data?.metaData?.data?.items ??
+        data?.data?.items ??
+        data?.items ??
+        data?.metaData ??
+        (Array.isArray(data) ? data : []);
+      const list: any[] = Array.isArray(items) ? items : [];
+      setPromotions(list.map(mapBEToUI));
+    } catch (err: any) {
+      toast.error("Không tải được danh sách khuyến mãi", { description: err?.message || "Lỗi kết nối API" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    loadPromotions();
+  }, []);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -473,51 +487,68 @@ export function Promotions() {
     });
   }
 
-  const handleAddPromotion = (formData: Omit<Promotion, "id" | "code">) => {
-    const newPromotion: Promotion = {
-      id: Date.now().toString(),
-      code: `KM${String(promotions.length + 1).padStart(3, "0")}`,
-      ...formData,
-    };
-    setPromotions([...promotions, newPromotion]);
-    setDialogOpen(false);
-    toast.success("Đã thêm khuyến mại mới");
-  };
-
-  const handleEditPromotion = (formData: Omit<Promotion, "id" | "code">) => {
-    if (!editingPromotion) return;
-    setPromotions(
-      promotions.map((p) =>
-        p.id === editingPromotion.id ? { ...p, ...formData } : p
-      )
-    );
-    setEditingPromotion(null);
-    setDialogOpen(false);
-    toast.success("Đã cập nhật khuyến mại");
-  };
-
-  const handleDeletePromotion = (id: string) => {
-    if (confirm("Bạn có chắc chắn muốn xóa khuyến mại này?")) {
-      setPromotions(promotions.filter((p) => p.id !== id));
-      toast.success("Đã xóa khuyến mại");
+  const handleAddPromotion = async (formData: Omit<Promotion, "id" | "code">) => {
+    try {
+      const payload = {
+        code: `KM${String(promotions.length + 1).padStart(3, "0")}`,
+        name: formData.name,
+        description: "",
+        type: formData.type === "percentage" ? "percentage" : formData.type === "amount" ? "fixed" : formData.type === "free-item" ? "item" : "fixed",
+        value: Number(formData.promotionValue || 0),
+        minOrderValue: Number(formData.minOrderValue || 0),
+        isActive: formData.status === "active",
+      };
+      await createPromotion(payload as any);
+      toast.success("Đã thêm khuyến mại mới");
+      setDialogOpen(false);
+      loadPromotions();
+    } catch (err: any) {
+      toast.error("Thêm khuyến mãi thất bại", { description: err?.message || "API lỗi" });
     }
   };
 
-  const handleToggleStatus = (id: string) => {
-    setPromotions(
-      promotions.map((promo) => {
-        if (promo.id === id) {
-          const newStatus = promo.status === "active" ? "inactive" : "active";
-          toast.success(
-            newStatus === "active"
-              ? "Đã kích hoạt khuyến mại"
-              : "Đã vô hiệu hóa khuyến mại"
-          );
-          return { ...promo, status: newStatus };
-        }
-        return promo;
-      })
-    );
+  const handleEditPromotion = async (formData: Omit<Promotion, "id" | "code">) => {
+    if (!editingPromotion) return;
+    try {
+      const payload = {
+        name: formData.name,
+        type: formData.type === "percentage" ? "percentage" : formData.type === "amount" ? "fixed" : formData.type === "free-item" ? "item" : "fixed",
+        value: Number(formData.promotionValue || 0),
+        minOrderValue: Number(formData.minOrderValue || 0),
+        isActive: formData.status === "active",
+      };
+      await updatePromotion(editingPromotion.id, payload as any);
+      toast.success("Đã cập nhật khuyến mại");
+      setEditingPromotion(null);
+      setDialogOpen(false);
+      loadPromotions();
+    } catch (err: any) {
+      toast.error("Cập nhật khuyến mãi thất bại", { description: err?.message || "API lỗi" });
+    }
+  };
+
+  const handleDeletePromotion = async (id: string) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa khuyến mại này?")) return;
+    try {
+      await deletePromotion(id);
+      toast.success("Đã xóa khuyến mại");
+      loadPromotions();
+    } catch (err: any) {
+      toast.error("Xóa khuyến mãi thất bại", { description: err?.message || "API lỗi" });
+    }
+  };
+
+  const handleToggleStatus = async (id: string) => {
+    const promo = promotions.find(p => p.id === id);
+    if (!promo) return;
+    const newStatus = promo.status === "active" ? "inactive" : "active";
+    try {
+      await updatePromotion(id, { isActive: newStatus === "active" } as any);
+      toast.success(newStatus === "active" ? "Đã kích hoạt khuyến mại" : "Đã vô hiệu hóa khuyến mại");
+      loadPromotions();
+    } catch (err: any) {
+      toast.error("Cập nhật trạng thái thất bại", { description: err?.message || "API lỗi" });
+    }
   };
 
   const openEditDialog = (promo: Promotion) => {

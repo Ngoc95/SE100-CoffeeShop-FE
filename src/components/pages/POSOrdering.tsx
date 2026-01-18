@@ -102,6 +102,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { getCategories } from "../../api/category";
 import { getOrderByTable, getOrders, sendOrderToKitchen, checkoutOrder, mapOrderToCartItems, mapOrdersToReadyItems } from "../../api/order";
 import { getAreas } from "../../api/area";
+import { getBankAccounts as fetchBankAccounts, createBankAccount as createBankAccountApi } from "../../api/finance";
 import { getCustomers } from "../../api/customer";
 import { create } from "domain";
 // Helper to safely extract array items from various API response shapes
@@ -285,7 +286,7 @@ interface POSOrderingProps {
 }
 
 export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -309,7 +310,8 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
   order_id: number
 }) => ({
   id: t.id,
-  name: t.tableName ?? String(t.id),
+  // Normalize to remove leading "Bàn" to avoid duplicate label "Bàn Bàn 01"
+  name: (t.tableName ?? String(t.id)).replace(/^Bàn\s*/i, ''),
   number: Number(t.tableName.replace(/\D/g, '')),
   capacity: t.capacity,
   status: (t.currentStatus === 'OCCUPIED' ? 'occupied' : 'available') as Table['status'],
@@ -346,22 +348,28 @@ useEffect(() => {
   const [bankAccounts, setBankAccounts] = useState<
     Array<{ bank: string; owner: string; account: string }>
   >([
-    {
-      bank: "Vietcombank (VCB)",
-      owner: "Nguyễn Trần Hòa",
-      account: "0353632151",
-    },
-    {
-      bank: "Techcombank (TCB)",
-      owner: "Nguyễn Trần Hòa",
-      account: "1234567890",
-    },
-    {
-      bank: "MB Bank",
-      owner: "Nguyễn Trần Hòa",
-      account: "0987654321",
-    },
+    // Will load from backend
   ]);
+  // Load bank accounts from backend
+  useEffect(() => {
+    const loadBankAccounts = async () => {
+      try {
+        const res = await fetchBankAccounts();
+        const items = extractItems(res);
+        const mapped = (items as any[]).map((ba: any) => ({
+          bank: ba.bankFullName ?? ba.bankName ?? ba.bank ?? "Ngân hàng",
+          owner: ba.owner ?? ba.ownerName ?? ba.accountOwner ?? "",
+          account: ba.accountNumber ?? ba.number ?? ba.account ?? "",
+        }));
+        setBankAccounts(mapped);
+      } catch (err: any) {
+        toast.error("Không tải được tài khoản ngân hàng", {
+          description: err?.message || "Lỗi kết nối API",
+        });
+      }
+    };
+    loadBankAccounts();
+  }, []);
   const [orderType, setOrderType] = useState<
     "dine-in" | "takeaway" | "delivery"
   >("dine-in");
@@ -481,6 +489,8 @@ useEffect(() => {
   const [tables, setTables] = useState<Table[]>([])
   useEffect(() => {
     const fetchTables = async () => {
+      // Gate by permission to avoid 403 for roles without table access
+      if (!hasPermission("tables:view" as any)) return;
       try {
         const res = await getTables();
         const items = extractItems(res);
@@ -501,6 +511,8 @@ useEffect(() => {
 
   useEffect(() => {
     const fetchAreas = async () => {
+      // Gate by permission to avoid 403 for roles without table access
+      if (!hasPermission("tables:view" as any)) return;
       try {
         const res = await getAreas();
         setAreas(extractItems(res));
@@ -1229,6 +1241,11 @@ useEffect(() => {
   };
   const handleSelectArea = (areaId: number | null) => {
   setSelectedAreaId(areaId)
+
+  if (!hasPermission("tables:view" as any)) {
+    toast.error("Bạn không có quyền xem phòng bàn");
+    return;
+  }
 
   getTables({
     areaId: areaId ?? undefined,
@@ -2300,8 +2317,19 @@ useEffect(() => {
           <Button
             variant="outline"
             className="border-2 border-blue-500 text-blue-700 hover:bg-blue-50 hover:text-blue-800 h-9 shadow-sm text-xs px-3"
-            onClick={() => setPromotionModalOpen(true)}
-            disabled={cart.length === 0}
+            onClick={() => {
+              if (!hasPermission("promotions:view" as any)) {
+                toast.error("Bạn không có quyền xem khuyến mãi");
+                return;
+              }
+              setPromotionModalOpen(true);
+            }}
+            disabled={cart.length === 0 || !hasPermission("promotions:view" as any)}
+            title={
+              !hasPermission("promotions:view" as any)
+                ? "Bạn không có quyền khuyến mãi"
+                : undefined
+            }
           >
             <Percent className="w-3.5 h-3.5 mr-1" />
             Khuyến mãi
@@ -2614,7 +2642,7 @@ useEffect(() => {
                           <span className="text-white">{table.name.replace(/\D/g, '')}</span>
                         </div>
                         <p className="text-sm text-neutral-900">
-                          Bàn {table.name}
+                          Bàn {(table.name || "").replace(/^Bàn\s*/i, "")}
                         </p>
                         <p className="text-xs text-neutral-500 mb-1">
                           {areas.find((a) => a.id === table.area)?.name}
@@ -2629,7 +2657,7 @@ useEffect(() => {
                             {table.currentOrder}
                           </Badge>
                         )}
-                        {table.createdAt && (
+                        {table.status === "occupied" && table.createdAt && (
                           <Badge variant="outline" className="mt-1 text-xs">
                             {getElapsedTime(table.createdAt)}
                           </Badge>
@@ -3010,12 +3038,22 @@ useEffect(() => {
         orderCode={selectedTable?.currentOrder || "TAKEAWAY"}
         bankAccounts={bankAccounts}
         onAddBankAccount={(bank, owner, account) => {
+          // Optimistically update, then sync to backend
           setBankAccounts((prev) => [...prev, { bank, owner, account }]);
+          const payload = {
+            bankName: bank,
+            ownerName: owner,
+            accountNumber: account,
+          };
+          createBankAccountApi(payload).catch((err: any) => {
+            toast.error("Thêm tài khoản ngân hàng thất bại", {
+              description: err?.message || "API lỗi",
+            });
+          });
         }}
         onConfirmPayment={(paymentMethod, _paymentDetails) => {
           const methodLabelMap: Record<string, string> = {
             cash: "Tiền mặt",
-            card: "Thẻ",
             transfer: "Chuyển khoản",
             combined: "Kết hợp",
           };
@@ -4010,7 +4048,8 @@ useEffect(() => {
             category: product?.category,
           };
         })}
-        selectedCustomer={null} // You can integrate customer selection here
+        orderId={selectedTable?.order_id}
+        selectedCustomer={selectedCustomer}
         onApply={handleApplyPromotion}
       />
 

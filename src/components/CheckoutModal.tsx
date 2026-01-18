@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Banknote, CreditCard, Smartphone, X } from "lucide-react";
+import { Banknote, Smartphone, X } from "lucide-react";
 import { toast } from "sonner";
 
 interface CheckoutItem {
@@ -39,7 +39,7 @@ interface CheckoutModalProps {
   bankAccounts: BankAccount[];
   onAddBankAccount: (bank: string, owner: string, account: string) => void;
   onConfirmPayment: (
-    paymentMethod: "cash" | "card" | "transfer" | "combined",
+    paymentMethod: "cash" | "transfer" | "combined",
     paymentDetails: any
   ) => void;
 }
@@ -59,14 +59,11 @@ export function CheckoutModal({
   onConfirmPayment,
 }: CheckoutModalProps) {
   const [paymentMethod, setPaymentMethod] = useState<
-    "cash" | "card" | "transfer" | "combined" | null
+    "cash" | "transfer" | "combined" | null
   >(null);
 
   // Cash payment
   const [receivedCash, setReceivedCash] = useState<number>(0);
-
-  // Card payment
-  const [selectedCardBankId, setSelectedCardBankId] = useState<number>(0);
 
   // Transfer payment
   const [qrImage, setQrImage] = useState<string | null>(null);
@@ -75,7 +72,6 @@ export function CheckoutModal({
 
   // Combined payment
   const [combinedCashAmount, setCombinedCashAmount] = useState<number>(0);
-  const [combinedCardAmount, setCombinedCardAmount] = useState<number>(0);
   const [combinedTransferAmount, setCombinedTransferAmount] =
     useState<number>(0);
   const [combinedTransferBankId, setCombinedTransferBankId] =
@@ -92,7 +88,7 @@ export function CheckoutModal({
   const calculateCustomerPaid = (): number => {
     if (paymentMethod === "cash") return receivedCash;
     if (paymentMethod === "combined")
-      return combinedCashAmount + combinedCardAmount + combinedTransferAmount;
+      return combinedCashAmount + combinedTransferAmount;
     return 0;
   };
 
@@ -106,7 +102,7 @@ export function CheckoutModal({
     if (paymentMethod === "cash" && receivedCash < finalAmount) return false;
     if (
       paymentMethod === "combined" &&
-      combinedCashAmount + combinedCardAmount + combinedTransferAmount <
+      combinedCashAmount + combinedTransferAmount <
         finalAmount
     )
       return false;
@@ -125,14 +121,11 @@ export function CheckoutModal({
 
     if (paymentMethod === "cash") {
       paymentDetails.receivedCash = receivedCash;
-    } else if (paymentMethod === "card") {
-      paymentDetails.bankAccountId = selectedCardBankId;
     } else if (paymentMethod === "transfer") {
       paymentDetails.qrImage = qrImage;
       paymentDetails.bankAccountId = selectedTransferBankId;
     } else if (paymentMethod === "combined") {
       paymentDetails.cashAmount = combinedCashAmount;
-      paymentDetails.cardAmount = combinedCardAmount;
       paymentDetails.transferAmount = combinedTransferAmount;
       paymentDetails.transferBankId = combinedTransferBankId;
     }
@@ -253,14 +246,6 @@ export function CheckoutModal({
                 Tiền mặt
               </Button>
               <Button
-                variant={paymentMethod === "card" ? "default" : "outline"}
-                className="w-full justify-start"
-                onClick={() => setPaymentMethod("card")}
-              >
-                <CreditCard className="w-4 h-4 mr-2" />
-                Thẻ
-              </Button>
-              <Button
                 variant={paymentMethod === "transfer" ? "default" : "outline"}
                 className="w-full justify-start"
                 onClick={() => setPaymentMethod("transfer")}
@@ -322,30 +307,7 @@ export function CheckoutModal({
               </div>
             )}
 
-            {/* Card Payment */}
-            {paymentMethod === "card" && (
-              <div className="space-y-3 bg-purple-50 p-3 rounded-lg border border-purple-200 mb-4">
-                <p className="text-sm text-slate-700">
-                  Vui lòng đợi khách hàng quẹt thẻ xong
-                </p>
-                <div>
-                  <Label className="text-sm">Tài khoản nhận tiền</Label>
-                  <select
-                    value={selectedCardBankId}
-                    onChange={(e) =>
-                      setSelectedCardBankId(parseInt(e.target.value))
-                    }
-                    className="w-full p-2 border border-purple-300 rounded-lg bg-white text-sm mt-1"
-                  >
-                    {bankAccounts.map((acc, idx) => (
-                      <option key={idx} value={idx}>
-                        {acc.bank} - {acc.owner}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
+            {/* Card Payment removed */}
 
             {/* Transfer Payment */}
             {paymentMethod === "transfer" && (
@@ -438,19 +400,6 @@ export function CheckoutModal({
                 </div>
 
                 <div>
-                  <Label className="text-xs">Thẻ</Label>
-                  <Input
-                    type="number"
-                    placeholder="0"
-                    value={combinedCardAmount || ""}
-                    onChange={(e) =>
-                      setCombinedCardAmount(Number(e.target.value) || 0)
-                    }
-                    className="mt-1 text-sm"
-                  />
-                </div>
-
-                <div>
                   <Label className="text-xs">Chuyển khoản</Label>
                   <Input
                     type="number"
@@ -481,33 +430,25 @@ export function CheckoutModal({
                     <span>Tổng:</span>
                     <span
                       className={`font-semibold ${
-                        combinedCashAmount +
-                          combinedCardAmount +
-                          combinedTransferAmount >=
+                        combinedCashAmount + combinedTransferAmount >=
                         finalAmount
                           ? "text-green-600"
                           : "text-red-600"
                       }`}
                     >
                       {(
-                        combinedCashAmount +
-                        combinedCardAmount +
-                        combinedTransferAmount
+                        combinedCashAmount + combinedTransferAmount
                       ).toLocaleString()}
                       ₫
                     </span>
                   </div>
-                  {combinedCashAmount +
-                    combinedCardAmount +
-                    combinedTransferAmount <
+                  {combinedCashAmount + combinedTransferAmount <
                     finalAmount && (
                     <p className="text-red-600 text-xs">
                       Còn thiếu:{" "}
                       {(
                         finalAmount -
-                        (combinedCashAmount +
-                          combinedCardAmount +
-                          combinedTransferAmount)
+                        (combinedCashAmount + combinedTransferAmount)
                       ).toLocaleString()}
                       ₫
                     </p>

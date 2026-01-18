@@ -148,9 +148,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Permission helper functions
-  const hasPermission = (permission: Permission): boolean => {
+  const hasPermission = (permission: Permission | string): boolean => {
     if (!user) return false;
-    return user.permissions.includes(permission);
+    const requested = String(permission);
+    const alt = requested.includes(":")
+      ? requested.replace(/:/g, "_").toUpperCase()
+      : requested;
+    return (
+      user.permissions.includes(requested as Permission) ||
+      (user.permissions as unknown as string[]).includes(alt)
+    );
   };
 
   const canView = (module: string): boolean => {
