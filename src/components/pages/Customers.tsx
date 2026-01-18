@@ -51,6 +51,8 @@ interface CustomerGroup {
   name: string;
 }
 
+let fetchCustomersParams: Record<string, any> = { "sort": "+code" }
+
 export function Customers() {
   const { hasPermission } = useAuth();
   const canCreate = hasPermission('customers:create');
@@ -63,8 +65,8 @@ export function Customers() {
   const [filterGender, setFilterGender] = useState("all");
   const [filterCity, setFilterCity] = useState("all");
 
-  const [sortBy, setSortBy] = useState<"name" | "orders" | "totalSpent" | null>(null);
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc" | "none">("none");
+  const [sortBy, setSortBy] = useState<string | null>();
+  const [sortOrder, setSortOrder] = useState<"+" | "-" | "none">("none");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -74,8 +76,10 @@ export function Customers() {
 
   const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
 
-  const fetchCustomersData = async (params?: Record<string, any>) => {
-    const res = await getCustomers(params)
+
+  // Functions
+  const fetchCustomersData = async () => {
+    const res = await getCustomers(fetchCustomersParams)
     const { customers, statistics } = res.data.metaData
     if (customers) {
       setCustomers(customers)
@@ -89,7 +93,6 @@ export function Customers() {
     if (groups) {
       setCustomerGroups(groups)
     }
-    // console.log("Customer groups: ", customerGroups)
   }
 
   useEffect(() => {
@@ -111,14 +114,6 @@ export function Customers() {
 
   }, []
   )
-
-
-
-  // const [customerGroups] = useState<CustomerGroup[]>([
-  //   { id: "vip", name: "VIP" },
-  //   { id: "regular", name: "Thường xuyên" },
-  //   { id: "new", name: "Khách mới" },
-  // ]);
 
   // Filtering and sorting
   // let filteredCustomers = customers.filter((customer) => {
@@ -158,47 +153,70 @@ export function Customers() {
   //   });
   // }
 
-  // const handleSort = (field: "name" | "orders" | "totalSpent") => {
-  //   if (sortBy === field) {
-  //     // Cycle through: asc -> desc -> none -> asc
-  //     if (sortOrder === "asc") {
-  //       setSortOrder("desc");
-  //     } else if (sortOrder === "desc") {
-  //       setSortOrder("none");
-  //       setSortBy(null);
-  //     } else {
-  //       setSortBy(field);
-  //       setSortOrder("asc");
-  //     }
-  //   } else {
-  //     setSortBy(field);
-  //     setSortOrder("asc");
-  //   }
-  // };
+  const handleSort = (field: string) => {
+    let tempSortBy = sortBy;
+    let tempSortOrder = sortOrder;
+    if (sortBy === field) {
+      // Cycle through: asc -> desc -> none -> asc
+      if (sortOrder === "+") {
+        setSortOrder("-");
 
-  const getSortIcon = (field: "name" | "orders" | "totalSpent") => {
+        tempSortOrder = "-"
+      }
+      else if (sortOrder === "-") {
+        setSortOrder("none");
+        setSortBy(null);
+
+        tempSortBy = null;
+      } else {
+        setSortOrder("+");
+
+        tempSortOrder = "+"
+      }
+    } else {
+      setSortBy(field);
+      setSortOrder("+");
+
+      tempSortBy = field;
+      tempSortOrder = "+"
+    }
+
+    if (tempSortBy && tempSortOrder) {
+      fetchCustomersParams["sort"] = tempSortOrder + tempSortBy;
+    }
+    else {
+      fetchCustomersParams["sort"] = "+code"
+    }
+
+    fetchCustomersData();
+  };
+
+  const getSortIcon = (field: string) => {
     if (sortBy !== field || sortOrder === "none") return null;
-    if (sortOrder === "asc") {
+    if (sortOrder === "+") {
       return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
     }
     return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
   };
 
   const handleApplyFilter = () => {
-    let params: Record<string, any> = {}
     if (filterActive != "all") {
-      params["isActive"] = filterActive === "Hoạt động" ? true : false
+      fetchCustomersParams["isActive"] = filterActive === "Hoạt động" ? true : false
     }
+    else delete fetchCustomersParams["isActive"]
     if (filterGroup != "all") {
-      params["groupId"] = filterGroup
+      fetchCustomersParams["groupId"] = filterGroup
     }
+    else delete fetchCustomersParams["groupId"]
     if (filterGender != "all") {
-      params["gender"] = filterGender
+      fetchCustomersParams["gender"] = filterGender
     }
+    else delete fetchCustomersParams["gender"]
     if (filterCity != "all") {
-      params["city"] = filterCity
+      fetchCustomersParams["city"] = filterCity
     }
-    fetchCustomersData(params)
+    else delete fetchCustomersParams["city"]
+    fetchCustomersData()
   }
 
   const handleSubmit = (formData: any) => {
@@ -254,23 +272,23 @@ export function Customers() {
     // }
   };
 
-  const handleToggleStatus = (id: string) => {
-    // setCustomers(
-    //   customers.map((customer) => {
-    //     if (customer.id === id) {
-    //       const newStatus =
-    //         customer.status === "active" ? "inactive" : "active";
-    //       toast.success(
-    //         newStatus === "active"
-    //           ? "Đã kích hoạt khách hàng"
-    //           : "Đã vô hiệu hóa khách hàng"
-    //       );
-    //       return { ...customer, status: newStatus };
-    //     }
-    //     return customer;
-    //   })
-    // );
-  };
+  // const handleToggleStatus = (id: string) => {
+  //   // setCustomers(
+  //   //   customers.map((customer) => {
+  //   //     if (customer.id === id) {
+  //   //       const newStatus =
+  //   //         customer.status === "active" ? "inactive" : "active";
+  //   //       toast.success(
+  //   //         newStatus === "active"
+  //   //           ? "Đã kích hoạt khách hàng"
+  //   //           : "Đã vô hiệu hóa khách hàng"
+  //   //       );
+  //   //       return { ...customer, status: newStatus };
+  //   //     }
+  //   //     return customer;
+  //   //   })
+  //   // );
+  // };
 
   const resetForm = () => {
     // setEditingCustomer(null);
@@ -292,9 +310,6 @@ export function Customers() {
 
   const totalCustomers = customers.length;
   const activeCustomers = customers.filter((c) => c.isActive === true).length;
-  // const inactiveCustomers = customers.filter(
-  //   (c) => c.status === "inactive"
-  // ).length;
 
   return (
     <div className="p-6 space-y-6">
@@ -459,9 +474,6 @@ export function Customers() {
                             </SelectItem>
                           ))
                         }
-                        {/* <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                      <SelectItem value="active">Hoạt động</SelectItem>
-                      <SelectItem value="inactive">Không hoạt động</SelectItem> */}
                       </SelectContent>
                     </Select>
                   </div>
@@ -513,10 +525,18 @@ export function Customers() {
               <TableHeader>
                 <TableRow className="bg-blue-100">
                   <TableHead className="w-16 text-sm text-center">STT</TableHead>
-                  <TableHead className="text-sm">Mã KH</TableHead>
                   <TableHead
                     className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                  // onClick={() => handleSort("name")}
+                    onClick={() => handleSort("code")}
+                  >
+                    <div className="flex items-center">
+                      Mã KH
+                      {getSortIcon("code")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("name")}
                   >
                     <div className="flex items-center">
                       Tên khách hàng
@@ -527,9 +547,10 @@ export function Customers() {
                   <TableHead className="text-sm">Ngày sinh</TableHead>
                   <TableHead className="text-sm">Liên hệ</TableHead>
                   <TableHead className="text-sm">Địa chỉ</TableHead>
+                  <TableHead className="text-sm">Nhóm KH</TableHead>
                   <TableHead
                     className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                  // onClick={() => handleSort("orders")}
+                    onClick={() => handleSort("totalOrders")}
                   >
                     <div className="flex items-center">
                       Đơn hàng
@@ -538,7 +559,7 @@ export function Customers() {
                   </TableHead>
                   <TableHead
                     className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                  // onClick={() => handleSort("totalSpent")}
+                    onClick={() => handleSort("totalSpent")}
                   >
                     <div className="flex items-center">
                       Tổng chi tiêu
@@ -546,7 +567,7 @@ export function Customers() {
                     </div>
                   </TableHead>
                   <TableHead className="text-sm">Trạng thái</TableHead>
-                  <TableHead className="text-sm text-right">Thao tác</TableHead>
+                  <TableHead className="text-sm text-center">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -591,14 +612,17 @@ export function Customers() {
                         </div>
                       </TableCell>
                       <TableCell className="text-slate-600">
+                        {customer.groupName}
+                      </TableCell>
+                      <TableCell className="text-slate-600">
                         {customer.totalOrders}
                       </TableCell>
                       <TableCell className="text-slate-900">
                         {formatCurrency(customer.totalSpent)}
                       </TableCell>
                       <TableCell>{getStatusBadge(customer.isActive)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                      <TableCell className="text-center">
+                        <div className="flex justify-center gap-2">
                           {canUpdate && (
                             <Button
                               variant="ghost"
@@ -620,29 +644,6 @@ export function Customers() {
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           )}
-                          {/* {canUpdate && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              // onClick={() => handleToggleStatus(customer.id)}
-                              className={
-                                customer.status === "active"
-                                  ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                              }
-                              title={
-                                customer.status === "active"
-                                  ? "Vô hiệu hóa"
-                                  : "Kích hoạt"
-                              }
-                            >
-                              {customer.status === "active" ? (
-                                <PowerOff className="w-4 h-4" />
-                              ) : (
-                                <Power className="w-4 h-4" />
-                              )}
-                            </Button>
-                          )} */}
                         </div>
                       </TableCell>
                     </TableRow>
