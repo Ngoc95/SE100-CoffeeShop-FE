@@ -578,12 +578,18 @@ export function Suppliers() {
                                     <div className="text-sm">
                                       <span className="font-semibold">Email:</span> {supplier.email}
                                     </div>
-                                    <div className="text-sm col-span-2">
+                                    <div className="text-sm">
                                       <span className="font-semibold">Địa chỉ:</span> {supplier.address}, {supplier.city}
                                     </div>
                                     <div className="text-sm">
                                       <span className="font-semibold">Công nợ:</span>{" "}
-                                      <span className="text-red-600">{formatCurrency(supplier.totalDebt)}</span>
+                                      <span className={supplier.totalDebt > 0
+                                        ? "text-red-600"
+                                        : "text-slate-600"}>{formatCurrency(supplier.totalDebt)}</span>
+                                    </div>
+                                    <div className="text-sm">
+                                      <span className="font-semibold">Tổng thanh toán:</span>{" "}
+                                      <span>{formatCurrency(supplier.totalPurchaseAmount)}</span>
                                     </div>
                                     <div className="text-sm">
                                       <span className="font-semibold">Trạng thái:</span>{" "}
