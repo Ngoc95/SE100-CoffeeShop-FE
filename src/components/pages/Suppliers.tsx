@@ -80,6 +80,12 @@ export function Suppliers() {
     }
   }, [])
 
+  const handleSearch = () => {
+    if (!searchQuery) delete fetchSuppliersParams["search"]
+    else fetchSuppliersParams["search"] = searchQuery
+    fetchSuppliersData()
+  }
+
   const handleSort = (field: string) => {
     let tempSortBy = sortBy;
     let tempSortOrder = sortOrder;
@@ -266,12 +272,29 @@ export function Suppliers() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                 <Input
-                  placeholder="Tìm kiếm theo tên, mã, số điện thoại..."
+                  placeholder="Tìm kiếm theo tên, mã, tên liên hệ, số điện thoại..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      handleSearch();
+                    }
+                  }}
                   className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
+                <X
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 w-5 h-5"
+                  onClick={() => setSearchQuery("")}
+                />
               </div>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  handleSearch();
+                }}
+              >
+                <Search className="w-4 h-4" />
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => setShowFilters(!showFilters)}
