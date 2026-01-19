@@ -1,21 +1,6 @@
-import { useState } from "react";
-import * as React from "react";
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  Search,
-  Power,
-  PowerOff,
-  X,
-  Filter,
-  ChevronDown,
-  Upload,
-  Download,
-  Printer,
-  ArrowUp,
-  ArrowDown,
-} from "lucide-react";
+import { useState, useEffect } from "react";
+import { useAuth } from "../../contexts/AuthContext";
+import { Plus, Pencil, Trash2, Search, Power, PowerOff, X, Filter, ChevronDown, Upload, Download, Printer, ArrowUp, ArrowDown } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
@@ -23,310 +8,237 @@ import { Label } from "../ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Checkbox } from "../ui/checkbox";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { toast } from "sonner";
 import { CustomerGroupFormDialog } from "../CustomerGroupFormDialog";
-
-interface Customer {
-  id: string;
-  code: string;
-  name: string;
-  phone: string;
-  email: string;
-}
+import { getCustomerGroups } from "../../api/customerGroup";
 
 interface CustomerGroup {
-  id: string;
-  code: string;
-  name: string;
-  status: "active" | "inactive";
-  customers: Customer[];
+  id: number,
+  code: "NKH001",
+  name: "Khách thường",
+  description: "Nhóm khách hàng mặc định",
+  priority: 0,
+  minSpend: 0,
+  minOrders: 0,
+  windowMonths: 12,
+  createdAt: "2026-01-17T08:36:16.847Z",
+  updatedAt: "2026-01-17T08:36:16.847Z",
+  deletedAt: string,
+  customerCount: 2
 }
 
 export function CustomerGroups() {
+  const { hasPermission } = useAuth();
+  let fetchCustomerGroupsParams: Record<string, any> = { "sort": "+code" }
+
+  const canCreate = hasPermission('customer_groups:create');
+  const canUpdate = hasPermission('customer_groups:update');
+  const canDelete = hasPermission('customer_groups:delete');
+
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<CustomerGroup | null>(null);
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
   const [customerFilterOpen, setCustomerFilterOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
-  
-  // Sort state
-  type SortField = "code" | "name" | "customers" | "status";
-  type SortOrder = "asc" | "desc" | "none";
-  const [sortField, setSortField] = useState<SortField | null>(null);
-  const [sortOrder, setSortOrder] = useState<SortOrder>("none");
 
-  // Mock available customers
-  const availableCustomers: Customer[] = [
-    {
-      id: "1",
-      code: "KH001",
-      name: "Nguyễn Văn An",
-      phone: "0901234567",
-      email: "an.nguyen@email.com",
-    },
-    {
-      id: "2",
-      code: "KH002",
-      name: "Trần Thị Bình",
-      phone: "0912345678",
-      email: "binh.tran@email.com",
-    },
-    {
-      id: "3",
-      code: "KH003",
-      name: "Lê Văn Cường",
-      phone: "0923456789",
-      email: "cuong.le@email.com",
-    },
-    {
-      id: "4",
-      code: "KH004",
-      name: "Phạm Thị Dung",
-      phone: "0934567890",
-      email: "dung.pham@email.com",
-    },
-    {
-      id: "5",
-      code: "KH005",
-      name: "Hoàng Văn Em",
-      phone: "0945678901",
-      email: "em.hoang@email.com",
-    },
-  ];
+  const [sortBy, setSortBy] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<string>("none");
 
-  const [groups, setGroups] = useState<CustomerGroup[]>([
-    {
-      id: "1",
-      code: "NKH001",
-      name: "Khách hàng VIP",
-      status: "active",
-      customers: [
-        {
-          id: "1",
-          code: "KH001",
-          name: "Nguyễn Văn An",
-          phone: "0901234567",
-          email: "an.nguyen@email.com",
-        },
-        {
-          id: "2",
-          code: "KH002",
-          name: "Trần Thị Bình",
-          phone: "0912345678",
-          email: "binh.tran@email.com",
-        },
-      ],
-    },
-    {
-      id: "2",
-      code: "NKH002",
-      name: "Khách hàng thân thiết",
-      status: "active",
-      customers: [
-        {
-          id: "3",
-          code: "KH003",
-          name: "Lê Văn Cường",
-          phone: "0923456789",
-          email: "cuong.le@email.com",
-        },
-      ],
-    },
-    {
-      id: "3",
-      code: "NKH003",
-      name: "Khách hàng mới",
-      status: "inactive",
-      customers: [],
-    },
-  ]);
+  const [groups, setGroups] = useState<CustomerGroup[]>([]);
 
-  // Filter customers for the customer filter dropdown
-  const filteredCustomersForFilter = availableCustomers.filter((customer) => {
-    const searchLower = customerSearchQuery.toLowerCase();
-    return (
-      customer.code.toLowerCase().includes(searchLower) ||
-      customer.name.toLowerCase().includes(searchLower)
-    );
-  });
+  // functions
+  const fetchCustomerGroupsData = async () => {
+    const res = await getCustomerGroups(fetchCustomerGroupsParams);
+    if (!res) return;
+    const { groups } = res.data.metaData
+    if (groups) {
+      setGroups(groups)
+    }
+  }
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
+  useEffect(() => {
+    console.log("Use effect group data")
+    try {
+      fetchCustomerGroupsData()
+    }
+    catch (error) {
+      console.log("Error when fetching customer groups: ", error);
+    }
+  }, [])
+
+  const handleSort = (field: string) => {
+    let tempSortBy = sortBy;
+    let tempSortOrder = sortOrder;
+    if (sortBy === field) {
       // Cycle through: asc -> desc -> none -> asc
-      if (sortOrder === "asc") {
-        setSortOrder("desc");
-      } else if (sortOrder === "desc") {
+      if (sortOrder === "+") {
+        setSortOrder("-");
+
+        tempSortOrder = "-"
+      }
+      else if (sortOrder === "-") {
         setSortOrder("none");
-        setSortField(null);
+        setSortBy(null);
+
+        tempSortBy = null;
       } else {
-        setSortField(field);
-        setSortOrder("asc");
+        setSortOrder("+");
+
+        tempSortOrder = "+"
       }
     } else {
-      setSortField(field);
-      setSortOrder("asc");
+      setSortBy(field);
+      setSortOrder("+");
+
+      tempSortBy = field;
+      tempSortOrder = "+"
     }
+
+    if (tempSortBy && tempSortOrder) {
+      fetchCustomerGroupsParams["sort"] = tempSortOrder + tempSortBy;
+    }
+    else {
+      fetchCustomerGroupsParams["sort"] = "+code"
+    }
+
+    fetchCustomerGroupsData();
   };
 
-  const getSortIcon = (field: SortField) => {
-    if (sortField !== field || sortOrder === "none") {
+  const getSortIcon = (field: string) => {
+    if (sortBy !== field || sortOrder === "none") {
       return null;
     }
-    if (sortOrder === "asc") {
+    if (sortOrder === "+") {
       return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
     }
     return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
   };
 
-  let filteredGroups = groups.filter((group) => {
-    // Search filter
-    const matchesSearch =
-      group.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      group.name.toLowerCase().includes(searchQuery.toLowerCase());
-
-    // Customer filter - check if group contains any of the selected customers
-    const matchesCustomerFilter =
-      selectedCustomers.length === 0 ||
-      group.customers.some((customer) =>
-        selectedCustomers.includes(customer.id)
-      );
-
-    return matchesSearch && matchesCustomerFilter;
-  });
-
   // Apply sorting
-  if (sortField && sortOrder !== "none") {
-    filteredGroups = [...filteredGroups].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
+  // if (sortField && sortOrder !== "none") {
+  //   filteredGroups = [...filteredGroups].sort((a, b) => {
+  //     let aValue: any;
+  //     let bValue: any;
 
-      if (sortField === "code") {
-        aValue = a.code;
-        bValue = b.code;
-      } else if (sortField === "name") {
-        aValue = a.name;
-        bValue = b.name;
-      } else if (sortField === "customers") {
-        aValue = a.customers.length;
-        bValue = b.customers.length;
-      } else if (sortField === "status") {
-        const statusOrder = { active: 0, inactive: 1 };
-        aValue = statusOrder[a.status] ?? 0;
-        bValue = statusOrder[b.status] ?? 0;
-      }
+  //     if (sortField === "code") {
+  //       aValue = a.code;
+  //       bValue = b.code;
+  //     } else if (sortField === "name") {
+  //       aValue = a.name;
+  //       bValue = b.name;
+  //     } else if (sortField === "customers") {
+  //       aValue = a.customers.length;
+  //       bValue = b.customers.length;
+  //     } else if (sortField === "status") {
+  //       const statusOrder = { active: 0, inactive: 1 };
+  //       aValue = statusOrder[a.status] ?? 0;
+  //       bValue = statusOrder[b.status] ?? 0;
+  //     }
 
-      if (typeof aValue === "string" && typeof bValue === "string") {
-        const comparison = aValue.localeCompare(bValue, "vi");
-        return sortOrder === "asc" ? comparison : -comparison;
-      }
+  //     if (typeof aValue === "string" && typeof bValue === "string") {
+  //       const comparison = aValue.localeCompare(bValue, "vi");
+  //       return sortOrder === "asc" ? comparison : -comparison;
+  //     }
 
-      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
-      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
-  }
+  //     if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+  //     if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+  //     return 0;
+  //   });
+  // }
 
-  const toggleCustomerFilter = (customerId: string) => {
-    setSelectedCustomers((prev) =>
-      prev.includes(customerId)
-        ? prev.filter((id) => id !== customerId)
-        : [...prev, customerId]
-    );
+  // const toggleCustomerFilter = (customerId: string) => {
+  //   setSelectedCustomers((prev) =>
+  //     prev.includes(customerId)
+  //       ? prev.filter((id) => id !== customerId)
+  //       : [...prev, customerId]
+  //   );
+  // };
+
+  // const removeCustomerFilter = (customerId: string) => {
+  //   setSelectedCustomers((prev) => prev.filter((id) => id !== customerId));
+  // };
+
+  // const clearAllFilters = () => {
+  //   setSelectedCustomers([]);
+  //   setSearchQuery("");
+  // };
+
+  // const getSelectedCustomerNames = () => {
+  //   if (selectedCustomers.length === 0) return "Tất cả khách hàng";
+  //   if (selectedCustomers.length === 1) {
+  //     const customer = availableCustomers.find(
+  //       (c) => c.id === selectedCustomers[0]
+  //     );
+  //     return customer?.name || "";
+  //   }
+  //   return `${selectedCustomers.length} khách hàng`;
+  // };
+
+  const handleSubmit = (formData: any /*{
+    name: string;
+    status: "active" | "inactive";
+    customers: Customer[];}*/
+  ) => {
+    // const newGroup: CustomerGroup = {
+    //   id: Date.now().toString(),
+    //   code: `NKH${String(groups.length + 1).padStart(3, "0")}`,
+    //   name: formData.name,
+    //   status: formData.status,
+    //   customers: formData.customers,
+    // };
+    // setGroups([...groups, newGroup]);
+    // setDialogOpen(false);
+    // toast.success("Đã thêm nhóm khách hàng mới");
   };
 
-  const removeCustomerFilter = (customerId: string) => {
-    setSelectedCustomers((prev) => prev.filter((id) => id !== customerId));
-  };
-
-  const clearAllFilters = () => {
-    setSelectedCustomers([]);
-    setSearchQuery("");
-  };
-
-  const getSelectedCustomerNames = () => {
-    if (selectedCustomers.length === 0) return "Tất cả khách hàng";
-    if (selectedCustomers.length === 1) {
-      const customer = availableCustomers.find(
-        (c) => c.id === selectedCustomers[0]
-      );
-      return customer?.name || "";
-    }
-    return `${selectedCustomers.length} khách hàng`;
-  };
-
-  const handleAddGroup = (formData: {
+  const handleEdit = (formData: any/*{
     name: string;
     status: "active" | "inactive";
     customers: Customer[];
-  }) => {
-    const newGroup: CustomerGroup = {
-      id: Date.now().toString(),
-      code: `NKH${String(groups.length + 1).padStart(3, "0")}`,
-      name: formData.name,
-      status: formData.status,
-      customers: formData.customers,
-    };
-    setGroups([...groups, newGroup]);
-    setDialogOpen(false);
-    toast.success("Đã thêm nhóm khách hàng mới");
-  };
-
-  const handleEditGroup = (formData: {
-    name: string;
-    status: "active" | "inactive";
-    customers: Customer[];
-  }) => {
-    if (!editingGroup) return;
-    setGroups(
-      groups.map((g) =>
-        g.id === editingGroup.id
-          ? {
-              ...g,
-              name: formData.name,
-              status: formData.status,
-              customers: formData.customers,
-            }
-          : g
-      )
-    );
-    setEditingGroup(null);
-    setDialogOpen(false);
-    toast.success("Đã cập nhật nhóm khách hàng");
+  }*/) => {
+    // if (!editingGroup) return;
+    // setGroups(
+    //   groups.map((g) =>
+    //     g.id === editingGroup.id
+    //       ? {
+    //         ...g,
+    //         name: formData.name,
+    //         status: formData.status,
+    //         customers: formData.customers,
+    //       }
+    //       : g
+    //   )
+    // );
+    // setEditingGroup(null);
+    // setDialogOpen(false);
+    // toast.success("Đã cập nhật nhóm khách hàng");
   };
 
   const handleDeleteGroup = (id: string) => {
-    if (confirm("Bạn có chắc chắn muốn xóa nhóm này?")) {
-      setGroups(groups.filter((g) => g.id !== id));
-      toast.success("Đã xóa nhóm khách hàng");
-    }
+    // if (confirm("Bạn có chắc chắn muốn xóa nhóm này?")) {
+    //   setGroups(groups.filter((g) => g.id !== id));
+    //   toast.success("Đã xóa nhóm khách hàng");
+    // }
   };
 
-  const handleToggleStatus = (id: string) => {
-    setGroups(
-      groups.map((group) => {
-        if (group.id === id) {
-          const newStatus = group.status === "active" ? "inactive" : "active";
-          toast.success(
-            newStatus === "active"
-              ? "Đã kích hoạt nhóm khách hàng"
-              : "Đã vô hiệu hóa nhóm khách hàng"
-          );
-          return { ...group, status: newStatus };
-        }
-        return group;
-      })
-    );
-  };
+  // const handleToggleStatus = (id: string) => {
+  //   setGroups(
+  //     groups.map((group) => {
+  //       if (group.id === id) {
+  //         const newStatus = group.status === "active" ? "inactive" : "active";
+  //         toast.success(
+  //           newStatus === "active"
+  //             ? "Đã kích hoạt nhóm khách hàng"
+  //             : "Đã vô hiệu hóa nhóm khách hàng"
+  //         );
+  //         return { ...group, status: newStatus };
+  //       }
+  //       return group;
+  //     })
+  //   );
+  // };
 
   const openEditDialog = (group: CustomerGroup) => {
     setEditingGroup(group);
@@ -334,9 +246,9 @@ export function CustomerGroups() {
   };
 
   const totalGroups = groups.length;
-  const activeGroups = groups.filter((g) => g.status === "active").length;
-  const inactiveGroups = groups.filter((g) => g.status === "inactive").length;
-  const totalCustomers = groups.reduce((sum, g) => sum + g.customers.length, 0);
+  // const activeGroups = groups.filter((g) => g.status === "active").length;
+  // const inactiveGroups = groups.filter((g) => g.status === "inactive").length;
+  // const totalCustomers = groups.reduce((sum, g) => sum + g.customers.length, 0);
 
   return (
     <div className="p-6 space-y-6">
@@ -401,162 +313,7 @@ export function CustomerGroups() {
                   className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
               </div>
-              <Button
-                variant="outline"
-                onClick={() => setShowFilters(!showFilters)}
-                className="gap-2"
-              >
-                <Filter className="w-4 h-4" />
-                Bộ lọc
-                {selectedCustomers.length > 0 && (
-                  <Badge className="ml-1 bg-blue-500 text-white px-1.5 py-0.5 text-xs">
-                    {selectedCustomers.length}
-                  </Badge>
-                )}
-              </Button>
             </div>
-
-            {/* Collapsible Filter Panel */}
-            {showFilters && (
-              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Customer Filter */}
-                  <div className="space-y-2">
-                    <Label className="text-xs text-slate-600">Khách hàng</Label>
-                    <Popover
-                      open={customerFilterOpen}
-                      onOpenChange={setCustomerFilterOpen}
-                    >
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className="w-full justify-between h-10 bg-white border-slate-300"
-                        >
-                          <span className="truncate">
-                            {getSelectedCustomerNames()}
-                          </span>
-                          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0" align="start">
-                        <div className="p-2 border-b border-slate-200">
-                          <div className="relative">
-                            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
-                            <Input
-                              placeholder="Tìm mã, tên khách hàng..."
-                              value={customerSearchQuery}
-                              onChange={(e) =>
-                                setCustomerSearchQuery(e.target.value)
-                              }
-                              className="pl-8 h-8 text-sm bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                            />
-                          </div>
-                        </div>
-                        <div className="max-h-64 overflow-y-auto p-2">
-                          {filteredCustomersForFilter.length === 0 ? (
-                            <div className="px-2 py-4 text-sm text-slate-500 text-center">
-                              Không tìm thấy khách hàng
-                            </div>
-                          ) : (
-                            filteredCustomersForFilter.map((customer) => (
-                              <div
-                                key={customer.id}
-                                className="flex items-center space-x-2 p-2 hover:bg-slate-50 rounded cursor-pointer"
-                                onClick={() => toggleCustomerFilter(customer.id)}
-                              >
-                                <Checkbox
-                                  checked={selectedCustomers.includes(customer.id)}
-                                  onCheckedChange={() =>
-                                    toggleCustomerFilter(customer.id)
-                                  }
-                                  className="border-slate-300"
-                                />
-                                <label className="text-sm flex-1 cursor-pointer font-normal">
-                                  <div className="flex flex-col">
-                                    <span className="text-slate-900">
-                                      {customer.name}
-                                    </span>
-                                    <span className="text-xs text-slate-500">
-                                      {customer.code}
-                                    </span>
-                                  </div>
-                                </label>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-
-                    {/* Selected Customer Badges */}
-                    {selectedCustomers.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {selectedCustomers.map((customerId) => {
-                          const customer = availableCustomers.find(
-                            (c) => c.id === customerId
-                          );
-                          if (!customer) return null;
-                          return (
-                            <Badge
-                              key={customerId}
-                              variant="secondary"
-                              className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 hover:bg-blue-100 font-normal"
-                            >
-                              {customer.name}
-                              <button
-                                type="button"
-                                className="ml-1 inline-flex items-center"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  removeCustomerFilter(customerId);
-                                }}
-                              >
-                                <X className="h-3 w-3 cursor-pointer hover:text-blue-900" />
-                              </button>
-                            </Badge>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Stats */}
-                  <div className="space-y-2">
-                    <Label className="text-xs text-slate-600">Thống kê</Label>
-                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-1">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Tổng nhóm:</span>
-                        <span className="font-medium text-slate-900">{totalGroups}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Hoạt động:</span>
-                        <span className="font-medium text-emerald-600">{activeGroups}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Tổng KH:</span>
-                        <span className="font-medium text-blue-600">{totalCustomers}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Clear Filters Button */}
-                {selectedCustomers.length > 0 && (
-                  <div className="flex justify-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={clearAllFilters}
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Xóa bộ lọc
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
@@ -565,7 +322,7 @@ export function CustomerGroups() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
-            Danh sách nhóm khách hàng ({filteredGroups.length})
+            Danh sách nhóm khách hàng ({groups.length})
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -592,29 +349,40 @@ export function CustomerGroups() {
                       {getSortIcon("name")}
                     </div>
                   </TableHead>
+                  <TableHead className="w-16 text-sm text-center">Mô tả</TableHead>
                   <TableHead
                     className="cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => handleSort("customers")}
+                    onClick={() => handleSort("priority")}
                   >
                     <div className="flex items-center">
-                      Số khách hàng
-                      {getSortIcon("customers")}
+                      Độ ưu tiên
+                      {getSortIcon("priority")}
                     </div>
                   </TableHead>
                   <TableHead
                     className="cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => handleSort("status")}
+                    onClick={() => handleSort("minOrders")}
                   >
                     <div className="flex items-center">
-                      Trạng thái
-                      {getSortIcon("status")}
+                      Số đơn tối thiểu
+                      {getSortIcon("minOrders")}
                     </div>
                   </TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("minSpend")}
+                  >
+                    <div className="flex items-center">
+                      Chi tiêu tối thiểu
+                      {getSortIcon("minSpend")}
+                    </div>
+                  </TableHead>
+                  <TableHead className="w-16 text-sm text-center">Số khách hàng</TableHead>
+                  <TableHead className="text-sm text-center">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredGroups.length === 0 ? (
+                {groups.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={6}
@@ -624,7 +392,7 @@ export function CustomerGroups() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredGroups.map((group, index) => (
+                  groups.map((group, index) => (
                     <TableRow key={group.id}>
                       <TableCell className="text-sm text-slate-600 text-center">
                         {index + 1}
@@ -636,65 +404,46 @@ export function CustomerGroups() {
                         {group.name}
                       </TableCell>
                       <TableCell className="text-sm text-slate-700">
-                        {group.customers.length}
+                        {group.description}
                       </TableCell>
-                      <TableCell className="text-sm">
-                        <Badge
-                          variant={
-                            group.status === "active"
-                              ? "default"
-                              : "secondary"
-                          }
-                          className={
-                            group.status === "active"
-                              ? "bg-emerald-500"
-                              : "bg-red-500 text-white hover:bg-red-500"
-                          }
-                        >
-                          {group.status === "active"
-                            ? "Hoạt động"
-                            : "Không hoạt động"}
-                        </Badge>
+                      <TableCell className="text-sm text-slate-700">
+                        {group.priority}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700">
+                        {group.minOrders.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700">
+                        {group.minSpend.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700">
+                        {group.customerCount.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-sm text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditDialog(group)}
-                            className="hover:bg-blue-100"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteGroup(group.id)}
-                            className="hover:bg-red-50"
-                          >
-                            <Trash2 className="w-4 h-4 text-red-600" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleToggleStatus(group.id)}
-                            className={
-                              group.status === "active"
-                                ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                            }
-                            title={
-                              group.status === "active"
-                                ? "Vô hiệu hóa"
-                                : "Kích hoạt"
-                            }
-                          >
-                            {group.status === "active" ? (
-                              <PowerOff className="w-4 h-4" />
-                            ) : (
-                              <Power className="w-4 h-4" />
-                            )}
-                          </Button>
+                        <div className="flex justify-center gap-2">
+                          {
+                            canUpdate && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditDialog(group)}
+                                className="hover:bg-blue-100"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            )
+                          }
+                          {
+                            canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                // onClick={() => handleDeleteGroup(group.id)}
+                                className="hover:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-600" />
+                              </Button>
+                            )
+                          }
                         </div>
                       </TableCell>
                     </TableRow>
@@ -705,9 +454,18 @@ export function CustomerGroups() {
           </div>
         </CardContent>
       </Card>
-
+      {/* Stats */}
+      <div className="space-y-2">
+        <Label className="text-xs text-slate-600">Thống kê</Label>
+        <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-1">
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-600">Tổng:</span>
+            <span className="font-medium text-slate-900">{totalGroups}</span>
+          </div>
+        </div>
+      </div>
       {/* Form Dialog */}
-      <CustomerGroupFormDialog
+      {/* <CustomerGroupFormDialog
         open={dialogOpen}
         onClose={() => {
           setDialogOpen(false);
@@ -716,7 +474,7 @@ export function CustomerGroups() {
         onSubmit={editingGroup ? handleEditGroup : handleAddGroup}
         editingGroup={editingGroup}
         availableCustomers={availableCustomers}
-      />
+      /> */}
     </div>
   );
 }

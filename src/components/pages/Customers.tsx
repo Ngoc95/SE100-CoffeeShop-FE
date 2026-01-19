@@ -51,10 +51,11 @@ interface CustomerGroup {
   name: string;
 }
 
-let fetchCustomersParams: Record<string, any> = { "sort": "+code" }
-
 export function Customers() {
   const { hasPermission } = useAuth();
+  let fetchCustomersParams: Record<string, any> = { "sort": "+code" }
+
+
   const canCreate = hasPermission('customers:create');
   const canUpdate = hasPermission('customers:update');
   const canDelete = hasPermission('customers:delete');
@@ -80,6 +81,7 @@ export function Customers() {
   // Functions
   const fetchCustomersData = async () => {
     const res = await getCustomers(fetchCustomersParams)
+    if (!res) return;
     const { customers, statistics } = res.data.metaData
     if (customers) {
       setCustomers(customers)
@@ -96,8 +98,6 @@ export function Customers() {
   }
 
   useEffect(() => {
-    console.log("Use effect in customers page!")
-
     try {
       fetchCustomersData()
     }
@@ -137,21 +137,6 @@ export function Customers() {
   //     matchesCity
   //   );
   // });
-
-  // Apply sorting
-  // if (sortBy && sortOrder !== "none") {
-  //   filteredCustomers = [...filteredCustomers].sort((a, b) => {
-  //     let comparison = 0;
-  //     if (sortBy === "name") {
-  //       comparison = a.name.localeCompare(b.name, "vi");
-  //     } else if (sortBy === "orders") {
-  //       comparison = a.orders - b.orders;
-  //     } else if (sortBy === "totalSpent") {
-  //       comparison = a.totalSpent - b.totalSpent;
-  //     }
-  //     return sortOrder === "asc" ? comparison : -comparison;
-  //   });
-  // }
 
   const handleSort = (field: string) => {
     let tempSortBy = sortBy;
