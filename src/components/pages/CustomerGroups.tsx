@@ -59,7 +59,6 @@ export function CustomerGroups() {
   }
 
   useEffect(() => {
-    console.log("Use effect group data")
     try {
       fetchCustomerGroupsData()
     }

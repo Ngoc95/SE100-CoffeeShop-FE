@@ -115,29 +115,6 @@ export function Customers() {
   }, []
   )
 
-  // Filtering and sorting
-  // let filteredCustomers = customers.filter((customer) => {
-  //   const matchesSearch =
-  //     customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-  //     customer.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-  //     customer.phone.includes(searchQuery);
-  //   const matchesGroup =
-  //     selectedGroup === "all" || customer.group === selectedGroup;
-  //   const matchesStatus =
-  //     selectedStatus === "all" || customer.status === selectedStatus;
-  //   const matchesGender =
-  //     selectedGender === "all" || customer.gender === selectedGender;
-  //   const matchesCity =
-  //     selectedCity === "all" || customer.city === selectedCity;
-  //   return (
-  //     matchesSearch &&
-  //     matchesGroup &&
-  //     matchesStatus &&
-  //     matchesGender &&
-  //     matchesCity
-  //   );
-  // });
-
   const handleSort = (field: string) => {
     let tempSortBy = sortBy;
     let tempSortOrder = sortOrder;
