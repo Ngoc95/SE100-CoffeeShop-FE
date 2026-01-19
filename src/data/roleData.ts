@@ -19,6 +19,8 @@ export const defaultRoles: Role[] = [
     isSystem: true,
     permissions: [
       'pos:access',
+      'tables:view',
+      'tables:update',
       'dashboard:view',
       'invoices:view',
       'invoices:create',

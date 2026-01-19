@@ -1439,27 +1439,120 @@ useEffect(() => {
 
     if (promotion) {
       const cart = getCurrentCart();
-      const subtotal = cart.reduce(
+      const orderTotal = cart.reduce(
         (sum, item) => sum + getItemPrice(item) * item.quantity,
         0
       );
 
+      // Helper: determine if a cart item is applicable under promotion scopes
+      const isItemApplicable = (item: CartItem) => {
+        const product = products.find((p) => String(p.id) === String(item.id));
+        const categoryId = product?.category;
+
+        const applyToAllItems = Boolean(promotion.applyToAllItems);
+        const applyToAllCategories = Boolean(promotion.applyToAllCategories);
+        const applyToAllCombos = Boolean(promotion.applyToAllCombos);
+        const applicableItemIds: string[] = (promotion.applicableItemIds || []).map((x: any) => String(x));
+        const applicableCategoryIds: string[] = (promotion.applicableCategoryIds || []).map((x: any) => String(x));
+        const applicableComboIds: string[] = (promotion.applicableComboIds || []).map((x: any) => String(x));
+
+        // Combos are separate entity: only include when explicitly allowed
+        if (item.isCombo) {
+          if (applyToAllCombos) return true;
+          if (applicableComboIds.length > 0 && item.comboId) {
+            return applicableComboIds.includes(String(item.comboId));
+          }
+          // If neither flag nor ids provided, combos are not applicable
+          return false;
+        }
+
+        // Items scope
+        if (applyToAllItems || applyToAllCategories) return true;
+        if (applicableItemIds.length === 0 && applicableCategoryIds.length === 0) {
+          // No explicit scope provided → treat as not applicable (backend should enforce at least one)
+          return false;
+        }
+        if (applicableItemIds.includes(String(item.id))) return true;
+        if (categoryId && applicableCategoryIds.includes(String(categoryId))) return true;
+        return false;
+      };
+
+      // Build applicable items list (exclude attached toppings which already merge into parent price)
+      const applicableItems = cart.filter((i) => !i.parentItemId && isItemApplicable(i));
+      const applicableSubtotal = applicableItems.reduce(
+        (sum, i) => sum + getItemPrice(i) * i.quantity,
+        0
+      );
+      const totalApplicableQty = applicableItems.reduce((sum, i) => sum + i.quantity, 0);
+
+      // Respect minOrderValue on total order
+      if (promotion.minOrderValue && orderTotal < Number(promotion.minOrderValue)) {
+        setAppliedPromoCode(promotion.code);
+        setDiscountAmount((pointsToUse || 0) * 10);
+        return;
+      }
+
       let calculatedDiscount = 0;
 
+      // Percentage (typeId=1)
       if (promotion.type === "percentage") {
-        calculatedDiscount = (subtotal * promotion.value) / 100;
-      } else if (promotion.type === "fixed") {
-        calculatedDiscount = promotion.value;
-      } else if (promotion.type === "item" && promotion.applicableCategories) {
-        cart.forEach((item) => {
-          const product = products.find((p) => p.id === item.id);
-          if (
-            product &&
-            product.category &&
-            promotion.applicableCategories.includes(product.category)
-          ) {
+        calculatedDiscount = (applicableSubtotal * Number(promotion.value)) / 100;
+        if (promotion.maxDiscount != null) {
+          calculatedDiscount = Math.min(calculatedDiscount, Number(promotion.maxDiscount));
+        }
+        calculatedDiscount = Math.min(calculatedDiscount, applicableSubtotal);
+      }
+      // Fixed amount (typeId=2)
+      else if (promotion.type === "fixed") {
+        calculatedDiscount = Math.min(Number(promotion.value), applicableSubtotal);
+      }
+      // Fixed price (typeId=3)
+      else if (promotion.type === "fixed_price") {
+        const finalPrice = Number(promotion.value) * totalApplicableQty;
+        calculatedDiscount = Math.max(0, applicableSubtotal - finalPrice);
+      }
+      // Gift (typeId=4)
+      else if (promotion.type === "gift") {
+        const buyQ = Number(promotion.buyQuantity) || 0;
+        const getQ = Number(promotion.getQuantity) || 0;
+        const requireSame = Boolean(promotion.requireSameItem);
+
+        let giftCount = 0;
+
+        if (buyQ > 0 && getQ > 0) {
+          if (requireSame) {
+            // Sum gifts per item
+            giftCount = applicableItems.reduce((sum, i) => sum + Math.floor(i.quantity / buyQ) * getQ, 0);
+          } else {
+            const totalQty = totalApplicableQty;
+            giftCount = Math.floor(totalQty / buyQ) * getQ;
+          }
+        } else if (getQ > 0) {
+          // Mode A: only minOrderValue + getQuantity
+          giftCount = getQ;
+        }
+
+        if (giftCount > 0) {
+          // Build unit price list of applicable items (repeat by quantity), sort ascending
+          const unitPrices: number[] = [];
+          applicableItems.forEach((i) => {
+            const unitPrice = getItemPrice(i); // price per unit includes customization
+            for (let q = 0; q < i.quantity; q++) unitPrices.push(unitPrice);
+          });
+          unitPrices.sort((a, b) => a - b);
+          const take = Math.min(giftCount, unitPrices.length);
+          calculatedDiscount = unitPrices.slice(0, take).reduce((s, p) => s + p, 0);
+        }
+        calculatedDiscount = Math.min(calculatedDiscount, applicableSubtotal);
+      }
+      // Backward compatibility: category-based item discount
+      else if (promotion.type === "item" && Array.isArray(promotion.applicableCategories)) {
+        applicableItems.forEach((item) => {
+          const product = products.find((p) => String(p.id) === String(item.id));
+          const categoryId = product?.category;
+          if (categoryId && promotion.applicableCategories.includes(categoryId)) {
             calculatedDiscount += Math.min(
-              promotion.value * item.quantity,
+              Number(promotion.value) * item.quantity,
               getItemPrice(item) * item.quantity
             );
           }
@@ -4049,7 +4142,13 @@ useEffect(() => {
           };
         })}
         orderId={selectedTable?.order_id}
-        selectedCustomer={selectedCustomer}
+        selectedCustomer={selectedCustomer ? {
+          id: String(selectedCustomer.id),
+          name: selectedCustomer.name,
+          phone: selectedCustomer.phone ?? "",
+          code: selectedCustomer.code,
+          points: 0,
+        } : null}
         onApply={handleApplyPromotion}
       />
 

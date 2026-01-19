@@ -11,7 +11,8 @@ import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { useAuth } from '../contexts/AuthContext';
-import { toast } from 'sonner@2.0.3';
+import { updateProfile, changePassword } from '../api/authApi';
+import { toast } from 'sonner';
 
 interface AccountProfileModalProps {
   open: boolean;
@@ -40,47 +41,70 @@ export function AccountProfileModal({ open, onOpenChange }: AccountProfileModalP
     }
   }, [open, user]);
 
-  const handleUsernameChange = () => {
-    // Validation
+  const handleUsernameChange = async () => {
     if (!username || username.trim() === '') {
       toast.error('Tên đăng nhập không được để trống');
       return;
     }
-
     if (username.length < 3) {
       toast.error('Tên đăng nhập phải có ít nhất 3 ký tự');
       return;
     }
 
-    // In real app, this would call API
-    toast.success('Đổi tên đăng nhập thành công!');
-    setIsEditingUsername(false);
+    try {
+      const res = await updateProfile({ username: username.trim() });
+      const updatedUser = res?.data?.metaData?.user ?? res?.data?.data ?? null;
+      // Optimistically update local cache
+      if (updatedUser) {
+        const cached = localStorage.getItem('user');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          parsed.username = updatedUser.username ?? username.trim();
+          localStorage.setItem('user', JSON.stringify(parsed));
+        }
+      } else {
+        // Fallback: update cached user username
+        const cached = localStorage.getItem('user');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          parsed.username = username.trim();
+          localStorage.setItem('user', JSON.stringify(parsed));
+        }
+      }
+      toast.success('Đổi tên đăng nhập thành công!');
+      setIsEditingUsername(false);
+    } catch (err: any) {
+      toast.error('Đổi tên đăng nhập thất bại', {
+        description: err?.response?.data?.message || err?.message || 'Lỗi kết nối API',
+      });
+    }
   };
 
-  const handlePasswordChange = () => {
-    // Validation
+  const handlePasswordChange = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       toast.error('Vui lòng điền đầy đủ thông tin');
       return;
     }
-
     if (newPassword.length < 6) {
       toast.error('Mật khẩu mới phải có ít nhất 6 ký tự');
       return;
     }
-
     if (newPassword !== confirmPassword) {
       toast.error('Mật khẩu mới và xác nhận mật khẩu không khớp');
       return;
     }
 
-    // In real app, this would call API
-    toast.success('Đổi mật khẩu thành công!');
-    
-    // Reset form
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+    try {
+      await changePassword({ currentPassword, newPassword });
+      toast.success('Đổi mật khẩu thành công!');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      toast.error('Đổi mật khẩu thất bại', {
+        description: err?.response?.data?.message || err?.message || 'Lỗi kết nối API',
+      });
+    }
   };
 
   return (
@@ -106,93 +130,50 @@ export function AccountProfileModal({ open, onOpenChange }: AccountProfileModalP
           <TabsContent value="personal" className="space-y-4 mt-4">
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
               <p className="text-sm text-amber-800">
-                ℹ️ Thông tin cá nhân chỉ có thể được chỉnh sửa bởi Quản lý trong module Nhân viên
+                ℹ️ Thông tin cá nhân được lấy từ tài khoản đăng nhập. Các trường chưa có dữ liệu sẽ không hiển thị.
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Họ và tên</Label>
-                <Input 
-                  value={user?.fullName || ''} 
-                  disabled 
+                <Input
+                  value={user?.fullName || ''}
+                  disabled
                   className="bg-slate-50"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label>Vai trò</Label>
-                <Input 
-                  value={user?.roleLabel || ''} 
-                  disabled 
+                <Input
+                  value={user?.roleLabel || ''}
+                  disabled
                   className="bg-slate-50"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label>Mã nhân viên</Label>
-                <Input 
-                  value="NV001" 
-                  disabled 
-                  className="bg-slate-50"
-                />
-              </div>
+              {user?.id && (
+                <div className="space-y-2">
+                  <Label>Mã nhân viên</Label>
+                  <Input
+                    value={user.id}
+                    disabled
+                    className="bg-slate-50"
+                  />
+                </div>
+              )}
 
-              <div className="space-y-2">
-                <Label>Số điện thoại</Label>
-                <Input 
-                  value="0901234567" 
-                  disabled 
-                  className="bg-slate-50"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>CMND/CCCD</Label>
-                <Input 
-                  value="001234567890" 
-                  disabled 
-                  className="bg-slate-50"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Ngày sinh</Label>
-                <Input 
-                  type="date"
-                  value="1990-01-01" 
-                  disabled 
-                  className="bg-slate-50"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Giới tính</Label>
-                <Input 
-                  value="Nam" 
-                  disabled 
-                  className="bg-slate-50"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Ngày vào làm</Label>
-                <Input 
-                  type="date"
-                  value="2023-01-15" 
-                  disabled 
-                  className="bg-slate-50"
-                />
-              </div>
-
-              <div className="col-span-2 space-y-2">
-                <Label>Địa chỉ</Label>
-                <Input 
-                  value="123 Nguyễn Huệ, Phường Bến Nghé, TP. Hồ Chí Minh" 
-                  disabled 
-                  className="bg-slate-50"
-                />
-              </div>
+              {user?.username && (
+                <div className="space-y-2">
+                  <Label>Tên đăng nhập</Label>
+                  <Input
+                    value={user.username}
+                    disabled
+                    className="bg-slate-50"
+                  />
+                </div>
+              )}
             </div>
           </TabsContent>
 
@@ -331,7 +312,7 @@ export function AccountProfileModal({ open, onOpenChange }: AccountProfileModalP
                     </div>
                   </div>
 
-                  <Button 
+                  <Button
                     onClick={handlePasswordChange}
                     className="w-full bg-blue-600 hover:bg-blue-700"
                   >
