@@ -115,38 +115,6 @@ export function CustomerGroups() {
     return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
   };
 
-  // Apply sorting
-  // if (sortField && sortOrder !== "none") {
-  //   filteredGroups = [...filteredGroups].sort((a, b) => {
-  //     let aValue: any;
-  //     let bValue: any;
-
-  //     if (sortField === "code") {
-  //       aValue = a.code;
-  //       bValue = b.code;
-  //     } else if (sortField === "name") {
-  //       aValue = a.name;
-  //       bValue = b.name;
-  //     } else if (sortField === "customers") {
-  //       aValue = a.customers.length;
-  //       bValue = b.customers.length;
-  //     } else if (sortField === "status") {
-  //       const statusOrder = { active: 0, inactive: 1 };
-  //       aValue = statusOrder[a.status] ?? 0;
-  //       bValue = statusOrder[b.status] ?? 0;
-  //     }
-
-  //     if (typeof aValue === "string" && typeof bValue === "string") {
-  //       const comparison = aValue.localeCompare(bValue, "vi");
-  //       return sortOrder === "asc" ? comparison : -comparison;
-  //     }
-
-  //     if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
-  //     if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
-  //     return 0;
-  //   });
-  // }
-
   // const toggleCustomerFilter = (customerId: string) => {
   //   setSelectedCustomers((prev) =>
   //     prev.includes(customerId)
@@ -174,6 +142,12 @@ export function CustomerGroups() {
   //   }
   //   return `${selectedCustomers.length} khách hàng`;
   // };
+
+  const handleSearch = () => {
+    if (!searchQuery) delete fetchCustomerGroupsParams["search"]
+    else fetchCustomerGroupsParams["search"] = searchQuery
+    fetchCustomerGroupsData()
+  }
 
   const handleSubmit = (formData: any /*{
     name: string;
@@ -306,12 +280,29 @@ export function CustomerGroups() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                 <Input
-                  placeholder="Tìm kiếm theo mã nhóm, tên nhóm..."
+                  placeholder="Tìm kiếm theo tên nhóm và mô tả nhóm"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      handleSearch();
+                    }
+                  }}
                   className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
+                <X
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 w-5 h-5"
+                  onClick={() => setSearchQuery("")}
+                />
               </div>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  handleSearch();
+                }}
+              >
+                <Search className="w-4 h-4" />
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -420,7 +411,7 @@ export function CustomerGroups() {
                       <TableCell className="text-sm text-right">
                         <div className="flex justify-center gap-2">
                           {
-                            canUpdate && (
+                            canUpdate && group.id != 1 && group.priority != 0 && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -432,7 +423,7 @@ export function CustomerGroups() {
                             )
                           }
                           {
-                            canDelete && (
+                            canDelete && group.id != 1 && group.priority != 0 && (
                               <Button
                                 variant="ghost"
                                 size="sm"
