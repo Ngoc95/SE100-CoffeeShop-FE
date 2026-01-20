@@ -71,23 +71,28 @@ function AppContent() {
   // Redirect based on user role when logged in
   useEffect(() => {
     if (isAuthenticated && user) {
-      switch (user.role) {
-        case "barista":
-          setCurrentPage("kitchen");
-          break;
-        case "cashier":
-        case "server":
-          setCurrentPage("pos");
-          break;
-        case "manager":
-          // Manager can access everything, default to dashboard
-          setCurrentPage("dashboard");
-          break;
-        default:
-          setCurrentPage("dashboard");
+      // Managers land on Dashboard
+      if (user.role === "manager") {
+        setCurrentPage("dashboard");
+        return;
       }
+
+      // Prefer POS if the user has POS access (cashier/server)
+      if (hasPermission("pos:access" as any)) {
+        setCurrentPage("pos");
+        return;
+      }
+
+      // Otherwise, route barista (or any role with kitchen access) to Kitchen
+      if (hasPermission("kitchen:access" as any)) {
+        setCurrentPage("kitchen");
+        return;
+      }
+
+      // Fallback to dashboard
+      setCurrentPage("dashboard");
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, hasPermission]);
 
   // Show login screen if not authenticated
   if (!isAuthenticated) {
@@ -162,11 +167,12 @@ function AppContent() {
       if (user?.role === "barista") {
         return <KitchenDisplay />;
       } else if (user?.role === "cashier" || user?.role === "server") {
-        return (
-          <POSOrdering
-            userRole={user?.role === "cashier" ? "cashier" : "waiter"}
-          />
-        );
+        const posUserRole =
+          user?.role === "cashier" ||
+          (user?.roleLabel?.toLowerCase().includes("thu ngân") ?? false)
+            ? "cashier"
+            : "waiter";
+        return <POSOrdering userRole={posUserRole} />;
       }
       return <Dashboard />;
     }
@@ -175,11 +181,14 @@ function AppContent() {
       case "dashboard":
         return <Dashboard />;
       case "pos":
-        return (
-          <POSOrdering
-            userRole={user?.role === "cashier" ? "cashier" : "waiter"}
-          />
-        );
+        {
+          const posUserRole =
+            user?.role === "cashier" ||
+            (user?.roleLabel?.toLowerCase().includes("thu ngân") ?? false)
+              ? "cashier"
+              : "waiter";
+          return <POSOrdering userRole={posUserRole} />;
+        }
       case "kitchen":
         return <KitchenDisplay />;
       case "inventory":

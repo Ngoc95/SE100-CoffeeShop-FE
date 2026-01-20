@@ -39,6 +39,8 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
     logout();
   };
 
+  
+
   // Allow all logged in users to access the menu, but filter items by permission
   const canAccessFullMenu = true;
 
@@ -68,7 +70,13 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
       'suppliers': 'suppliers:view',
       'promotions': 'promotions:view',
       'finance': 'finance:view',
-      'reports': 'reports:view',
+      'reports-endofday': 'reports:view',
+      'reports-finance': 'reports:view',
+      'reports-products': 'reports:view',
+      'reports-sales': 'reports:view',
+      'reports-customers': 'reports:view',
+      'reports-suppliers': 'reports:view',
+      'reports-employees': 'reports:view',
       'invoices': 'invoices:view',
       'returns': 'returns:view',
       'purchase-orders': 'purchase_orders:view',
@@ -129,7 +137,7 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
   ];
 
   const reportMenuItems = [
-    { id: 'reports' as PageType, label: 'Báo cáo' },
+    { id: 'reports-sales' as PageType, label: 'Báo cáo' },
   ];
 
   const fullscreenMenuItems = [
@@ -225,6 +233,7 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                     <User className="w-4 h-4 mr-2" />
                     Tài khoản
                   </DropdownMenuItem>
+                  
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
                     <LogOut className="w-4 h-4 mr-2" />
@@ -519,6 +528,7 @@ export function TopNavbar({ currentPage, onNavigate, isFullscreen }: TopNavbarPr
                   <User className="w-4 h-4 mr-2" />
                   Tài khoản
                 </DropdownMenuItem>
+                
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
                   <LogOut className="w-4 h-4 mr-2" />

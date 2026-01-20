@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from "../../contexts/AuthContext";
 import {
   Plus, 
@@ -77,6 +77,8 @@ import {
   endOfYear
 } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { getFinanceTransactions, getFinanceCategories, getBankAccounts, getFinancePersons } from '../../api/finance';
+import { toast } from 'sonner';
 
 export function Finance() {
   const { hasPermission } = useAuth();
@@ -215,19 +217,7 @@ export function Finance() {
     { id: 'le-van-c', name: 'Lê Văn C' },
   ];
 
-  const allCategories = [
-    { id: 'customer-payment', name: 'Tiền khách trả', type: 'receipt' },
-    { id: 'debt-collection', name: 'Thu nợ', type: 'receipt' },
-    { id: 'loan', name: 'Vay', type: 'receipt' },
-    { id: 'investment', name: 'Đầu tư', type: 'receipt' },
-    { id: 'other-receipt', name: 'Thu khác', type: 'receipt' },
-    { id: 'supplier-payment', name: 'Tiền trả NCC', type: 'payment' },
-    { id: 'salary', name: 'Tiền lương', type: 'payment' },
-    { id: 'utilities', name: 'Điện nước', type: 'payment' },
-    { id: 'rent', name: 'Tiền thuê mặt bằng', type: 'payment' },
-    { id: 'debt-payment', name: 'Trả nợ', type: 'payment' },
-    { id: 'other-payment', name: 'Chi khác', type: 'payment' },
-  ];
+  const [allCategories, setAllCategories] = useState<Array<{ id: string; name: string; type?: 'receipt' | 'payment' }>>([]);
 
   const allCustomers = [
     { id: '1', name: 'Anh Giang - Kim Mã', phone: '0987654321' },
@@ -251,10 +241,7 @@ export function Finance() {
     { id: '2', name: 'Người khác 2', phone: '0907890123' },
   ];
 
-  const allBankAccounts = [
-    { id: '1', name: 'TK Vietcombank', accountNumber: '1234567890', bank: 'VCB', bankFull: 'VCB - Ngân hàng TMCP Ngoại thương Việt Nam', owner: 'Nguyễn Văn A' },
-    { id: '2', name: 'TK Techcombank', accountNumber: '0987654321', bank: 'TCB', bankFull: 'TCB - Ngân hàng TMCP Kỹ Thương Việt Nam', owner: 'Công ty ABC' },
-  ];
+  const [allBankAccounts, setAllBankAccounts] = useState<Array<{ id: string; name?: string; accountNumber: string; bank?: string; bankFull?: string; owner?: string }>>([]);
 
   const vietnameseBanks = [
     { id: 'VCB', name: 'VCB - Ngân hàng TMCP Ngoại thương Việt Nam' },
@@ -305,20 +292,71 @@ export function Finance() {
     closingBalance: 8540000,
   };
 
-  const allTransactions = [
-    { id: 'TTPN000050', time: '02/12/2025 16:00', type: 'chi', category: 'Tiền trả NCC', person: 'Đại lý Hồng Phúc', amount: -1283000, status: 'completed', note: '', method: 'cash' },
-    { id: 'THD000050', time: '02/12/2025 16:00', type: 'thu', category: 'Tiền khách trả', person: 'Anh Giang - Kim Mã', amount: 1377000, status: 'completed', note: '', method: 'cash' },
-    { id: 'TTPN000049', time: '02/12/2025 15:00', type: 'chi', category: 'Tiền trả NCC', person: 'Đại lý Hồng Phúc', amount: -745500, status: 'completed', note: '', method: 'bank' },
-    { id: 'THD000049', time: '02/12/2025 15:00', type: 'thu', category: 'Tiền khách trả', person: 'Nguyễn Văn Hải', amount: 685000, status: 'completed', note: '', method: 'bank' },
-    { id: 'TTPN000048', time: '02/12/2025 14:00', type: 'chi', category: 'Tiền trả NCC', person: 'Cửa hàng Đại Việt', amount: -207500, status: 'completed', note: '', method: 'cash' },
-    { id: 'THD000048', time: '02/12/2025 14:00', type: 'thu', category: 'Tiền khách trả', person: 'Anh Giang - Kim Mã', amount: 282000, status: 'completed', note: '', method: 'cash' },
-    { id: 'TTPN000047', time: '01/12/2025 10:00', type: 'chi', category: 'Tiền trả NCC', person: 'Cửa hàng Đại Việt', amount: -1766500, status: 'completed', note: '', method: 'cash' },
-    { id: 'THD000047', time: '01/12/2025 10:00', type: 'thu', category: 'Tiền khách trả', person: 'Nguyễn Văn Hải', amount: 2060000, status: 'cancelled', note: '', method: 'cash' },
-    { id: 'TTPN000046', time: '01/12/2025 09:00', type: 'chi', category: 'Tiền trả NCC', person: 'Cửa hàng Đại Việt', amount: -1727000, status: 'completed', note: '', method: 'bank' },
-    { id: 'THD000046', time: '01/12/2025 09:00', type: 'thu', category: 'Tiền khách trả', person: 'Anh Giang - Kim Mã', amount: 1968000, status: 'completed', note: '', method: 'bank' },
-    { id: 'TTPN000045', time: '01/12/2025 08:00', type: 'chi', category: 'Tiền trả NCC', person: 'Cửa hàng Đại Việt', amount: -35000, status: 'completed', note: '', method: 'cash' },
-    { id: 'THD000045', time: '01/12/2025 08:00', type: 'thu', category: 'Tiền khách trả', person: 'Phạm Thu Hương', amount: 45000, status: 'completed', note: '', method: 'cash' },
-  ];
+  const [allTransactions, setAllTransactions] = useState<Array<{ id: string; time: string; type: 'thu' | 'chi'; category: string; person: string; amount: number; status: string; note: string; method: 'cash' | 'transfer' }>>([]);
+
+  // Fetch finance data from backend
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Categories
+        const catRes = await getFinanceCategories();
+        const catItems = (catRes?.data?.metaData?.items ?? catRes?.data?.metaData ?? catRes?.data ?? []) as any[];
+        const mappedCats = catItems.map((c: any) => {
+          const typeRaw = (c.type ?? c.typeId ?? '').toString().toLowerCase();
+          const type: 'receipt' | 'payment' | undefined = typeRaw.includes('receipt') || typeRaw === '1' ? 'receipt' : (typeRaw.includes('payment') || typeRaw === '2' ? 'payment' : undefined);
+          return { id: String(c.id ?? c.code ?? c.name), name: c.name ?? 'Danh mục', type };
+        });
+        setAllCategories(mappedCats);
+
+        // Bank Accounts
+        const bankRes = await getBankAccounts();
+        const bankItems = (bankRes?.data?.metaData?.items ?? bankRes?.data?.metaData ?? bankRes?.data ?? []) as any[];
+        const mappedBanks = bankItems.map((ba: any) => ({
+          id: String(ba.id ?? ba.accountId ?? ba.accountNumber ?? Math.random()),
+          name: ba.name ?? `${ba.bankName ?? 'Ngân hàng'} - ${ba.ownerName ?? ba.owner ?? ''}`,
+          accountNumber: String(ba.accountNumber ?? ba.number ?? ''),
+          bank: ba.bankCode ?? ba.bank ?? undefined,
+          bankFull: ba.bankFullName ?? ba.bankName ?? undefined,
+          owner: ba.ownerName ?? ba.owner ?? undefined,
+        }));
+        setAllBankAccounts(mappedBanks);
+
+        // Transactions
+        const tranRes = await getFinanceTransactions({});
+        const tranItems = (tranRes?.data?.metaData?.items ?? tranRes?.data?.metaData ?? tranRes?.data ?? []) as any[];
+        const mappedTrans = tranItems.map((t: any) => {
+          const code = String(t.code ?? t.id ?? t.transactionId ?? '');
+          const dateStr = t.transactionDate ?? t.createdAt ?? new Date().toISOString();
+          const dt = new Date(dateStr);
+          const time = `${dt.toLocaleDateString('vi-VN')} ${dt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
+          const typeRaw = (t.type ?? t.transactionType ?? '').toString().toLowerCase();
+          const isReceipt = typeRaw.includes('thu') || typeRaw.includes('income');
+          const isPayment = typeRaw.includes('chi') || typeRaw.includes('expense');
+          const amountNum = Number(t.amount ?? 0);
+          const type: 'thu' | 'chi' = isReceipt ? 'thu' : (isPayment ? 'chi' : (amountNum >= 0 ? 'thu' : 'chi'));
+          const normalizedAmount = type === 'chi' ? -Math.abs(amountNum) : Math.abs(amountNum);
+          return {
+            id: code,
+            time,
+            type,
+            category: t.category?.name ?? t.categoryName ?? '',
+            person: t.person?.name ?? t.personName ?? '',
+            amount: normalizedAmount,
+            status: t.status ?? 'completed',
+            note: t.note ?? '',
+            method: (t.paymentMethod ?? 'cash') === 'transfer' ? 'transfer' : 'cash',
+          };
+        });
+        setAllTransactions(mappedTrans);
+
+        // Persons (optional wiring, kept for future use)
+        await getFinancePersons().catch(() => void 0);
+      } catch (err: any) {
+        toast.error('Không tải được dữ liệu tài chính', { description: err?.message || 'Lỗi kết nối API' });
+      }
+    };
+    loadData();
+  }, []);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {

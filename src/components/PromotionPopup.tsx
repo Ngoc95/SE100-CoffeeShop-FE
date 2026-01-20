@@ -1,3 +1,4 @@
+import { useAuth } from "../contexts/AuthContext";
 import { useState, useEffect } from "react";
 import {
   Percent,
@@ -30,6 +31,7 @@ import { Badge } from "./ui/badge";
 import { Card } from "./ui/card";
 import { Label } from "./ui/label";
 import { toast } from "sonner";
+import { getAvailablePromotions, applyPromotion, getPromotions as fetchPromotions } from "../api/promotions";
 
 interface OrderItem {
   id: string;
@@ -63,13 +65,22 @@ interface ComboCondition {
 }
 
 interface Promotion {
+  id?: number | string;
   code: string;
   name: string;
   description: string;
-  type: "percentage" | "fixed" | "item" | "combo";
+  type: "percentage" | "fixed" | "fixed_price" | "gift" | "item" | "combo";
   value: number;
   minOrderValue?: number;
+  maxDiscount?: number;
+  // Product scope flags
+  applyToAllItems?: boolean;
+  applyToAllCategories?: boolean;
+  applyToAllCombos?: boolean;
+  applicableItemIds?: (string | number)[];
   applicableCategories?: string[];
+  applicableCategoryIds?: (string | number)[];
+  applicableComboIds?: (string | number)[];
   maxUsage?: number;
   currentUsage?: number;
   expiryDate?: Date;
@@ -80,9 +91,20 @@ interface Promotion {
   applicableCustomerIds?: string[];
   applicableMembershipTiers?: string[];
   requiresCustomer?: boolean;
+  // Walk-in and groups
+  applyToAllCustomers?: boolean;
+  applyToAllCustomerGroups?: boolean;
+  applyToWalkIn?: boolean;
+  applicableCustomerGroupIds?: string[];
+  maxTotalUsage?: number;
+  maxUsagePerCustomer?: number | null;
   // NEW: Combo-specific fields
   isCombo?: boolean;
   comboCondition?: ComboCondition;
+  // Gift fields
+  buyQuantity?: number;
+  getQuantity?: number;
+  requireSameItem?: boolean;
 }
 
 interface PromotionPopupProps {
@@ -91,6 +113,7 @@ interface PromotionPopupProps {
   orderTotal: number;
   orderItems: OrderItem[];
   selectedCustomer?: Customer | null;
+  orderId?: number | string;
   onApply: (
     promotion: Promotion | null,
     pointsToUse?: number,
@@ -104,8 +127,11 @@ export function PromotionPopup({
   orderTotal,
   orderItems,
   selectedCustomer: initialCustomer,
+  orderId,
   onApply,
 }: PromotionPopupProps) {
+  const { hasPermission } = useAuth();
+  const [notAuthorized, setNotAuthorized] = useState(false);
   const [promoCode, setPromoCode] = useState("");
   const [validationState, setValidationState] = useState<
     "idle" | "loading" | "success" | "error"
@@ -161,137 +187,18 @@ export function PromotionPopup({
     },
   ];
 
-  // Mock promotions data with customer-specific fields
-  const availablePromotions: Promotion[] = [
-    {
-      code: "KM10",
-      name: "Giảm 10% hóa đơn",
-      description: "Giảm 10% tổng giá trị hóa đơn",
-      type: "percentage",
-      value: 10,
-      minOrderValue: 100000,
-      isActive: true,
-      maxUsage: 100,
-      currentUsage: 45,
-      applicableMembershipTiers: ["Bạc", "Vàng", "Kim cương"],
-    },
-    {
-      code: "VIPGOLD",
-      name: "Ưu đãi VIP Vàng",
-      description: "Giảm 15% dành riêng cho hạng Vàng",
-      type: "percentage",
-      value: 15,
-      minOrderValue: 50000,
-      isActive: true,
-      customerSpecific: true,
-      applicableMembershipTiers: ["Vàng"],
-      requiresCustomer: true,
-    },
-    {
-      code: "GIAMCF",
-      name: "Giảm 5.000đ Cà phê",
-      description: "Giảm 5.000đ cho món Cà phê",
-      type: "item",
-      value: 5000,
-      applicableCategories: ["coffee"],
-      isActive: true,
-      maxUsage: 50,
-      currentUsage: 30,
-    },
-    {
-      code: "DIAMOND20",
-      name: "Kim cương giảm 20%",
-      description: "Giảm 20% cho khách hàng Kim cương",
-      type: "percentage",
-      value: 20,
-      minOrderValue: 200000,
-      isActive: true,
-      customerSpecific: true,
-      applicableMembershipTiers: ["Kim cương"],
-      requiresCustomer: true,
-    },
-    {
-      code: "GIAM20K",
-      name: "Giảm 20.000đ hóa đơn",
-      description: "Giảm 20.000đ cho đơn hàng",
-      type: "fixed",
-      value: 20000,
-      minOrderValue: 150000,
-      isActive: true,
-      conflictsWith: ["KM10"],
-    },
-    {
-      code: "KHCU001",
-      name: "Ưu đãi khách hàng Nguyễn Văn An",
-      description: "Giảm 30.000đ dành riêng",
-      type: "fixed",
-      value: 30000,
-      isActive: true,
-      customerSpecific: true,
-      applicableCustomerIds: ["KH001"],
-      requiresCustomer: true,
-    },
-    {
-      code: "TRATHANH",
-      name: "Giảm 10.000đ Trà",
-      description: "Giảm 10.000đ cho món Trà",
-      type: "item",
-      value: 10000,
-      applicableCategories: ["tea"],
-      isActive: true,
-    },
-    // NEW: Combo Promotions
-    {
-      code: "COMBO1CF",
-      name: "Combo 1 Cà phê + 1 Bánh",
-      description: "Mua 1 Cà phê + 1 Bánh giảm 20.000đ",
-      type: "combo",
-      value: 20000,
-      isActive: true,
-      isCombo: true,
-      comboCondition: {
-        requiredItems: [
-          { category: "coffee", minQuantity: 1 },
-          { category: "pastry", minQuantity: 1 },
-        ],
-        discount: { type: "fixed", value: 20000 },
-      },
-    },
-    {
-      code: "COMBO2TRA",
-      name: "Combo 2 Trà + 1 Sinh tố",
-      description: "Mua 2 Trà + 1 Sinh tố giảm 15%",
-      type: "combo",
-      value: 15,
-      isActive: true,
-      isCombo: true,
-      comboCondition: {
-        requiredItems: [
-          { category: "tea", minQuantity: 2 },
-          { category: "smoothie", minQuantity: 1 },
-        ],
-        discount: { type: "percentage", value: 15 },
-      },
-      applicableMembershipTiers: ["Vàng", "Kim cương"],
-    },
-    {
-      code: "COMBOVIP",
-      name: "Combo VIP 3 Cà phê",
-      description: "Mua 3 Cà phê giảm 30.000đ",
-      type: "combo",
-      value: 30000,
-      minOrderValue: 100000,
-      isActive: true,
-      isCombo: true,
-      comboCondition: {
-        requiredItems: [{ category: "coffee", minQuantity: 3 }],
-        discount: { type: "fixed", value: 30000 },
-      },
-      customerSpecific: true,
-      applicableMembershipTiers: ["Vàng", "Kim cương"],
-      requiresCustomer: true,
-    },
-  ];
+  // Backend-driven promotions list
+  const [availablePromotions, setAvailablePromotions] = useState<Promotion[]>([]);
+  const [isLoadingPromos, setIsLoadingPromos] = useState(false);
+
+  // Permission gate: avoid backend calls when lacking permission
+  useEffect(() => {
+    if (!hasPermission("promotions:view" as any)) {
+      setNotAuthorized(true);
+    } else {
+      setNotAuthorized(false);
+    }
+  }, [hasPermission]);
 
   useEffect(() => {
     if (initialCustomer) {
@@ -299,85 +206,208 @@ export function PromotionPopup({
     }
   }, [initialCustomer]);
 
+  // Load available promotions from backend when modal opens or dependencies change
+  useEffect(() => {
+    const loadAvailable = async () => {
+      if (!open || notAuthorized) return;
+      setIsLoadingPromos(true);
+      try {
+        // Flexible extractor to handle various API response shapes
+        const extractItems = (res: any): any[] => {
+          const data = res?.data ?? res;
+          const candidates = [
+            data?.metaData?.promotions,
+            data?.metaData?.items,
+            data?.metaData?.data?.items,
+            data?.metaData?.data,
+            data?.data?.items,
+            data?.data?.records,
+            data?.data?.list,
+            data?.items,
+            data?.records,
+            data?.list,
+            data?.metaData,
+            Array.isArray(data) ? data : undefined,
+          ];
+          for (const c of candidates) {
+            if (Array.isArray(c)) return c;
+          }
+          // As a last resort, scan enumerable properties and return the first array
+          if (data && typeof data === "object") {
+            for (const key of Object.keys(data)) {
+              if (Array.isArray((data as any)[key])) return (data as any)[key];
+            }
+          }
+          return [];
+        };
+
+        let list: any[] = [];
+        if (orderId) {
+          const res = await getAvailablePromotions({
+            orderId,
+            customerId: selectedCustomer?.id,
+          });
+          list = extractItems(res);
+        } else {
+          const res = await fetchPromotions({ isActive: true, limit: 50 });
+          list = extractItems(res);
+        }
+        const mapTypeId = (typeId: any): Promotion["type"] => {
+          const id = Number(typeId);
+          switch (id) {
+            case 1:
+              return "percentage";
+            case 2:
+              return "fixed";
+            case 3:
+              return "fixed_price";
+            case 4:
+              return "gift";
+            default: {
+              const t = (typeof typeId === "string" ? typeId : "percentage").toLowerCase();
+              return (t === "percentage" || t === "fixed" || t === "fixed_price" || t === "gift" || t === "item" || t === "combo") ? (t as Promotion["type"]) : "percentage";
+            }
+          }
+        };
+
+        let mapped: Promotion[] = list.map((p: any) => ({
+          id: Number(p.id ?? p.promotionId ?? 0),
+          code: String(p.code ?? p.promotionCode ?? p.id ?? ""),
+          name: String(p.name ?? p.title ?? "Khuyến mãi"),
+          description: String(p.description ?? ""),
+          type: mapTypeId(p.typeId ?? p.type),
+          value: Number(p.discountValue ?? p.value ?? p.promotionValue ?? 0),
+          minOrderValue: p.minOrderValue != null ? Number(p.minOrderValue) : undefined,
+          maxDiscount: p.maxDiscount != null ? Number(p.maxDiscount) : undefined,
+          applyToAllItems: Boolean(p.applyToAllItems),
+          applyToAllCategories: Boolean(p.applyToAllCategories),
+          applyToAllCombos: Boolean(p.applyToAllCombos),
+          applicableItemIds: Array.isArray(p.applicableItemIds) ? p.applicableItemIds : undefined,
+          applicableCategories: Array.isArray(p.applicableCategories) ? p.applicableCategories : undefined,
+          applicableCategoryIds: Array.isArray(p.applicableCategoryIds) ? p.applicableCategoryIds : undefined,
+          applicableComboIds: Array.isArray(p.applicableComboIds) ? p.applicableComboIds : undefined,
+          maxUsage: p.maxUsage != null ? Number(p.maxUsage) : undefined,
+          currentUsage: p.currentUsage != null ? Number(p.currentUsage) : undefined,
+          expiryDate: p.expiryDate ? new Date(p.expiryDate) : undefined,
+          isActive: p.isActive != null ? Boolean(p.isActive) : true,
+          conflictsWith: Array.isArray(p.conflictsWith) ? p.conflictsWith : undefined,
+          customerSpecific: Boolean(p.customerSpecific ?? false),
+          applicableCustomerIds: Array.isArray(p.applicableCustomerIds) ? p.applicableCustomerIds : undefined,
+          applicableMembershipTiers: Array.isArray(p.applicableMembershipTiers) ? p.applicableMembershipTiers : undefined,
+          requiresCustomer: Boolean(p.requiresCustomer ?? false),
+          isCombo: Boolean(p.isCombo),
+          comboCondition: p.comboCondition ?? undefined,
+          buyQuantity: p.buyQuantity != null ? Number(p.buyQuantity) : undefined,
+          getQuantity: p.getQuantity != null ? Number(p.getQuantity) : undefined,
+          requireSameItem: Boolean(p.requireSameItem),
+        }));
+
+        // Fallback: if filtered listing returned empty, try unfiltered list
+        if (!orderId && mapped.length === 0) {
+          try {
+            const res2 = await fetchPromotions();
+            const list2: any[] = extractItems(res2);
+            mapped = list2.map((p: any) => ({
+              id: Number(p.id ?? p.promotionId ?? 0),
+              code: String(p.code ?? p.promotionCode ?? p.id ?? ""),
+              name: String(p.name ?? p.title ?? "Khuyến mãi"),
+              description: String(p.description ?? ""),
+              type: mapTypeId(p.typeId ?? p.type),
+              value: Number(p.discountValue ?? p.value ?? p.promotionValue ?? 0),
+              minOrderValue: p.minOrderValue != null ? Number(p.minOrderValue) : undefined,
+              maxDiscount: p.maxDiscount != null ? Number(p.maxDiscount) : undefined,
+              applyToAllItems: Boolean(p.applyToAllItems),
+              applyToAllCategories: Boolean(p.applyToAllCategories),
+              applyToAllCombos: Boolean(p.applyToAllCombos),
+              applicableItemIds: Array.isArray(p.applicableItemIds) ? p.applicableItemIds : undefined,
+              applicableCategories: Array.isArray(p.applicableCategories) ? p.applicableCategories : undefined,
+              applicableCategoryIds: Array.isArray(p.applicableCategoryIds) ? p.applicableCategoryIds : undefined,
+              applicableComboIds: Array.isArray(p.applicableComboIds) ? p.applicableComboIds : undefined,
+              maxUsage: p.maxUsage != null ? Number(p.maxUsage) : undefined,
+              currentUsage: p.currentUsage != null ? Number(p.currentUsage) : undefined,
+              expiryDate: p.expiryDate ? new Date(p.expiryDate) : undefined,
+              isActive: p.isActive != null ? Boolean(p.isActive) : true,
+              conflictsWith: Array.isArray(p.conflictsWith) ? p.conflictsWith : undefined,
+              customerSpecific: Boolean(p.customerSpecific ?? false),
+              applicableCustomerIds: Array.isArray(p.applicableCustomerIds) ? p.applicableCustomerIds : undefined,
+              applicableMembershipTiers: Array.isArray(p.applicableMembershipTiers) ? p.applicableMembershipTiers : undefined,
+              requiresCustomer: Boolean(p.requiresCustomer ?? false),
+              isCombo: Boolean(p.isCombo),
+              comboCondition: p.comboCondition ?? undefined,
+              buyQuantity: p.buyQuantity != null ? Number(p.buyQuantity) : undefined,
+              getQuantity: p.getQuantity != null ? Number(p.getQuantity) : undefined,
+              requireSameItem: Boolean(p.requireSameItem),
+            }));
+          } catch {}
+        }
+        setAvailablePromotions(mapped);
+      } catch (err: any) {
+        const status = err?.response?.status;
+        if (status === 403) {
+          setNotAuthorized(true);
+          toast.error("Không thể tải khuyến mãi (403 - thiếu quyền)");
+        } else {
+          toast.error("Không tải được khuyến mãi", {
+            description: err?.message || "Lỗi kết nối API",
+          });
+        }
+        setAvailablePromotions([]);
+      } finally {
+        setIsLoadingPromos(false);
+      }
+    };
+    loadAvailable();
+  }, [open, orderId, selectedCustomer, notAuthorized]);
+
+  // Early UI guard: show friendly message if lacking permission
+  if (notAuthorized) {
+    return (
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Khuyến mãi</DialogTitle>
+          </DialogHeader>
+          <div className="p-2 text-center text-slate-600">
+            Bạn không có quyền xem/áp dụng khuyến mãi.
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   const validatePromoCode = (
     code: string,
     customer: Customer | null = selectedCustomer
   ) => {
     setValidationState("loading");
-
-    // Simulate API call
-    setTimeout(() => {
-      const promo = availablePromotions.find(
-        (p) => p.code.toLowerCase() === code.toLowerCase()
+    const promo = availablePromotions.find(
+      (p) => p.code.toLowerCase() === code.toLowerCase()
+    );
+    if (!promo) {
+      setValidationState("error");
+      setValidationMessage("Mã không hợp lệ hoặc không khả dụng cho đơn này");
+      return;
+    }
+    if (promo.requiresCustomer && !customer) {
+      setValidationState("error");
+      setValidationMessage("Mã này yêu cầu chọn khách hàng");
+      return;
+    }
+    if (promo.minOrderValue && orderTotal < promo.minOrderValue) {
+      setValidationState("error");
+      setValidationMessage(
+        `Đơn hàng phải từ ${promo.minOrderValue.toLocaleString("vi-VN")}đ`
       );
-
-      if (!promo) {
-        setValidationState("error");
-        setValidationMessage("Mã không hợp lệ");
-        return;
-      }
-
-      if (!promo.isActive) {
-        setValidationState("error");
-        setValidationMessage("Mã khuyến mãi đã hết hạn");
-        return;
-      }
-
-      // Check customer requirement
-      if (promo.requiresCustomer && !customer) {
-        setValidationState("error");
-        setValidationMessage("Mã này yêu cầu chọn khách hàng");
-        return;
-      }
-
-      // Check customer-specific eligibility
-      if (customer && promo.customerSpecific) {
-        if (
-          promo.applicableCustomerIds &&
-          !promo.applicableCustomerIds.includes(customer.id)
-        ) {
-          setValidationState("error");
-          setValidationMessage("Mã này không áp dụng cho khách hàng này");
-          return;
-        }
-
-        if (
-          promo.applicableMembershipTiers &&
-          customer.membershipTier &&
-          !promo.applicableMembershipTiers.includes(customer.membershipTier)
-        ) {
-          setValidationState("error");
-          setValidationMessage(
-            `Mã này chỉ áp dụng cho hạng: ${promo.applicableMembershipTiers.join(
-              ", "
-            )}`
-          );
-          return;
-        }
-      }
-
-      if (promo.minOrderValue && orderTotal < promo.minOrderValue) {
-        setValidationState("error");
-        setValidationMessage(
-          `Đơn hàng phải từ ${promo.minOrderValue.toLocaleString("vi-VN")}đ`
-        );
-        return;
-      }
-
-      if (
-        promo.maxUsage &&
-        promo.currentUsage &&
-        promo.currentUsage >= promo.maxUsage
-      ) {
-        setValidationState("error");
-        setValidationMessage("Mã khuyến mãi đã hết lượt sử dụng");
-        return;
-      }
-
-      setValidationState("success");
-      setValidationMessage("Mã hợp lệ");
-      setSelectedPromo(promo);
-    }, 500);
+      return;
+    }
+    setValidationState("success");
+    setValidationMessage("Mã hợp lệ");
+    setSelectedPromo(promo);
   };
 
   const handleApplyCode = () => {
@@ -391,10 +421,45 @@ export function PromotionPopup({
     let orderDiscount = 0;
     const itemDiscounts: { itemName: string; discount: number }[] = [];
 
+    const totalQty = orderItems.reduce((sum, i) => sum + i.quantity, 0);
+
     if (promo.type === "percentage") {
       orderDiscount = (orderTotal * promo.value) / 100;
+      if (promo.maxDiscount != null) {
+        orderDiscount = Math.min(orderDiscount, Number(promo.maxDiscount));
+      }
+      orderDiscount = Math.min(orderDiscount, orderTotal);
     } else if (promo.type === "fixed") {
-      orderDiscount = promo.value;
+      orderDiscount = Math.min(promo.value, orderTotal);
+    } else if (promo.type === "fixed_price") {
+      const finalPrice = Number(promo.value) * totalQty;
+      orderDiscount = Math.max(0, orderTotal - finalPrice);
+    } else if (promo.type === "gift") {
+      const buyQ = Number(promo.buyQuantity) || 0;
+      const getQ = Number(promo.getQuantity) || 0;
+      const requireSame = Boolean(promo.requireSameItem);
+
+      let giftCount = 0;
+      if (buyQ > 0 && getQ > 0) {
+        if (requireSame) {
+          giftCount = orderItems.reduce((sum, i) => sum + Math.floor(i.quantity / buyQ) * getQ, 0);
+        } else {
+          giftCount = Math.floor(totalQty / buyQ) * getQ;
+        }
+      } else if (getQ > 0) {
+        giftCount = getQ;
+      }
+      if (giftCount > 0) {
+        const unitPrices: number[] = [];
+        orderItems.forEach((i) => {
+          const unitPrice = i.price;
+          for (let q = 0; q < i.quantity; q++) unitPrices.push(unitPrice);
+        });
+        unitPrices.sort((a, b) => a - b);
+        const take = Math.min(giftCount, unitPrices.length);
+        orderDiscount = unitPrices.slice(0, take).reduce((s, p) => s + p, 0);
+      }
+      orderDiscount = Math.min(orderDiscount, orderTotal);
     } else if (promo.type === "item" && promo.applicableCategories) {
       orderItems.forEach((item) => {
         if (
@@ -431,6 +496,10 @@ export function PromotionPopup({
         return "% Hóa đơn";
       case "fixed":
         return "Giảm tiền";
+      case "fixed_price":
+        return "Đồng giá";
+      case "gift":
+        return "Tặng món";
       case "item":
         return "Theo món";
       case "combo":
@@ -444,6 +513,10 @@ export function PromotionPopup({
         return "bg-blue-100 text-blue-700 border-blue-300";
       case "fixed":
         return "bg-green-100 text-green-700 border-green-300";
+      case "fixed_price":
+        return "bg-indigo-100 text-indigo-700 border-indigo-300";
+      case "gift":
+        return "bg-amber-100 text-amber-700 border-amber-300";
       case "item":
         return "bg-purple-100 text-purple-700 border-purple-300";
       case "combo":
@@ -664,7 +737,7 @@ export function PromotionPopup({
       customerSearch.length > 0
   );
 
-  const handleApply = () => {
+  const handleApply = async () => {
     if (!selectedPromo && pointsToUse === 0) {
       toast.error("Vui lòng chọn khuyến mãi hoặc nhập điểm");
       return;
@@ -673,6 +746,28 @@ export function PromotionPopup({
     if (selectedPromo?.requiresCustomer && !selectedCustomer) {
       toast.error("Vui lòng chọn khách hàng");
       return;
+    }
+
+    // Require permission to apply
+    if (!hasPermission("promotions:apply" as any)) {
+      toast.error("Bạn không có quyền áp dụng khuyến mãi");
+      return;
+    }
+
+    // Best-effort backend apply before notifying UI
+    if (orderId && selectedPromo) {
+      try {
+        await applyPromotion({
+          orderId,
+          promotionId: selectedPromo.id,
+          customerId: selectedCustomer?.id,
+          pointsToUse: pointsToUse,
+        } as any);
+      } catch (err: any) {
+        toast.error("Áp dụng khuyến mãi backend thất bại", {
+          description: err?.message || "API lỗi",
+        });
+      }
     }
 
     onApply(selectedPromo, pointsToUse, selectedCustomer);
@@ -929,8 +1024,8 @@ export function PromotionPopup({
           <div className="space-y-3">
             <Label>Mã khuyến mãi gợi ý</Label>
             <div className="flex flex-wrap gap-3 max-h-80 overflow-y-auto pr-1">
-              {availablePromotions
-                .filter((p) => p.isActive && !p.isCombo)
+                {availablePromotions
+                  .filter((p) => p.isActive)
                 .map((promo) => {
                   const { applicable, reason } = isPromoApplicable(promo);
                   const isSelected = selectedPromo?.code === promo.code;
@@ -1059,6 +1154,12 @@ export function PromotionPopup({
                     </Card>
                   );
                 })}
+              {availablePromotions.filter((p) => p.isActive).length === 0 && !isLoadingPromos && (
+                <Card className="p-4 border-slate-200 bg-slate-50 w-full">
+                  <p className="text-sm text-slate-700">Không có khuyến mãi khả dụng.</p>
+                  <p className="text-xs text-slate-500 mt-1">Thử làm mới hoặc kiểm tra quyền truy cập.</p>
+                </Card>
+              )}
             </div>
           </div>
 

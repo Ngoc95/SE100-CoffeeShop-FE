@@ -10,10 +10,11 @@ import {
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { ScrollArea } from "./ui/scroll-area";
-import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Label } from "./ui/label";
+import { Checkbox } from "./ui/checkbox";
 import { Separator } from "./ui/separator";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
+import { cn } from "./ui/utils";
 
 interface ComboItem {
   id: string;
@@ -82,6 +83,19 @@ export function ComboSelectionPopup({
   ) => {
     setSelectedItems((prev) => {
       const currentSelections = prev[groupId] || [];
+      const isSelected = currentSelections.includes(itemId);
+
+      // Allow toggling (unselect) if clicked on already selected item
+      if (isSelected) {
+        // If it's a required group and unselecting would drop below minSelect,
+        // we might typically prevent it, BUT the user explicitly asked to "unselect lun dc ko"
+        // even for single select. So let's allow unselect. 
+        // Validation steps will block confirming anyway if requirements aren't met.
+        return {
+          ...prev,
+          [groupId]: currentSelections.filter((id) => id !== itemId),
+        };
+      }
 
       // For single selection (max = 1)
       if (group.maxSelect === 1) {
@@ -91,26 +105,20 @@ export function ComboSelectionPopup({
         };
       }
 
-      // For multiple selection
-      const isSelected = currentSelections.includes(itemId);
-      let newSelections: string[];
-
-      if (isSelected) {
-        newSelections = currentSelections.filter((id) => id !== itemId);
-      } else {
-        if (currentSelections.length >= group.maxSelect) {
-          toast.error(`Chỉ được chọn tối đa ${group.maxSelect} món`);
-          return prev;
-        }
-        newSelections = [...currentSelections, itemId];
+      // For multiple selection check max limit
+      if (currentSelections.length >= group.maxSelect) {
+        toast.error(`Chỉ được chọn tối đa ${group.maxSelect} món`);
+        return prev;
       }
-
+      
       return {
         ...prev,
-        [groupId]: newSelections,
+        [groupId]: [...currentSelections, itemId],
       };
     });
   };
+
+
 
   const validateSelections = (): {
     valid: boolean;
@@ -140,8 +148,9 @@ export function ComboSelectionPopup({
       const selections = selectedItems[group.id] || [];
       selections.forEach((itemId) => {
         const item = group.items.find((i) => i.id === itemId);
+        console.log("debug item extra price",item);
         if (item?.extraPrice) {
-          total += item.extraPrice;
+          total += Number(item.extraPrice);
         }
       });
     });
@@ -167,8 +176,8 @@ export function ComboSelectionPopup({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] p-0">
-        <DialogHeader className="px-6 pt-6 pb-4">
+      <DialogContent className="max-w-2xl max-h-[90vh] p-0 flex flex-col">
+        <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <DialogTitle className="text-xl mb-2">{combo.name}</DialogTitle>
@@ -183,10 +192,7 @@ export function ComboSelectionPopup({
           </div>
         </DialogHeader>
 
-        <ScrollArea
-          className="flex-1 px-6"
-          style={{ maxHeight: "calc(90vh - 220px)" }}
-        >
+        <ScrollArea className="flex-1 px-6 overflow-y-auto">
           <div className="space-y-6 pb-4">
             {combo.groups.map((group, groupIndex) => (
               <div key={group.id}>
@@ -209,59 +215,8 @@ export function ComboSelectionPopup({
                     </span>
                   </div>
 
+                  {/* Single Select */}
                   {group.maxSelect === 1 ? (
-                    <RadioGroup
-                      value={selectedItems[group.id]?.[0] || ""}
-                      onValueChange={(value) =>
-                        handleItemSelect(group.id, value, group)
-                      }
-                    >
-                      {group.items.map((item) => (
-                        <div
-                          key={item.id}
-                          className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                            selectedItems[group.id]?.includes(item.id)
-                              ? "border-blue-500 bg-blue-50"
-                              : "border-gray-200 hover:border-gray-300"
-                          } ${item.stock === 0 ? "opacity-50" : ""}`}
-                        >
-                          <div className="flex items-center gap-3 flex-1">
-                            <RadioGroupItem
-                              value={item.id}
-                              id={`${group.id}-${item.id}`}
-                              disabled={item.stock === 0}
-                            />
-                            <Label
-                              htmlFor={`${group.id}-${item.id}`}
-                              className="flex-1 cursor-pointer"
-                            >
-                              <div className="flex items-center justify-between">
-                                <span>{item.name}</span>
-                                <div className="flex items-center gap-2">
-                                  {item.extraPrice && item.extraPrice > 0 && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs"
-                                    >
-                                      +{item.extraPrice.toLocaleString()}đ
-                                    </Badge>
-                                  )}
-                                  {item.stock === 0 && (
-                                    <Badge
-                                      variant="destructive"
-                                      className="text-xs"
-                                    >
-                                      Hết hàng
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                            </Label>
-                          </div>
-                        </div>
-                      ))}
-                    </RadioGroup>
-                  ) : (
                     <div className="space-y-2">
                       {group.items.map((item) => {
                         const isSelected = selectedItems[group.id]?.includes(
@@ -274,9 +229,9 @@ export function ComboSelectionPopup({
                               item.stock > 0 &&
                               handleItemSelect(group.id, item.id, group)
                             }
-                            className={`flex items-center justify-between p-3 rounded-lg border transition-colors cursor-pointer ${
+                            className={`flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer ${
                               isSelected
-                                ? "border-blue-500 bg-blue-50"
+                                ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500"
                                 : "border-gray-200 hover:border-gray-300"
                             } ${
                               item.stock === 0
@@ -286,39 +241,93 @@ export function ComboSelectionPopup({
                           >
                             <div className="flex items-center gap-3 flex-1">
                               <div
-                                className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                                   isSelected
-                                    ? "border-blue-500 bg-blue-500"
-                                    : "border-gray-300"
+                                    ? "border-blue-600 bg-white"
+                                    : "border-gray-400"
                                 }`}
                               >
                                 {isSelected && (
-                                  <CheckCircle2 className="w-3 h-3 text-white" />
+                                  <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />
                                 )}
                               </div>
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between">
-                                  <span>{item.name}</span>
-                                  <div className="flex items-center gap-2">
-                                    {item.extraPrice && item.extraPrice > 0 && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs"
-                                      >
-                                        +{item.extraPrice.toLocaleString()}đ
-                                      </Badge>
-                                    )}
-                                    {item.stock === 0 && (
-                                      <Badge
-                                        variant="destructive"
-                                        className="text-xs"
-                                      >
-                                        Hết hàng
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
+                              <Label
+                                className={`flex-1 cursor-pointer ${
+                                  isSelected ? "text-blue-900 font-medium" : "text-slate-700"
+                                }`}
+                              >
+                                {item.name}
+                              </Label>
+                            </div>
+                            
+                            <div className="text-right flex items-center gap-2">
+                                {item.extraPrice && item.extraPrice > 0 && (
+                                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-200 bg-amber-50">
+                                    +{item.extraPrice.toLocaleString()}đ
+                                  </Badge>
+                                )}
+                                {item.stock === 0 && (
+                                  <Badge variant="destructive" className="text-xs">
+                                    Hết hàng
+                                  </Badge>
+                                )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    /* Multi Select */
+                    <div className="space-y-2">
+                      {group.items.map((item) => {
+                        const isSelected = selectedItems[group.id]?.includes(
+                          item.id
+                        );
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={() =>
+                              item.stock > 0 &&
+                              handleItemSelect(group.id, item.id, group)
+                            }
+                            className={`flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer ${
+                              isSelected
+                                ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500"
+                                : "border-gray-200 hover:border-gray-300"
+                            } ${
+                              item.stock === 0
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 flex-1">
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() =>
+                                  handleItemSelect(group.id, item.id, group)
+                                }
+                                className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                              />
+                              <Label
+                                className={`flex-1 cursor-pointer ${
+                                  isSelected ? "text-blue-900 font-medium" : "text-slate-700"
+                                }`}
+                              >
+                                {item.name}
+                              </Label>
+                            </div>
+                            
+                            <div className="text-right flex items-center gap-2">
+                                {item.extraPrice && item.extraPrice > 0 && (
+                                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-200 bg-amber-50">
+                                    +{item.extraPrice.toLocaleString()}đ
+                                  </Badge>
+                                )}
+                                {item.stock === 0 && (
+                                  <Badge variant="destructive" className="text-xs">
+                                    Hết hàng
+                                  </Badge>
+                                )}
                             </div>
                           </div>
                         );
@@ -331,7 +340,7 @@ export function ComboSelectionPopup({
           </div>
         </ScrollArea>
 
-        <div className="border-t bg-gray-50 px-6 py-4 space-y-4">
+        <div className="shrink-0 border-t bg-gray-50 px-6 py-4 space-y-4">
           {!validation.valid && (
             <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5 shrink-0" />
