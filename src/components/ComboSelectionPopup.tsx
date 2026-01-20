@@ -148,8 +148,9 @@ export function ComboSelectionPopup({
       const selections = selectedItems[group.id] || [];
       selections.forEach((itemId) => {
         const item = group.items.find((i) => i.id === itemId);
+        console.log("debug item extra price",item);
         if (item?.extraPrice) {
-          total += item.extraPrice;
+          total += Number(item.extraPrice);
         }
       });
     });

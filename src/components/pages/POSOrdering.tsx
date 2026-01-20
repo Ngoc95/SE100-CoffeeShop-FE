@@ -1,4 +1,4 @@
-import { SetStateAction, useEffect, useState } from "react";
+import React, { SetStateAction, useEffect, useState } from "react";
 import { getInventoryItems, getToppingItems, getItemById } from "../../api/inventoryItem";
 import { getTables } from "../../api/table";
 import axiosClient from "../../api/axiosClient";
@@ -161,10 +161,12 @@ interface CartItem {
   // Combo fields
   isCombo?: boolean;
   comboId?: string | number;
+  comboInstanceId?: string; // Unique instance ID for distinguishing multiple identical combos
   comboName?: string;
   comboPrice?: number;
   comboItems?: CartItem[];
   comboExpanded?: boolean;
+  extraPrice?: number; // Extra price for combo items (upgrade fee)
   // Topping fields
   isTopping?: boolean;
   parentItemId?: string; // If this is an attached topping, store parent item ID
@@ -407,7 +409,27 @@ useEffect(() => {
   const [cancelItemModalOpen, setCancelItemModalOpen] = useState(false);
   const [itemToCancel, setItemToCancel] = useState<CartItem | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  const [otherReason, setOtherReason] = useState("");
   const [cancelQuantity, setCancelQuantity] = useState(1);
+  
+  // Cancel Topping states
+  const [cancelToppingModalOpen, setCancelToppingModalOpen] = useState(false);
+  const [toppingToCancel, setToppingToCancel] = useState<{parentItemId: string, topping: CartItem} | null>(null);
+  const [cancelToppingReason, setCancelToppingReason] = useState("");
+  const [otherToppingReason, setOtherToppingReason] = useState("");
+  const [cancelToppingQuantity, setCancelToppingQuantity] = useState(1);
+  
+  const cancelReasons = [
+    "Khác",
+    "Khách đợi lâu",
+    "Khách không hài lòng",
+    "Khách đổi món",
+    "Khách hủy món",
+    "Nhân viên ghi sai đơn",
+  ];
+  // Topping copy dialog states (for adding quantity to sent items with toppings)
+  const [toppingCopyDialogOpen, setToppingCopyDialogOpen] = useState(false);
+  const [pendingQuantityChange, setPendingQuantityChange] = useState<{item: CartItem, quantityToAdd: number} | null>(null);
   const [mergeTableOpen, setMergeTableOpen] = useState(false);
   const [mergeTargetTable, setMergeTargetTable] = useState<Table | null>(null);
   const [splitOrderOpen, setSplitOrderOpen] = useState(false);
@@ -445,6 +467,10 @@ useEffect(() => {
   const [discountAmount, setDiscountAmount] = useState(0);
   const [selectedPromotion, setSelectedPromotion] = useState<any>(null);
   const [usedPoints, setUsedPoints] = useState(0);
+
+// Backend totals (subtotal and totalAmount)
+const [orderSubtotal, setOrderSubtotal] = useState<number>(0);
+const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
 
   // Kitchen update needed state - track when to enable send to kitchen button
   const [isKitchenUpdateNeeded, setIsKitchenUpdateNeeded] = useState(false);
@@ -614,22 +640,22 @@ useEffect(() => {
   }, [takeawayOrderId]);
 
   const [tables, setTables] = useState<Table[]>([])
+  
+  // Reusable function to refresh tables list
+  const refreshTables = async () => {
+    // Gate by permission to avoid 403 for roles without table access
+    if (!hasPermission("tables:view" as any)) return;
+    try {
+      const res = await getTables();
+      const items = extractItems(res);
+      setTables(items.map(mapTableFromBE));
+    } catch (err: any) {
+      console.error("Failed to refresh tables:", err);
+    }
+  };
+  
   useEffect(() => {
-    const fetchTables = async () => {
-      // Gate by permission to avoid 403 for roles without table access
-      if (!hasPermission("tables:view" as any)) return;
-      try {
-        const res = await getTables();
-        const items = extractItems(res);
-        setTables(items.map(mapTableFromBE));
-      } catch (err: any) {
-        toast.error("Không tải được danh sách bàn", {
-          description: err?.message || "Lỗi kết nối API",
-        });
-      }
-    };
-
-    fetchTables();
+    refreshTables();
   }, [])
 
 
@@ -938,13 +964,20 @@ useEffect(() => {
   // Refresh order helper
   const fetchTableOrder = async (table: Table) => {
     try {
+      // Reset totals before fetching
+      setOrderSubtotal(0);
+      setOrderTotalAmount(0);
+
       const res = await getOrderByTable(table.id);
       const orderData = res?.data?.metaData ?? res?.data;
       
       if (orderData && orderData.status !== 'cancelled') {
          // Update state with fetched order ID
          setSelectedTable(prev => prev?.id === table.id ? ({ ...prev, order_id: orderData.id, currentOrder: orderData.orderCode }) : prev);
-        
+        // Set backend totals
+        setOrderSubtotal(Number(orderData.subtotal ?? 0));
+        setOrderTotalAmount(Number(orderData.totalAmount ?? 0));
+
         const newItems = mapOrderToCartItems(orderData);
         setTableOrders(prev => ({ ...prev, [table.id]: newItems }));
 
@@ -1014,44 +1047,40 @@ useEffect(() => {
     combo: PosCombo
   ) => {
     // 1. Construct the combo payload
-    // We need to map the selected items (product IDs) back to the combo structure
-    
-    // Structure expected by BE or Local Cart:
-    // A regular item but with isCombo=true and comboItems
-    
-    // Create sub-items
+    const comboInstanceId = `${combo.id}-${Date.now()}`;
     const comboSubItems: CartItem[] = [];
     
+    let isFirstItem = true;
+
     combo.groups.forEach(group => {
         const selectedIds = selectedItems[group.id] || [];
         selectedIds.forEach(itemId => {
              const groupItem = group.items.find(i => i.id === itemId);
              if (groupItem) {
+                 // Calculate local price: Base combo price (for 1st item) + Extra Price
+                 let itemPrice = Number(groupItem.extraPrice || 0);
+                 if (isFirstItem) {
+                     itemPrice += Number(combo.price);
+                     isFirstItem = false;
+                 }
+
                  comboSubItems.push({
-                     id: `${combo.id}-${group.id}-${itemId}-${Date.now()}`, // Temporary ID
+                     id: `${combo.id}-${group.id}-${itemId}-${Date.now()}`,
                      name: groupItem.name,
-                     price: groupItem.extraPrice || 0, // In combo, usually items are 0 or have extra price
+                     price: itemPrice, 
                      quantity: 1,
                      status: 'pending',
-                     inventoryItemId: groupItem.id, // Store real ID for API
-                     // If we had customization for these, we'd add it here. 
-                     // For now, assume default.
+                     inventoryItemId: groupItem.id, 
+                     extraPrice: Number(groupItem.extraPrice || 0),
+                     // Combo Linking
+                     comboId: combo.id,
+                     comboName: combo.name,
+                     comboPrice: combo.price,
+                     comboInstanceId: comboInstanceId
                  });
              }
         });
     });
-
-    const newComboItem: CartItem = {
-        id: `${combo.id}-${Date.now()}`,
-        name: combo.name,
-        price: combo.price, // Base combo price
-        quantity: 1,
-        status: 'pending',
-        isCombo: true,
-        comboId: combo.id,
-        comboItems: comboSubItems,
-        comboExpanded: true
-    };
 
     // 2. Add to Cart (Local or API)
     let currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
@@ -1059,7 +1088,7 @@ useEffect(() => {
     // Nếu có bàn nhưng chưa có order → tạo order mới trước
     if (!isTakeaway && selectedTable && !selectedTable.order_id) {
         try {
-            const newOrderRes = await createOrder({ tableId: selectedTable.id });
+            const newOrderRes = await createOrder({ tableId: selectedTable.id, items: [] });
             const newOrderData = newOrderRes?.data?.metaData ?? newOrderRes?.data;
             const newOrderId = newOrderData?.id;
             
@@ -1071,6 +1100,8 @@ useEffect(() => {
                     order_id: newOrderId as any,
                     status: 'occupied'
                 });
+                // Refresh tables to show occupied status
+                await refreshTables();
                 toast.success(`Đã tạo đơn hàng mới cho ${selectedTable.name}`);
             } else {
                 toast.error("Không thể tạo đơn hàng mới");
@@ -1085,7 +1116,7 @@ useEffect(() => {
     // Nếu là takeaway mà chưa có order → tạo takeaway order
     if (isTakeaway && !takeawayOrderId) {
         try {
-            const newOrderRes = await createOrder({ tableId: null });
+            const newOrderRes = await createOrder({ tableId: null as any, items: [] } as any);
             const newOrderData = newOrderRes?.data?.metaData ?? newOrderRes?.data;
             const newOrderId = newOrderData?.id;
             const newOrderCode = newOrderData?.orderCode || String(newOrderId);
@@ -1146,9 +1177,9 @@ useEffect(() => {
              toast.error(`Lỗi thêm combo: ${e?.message || 'Không rõ'}`);
         }
     } else {
-        // Fallback: Local Only (should not happen after above logic)
+        // Fallback: Local Only - Flatten items for rendering consistency
         const cart = getCurrentCart();
-        updateCurrentCart([...cart, newComboItem]);
+        updateCurrentCart([...cart, ...comboSubItems]);
         setComboSelectionOpen(false);
         toast.success("Đã thêm combo (Local)");
     }
@@ -1281,6 +1312,19 @@ useEffect(() => {
                      await updateOrderItem(currentOrderId, item.orderItemId, {
                          quantity: newQty
                      });
+                     
+                     // Also update attached toppings quantities proportionally
+                     if (item.attachedToppings && item.attachedToppings.length > 0) {
+                       for (const topping of item.attachedToppings) {
+                         if (topping.orderItemId) {
+                           const newToppingQty = Math.round((topping.quantity / item.quantity) * newQty);
+                           await updateOrderItem(currentOrderId, topping.orderItemId, {
+                             quantity: newToppingQty
+                           });
+                         }
+                       }
+                     }
+                     
                      toast.success(`Đã cập nhật số lượng ${item.name} thành ${newQty}`);
                  } else {
                      // Item is already sent to kitchen: ADD NEW ITEM
@@ -1289,12 +1333,20 @@ useEffect(() => {
                          return;
                      }
                      
+                     // Check if item has attached toppings - show dialog to ask if user wants to copy them
+                     if (item.attachedToppings && item.attachedToppings.length > 0) {
+                       setPendingQuantityChange({ item, quantityToAdd });
+                       setToppingCopyDialogOpen(true);
+                       return; // Wait for user choice in dialog
+                     }
+                     
+                     // No toppings - add directly
                      await addOrderItem(currentOrderId, {
                          itemId: Number(item.inventoryItemId),
                          quantity: quantityToAdd,
                          notes: item.notes,
                          // Copy customization if available
-                         customization: item.customization,
+                        customization: stripToppingsFromCustomization(item.customization),
                      });
                      toast.success(`Đã gọi thêm ${quantityToAdd} ${item.name}`);
                  }
@@ -1345,28 +1397,35 @@ useEffect(() => {
     }
   };
 
-  const handleRemoveCombo = async (comboId: string) => {
-
+  const handleRemoveCombo = async (comboInstanceId: string, comboItems?: CartItem[]) => {
      const cart = getCurrentCart();
-     // Ensure loose comparison for ID match as comboId can be string or number
-     const items = cart.filter(i => String(i.comboId) === String(comboId));
-     console.log(`Deleting combo ${comboId}, found ${items.length} items`, items);
+     // Use provided comboItems if available (from rendering), otherwise find by comboInstanceId or comboId
+     let items = comboItems;
+     if (!items || items.length === 0) {
+       // Fallback: find items by comboInstanceId
+       items = cart.filter(i => i.comboInstanceId === comboInstanceId || String(i.comboId) === comboInstanceId);
+     }
+     console.log(`Deleting combo instance ${comboInstanceId}, found ${items.length} items`, items);
      
      if (items.length === 0) return;
 
      const isAnySent = items.some(i => i.status && i.status !== 'pending');
      const currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
      
+     // Get orderItemIds for this specific combo instance
+     const orderItemIds = items.map(i => i.orderItemId).filter(Boolean);
+     
      if (isAnySent) {
          // Open Cancel Modal for the entire combo
          // We pass a "virtual" item representing the combo
          const comboName = items[0].comboName || "Combo";
          setItemToCancel({ 
-             id: comboId, 
+             id: comboInstanceId, 
              name: comboName, 
              quantity: 1, 
              price: 0, 
              status: 'served', // Treat as served so logic knows it's sent
+             comboInstanceId: comboInstanceId,
              // Custom properties
              ...({ isCombo: true, items: items } as any)
          } as CartItem);
@@ -1376,11 +1435,12 @@ useEffect(() => {
      } else {
          // All pending -> Delete all immediately
          if (!currentOrderId) {
-             // Local cart removal
-             updateCurrentCart(cart.filter(i => i.comboId !== comboId));
+             // Local cart removal - filter by orderItemIds for specific instance
+             const idsToRemove = new Set(orderItemIds);
+             updateCurrentCart(cart.filter(i => !idsToRemove.has(i.orderItemId)));
              toast.success("Đã xóa combo");
          } else {
-             // API removal
+             // API removal - only remove items from this specific instance
              try {
                  await Promise.all(items.map(item => {
                      if (item.orderItemId) {
@@ -1410,6 +1470,50 @@ useEffect(() => {
              }
          }
      }
+  };
+
+  // Handle removal of individual combo items (same logic as regular items)
+  const handleRemoveComboItem = async (item: CartItem) => {
+    // If no orderItemId (local only), remove from cart
+    if (!item.orderItemId) {
+      const cart = getCurrentCart();
+      updateCurrentCart(cart.filter(i => i.id !== item.id));
+      toast.success("Đã xóa món khỏi giỏ hàng");
+      return;
+    }
+    
+    const currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
+    if (!currentOrderId) return;
+    
+    const isPending = !item.status || item.status === 'pending';
+    
+    if (isPending) {
+      // Pending: remove directly
+      try {
+        await removeOrderItem(currentOrderId, item.orderItemId);
+        toast.success("Đã xóa món khỏi đơn hàng");
+        
+        // Refresh data
+        if (isTakeaway && takeawayOrderId) {
+          const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
+          const orderData = res?.data?.metaData ?? res?.data;
+          if (orderData) {
+            setTakeawayOrders(mapOrderToCartItems(orderData));
+          }
+        } else if (selectedTable) {
+          fetchTableOrder(selectedTable);
+        }
+      } catch (err: any) {
+        toast.error(`Xóa món thất bại: ${err?.message}`);
+      }
+    } else {
+      // Sent to kitchen: show cancel modal
+      setItemToCancel(item);
+      setCancelQuantity(item.quantity);
+      setCancelReason("");
+      setOtherReason("");
+      setCancelItemModalOpen(true);
+    }
   };
 
   const removeFromCart = async (id: string, reason?: string) => {
@@ -1480,15 +1584,22 @@ useEffect(() => {
             // Chưa có reason → mở modal để nhập reason
             setItemToCancel(item);
             setCancelQuantity(item.quantity); 
-            setCancelReason(""); 
+            setCancelReason("");
+            setOtherReason("");
             setCancelItemModalOpen(true);
         }
     }
   };
   
   const handleConfirmCancel = async () => {
+    if (!cancelReason || (cancelReason === "Khác" && !otherReason.trim())) {
+      return;
+    }
+    
     const currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
     if (!itemToCancel || !currentOrderId) return;
+    
+    const finalReason = cancelReason === "Khác" ? otherReason : cancelReason;
       
     try {
         // Check if it's a combo cancellation
@@ -1497,7 +1608,7 @@ useEffect(() => {
             const responses = await Promise.all(comboItems.map(item => 
                  deleteOrderItem(currentOrderId, item.orderItemId || item.id, {
                     quantity: item.quantity,
-                    reason: cancelReason || "Hủy combo"
+                    reason: finalReason || "Hủy combo"
                  })
             ));
             toast.success("Đã hủy combo thành công");
@@ -1510,8 +1621,12 @@ useEffect(() => {
 
             if (anyCanceled) {
                  alert("Bạn đã hủy hết món trong đơn hàng. Đơn hàng sẽ chuyển sang trạng thái Đã Hủy.");
+                 // Refresh tables to update status
+                 await refreshTables();
                  if (selectedTable) {
                     fetchTableOrder(selectedTable);
+                    // Clear selected table since order is canceled
+                    setSelectedTable(null);
                  } else if (isTakeaway) {
                     setTakeawayOrders([]);
                     setTakeawayOrderId(null);
@@ -1527,17 +1642,19 @@ useEffect(() => {
             // Single item cancellation
             const res = await deleteOrderItem(currentOrderId, itemToCancel.orderItemId || itemToCancel.id, {
                    quantity: cancelQuantity,
-                   reason: cancelReason || "Khách hủy"
+                   reason: finalReason || "Khách hủy"
             });
             toast.success("Đã hủy món thành công");
             
             const metaData = res.data?.metaData ?? res.data; // Check response structure
             if (metaData?.allItemsCanceled) {
                  alert("Bạn đã hủy hết món trong đơn hàng. Đơn hàng sẽ chuyển sang trạng thái Đã Hủy.");
+                 // Refresh tables to update status
+                 await refreshTables();
                  // Refresh entirely to clear state
                  if (selectedTable) {
-                    // Update table status locally or fetch
-                    fetchTableOrder(selectedTable);
+                    // Clear selected table since order is canceled
+                    setSelectedTable(null);
                  } else if (isTakeaway) {
                     setTakeawayOrders([]);
                     setTakeawayOrderId(null);
@@ -1565,6 +1682,100 @@ useEffect(() => {
         setCancelItemModalOpen(false);
         setItemToCancel(null);
     }
+  };
+
+  // Handle topping copy dialog - add item with toppings
+  const handleAddItemWithToppings = async () => {
+    if (!pendingQuantityChange) return;
+    
+    const { item, quantityToAdd } = pendingQuantityChange;
+    const currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
+    
+    if (!currentOrderId || !item.inventoryItemId) {
+      toast.error("Không tìm thấy thông tin đơn hàng");
+      setToppingCopyDialogOpen(false);
+      setPendingQuantityChange(null);
+      return;
+    }
+    
+    try {
+      // Build attachedToppings payload from existing toppings
+      const attachedToppings = item.attachedToppings?.map(t => ({
+        itemId: Number(t.inventoryItemId),
+        quantity: t.quantity
+      })) || [];
+      
+      await addOrderItem(currentOrderId, {
+        itemId: Number(item.inventoryItemId),
+        quantity: quantityToAdd,
+        notes: item.notes,
+        customization: stripToppingsFromCustomization(item.customization),
+        attachedToppings: attachedToppings
+      });
+      
+      toast.success(`Đã gọi thêm ${quantityToAdd} ${item.name} (kèm topping)`);
+      
+      // Refresh data
+      if (isTakeaway && takeawayOrderId) {
+        const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
+        const orderData = res?.data?.metaData ?? res?.data;
+        if (orderData) setTakeawayOrders(mapOrderToCartItems(orderData));
+      } else if (selectedTable) {
+        fetchTableOrder(selectedTable);
+      }
+    } catch (err: any) {
+      toast.error(`Thêm món thất bại: ${err?.message}`);
+    } finally {
+      setToppingCopyDialogOpen(false);
+      setPendingQuantityChange(null);
+    }
+  };
+  
+  // Handle topping copy dialog - add item without toppings
+  const handleAddItemWithoutToppings = async () => {
+    if (!pendingQuantityChange) return;
+    
+    const { item, quantityToAdd } = pendingQuantityChange;
+    const currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
+    
+    if (!currentOrderId || !item.inventoryItemId) {
+      toast.error("Không tìm thấy thông tin đơn hàng");
+      setToppingCopyDialogOpen(false);
+      setPendingQuantityChange(null);
+      return;
+    }
+    
+    try {
+      await addOrderItem(currentOrderId, {
+        itemId: Number(item.inventoryItemId),
+        quantity: quantityToAdd,
+        notes: item.notes,
+        customization: stripToppingsFromCustomization(item.customization),
+        // No toppings
+      });
+      
+      toast.success(`Đã gọi thêm ${quantityToAdd} ${item.name} (không có topping)`);
+      
+      // Refresh data
+      if (isTakeaway && takeawayOrderId) {
+        const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
+        const orderData = res?.data?.metaData ?? res?.data;
+        if (orderData) setTakeawayOrders(mapOrderToCartItems(orderData));
+      } else if (selectedTable) {
+        fetchTableOrder(selectedTable);
+      }
+    } catch (err: any) {
+      toast.error(`Thêm món thất bại: ${err?.message}`);
+    } finally {
+      setToppingCopyDialogOpen(false);
+      setPendingQuantityChange(null);
+    }
+  };
+  
+  // Handle topping copy dialog - cancel
+  const handleCancelToppingCopy = () => {
+    setToppingCopyDialogOpen(false);
+    setPendingQuantityChange(null);
   };
 
   const handleSelectTable = (table: Table) => {
@@ -2152,7 +2363,9 @@ useEffect(() => {
                  currentOrderId = newOrder.id;
                  
                  // Ideally update selectedTable state immediately so next item knows
-                 setSelectedTable(prev => prev ? { ...prev, order_id: currentOrderId, currentOrder: newOrder.orderCode } : null);
+                 setSelectedTable(prev => prev ? { ...prev, order_id: currentOrderId, currentOrder: newOrder.orderCode, status: 'occupied' } : null);
+                 // Refresh tables to show occupied status
+                 await refreshTables();
              }
 
              if (currentOrderId) {
@@ -2166,7 +2379,7 @@ useEffect(() => {
                      // CASE 1: EDITING EXISTING SENT ITEM -> UPDATE
                      await updateOrderItem(currentOrderId, finalItem.orderItemId, {
                          notes: notes,
-                         customization: finalItem.customization,
+                        customization: stripToppingsFromCustomization(finalItem.customization),
                          attachedToppings: attachedToppings
                      });
                      toast.success("Đã cập nhật món");
@@ -2176,7 +2389,7 @@ useEffect(() => {
                         itemId: Number(finalItem.id.split('-')[0]),
                         quantity: finalItem.quantity,
                         notes: notes,
-                        customization: finalItem.customization,
+                        customization: stripToppingsFromCustomization(finalItem.customization),
                         attachedToppings: attachedToppings
                      });
                      toast.success("Đã thêm món vào đơn");
@@ -2228,7 +2441,7 @@ useEffect(() => {
                      // UPDATE
                      await updateOrderItem(currentOrderId, finalItem.orderItemId, {
                          notes: notes,
-                         customization: finalItem.customization,
+                        customization: stripToppingsFromCustomization(finalItem.customization),
                          attachedToppings: attachedToppings
                      });
                      toast.success("Đã cập nhật món (Mang về)");
@@ -2238,7 +2451,7 @@ useEffect(() => {
                         itemId: Number(finalItem.id.split('-')[0]),
                         quantity: finalItem.quantity,
                         notes: notes,
-                        customization: finalItem.customization,
+                        customization: stripToppingsFromCustomization(finalItem.customization),
                         attachedToppings: attachedToppings
                      });
                      toast.success("Đã thêm món (Mang về)");
@@ -2364,24 +2577,122 @@ useEffect(() => {
   // Helper function to remove attached topping
   const removeAttachedTopping = (parentItemId: string, toppingId: string) => {
     const cart = getCurrentCart();
-    const updatedCart = cart.map((item) => {
-      if (item.id === parentItemId && item.attachedToppings) {
-        return {
-          ...item,
-          attachedToppings: item.attachedToppings.filter(
-            (t) => t.id !== toppingId
-          ),
-        };
+    const parentItem = cart.find(i => i.id === parentItemId);
+    const topping = parentItem?.attachedToppings?.find(t => t.id === toppingId);
+    
+    if (!parentItem || !topping) {
+      toast.error("Không tìm thấy topping");
+      return;
+    }
+    
+    const currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
+    
+    // If topping has orderItemId (saved to DB), need to call API
+    if (topping.orderItemId && currentOrderId) {
+      const isPending = !topping.status || topping.status === 'pending';
+      
+      if (isPending) {
+        // Pending: remove permanently
+        (async () => {
+          try {
+            if (!topping.orderItemId) return;
+            await removeOrderItem(currentOrderId, topping.orderItemId as number);
+            toast.success("Đã xóa topping");
+            
+            // Refresh order data
+            if (isTakeaway && takeawayOrderId) {
+              const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
+              const orderData = res?.data?.metaData ?? res?.data;
+              if (orderData) {
+                setTakeawayOrders(mapOrderToCartItems(orderData));
+              }
+            } else if (selectedTable) {
+              fetchTableOrder(selectedTable);
+            }
+          } catch (err: any) {
+            toast.error(`Xóa topping thất bại: ${err?.message}`);
+          }
+        })();
+      } else {
+        // Sent: show cancel modal
+        setToppingToCancel({ parentItemId, topping });
+        setCancelToppingQuantity(topping.quantity);
+        setCancelToppingReason("");
+        setOtherToppingReason("");
+        setCancelToppingModalOpen(true);
       }
-      return item;
-    });
-    updateCurrentCart(updatedCart);
+    } else {
+      // Local only: just update cart
+      const updatedCart = cart.map((item) => {
+        if (item.id === parentItemId && item.attachedToppings) {
+          return {
+            ...item,
+            attachedToppings: item.attachedToppings.filter(
+              (t) => t.id !== toppingId
+            ),
+          };
+        }
+        return item;
+      });
+      updateCurrentCart(updatedCart);
+      toast.success("Đã xóa topping");
+    }
+  };
+  
+  // Handle confirm cancel topping
+  const handleConfirmCancelTopping = async () => {
+    if (!toppingToCancel || !cancelToppingReason || (cancelToppingReason === "Khác" && !otherToppingReason.trim())) {
+      return;
+    }
+    
+    const currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
+    if (!currentOrderId || !toppingToCancel.topping.orderItemId) return;
+    
+    try {
+      const finalReason = cancelToppingReason === "Khác" ? otherToppingReason : cancelToppingReason;
+      
+      await deleteOrderItem(currentOrderId, toppingToCancel.topping.orderItemId, {
+        quantity: cancelToppingQuantity,
+        reason: finalReason
+      });
+      
+      toast.success("Đã hủy topping");
+      
+      // Refresh order data
+      if (isTakeaway && takeawayOrderId) {
+        const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
+        const orderData = res?.data?.metaData ?? res?.data;
+        if (orderData) {
+          setTakeawayOrders(mapOrderToCartItems(orderData));
+        }
+      } else if (selectedTable) {
+        fetchTableOrder(selectedTable);
+      }
+      
+      // Reset modal
+      setCancelToppingModalOpen(false);
+      setToppingToCancel(null);
+      setCancelToppingQuantity(1);
+      setCancelToppingReason("");
+      setOtherToppingReason("");
+    } catch (err: any) {
+      toast.error(`Hủy topping thất bại: ${err?.message}`);
+    }
+  };
+
+  // Helper to strip toppings from customization (toppings are sent via attachedToppings)
+  const stripToppingsFromCustomization = (customization: any) => {
+    if (!customization) return undefined;
+    const { toppings, ...rest } = customization;
+    return Object.keys(rest).length > 0 ? rest : undefined;
   };
 
   // Helper function to calculate item price with customization and attached toppings
   const getItemPrice = (item: CartItem): number => {
     // Coerce base price to number to prevent string concatenation (e.g., "42000" + 8000)
     const basePrice = Number(item.price) || 0;
+    // Extra price for combo items (upgrade fee) - already included in backend unitPrice but adding for safety
+    const extraPrice = Number(item.extraPrice) || 0;
     const customizationToppingsPrice =
       item.customization?.toppings?.reduce(
         (sum, t) => sum + (Number(t.price) || 0) * (t.quantity ?? 1),
@@ -2392,11 +2703,11 @@ useEffect(() => {
         (sum, t) => sum + (Number(t.price) || 0) * t.quantity,
         0
       ) || 0;
-    return basePrice + customizationToppingsPrice + attachedToppingsPrice;
+    return basePrice + extraPrice + customizationToppingsPrice + attachedToppingsPrice;
   };
 
   const cart = getCurrentCart();
-  const totalAmount = cart.reduce((sum, item) => {
+  const localTotalAmount = cart.reduce((sum, item) => {
     // Skip attached toppings - they're included in parent price
     if (item.parentItemId) return sum;
     return sum + getItemPrice(item) * item.quantity;
@@ -2406,6 +2717,10 @@ useEffect(() => {
     if (item.parentItemId) return sum;
     return sum + item.quantity;
   }, 0);
+
+  // Decide display totals: prefer backend values when available
+  const displaySubtotal = orderSubtotal > 0 ? orderSubtotal : localTotalAmount;
+  const displayTotalAmount = orderTotalAmount > 0 ? orderTotalAmount : localTotalAmount;
 
   const getTableStatusColor = (status: Table["status"]) => {
     switch (status) {
@@ -2674,15 +2989,16 @@ useEffect(() => {
             {/* Combo Suggestion Banner - will add later */}
 
             {(() => {
-              // Group items: combo items grouped by comboId, non-combo items separate
-              const comboGroups = new Map<string | number, typeof cart>();
+              // Group items: combo items grouped by comboInstanceId (or comboId fallback), non-combo items separate
+              const comboGroups = new Map<string, typeof cart>();
               const nonComboItems: typeof cart = [];
               
               cart.forEach(item => {
                 if (item.parentItemId) return; // Skip toppings
                 
-                if (item.comboId) {
-                  const key = item.comboId;
+                if (item.comboId || item.comboInstanceId) {
+                  // Use comboInstanceId if available, otherwise fallback to comboId
+                  const key = item.comboInstanceId || `combo-${item.comboId}-fallback`;
                   const existing = comboGroups.get(key) || [];
                   existing.push(item);
                   comboGroups.set(key, existing);
@@ -2691,17 +3007,54 @@ useEffect(() => {
                 }
               });
 
+              // Count combo types for displaying "2x Combo..." 
+              // Group instances by comboId to count identical combos
+              const comboIdToInstances = new Map<string | number, string[]>();
+              comboGroups.forEach((items, instanceId) => {
+                const comboId = items[0]?.comboId;
+                if (comboId) {
+                  const existing = comboIdToInstances.get(comboId) || [];
+                  existing.push(instanceId);
+                  comboIdToInstances.set(comboId, existing);
+                }
+              });
+
               return (
                 <>
-                  {/* Render Combo Groups */}
-                  {Array.from(comboGroups.entries()).map(([comboId, comboItems]) => {
-                    // Get combo info from first item (all items in same combo have same info)
-                    const firstItem = comboItems[0];
-                    const comboName = firstItem?.comboName || `Combo #${comboId}`;
-                    const comboPrice = firstItem?.comboPrice ?? comboItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+                  {/* Render Combo Groups - Aggregate identical combos */}
+                  {Array.from(comboIdToInstances.entries()).map(([comboId, instanceIds]) => {
+                    // Get all items from all instances of this comboId
+                    const allComboItems: typeof cart = [];
+                    instanceIds.forEach(instanceId => {
+                      const items = comboGroups.get(instanceId) || [];
+                      allComboItems.push(...items);
+                    });
+                    
+                    if (allComboItems.length === 0) return null;
+                    
+                    // Get combo info from first item
+                    const firstItem = allComboItems[0];
+                    const baseComboName = firstItem?.comboName || `Combo #${comboId}`;
+                    // Count instances of this combo type
+                    const instanceCount = instanceIds.length;
+                    // Display with count prefix if multiple instances
+                    const comboName = instanceCount > 1 ? `${instanceCount}x ${baseComboName}` : baseComboName;
+                    
+                    // Calculate combo price: base price per instance + total extra prices from all items
+                    const baseComboPrice = firstItem?.comboPrice ?? 0;
+                    const totalExtraPrice = allComboItems.reduce((sum, i) => sum + (Number(i.extraPrice) || 0), 0);
+                    // Total price = (base price * instance count) + total extra prices
+                    const comboPrice = (baseComboPrice * instanceCount) + totalExtraPrice;
+                    
+                    // Group items by instance for rendering (to allow individual instance deletion)
+                    const itemsByInstance = new Map<string, typeof cart>();
+                    instanceIds.forEach(instanceId => {
+                      const items = comboGroups.get(instanceId) || [];
+                      itemsByInstance.set(instanceId, items);
+                    });
                     
                     return (
-                      <Card key={`combo-${comboId}`} className="border-green-300 bg-green-50/50">
+                      <Card key={`combo-aggregated-${comboId}`} className="border-green-300 bg-green-50/50">
                         <CardContent className="p-3">
                           {/* Combo Header */}
                           <div className="flex items-center justify-between mb-2">
@@ -2711,26 +3064,57 @@ useEffect(() => {
                                 {comboName}
                               </span>
                               <Badge className="bg-green-500 text-xs">
-                                {comboItems.length} món
+                                {allComboItems.length} món
                               </Badge>
                             </div>
-                            <span className="font-semibold text-green-700">
-                              {comboPrice.toLocaleString()}đ
-                            </span>
-                             {/* Combo Delete Button */}
-                             <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0 ml-2 text-red-500 hover:bg-red-50 hover:text-red-700"
-                                onClick={() => handleRemoveCombo(String(comboId))}
-                                title="Xóa combo"
-                             >
-                                <Trash2 className="w-4 h-4" />
-                             </Button>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-green-700">
+                                {comboPrice.toLocaleString()}đ
+                              </span>
+                              {/* Show delete button for entire combo if single instance, or if user wants to delete all */}
+                              {instanceCount === 1 && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 ml-2 text-red-500 hover:bg-red-50 hover:text-red-700"
+                                  onClick={() => handleRemoveCombo(instanceIds[0], itemsByInstance.get(instanceIds[0]))}
+                                  title="Xóa combo"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
                           
-                          {/* Combo Items */}
-                          <div className="space-y-2 ml-4 border-l-2 border-green-300 pl-3">
+                          {/* Render each instance's items */}
+                          {Array.from(itemsByInstance.entries()).map(([comboInstanceId, comboItems]) => {
+                            // Calculate price for this specific instance
+                            const instanceBasePrice = comboItems[0]?.comboPrice ?? 0;
+                            const instanceExtraPrice = comboItems.reduce((sum, i) => sum + (Number(i.extraPrice) || 0), 0);
+                            const instancePrice = instanceBasePrice + instanceExtraPrice;
+                            
+                            return (
+                              <div key={`combo-instance-${comboInstanceId}`} className="mb-3 last:mb-0">
+                                {/* Instance header with delete button (only show if multiple instances) */}
+                                {instanceCount > 1 && (
+                                  <div className="flex items-center justify-between mb-2 pb-2 border-b border-green-200">
+                                    <span className="text-xs text-green-600 font-medium">
+                                      Combo #{instanceIds.indexOf(comboInstanceId) + 1}
+                                    </span>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 text-red-500 hover:bg-red-50 hover:text-red-700"
+                                      onClick={() => handleRemoveCombo(comboInstanceId, comboItems)}
+                                      title="Xóa combo này"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                )}
+                                
+                                {/* Combo Items for this instance */}
+                                <div className="space-y-2 ml-4 border-l-2 border-green-300 pl-3">
                             {comboItems.map(item => {
                               // Determine status display
                               const isPending = !item.status || item.status === 'pending';
@@ -2746,10 +3130,16 @@ useEffect(() => {
                               return (
                                 <div key={item.id} className="py-1">
                                   <div className="flex items-center justify-between">
-                                    <div className="flex-1 flex items-center gap-2">
+                                    <div className="flex-1 flex items-center gap-2 flex-wrap">
                                       <span className="text-sm text-slate-700">
                                         {item.quantity}x {item.name}
                                       </span>
+                                      {/* Extra Price Badge for combo items */}
+                                      {(item.extraPrice ?? 0) > 0 && (
+                                        <Badge variant="outline" className="text-xs text-amber-600 border-amber-200 bg-amber-50">
+                                          +{item.extraPrice?.toLocaleString()}đ
+                                        </Badge>
+                                      )}
                                       {/* Status Badge */}
                                       <span className={`text-xs px-1.5 py-0.5 rounded ${statusColor}`}>
                                         {statusLabel}
@@ -2769,7 +3159,18 @@ useEffect(() => {
                                           <Settings className={`w-3 h-3 ${!isPending ? 'text-slate-300' : ''}`} />
                                         </Button>
                                       )}
-                                      {/* No individual delete for combo items - delete entire combo or change selection */}
+                                      {/* Trash button for individual combo items */}
+                                      {!item.isTopping && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 w-6 p-0 text-red-500 hover:bg-red-50 hover:text-red-700"
+                                          onClick={() => handleRemoveComboItem(item)}
+                                          title={isPending ? "Xóa món" : "Hủy món"}
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                      )}
                                     </div>
                                   </div>
                                   {/* Customization info */}
@@ -2787,7 +3188,10 @@ useEffect(() => {
                                 </div>
                               );
                             })}
-                          </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </CardContent>
                       </Card>
                     );
@@ -2874,7 +3278,7 @@ useEffect(() => {
           <div className="flex justify-between text-sm">
             <span className="text-blue-950">Tổng cộng ước tính</span>
             <span className="text-blue-900 text-2xl font-semibold">
-              {totalAmount.toLocaleString()}₫
+              {displaySubtotal.toLocaleString()}₫
             </span>
           </div>
         </div>
@@ -3622,17 +4026,89 @@ useEffect(() => {
       <CheckoutModal
         open={checkoutOpen}
         onClose={() => setCheckoutOpen(false)}
-        items={cart
-          .filter((item) => !item.parentItemId)
-          .map((item) => ({
-            id: item.id,
-            name: item.name,
-            quantity: item.quantity,
-            price: getItemPrice(item),
-            basePrice: item.basePrice ?? item.price,
-            notes: item.notes,
-          }))}
-        totalAmount={totalAmount}
+        items={(() => {
+          // Group items for checkout display
+          const checkoutItems: any[] = [];
+          const processedComboInstances = new Set<string>();
+          
+          // First, group combo items by instance
+          const comboGroups = new Map<string, CartItem[]>();
+          const nonComboItems: CartItem[] = [];
+          
+          cart.forEach(item => {
+            if (item.parentItemId) return; // Skip toppings here, they'll be added to parents
+            
+            if (item.comboInstanceId || item.comboId) {
+              const key = item.comboInstanceId || `combo-${item.comboId}-fallback`;
+              if (!comboGroups.has(key)) {
+                comboGroups.set(key, []);
+              }
+              comboGroups.get(key)!.push(item);
+            } else {
+              nonComboItems.push(item);
+            }
+          });
+          
+          // Add combo groups as combo headers
+          comboGroups.forEach((comboItems, instanceId) => {
+            if (processedComboInstances.has(instanceId)) return;
+            processedComboInstances.add(instanceId);
+            
+            const firstItem = comboItems[0];
+            const comboName = firstItem?.comboName || `Combo`;
+            const baseComboPrice = firstItem?.comboPrice ?? 0;
+            const totalExtraPrice = comboItems.reduce((sum, i) => sum + (Number(i.extraPrice) || 0), 0);
+            const comboPrice = baseComboPrice + totalExtraPrice;
+            
+            checkoutItems.push({
+              id: `checkout-combo-${instanceId}`,
+              name: comboName,
+              quantity: 1,
+              price: comboPrice,
+              basePrice: baseComboPrice,
+              isComboHeader: true,
+              comboInstanceId: instanceId,
+              comboItems: comboItems.map(ci => ({
+                id: ci.id,
+                name: ci.name,
+                quantity: ci.quantity,
+                price: ci.price,
+                basePrice: ci.price,
+                extraPrice: ci.extraPrice,
+              })),
+            });
+          });
+          
+          // Add non-combo items with their toppings
+          nonComboItems.forEach(item => {
+            checkoutItems.push({
+              id: item.id,
+              name: item.name,
+              quantity: item.quantity,
+              price: getItemPrice(item),
+              basePrice: item.basePrice ?? item.price,
+              notes: item.notes,
+            });
+            
+            // Add attached toppings
+            if (item.attachedToppings && item.attachedToppings.length > 0) {
+              item.attachedToppings.forEach(topping => {
+                checkoutItems.push({
+                  id: topping.id,
+                  name: topping.name,
+                  quantity: topping.quantity,
+                  price: topping.price * topping.quantity,
+                  basePrice: topping.price,
+                  isTopping: true,
+                  parentName: item.name,
+                });
+              });
+            }
+          });
+          
+          return checkoutItems;
+        })()}
+        totalAmount={displayTotalAmount}
         discountAmount={discountAmount}
         tableNumber={selectedTable?.id}
         tableArea={selectedTable ? areas.find((a) => a.id === selectedTable.area)?.name : undefined}
@@ -3669,7 +4145,7 @@ useEffect(() => {
               // Call checkout API
               const res = await checkoutOrder(Number(orderId), {
                 paymentMethod,
-                paidAmount: _paymentDetails.customerPaid || totalAmount,
+                paidAmount: _paymentDetails.customerPaid || displayTotalAmount,
                 bankAccountId: _paymentDetails.bankAccountId,
                 promotionId,
                 selectedGifts,
@@ -3681,22 +4157,82 @@ useEffect(() => {
               const orderData = data.metaData ?? data.order ?? data;
               // Access order items nested in the 'order' property
               const itemsList = orderData.order?.orderItems || orderData.orderitems || [];
+              const comboSummary = orderData.order?.comboSummary ?? orderData.comboSummary ?? [];
               
-              const finalItems = itemsList.map((item: any) => ({
-                id: item.id.toString(),
-                name: item.name,
-                quantity: item.quantity,
-                price: Number(item.totalPrice) / Number(item.quantity || 1), 
-                notes: item.notes,
-              }));
+              // Group items for receipt with combo and topping support
+              const receiptItems: any[] = [];
+              const processedComboItems = new Set<number>();
               
-              // Only print active items (not canceled)
-              const activeReceiptItems = finalItems.filter((i: any) => !i.notes?.includes('Đã hủy'));
+              // Process combo summary to create combo headers
+              comboSummary.forEach((cs: any) => {
+                if (!cs?.comboId) return;
+                
+                const comboItems = cs.items || [];
+                const comboItemIds = comboItems.map((i: any) => i.id);
+                
+                // Find actual items for this combo
+                const actualComboItems = itemsList.filter((item: any) => 
+                  comboItemIds.includes(item.id) && item.status !== 'canceled'
+                );
+                
+                if (actualComboItems.length > 0) {
+                  const totalPrice = actualComboItems.reduce((sum: number, i: any) => 
+                    sum + Number(i.totalPrice || 0), 0
+                  );
+                  
+                  receiptItems.push({
+                    id: `combo-${cs.comboId}-${cs.items[0]?.id}`,
+                    name: cs.comboName || `Combo #${cs.comboId}`,
+                    quantity: 1,
+                    price: totalPrice,
+                    isComboHeader: true,
+                    comboItems: actualComboItems.map((item: any) => ({
+                      id: item.id.toString(),
+                      name: item.name,
+                      quantity: item.quantity,
+                      price: Number(item.totalPrice) / Number(item.quantity || 1),
+                      extraPrice: item.extraPrice || 0,
+                    })),
+                  });
+                  
+                  // Mark these items as processed
+                  actualComboItems.forEach((item: any) => processedComboItems.add(item.id));
+                }
+              });
+              
+              // Process remaining items (non-combo)
+              itemsList.forEach((item: any) => {
+                if (processedComboItems.has(item.id)) return; // Skip already processed combo items
+                if (item.status === 'canceled') return; // Skip canceled items
+                
+                // Check if this is a topping
+                if (item.isTopping) {
+                  receiptItems.push({
+                    id: item.id.toString(),
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: Number(item.totalPrice) / Number(item.quantity || 1),
+                    notes: item.notes,
+                    isTopping: true,
+                  });
+                } else {
+                  receiptItems.push({
+                    id: item.id.toString(),
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: Number(item.totalPrice) / Number(item.quantity || 1),
+                    notes: item.notes,
+                  });
+                }
+              });
+              
+              // Filter out any items with cancel notes
+              const activeReceiptItems = receiptItems.filter((i: any) => !i.notes?.includes('Đã hủy'));
               
               // Store receipt data BEFORE clearing state
               setReceiptData({
                 items: activeReceiptItems,
-                totalAmount: Number(orderData.totalAmount ?? totalAmount),
+                totalAmount: Number(orderData.totalAmount ?? displayTotalAmount),
                 orderNumber: orderData.order?.orderCode ?? (isTakeaway ? String(takeawayOrderId) : selectedTable?.currentOrder),
                 customerName: selectedCustomer?.name || orderData.order?.customer?.name || "Khách hàng",
                 tableNumber: isTakeaway ? undefined : (selectedTable ? String(selectedTable.id) : undefined)
@@ -3841,7 +4377,7 @@ useEffect(() => {
               className="bg-blue-600 hover:bg-blue-700 w-full"
               onClick={() => {
                 if (pendingOutageProduct) {
-                  addToCart(pendingOutageProduct, true);
+                  addToCart(pendingOutageProduct);
                 }
                 setOutageConfirmOpen(false);
                 setPendingOutageProduct(null);
@@ -4597,7 +5133,7 @@ useEffect(() => {
       <PromotionPopup
         open={promotionModalOpen}
         onClose={() => setPromotionModalOpen(false)}
-        orderTotal={totalAmount}
+        orderTotal={displayTotalAmount}
         orderItems={cart.map((item) => {
           const product = products.find((p) => p.id === item.id);
           return {
@@ -4883,25 +5419,267 @@ useEffect(() => {
 
       {/* Cancel Item Modal */}
       <Dialog open={cancelItemModalOpen} onOpenChange={setCancelItemModalOpen}>
-        <DialogContent className="max-w-sm" aria-describedby={undefined}>
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              Xác nhận giảm / Hủy món
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-slate-700">
+                Bạn có chắc chắn muốn xóa{" "}
+                <span className="font-semibold text-slate-900">
+                  {itemToCancel?.name}
+                </span>{" "}
+                khỏi đơn hàng không?
+              </p>
+              <div className="flex items-center gap-3 mt-3">
+                <span className="text-sm text-slate-600">Số lượng hủy:</span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCancelQuantity(Math.max(1, cancelQuantity - 1))}
+                    disabled={cancelQuantity <= 1}
+                    className="h-7 w-7 p-0"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </Button>
+                  <span className="text-sm font-medium w-8 text-center">
+                    {cancelQuantity}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCancelQuantity(Math.min(itemToCancel?.quantity || 1, cancelQuantity + 1))}
+                    disabled={cancelQuantity >= (itemToCancel?.quantity || 1)}
+                    className="h-7 w-7 p-0"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                  <span className="text-sm text-slate-600 ml-1">
+                    / {itemToCancel?.quantity || 1}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label
+                htmlFor="cancel-reason"
+                className="text-sm font-medium mb-2 block"
+              >
+                Lý do hủy <span className="text-red-500">*</span>
+              </Label>
+              <Select value={cancelReason} onValueChange={setCancelReason}>
+                <SelectTrigger id="cancel-reason">
+                  <SelectValue placeholder="Chọn lý do hủy..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {cancelReasons.map((reason) => (
+                    <SelectItem key={reason} value={reason}>
+                      {reason}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {cancelReason === "Khác" && (
+              <div>
+                <Label
+                  htmlFor="other-cancel-reason"
+                  className="text-sm font-medium mb-2 block"
+                >
+                  Ghi chú lý do khác
+                </Label>
+                <Input
+                  id="other-cancel-reason"
+                  placeholder="Nhập lý do hủy..."
+                  value={otherReason}
+                  onChange={(e) => setOtherReason(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCancelItemModalOpen(false);
+                setCancelReason("");
+                setOtherReason("");
+              }}
+            >
+              Bỏ qua
+            </Button>
+            <Button
+              onClick={handleConfirmCancel}
+              disabled={
+                !cancelReason ||
+                (cancelReason === "Khác" && !otherReason.trim())
+              }
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Chắc chắn
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Topping Modal */}
+      <Dialog open={cancelToppingModalOpen} onOpenChange={setCancelToppingModalOpen}>
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              Xác nhận hủy topping
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-slate-700">
+                Bạn có chắc chắn muốn hủy topping{" "}
+                <span className="font-semibold text-slate-900">
+                  {toppingToCancel?.topping.name}
+                </span>{" "}
+                khỏi món{" "}
+                <span className="font-semibold text-slate-900">
+                  {cart.find(i => i.id === toppingToCancel?.parentItemId)?.name}
+                </span>{" "}
+                không?
+              </p>
+              <div className="flex items-center gap-3 mt-3">
+                <span className="text-sm text-slate-600">Số lượng hủy:</span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCancelToppingQuantity(Math.max(1, cancelToppingQuantity - 1))}
+                    disabled={cancelToppingQuantity <= 1}
+                    className="h-7 w-7 p-0"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </Button>
+                  <span className="text-sm font-medium w-8 text-center">
+                    {cancelToppingQuantity}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCancelToppingQuantity(Math.min(toppingToCancel?.topping.quantity || 1, cancelToppingQuantity + 1))}
+                    disabled={cancelToppingQuantity >= (toppingToCancel?.topping.quantity || 1)}
+                    className="h-7 w-7 p-0"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                  <span className="text-sm text-slate-600 ml-1">
+                    / {toppingToCancel?.topping.quantity || 1}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label
+                htmlFor="cancel-topping-reason"
+                className="text-sm font-medium mb-2 block"
+              >
+                Lý do hủy <span className="text-red-500">*</span>
+              </Label>
+              <Select value={cancelToppingReason} onValueChange={setCancelToppingReason}>
+                <SelectTrigger id="cancel-topping-reason">
+                  <SelectValue placeholder="Chọn lý do hủy..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {cancelReasons.map((reason) => (
+                    <SelectItem key={reason} value={reason}>
+                      {reason}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {cancelToppingReason === "Khác" && (
+              <div>
+                <Label
+                  htmlFor="other-cancel-topping-reason"
+                  className="text-sm font-medium mb-2 block"
+                >
+                  Ghi chú lý do khác
+                </Label>
+                <Input
+                  id="other-cancel-topping-reason"
+                  placeholder="Nhập lý do hủy..."
+                  value={otherToppingReason}
+                  onChange={(e) => setOtherToppingReason(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCancelToppingModalOpen(false);
+                setCancelToppingReason("");
+                setOtherToppingReason("");
+                setToppingToCancel(null);
+              }}
+            >
+              Bỏ qua
+            </Button>
+            <Button
+              onClick={handleConfirmCancelTopping}
+              disabled={
+                !cancelToppingReason ||
+                (cancelToppingReason === "Khác" && !otherToppingReason.trim())
+              }
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Chắc chắn
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Topping Copy Dialog - shown when adding quantity to sent items with toppings */}
+      <Dialog open={toppingCopyDialogOpen} onOpenChange={setToppingCopyDialogOpen}>
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
            <DialogHeader>
-             <DialogTitle>Hủy món / Giảm số lượng</DialogTitle>
+             <DialogTitle>Thêm món có topping</DialogTitle>
            </DialogHeader>
            <div className="space-y-4">
-              <p>Bạn đang hủy xác nhận món: <b>{itemToCancel?.name}</b></p>
-              <p>Số lượng hủy: <b>{cancelQuantity}</b></p>
-              <div className="space-y-2">
-                 <Label>Lý do hủy</Label>
-                 <Input 
-                    value={cancelReason} 
-                    onChange={(e) => setCancelReason(e.target.value)} 
-                    placeholder="Nhập lý do hủy (VD: Khách đổi ý)..." 
-                 />
+              <p>Bạn đang thêm <b>{pendingQuantityChange?.quantityToAdd || 1}</b> món <b>{pendingQuantityChange?.item?.name}</b></p>
+              <p className="text-sm text-slate-600">Món này có các topping đi kèm:</p>
+              <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+                {pendingQuantityChange?.item?.attachedToppings?.map((topping, idx) => (
+                  <div key={idx} className="text-sm text-amber-800">
+                    • {topping.name} x{topping.quantity}
+                  </div>
+                ))}
               </div>
+              <p className="text-sm text-slate-600">Bạn có muốn thêm topping giống món cũ không?</p>
            </div>
-           <DialogFooter>
-             <Button variant="outline" onClick={() => setCancelItemModalOpen(false)}>Quay lại</Button>
-             <Button variant="destructive" onClick={handleConfirmCancel} disabled={!cancelReason.trim()}>Xác nhận hủy</Button>
+           <DialogFooter className="flex flex-col sm:flex-row gap-2">
+             <Button variant="outline" onClick={handleCancelToppingCopy} className="sm:order-1">
+               Hủy
+             </Button>
+             <Button variant="secondary" onClick={handleAddItemWithoutToppings} className="sm:order-2">
+               Không có topping
+             </Button>
+             <Button onClick={handleAddItemWithToppings} className="bg-blue-600 hover:bg-blue-700 sm:order-3">
+               Có, thêm topping
+             </Button>
            </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -4972,7 +5750,7 @@ useEffect(() => {
             {totalItems} món đang chọn
           </p>
           <p className="text-blue-600 font-bold text-lg">
-            {totalAmount.toLocaleString()}đ
+            {displayTotalAmount.toLocaleString()}đ
           </p>
         </div>
         <Button

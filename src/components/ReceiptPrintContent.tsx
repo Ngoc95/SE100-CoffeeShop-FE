@@ -7,6 +7,12 @@ interface ReceiptItem {
   quantity: number;
   notes?: string;
   unit?: string;
+  // New fields for grouping
+  isComboHeader?: boolean;
+  comboItems?: ReceiptItem[];
+  isTopping?: boolean;
+  parentName?: string;
+  extraPrice?: number;
 }
 
 interface ReceiptPrintContentProps {
@@ -259,31 +265,74 @@ export function ReceiptPrintContent({
 
       {/* Items Section */}
       <div className="receipt-items-section">
-        {items.map((item) => (
-          <div key={item.id} className="receipt-item">
-            <div className="receipt-item-name">
-              <span>{item.name}</span>
-              <span>-</span>
-              <span>{item.price.toLocaleString()}₫</span>
+        {items.map((item) => {
+          // Render combo header with nested items
+          if (item.isComboHeader && item.comboItems) {
+            return (
+              <div key={item.id} className="receipt-item" style={{ marginBottom: "6px" }}>
+                {/* Combo Header */}
+                <div className="receipt-item-name" style={{ fontWeight: "bold" }}>
+                  <span>[COMBO] {item.name}</span>
+                  <span>-</span>
+                  <span>{item.price.toLocaleString()}₫</span>
+                </div>
+                {/* Combo Items - Indented */}
+                {item.comboItems.map((subItem) => (
+                  <div key={subItem.id} style={{ marginLeft: "8px", fontSize: "8px", color: "#444" }}>
+                    <span>  - {subItem.quantity}x {subItem.name}</span>
+                    {(subItem.extraPrice ?? 0) > 0 && (
+                      <span style={{ marginLeft: "4px" }}>+{subItem.extraPrice?.toLocaleString()}₫</span>
+                    )}
+                  </div>
+                ))}
+                {item.notes && (
+                  <div style={{ fontSize: "8px", color: "#555", marginTop: "1px", marginLeft: "8px" }}>
+                    Ghi chú: {item.notes}
+                  </div>
+                )}
+              </div>
+            );
+          }
+          
+          // Render topping (indented under parent)
+          if (item.isTopping) {
+            return (
+              <div key={item.id} style={{ marginLeft: "8px", fontSize: "8px", color: "#666" }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>  + {item.name} x{item.quantity}</span>
+                  <span>{(item.price * item.quantity).toLocaleString()}₫</span>
+                </div>
+              </div>
+            );
+          }
+          
+          // Render normal item
+          return (
+            <div key={item.id} className="receipt-item">
+              <div className="receipt-item-name">
+                <span>{item.name}</span>
+                <span>-</span>
+                <span>{item.price.toLocaleString()}₫</span>
+              </div>
+              <div className="receipt-item-price-qty">
+                <span>SL</span>
+                <div className="receipt-item-qty-section">
+                  <strong>{item.quantity}</strong>
+                </div>
+                <div className="receipt-item-price-section">
+                  <strong>
+                    {(item.price * item.quantity).toLocaleString()}₫
+                  </strong>
+                </div>
+              </div>
+              {item.notes && (
+                <div style={{ fontSize: "8px", color: "#555", marginTop: "1px" }}>
+                  - {item.notes}
+                </div>
+              )}
             </div>
-            <div className="receipt-item-price-qty">
-              <span>SL</span>
-              <div className="receipt-item-qty-section">
-                <strong>{item.quantity}</strong>
-              </div>
-              <div className="receipt-item-price-section">
-                <strong>
-                  {(item.price * item.quantity).toLocaleString()}₫
-                </strong>
-              </div>
-            </div>
-            {item.notes && (
-              <div style={{ fontSize: "8px", color: "#555", marginTop: "1px" }}>
-                - {item.notes}
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Totals Section */}

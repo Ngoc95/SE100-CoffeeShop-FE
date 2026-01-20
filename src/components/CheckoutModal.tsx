@@ -42,6 +42,13 @@ interface CheckoutItem {
   quantity: number;
   price: number;
   basePrice: number;
+  // New fields for grouping
+  isComboHeader?: boolean;
+  comboInstanceId?: string;
+  comboItems?: CheckoutItem[];
+  isTopping?: boolean;
+  parentName?: string;
+  extraPrice?: number;
 }
 
 interface BankAccount {
@@ -98,14 +105,14 @@ export function CheckoutModal({
   // Transfer payment
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [selectedTransferBankId, setSelectedTransferBankId] =
-    useState<number>(0);
+    useState<number | null>(null);
 
   // Combined payment
   const [combinedCashAmount, setCombinedCashAmount] = useState<number>(0);
   const [combinedTransferAmount, setCombinedTransferAmount] =
     useState<number>(0);
   const [combinedTransferBankId, setCombinedTransferBankId] =
-    useState<number>(0);
+    useState<number | null>(null);
 
   // New account dialog
   const [newAccountOpen, setNewAccountOpen] = useState(false);
@@ -155,6 +162,8 @@ export function CheckoutModal({
       setReceivedCash(finalAmount);
       setCombinedCashAmount(finalAmount);
       setCombinedTransferAmount(0);
+      setSelectedTransferBankId(null);
+      setCombinedTransferBankId(null);
     }
   }, [open, finalAmount]);
 
@@ -174,22 +183,19 @@ export function CheckoutModal({
   useEffect(() => {
     const generateQR = async () => {
         let amount = 0;
-        let bankId = 0;
+        let bankId: number | null = null
 
         if (paymentMethod === 'transfer') {
-            amount = finalAmount;
-            bankId = selectedTransferBankId;
+          amount = finalAmount
+          bankId = selectedTransferBankId
         } else if (paymentMethod === 'combined') {
-            amount = combinedTransferAmount;
-            bankId = combinedTransferBankId;
-        } else {
-            setQrImage(null);
-            return;
+          amount = combinedTransferAmount
+          bankId = combinedTransferBankId
         }
 
-        if (amount <= 0 || !bankId) {
-             setQrImage(null);
-             return;
+        if (amount <= 0 || bankId == null) {
+          setQrImage(null)
+          return
         }
 
         // Find bank details (using index as ID for now as implementation uses index)
@@ -197,12 +203,8 @@ export function CheckoutModal({
         if (!bank) return;
         
         // VietQR Format: https://img.vietqr.io/image/<BANK_ID>-<ACCOUNT_NO>-<TEMPLATE>.png?amount=<AMOUNT>&addInfo=<INFO>&accountName=<NAME>
-        // Assuming bank.bank is a valid bin or short name (e.g. MB, TCB, VCB)
-        // Encode URI components
-        
-        // Clean bank name if needed (VietQR expects short name like MB, TCB, VCB, ACB, VPBank, TPBank, etc.)
-        // We will trust the input 'bank' for now.
-        const bankCode = bank.bank; 
+        // Extract BIN/Bank Code from "VCB - Ngân hàng TMCP..." format
+        const bankCode = bank.bank.split(' - ')[0];
         const accountNo = bank.account;
         const template = 'compact'; 
         
@@ -221,6 +223,10 @@ export function CheckoutModal({
   const canConfirm = (): boolean => {
     if (!paymentMethod) return false;
     if (paymentMethod === "cash" && receivedCash < finalAmount) return false;
+    if (paymentMethod === "transfer" && selectedTransferBankId == null)
+      return false
+    if (paymentMethod === "combined" && combinedTransferBankId == null)
+      return false
     if (
       paymentMethod === "combined" &&
       combinedCashAmount + combinedTransferAmount <
@@ -302,24 +308,84 @@ export function CheckoutModal({
           <div className="flex-1 border-r overflow-y-auto p-4 space-y-2">
             <h3 className="text-sm font-semibold mb-3">Chi tiết giao dịch</h3>
             <div className="space-y-2 text-sm">
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex justify-between items-start gap-2 pb-2 border-b"
-                >
-                  <div className="flex-1">
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-xs text-slate-500">
-                      SL: {item.quantity}
-                    </p>
+              {items.map((item) => {
+                // Render combo header with nested items
+                if (item.isComboHeader && item.comboItems) {
+                  return (
+                    <div key={item.id} className="pb-2 border-b border-green-200">
+                      {/* Combo Header */}
+                      <div className="flex justify-between items-start gap-2 bg-green-50 p-2 rounded-t-lg border-l-2 border-green-400">
+                        <div className="flex-1">
+                          <p className="font-medium text-green-800">{item.name}</p>
+                          <p className="text-xs text-green-600">Combo - {item.comboItems.length} món</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium text-green-700">
+                            {item.price.toLocaleString()}₫
+                          </p>
+                        </div>
+                      </div>
+                      {/* Combo Items - Indented */}
+                      <div className="ml-4 pl-2 border-l-2 border-green-200 mt-1 space-y-1">
+                        {item.comboItems.map((subItem) => (
+                          <div key={subItem.id} className="flex justify-between items-start text-slate-600">
+                            <div className="flex-1">
+                              <span className="text-xs">
+                                {subItem.quantity}x {subItem.name}
+                                {(subItem.extraPrice ?? 0) > 0 && (
+                                  <span className="text-amber-600 ml-1">+{subItem.extraPrice?.toLocaleString()}₫</span>
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+                
+                // Render topping (indented under parent)
+                if (item.isTopping) {
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex justify-between items-start gap-2 pb-1 ml-4 pl-2 border-l-2 border-amber-200"
+                    >
+                      <div className="flex-1">
+                        <p className="text-xs text-amber-700">+ {item.name}</p>
+                        <p className="text-xs text-amber-500">
+                          SL: {item.quantity}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-amber-600">
+                          {item.price.toLocaleString()}₫
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+                
+                // Render normal item
+                return (
+                  <div
+                    key={item.id}
+                    className="flex justify-between items-start gap-2 pb-2 border-b"
+                  >
+                    <div className="flex-1">
+                      <p className="font-medium">{item.name}</p>
+                      <p className="text-xs text-slate-500">
+                        SL: {item.quantity}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">
+                        {item.price.toLocaleString()}₫
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-medium">
-                      {item.price.toLocaleString()}₫
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Summary */}
@@ -582,63 +648,44 @@ export function CheckoutModal({
             {/* Transfer Payment */}
             {paymentMethod === "transfer" && (
               <div className="space-y-3 bg-blue-50 p-3 rounded-lg border border-blue-200 mb-4">
+                
+                {/* QR Section */}
                 <div>
                   <Label className="text-sm">Mã QR</Label>
-                  <div className="mt-1 border-2 border-dashed border-blue-300 rounded-lg p-3 text-center min-h-[100px] flex items-center justify-center">
+
+                  <div className="mt-1 border-2 border-dashed border-blue-300 rounded-lg p-3 text-center min-h-[180px] flex items-center justify-center">
                     {qrImage ? (
                       <div className="text-center">
                         <img
                           src={qrImage}
                           alt="QR"
-                          className="w-20 h-20 mx-auto mb-2 rounded"
+                          className="w-48 h-48 mx-auto rounded-lg border"
                         />
-                        <button
-                          onClick={() =>
-                            document.getElementById("qr-input")?.click()
-                          }
-                          className="text-xs text-blue-600 hover:underline"
-                        >
-                          Thay đổi
-                        </button>
+                        <p className="text-xs text-slate-500 mt-2">
+                          Quét mã để thanh toán
+                        </p>
                       </div>
                     ) : (
-                      <label
-                        htmlFor="qr-input"
-                        className="text-center cursor-pointer"
-                      >
-                        <p className="text-2xl mb-1">📸</p>
-                        <p className="text-xs text-slate-600">
-                          Click để tải lên
-                        </p>
-                      </label>
+                      <p className="text-xs text-slate-500">
+                        Vui lòng chọn tài khoản ngân hàng để tạo mã QR
+                      </p>
                     )}
-                    <input
-                      id="qr-input"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            setQrImage(event.target?.result as string);
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                    />
                   </div>
                 </div>
+
+                {/* Bank Select */}
                 <div>
                   <Label className="text-sm">Tài khoản nhận tiền</Label>
                   <select
-                    value={selectedTransferBankId}
+                    value={selectedTransferBankId ?? ""}
                     onChange={(e) =>
-                      setSelectedTransferBankId(parseInt(e.target.value))
+                      setSelectedTransferBankId(Number(e.target.value))
                     }
                     className="w-full p-2 border border-blue-300 rounded-lg bg-white text-sm mt-1"
                   >
+                    <option value="" disabled>
+                      -- Chọn tài khoản --
+                    </option>
                     {bankAccounts.map((acc, idx) => (
                       <option key={idx} value={idx}>
                         {acc.bank} - {acc.owner}
@@ -646,8 +693,10 @@ export function CheckoutModal({
                     ))}
                   </select>
                 </div>
+
               </div>
             )}
+
 
             {/* Combined Payment */}
             {paymentMethod === "combined" && (
@@ -683,12 +732,15 @@ export function CheckoutModal({
                     className="mt-1 text-sm mb-2"
                   />
                   <select
-                    value={combinedTransferBankId}
+                    value={combinedTransferBankId ?? ""}
                     onChange={(e) =>
-                      setCombinedTransferBankId(parseInt(e.target.value))
+                      setCombinedTransferBankId(Number(e.target.value))
                     }
                     className="w-full p-2 border border-green-300 rounded-lg bg-white text-sm"
                   >
+                    <option value="" disabled>
+                        -- Chọn tài khoản --
+                    </option>
                     {bankAccounts.map((acc, idx) => (
                       <option key={idx} value={idx}>
                         {acc.bank} - {acc.owner}
