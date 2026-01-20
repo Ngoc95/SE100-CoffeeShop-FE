@@ -1,4 +1,5 @@
 import axiosClient from './axiosClient'
+import axios from './axiosClient'
 
 export const getCustomers = (params?: Record<string, any>) => {
   return axiosClient.get('/customers', { params })
@@ -29,4 +30,27 @@ export const updateCustomer = (
   }
   if (params["birthday"] === null) params["birthday"] = "2026-01-16"
   return axiosClient.patch(`/customers/${id}`, params)
+}
+
+export const createCustomer = (
+  name?: string,
+  phone?: string,
+  city?: string,
+  gender?: string,
+  birthday?: string,
+  address?: string,
+  isActive?: boolean
+) => {
+  let params: Record<string, any> = {
+    name: name,
+    phone: phone,
+    city: city,
+    gender: gender,
+    birthday: birthday,
+    address: address,
+    isActive: isActive
+  }
+  console.log("Add params: ", params)
+  if (params["birthday"] === null || params["birthday"] === "") params["birthday"] = "2026-01-16"
+  return axiosClient.post('/customers', params)
 }

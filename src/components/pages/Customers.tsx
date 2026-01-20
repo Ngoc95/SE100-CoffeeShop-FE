@@ -9,8 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Label } from "../ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { toast } from "sonner";
-import { CustomerEditFormDialog, EditCustomer } from "../CustomerFormDialog";
-import { deleteCustomer, getCustomers, updateCustomer } from "../../api/customer";
+import { AddCustomer, CustomerAddFormDialog, CustomerEditFormDialog, EditCustomer } from "../CustomerFormDialog";
+import { createCustomer, deleteCustomer, getCustomers, updateCustomer } from "../../api/customer";
 import { getCustomerGroups } from "../../api/customerGroup";
 
 interface Customer {
@@ -201,7 +201,21 @@ export function Customers() {
     fetchCustomersData()
   }
 
-  const validateSumbitEdit = (formData: EditCustomer) => {
+  const validateSubmitEdit = (formData: EditCustomer) => {
+    if (!formData.name || !formData.phone) {
+      toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
+      return false;
+    }
+
+    if (!/^\d+$/.test(formData.phone) || formData.phone.length !== 10) {
+      toast.error("SĐT phải có 10 ký tự và chỉ có chữ số!");
+      return false;
+    }
+
+    return true;
+  }
+
+  const validateSubmitAdd = (formData: AddCustomer) => {
     if (!formData.name || !formData.phone) {
       toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
       return false;
@@ -218,7 +232,7 @@ export function Customers() {
   const handleSubmitEdit = async (formData: EditCustomer) => {
     if (!formData) return;
 
-    if (!validateSumbitEdit(formData)) return;
+    if (!validateSubmitEdit(formData)) return;
 
     try {
       await updateCustomer(
@@ -235,12 +249,39 @@ export function Customers() {
       await fetchCustomersData()
     }
     catch (error) {
-      toast.error("Cập nhật khách hàng thất bại. Error: " + error);
+      toast.error("Cập nhật khách hàng thất bại. Lỗi: " + error.response.data.message);
     }
 
     setEditDialogOpen(false);
     resetForm();
   };
+
+  const handleSubmitAdd = async (formData: AddCustomer) => {
+    if (!formData) return;
+
+    if (!validateSubmitAdd(formData)) return;
+
+    let res;
+
+    try {
+      await createCustomer(
+        formData.name,
+        formData.phone,
+        formData.city,
+        formData.gender,
+        formData.birthday,
+        formData.address,
+        formData.isActive
+      )
+      toast.success("Thêm khách hàng thành công");
+      await fetchCustomersData()
+    }
+    catch (error) {
+      toast.error("Thêm khách hàng thất bại. Lỗi: " + error.response.data.message);
+    }
+
+    setAddDialogOpen(false);
+  }
 
   const handleEdit = (customer: Customer) => {
     const tempEditCustomer: EditCustomer = {
@@ -257,6 +298,11 @@ export function Customers() {
     setEditingCustomer(tempEditCustomer);
     setEditDialogOpen(true);
   };
+
+  const handleAddNew = () => {
+    setAddDialogOpen(true);
+  };
+
 
   const handleDelete = async (id: number) => {
     if (confirm("Bạn có chắc chắn muốn xóa khách hàng này?")) {
@@ -342,10 +388,9 @@ export function Customers() {
           {canCreate && (
             <Button
               className="bg-blue-600 hover:bg-blue-700"
-            // onClick={() => {
-            //   setEditingCustomer(null);
-            //   setDialogOpen(true);
-            // }}
+              onClick={() => {
+                handleAddNew();
+              }}
             >
               <Plus className="w-4 h-4 mr-2" />
               Thêm khách hàng
@@ -682,7 +727,9 @@ export function Customers() {
           </div>
         </div>
       </div>
-      {/* Customer Form Dialog */}
+
+
+      {/* Customer Edit Form Dialog */}
       <CustomerEditFormDialog
         open={editDialogOpen}
         onClose={() => {
@@ -691,6 +738,16 @@ export function Customers() {
         }}
         onSubmit={(customers: EditCustomer) => handleSubmitEdit(customers)}
         editingCustomer={editingCustomer}
+      />
+
+      {/* Customer Add Form Dialog */}
+      <CustomerAddFormDialog
+        open={addDialogOpen}
+        onClose={() => {
+          setAddDialogOpen(false);
+          resetForm();
+        }}
+        onSubmit={(customers: AddCustomer) => handleSubmitAdd(customers)}
       />
     </div >
   );
