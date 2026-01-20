@@ -1,4 +1,4 @@
-import { useState, Fragment, ChangeEvent } from "react";
+import { useState, Fragment, ChangeEvent, useEffect } from "react";
 import {
   Search,
   Plus,
@@ -20,7 +20,11 @@ import {
   Upload,
   Download,
   Filter,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
+import { inventoryService } from "../../services/inventoryService";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
 import { exportToCSV } from "../utils/export";
@@ -59,60 +63,19 @@ import { ImageUploadWithCrop } from "../ImageUploadWithCrop";
 import { ImportExcelDialog } from "../ImportExcelDialog";
 import { ExportExcelDialog } from "../ExportExcelDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-
-// Type definitions
-type ItemType = "ready-made" | "composite" | "ingredient";
-type SortField = "name" | "currentStock" | "totalValue" | "expiryDate" | "category" | "unit" | "batches" | "status" | "productStatus" | "ingredients" | "avgUnitCost" | "supplier" | "sellingPrice";
-type SortOrder = "asc" | "desc" | "none";
-
-interface BatchInfo {
-  batchCode: string;
-  quantity: number;
-  unitCost: number;
-  entryDate: string;
-  expiryDate?: string;
-  supplier: string;
-}
-
-interface CompositeIngredient {
-  ingredientId: string;
-  ingredientName: string;
-  unit: string;
-  quantity: number;
-  unitCost: number;
-}
-
-interface InventoryItem {
-  id: string;
-  name: string;
-  type: ItemType;
-  category: string;
-  currentStock: number;
-  unit: string;
-  minStock: number;
-  maxStock: number;
-  status: "good" | "low" | "expiring" | "expired" | "critical";
-  productStatus?: "selling" | "paused" | "not_running" | "hot";
-  imageUrl?: string; // Image URL for the item
-
-  // For ready-made & ingredients
-  batches?: BatchInfo[];
-
-  // For composite items
-  ingredients?: CompositeIngredient[];
-
-  // Calculated fields
-  totalValue: number;
-  avgUnitCost: number;
-  sellingPrice?: number;
-  isTopping?: boolean;
-  associatedProductIds?: string[];
-}
+import {
+  InventoryItem,
+  ItemType,
+  SortField,
+  SortOrder,
+  BatchInfo,
+  CompositeIngredient,
+} from "../../types/inventory"
 
 import { useAuth } from "../../contexts/AuthContext";
 
 export function Inventory() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const canCreate = hasPermission('goods_inventory:create');
   const canUpdate = hasPermission('goods_inventory:update');
   const canDelete = hasPermission('goods_inventory:delete');
@@ -176,346 +139,122 @@ export function Inventory() {
     minStock: 0,
     maxStock: 0,
     sellingPrice: undefined as number | undefined,
-    productStatus: undefined as string | undefined, // Add productStatus
-    ingredients: [] as CompositeIngredient[], // Add ingredients
+    productStatus: undefined as string | undefined,
+    ingredients: [] as CompositeIngredient[],
     isTopping: false,
     associatedProductIds: [] as string[],
     imageUrl: "",
   });
 
-  // Mock data
-  const inventoryItems: InventoryItem[] = [
-    // Ready-made items
-    {
-      id: "rm1",
-      name: "Coca Cola",
-      type: "ready-made",
-      category: "bottled-beverages",
-      currentStock: 48,
-      unit: "chai",
-      minStock: 20,
-      maxStock: 100,
-      status: "good",
-      imageUrl:
-        "https://images.unsplash.com/photo-1648569883125-d01072540b4c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb2NhJTIwY29sYSUyMGJvdHRsZXxlbnwxfHx8fDE3NjM5OTI5MTR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      batches: [
-        {
-          batchCode: "LO001",
-          quantity: 30,
-          unitCost: 12000,
-          entryDate: "2025-01-10",
-          expiryDate: "2025-06-15",
-          supplier: "Coca Cola Việt Nam",
-        },
-        {
-          batchCode: "LO002",
-          quantity: 18,
-          unitCost: 11500,
-          entryDate: "2025-01-18",
-          expiryDate: "2025-07-20",
-          supplier: "Coca Cola Việt Nam",
-        },
-      ],
-      totalValue: 567000,
-      avgUnitCost: 11813,
-      sellingPrice: 15000,
-    },
-    {
-      id: "rm2",
-      name: "Bánh Croissant",
-      type: "ready-made",
-      category: "packaging",
-      currentStock: 8,
-      unit: "cái",
-      minStock: 15,
-      maxStock: 50,
-      status: "low",
-      imageUrl:
-        "https://images.unsplash.com/photo-1712723246766-3eaea22e52ff?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjcm9pc3NhbnQlMjBwYXN0cnl8ZW58MXx8fHwxNzY0MDA2MzEyfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      batches: [
-        {
-          batchCode: "LO003",
-          quantity: 8,
-          unitCost: 25000,
-          entryDate: "2025-01-22",
-          expiryDate: "2025-01-26",
-          supplier: "Tiệm bánh ABC",
-        },
-      ],
-      totalValue: 200000,
-      avgUnitCost: 25000,
-      sellingPrice: 20000,
-    },
+  // API states
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [items, setItems] = useState<InventoryItem[]>([]);
 
-    // Composite items
-    {
-      id: "cp1",
-      name: "Cà phê Latte",
-      type: "composite",
-      category: "bottled-beverages",
-      currentStock: 0,
-      unit: "ly",
-      minStock: 0,
-      maxStock: 0,
-      status: "good",
-      imageUrl:
-        "https://images.unsplash.com/photo-1585494156145-1c60a4fe952b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb2ZmZWUlMjBsYXR0ZXxlbnwxfHx8fDE3NjM5MzQ4NTN8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      ingredients: [
-        {
-          ingredientId: "ing1",
-          ingredientName: "Cà phê hạt Arabica",
-          unit: "g",
-          quantity: 18,
-          unitCost: 350,
-        },
-        {
-          ingredientId: "ing2",
-          ingredientName: "Sữa tươi",
-          unit: "ml",
-          quantity: 200,
-          unitCost: 28,
-        },
-        {
-          ingredientId: "ing3",
-          ingredientName: "Đường trắng",
-          unit: "g",
-          quantity: 10,
-          unitCost: 22,
-        },
-      ],
-      totalValue: 0,
-      avgUnitCost: 12120,
-      sellingPrice: 35000,
-    },
-    {
-      id: "cp2",
-      name: "Trà sữa Ô Long",
-      type: "composite",
-      category: "bottled-beverages",
-      currentStock: 0,
-      unit: "ly",
-      minStock: 0,
-      maxStock: 0,
-      status: "good",
-      imageUrl:
-        "https://images.unsplash.com/photo-1597215753169-e717ab0acbe5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtaWxrJTIwdGVhJTIwb29sb25nfGVufDF8fHx8MTc2NDAzNDc5NXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      ingredients: [
-        {
-          ingredientId: "ing5",
-          ingredientName: "Trà Ô Long",
-          unit: "g",
-          quantity: 10,
-          unitCost: 280,
-        },
-        {
-          ingredientId: "ing2",
-          ingredientName: "Sữa tươi",
-          unit: "ml",
-          quantity: 150,
-          unitCost: 28,
-        },
-        {
-          ingredientId: "ing3",
-          ingredientName: "Đường trắng",
-          unit: "g",
-          quantity: 15,
-          unitCost: 22,
-        },
-        {
-          ingredientId: "ing4",
-          ingredientName: "Kem tươi",
-          unit: "ml",
-          quantity: 30,
-          unitCost: 85,
-        },
-      ],
-      totalValue: 0,
-      avgUnitCost: 10280,
-      sellingPrice: 30000,
-    },
+  // Fetch inventory items from API
+  useEffect(() => {
+    fetchInventoryItems();
+  }, []);
 
-    // Ingredients
-    {
-      id: "ing1",
-      name: "Cà phê hạt Arabica",
-      type: "ingredient",
-      category: "coffee",
-      currentStock: 15,
-      unit: "kg",
-      minStock: 20,
-      maxStock: 50,
-      status: "low",
-      imageUrl:
-        "https://images.unsplash.com/photo-1627060063885-e1a30ab40551?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb2ZmZWUlMjBiZWFucyUyMGFyYWJpY2F8ZW58MXx8fHwxNzY0MDM1MDMwfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      batches: [
+  const fetchInventoryItems = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      console.log("[Inventory] Fetching items...");
+      
+      // Check if user is authenticated
+      if (!user) {
+        console.warn("[Inventory] User not authenticated, loading mock data...");
+        throw new Error("Not authenticated");
+      }
+      
+      const data = await inventoryService.getItems();
+      console.log("[Inventory] API Response:", data);
+      
+      // Handle API response structure: { metaData: { items: [...] } }
+      let itemsArray: any[] = [];
+      
+      if (data?.metaData?.items && Array.isArray(data.metaData.items)) {
+        itemsArray = data.metaData.items;
+      } else if (data?.items && Array.isArray(data.items)) {
+        itemsArray = data.items;
+      } else if (Array.isArray(data)) {
+        itemsArray = data;
+      }
+      
+      // Map API response to InventoryItem type
+      const mappedItems: InventoryItem[] = itemsArray.map((item: any) => ({
+        id: String(item.id),
+        code: item.code || "",
+        name: item.name || "",
+        category: item.category?.name || (typeof item.category === "string" ? item.category : ""),
+        unit: item.unit?.name || (typeof item.unit === "string" ? item.unit : ""),
+        currentStock: Number(item.currentStock) || 0,
+        minStock: item.minStock ? Number(item.minStock) : 0,
+        maxStock: item.maxStock ? Number(item.maxStock) : 0,
+        sellingPrice: Number(item.sellingPrice) || 0,
+        productStatus: item.productStatus || "selling",
+        itemType: item.itemType?.name?.toLowerCase() === "ready-made" ? "ready-made" 
+                 : item.itemType?.name?.toLowerCase() === "composite" ? "composite"
+                 : item.itemType?.name?.toLowerCase() === "ingredient" ? "ingredient"
+                 : "ingredient",
+        isTopping: item.isTopping || false,
+        createdAt: item.createdAt || new Date().toISOString(),
+        updatedAt: item.updatedAt || new Date().toISOString(),
+      }));
+      
+      console.log("[Inventory] Mapped items:", mappedItems);
+      setItems(mappedItems);
+      
+      if (mappedItems.length === 0) {
+        console.warn("[Inventory] No items returned from API");
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Lỗi khi tải dữ liệu";
+      console.error("Error fetching inventory:", err);
+      
+      // Load mock data as fallback
+      console.log("[Inventory] Loading fallback mock data...");
+      const mockItems: InventoryItem[] = [
         {
-          batchCode: "LO101",
-          quantity: 10,
-          unitCost: 350000,
-          entryDate: "2025-01-05",
-          expiryDate: "2025-06-15",
-          supplier: "Trung Nguyên",
+          id: "1",
+          code: "CF001",
+          name: "Cà phê Arabica",
+          category: "coffee",
+          unit: "kg",
+          currentStock: 50,
+          minStock: 10,
+          maxStock: 100,
+          sellingPrice: 350000,
+          productStatus: "selling",
+          itemType: "ingredient",
+          isTopping: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         },
         {
-          batchCode: "LO102",
-          quantity: 5,
-          unitCost: 360000,
-          entryDate: "2025-01-15",
-          expiryDate: "2025-06-20",
-          supplier: "Trung Nguyên",
+          id: "2",
+          code: "MK001",
+          name: "Sữa tươi",
+          category: "dairy",
+          unit: "liter",
+          currentStock: 30,
+          minStock: 5,
+          maxStock: 50,
+          sellingPrice: 0,
+          productStatus: "selling",
+          itemType: "ingredient",
+          isTopping: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         },
-      ],
-      totalValue: 5300000,
-      avgUnitCost: 353333,
-      sellingPrice: 420000,
-    },
-    {
-      id: "ing2",
-      name: "Sữa tươi",
-      type: "ingredient",
-      category: "dairy",
-      currentStock: 12,
-      unit: "L",
-      minStock: 10,
-      maxStock: 30,
-      status: "expiring",
-      imageUrl:
-        "https://images.unsplash.com/photo-1523473827533-2a64d0d36748?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmcmVzaCUyMG1pbGt8ZW58MXx8fHwxNzYzOTUwMzcyfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      batches: [
-        {
-          batchCode: "LO201",
-          quantity: 7,
-          unitCost: 28000,
-          entryDate: "2025-01-20",
-          expiryDate: "2025-01-27",
-          supplier: "Vinamilk",
-        },
-        {
-          batchCode: "LO202",
-          quantity: 5,
-          unitCost: 27500,
-          entryDate: "2025-01-22",
-          expiryDate: "2025-01-29",
-          supplier: "Vinamilk",
-        },
-      ],
-      totalValue: 333500,
-      avgUnitCost: 27792,
-      sellingPrice: 35000,
-    },
-    {
-      id: "ing3",
-      name: "Đường trắng",
-      type: "ingredient",
-      category: "syrup",
-      currentStock: 3,
-      unit: "kg",
-      minStock: 10,
-      maxStock: 30,
-      status: "critical",
-      imageUrl:
-        "https://images.unsplash.com/photo-1641679103706-fc8542e2a97a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3aGl0ZSUyMHN1Z2FyfGVufDF8fHx8MTc2Mzk5NTQ0Mnww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      batches: [
-        {
-          batchCode: "LO301",
-          quantity: 3,
-          unitCost: 22000,
-          entryDate: "2025-01-10",
-          expiryDate: "2025-12-31",
-          supplier: "Biên Hòa",
-        },
-      ],
-      totalValue: 66000,
-      avgUnitCost: 22000,
-      sellingPrice: 30000,
-    },
-    {
-      id: "ing4",
-      name: "Kem tươi",
-      type: "ingredient",
-      category: "dairy",
-      currentStock: 8,
-      unit: "hộp",
-      minStock: 5,
-      maxStock: 20,
-      status: "expiring",
-      imageUrl:
-        "https://images.unsplash.com/photo-1622737338437-39a24c37f0de?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3aGlwcGVkJTIwY3JlYW18ZW58MXx8fHwxNzY0MDM1MDMxfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      batches: [
-        {
-          batchCode: "LO401",
-          quantity: 8,
-          unitCost: 85000,
-          entryDate: "2025-01-19",
-          expiryDate: "2025-01-29",
-          supplier: "Anchor",
-        },
-      ],
-      totalValue: 680000,
-      avgUnitCost: 85000,
-      sellingPrice: 110000,
-    },
-    {
-      id: "ing5",
-      name: "Trà Ô Long",
-      type: "ingredient",
-      category: "tea",
-      currentStock: 25,
-      unit: "kg",
-      minStock: 10,
-      maxStock: 40,
-      status: "good",
-      imageUrl:
-        "https://images.unsplash.com/photo-1760074057726-e94ee8ff1eb4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxvb2xvbmclMjB0ZWElMjBsZWF2ZXN8ZW58MXx8fHwxNzYzOTY1ODc2fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      batches: [
-        {
-          batchCode: "LO501",
-          quantity: 15,
-          unitCost: 280000,
-          entryDate: "2025-01-08",
-          expiryDate: "2025-06-30",
-          supplier: "Phúc Long",
-        },
-        {
-          batchCode: "LO502",
-          quantity: 10,
-          unitCost: 275000,
-          entryDate: "2025-01-16",
-          expiryDate: "2025-07-15",
-          supplier: "Phúc Long",
-        },
-      ],
-      totalValue: 6950000,
-      avgUnitCost: 278000,
-      sellingPrice: 350000,
-    },
-    {
-      id: "ing6",
-      name: "Ly nhựa size L",
-      type: "ingredient",
-      category: "packaging",
-      currentStock: 150,
-      unit: "cái",
-      minStock: 500,
-      maxStock: 2000,
-      status: "critical",
-      imageUrl:
-        "https://images.unsplash.com/photo-1561050933-2482aca2dd64?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwbGFzdGljJTIwY3VwfGVufDF8fHx8MTc2NDAzNTAzMnww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      batches: [
-        {
-          batchCode: "LO601",
-          quantity: 150,
-          unitCost: 1200,
-          entryDate: "2025-01-12",
-          expiryDate: "2025-12-31",
-          supplier: "Bao bì Minh Anh",
-        },
-      ],
-      totalValue: 180000,
-      avgUnitCost: 1200,
-      sellingPrice: 2500,
-    },
-  ];
+      ];
+      setItems(mockItems);
+      setError(null); // Don't show error if we have mock data
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -578,6 +317,48 @@ export function Inventory() {
         ? prev.filter((s) => s !== status)
         : [...prev, status]
     );
+  };
+
+  // Handle Add Item
+  const handleAddItem = async (newItem: InventoryItem) => {
+    try {
+      const createdItem = await inventoryService.createItem(newItem);
+      setItems([...items, createdItem]);
+      setAddDialogOpen(false);
+      toast.success("Thêm mặt hàng thành công");
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Lỗi khi thêm mặt hàng";
+      toast.error(errorMsg);
+      console.error("Error creating item:", err);
+    }
+  };
+
+  // Handle Update Item
+  const handleUpdateItem = async (itemId: string, updatedData: any) => {
+    try {
+      const updatedItem = await inventoryService.updateItem(itemId, updatedData);
+      setItems(items.map(item => item.id === itemId ? updatedItem : item));
+      setEditDialogOpen(false);
+      setEditingItem(null);
+      toast.success("Cập nhật thành công");
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Lỗi khi cập nhật";
+      toast.error(errorMsg);
+      console.error("Error updating item:", err);
+    }
+  };
+
+  // Handle Delete Item
+  const handleDeleteItem = async (itemId: string) => {
+    try {
+      await inventoryService.deleteItem(itemId);
+      setItems(items.filter(item => item.id !== itemId));
+      toast.success("Xóa thành công");
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Lỗi khi xóa";
+      toast.error(errorMsg);
+      console.error("Error deleting item:", err);
+    }
   };
 
   const getStatusBadge = (status: InventoryItem["status"]) => {
@@ -650,8 +431,6 @@ export function Inventory() {
         return "Thêm nguyên liệu";
     }
   };
-
-  const [items, setItems] = useState<InventoryItem[]>(inventoryItems);
 
   let filteredItems = items.filter((item) => {
     const matchesCategory =
@@ -747,8 +526,49 @@ export function Inventory() {
     (item) => item.type === activeTab
   );
 
+  // Show loading state
+  if (loading && items.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-3" />
+          <p className="text-slate-600">Đang tải dữ liệu kho hàng...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error && items.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center p-4">
+        <Card className="max-w-md border-red-200 bg-red-50">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center gap-3">
+              <AlertCircle className="w-8 h-8 text-red-600" />
+              <p className="text-red-700 text-center font-medium">Lỗi khi tải dữ liệu</p>
+              <p className="text-red-600 text-sm text-center">{error}</p>
+              <Button 
+                onClick={fetchInventoryItems} 
+                className="mt-4 w-full bg-red-600 hover:bg-red-700"
+              >
+                Thử lại
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full flex flex-col">
+      {/* Loading Overlay */}
+      {loading && items.length > 0 && (
+        <div className="absolute inset-0 bg-white/50 flex items-center justify-center rounded-lg z-50">
+          <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+        </div>
+      )}
       {/* Main Content */}
       <div className="flex-1 p-4 lg:p-8 space-y-6 overflow-y-auto">
         {/* Header */}
