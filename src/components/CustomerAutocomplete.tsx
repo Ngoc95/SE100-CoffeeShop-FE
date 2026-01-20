@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Search, X, Plus } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -10,13 +10,19 @@ import {
   DialogFooter,
 } from "./ui/dialog";
 import { Label } from "./ui/label";
-import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
-import { Textarea } from "./ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import { toast } from "sonner";
+import { getCustomers, createCustomer } from "../api/customer";
 
 interface Customer {
   id: number
-  code: string        // 👈 BẮT BUỘC
+  code: string
   name: string
   phone?: string
   gender?: string
@@ -37,7 +43,7 @@ interface CustomerAutocompleteProps {
 }
 
 export function CustomerAutocomplete({
-  customers,
+  customers: initialCustomers,
   value,
   onChange,
   onAddNew,
@@ -47,25 +53,71 @@ export function CustomerAutocomplete({
   const [isOpen, setIsOpen] = useState(false);
   const [searchValue, setSearchValue] = useState(value);
   const [addCustomerDialogOpen, setAddCustomerDialogOpen] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<Customer[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Form state
-  const [customerType, setCustomerType] = useState("personal");
-  const [code, setCode] = useState("");
+  // Simplified form state (only name, phone, gender as per API)
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [address, setAddress] = useState("");
-  const [city, setCity] = useState("");
-  const [district, setDistrict] = useState("");
-  const [ward, setWard] = useState("");
-  const [notes, setNotes] = useState("");
+  const [gender, setGender] = useState<string>("male");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const filteredCustomers = customers.filter(
-    (customer) =>
-      customer.code.toUpperCase().includes(searchValue.toUpperCase()) ||
-      customer.name.toLowerCase().includes(searchValue.toLowerCase())
-  );
+  // Use initial customers for dropdown when no search
+  const displayCustomers = searchValue && searchValue.trim() ? searchResults : initialCustomers;
+
+  // Debounced API search
+  const searchCustomersAPI = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await getCustomers({ search: query });
+      // API returns { metaData: { customers: [...] } }
+      const data = response?.data?.metaData?.customers ?? response?.data?.metaData ?? response?.data ?? [];
+      setSearchResults(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error searching customers:", error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  // Sync internal state with prop value
+  useEffect(() => {
+    setSearchValue(value);
+  }, [value]);
+
+  // Handle search input change with debounce
+  const handleSearchChange = (newValue: string) => {
+    setSearchValue(newValue);
+    setIsOpen(true);
+
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Set new debounce timer (300ms)
+    debounceTimerRef.current = setTimeout(() => {
+      searchCustomersAPI(newValue);
+    }, 300);
+  };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -89,39 +141,48 @@ export function CustomerAutocomplete({
 
   const handleClear = () => {
     setSearchValue("");
+    setSearchResults([]);
     onChange("");
   };
 
-  const handleAddCustomer = () => {
-    if (!code.trim() || !name.trim()) {
-      toast.error("Vui lòng nhập mã và tên khách hàng");
+  const handleAddCustomer = async () => {
+    if (!name.trim()) {
+      toast.error("Vui lòng nhập tên khách hàng");
+      return;
+    }
+    if (!phone.trim()) {
+      toast.error("Vui lòng nhập số điện thoại");
       return;
     }
 
-    const newCustomer: Customer = {
-      id: Date.now(), // Temporary 
-      code: code.toUpperCase(),
-      name: name,
-      phone: phone || undefined,
-    };
+    setIsSubmitting(true);
+    try {
+      const response = await createCustomer({
+        name: name.trim(),
+        phone: phone.trim(),
+        gender: gender,
+      });
 
-    if (onAddNew) {
-      onAddNew(newCustomer);
+      const newCustomer = response?.data?.metaData ?? response?.data;
+      
+      if (newCustomer && onAddNew) {
+        onAddNew(newCustomer);
+      }
+
+      // Reset form and close dialog
+      setName("");
+      setPhone("");
+      setGender("male");
+      setAddCustomerDialogOpen(false);
+
+      toast.success("Đã thêm khách hàng thành công");
+    } catch (error: any) {
+      toast.error("Thêm khách hàng thất bại", {
+        description: error?.response?.data?.message || error?.message,
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // Reset form and close dialog
-    setCode("");
-    setName("");
-    setPhone("");
-    setEmail("");
-    setAddress("");
-    setCity("");
-    setDistrict("");
-    setWard("");
-    setNotes("");
-    setAddCustomerDialogOpen(false);
-
-    toast.success("Đã thêm khách hàng thành công");
   };
 
   return (
@@ -133,21 +194,10 @@ export function CustomerAutocomplete({
             type="text"
             placeholder={placeholder}
             value={searchValue}
-            onChange={(e) => {
-              setSearchValue(e.target.value.toUpperCase());
-              setIsOpen(true);
-            }}
+            onChange={(e) => handleSearchChange(e.target.value)}
             onFocus={() => setIsOpen(true)}
-            className="h-9 text-xs pl-8 pr-8 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+            className="h-10 text-sm pl-9 pr-4 bg-white border-slate-200 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-md"
           />
-          {searchValue && (
-            <button
-              onClick={handleClear}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
         </div>
 
         {onAddNew && (
@@ -165,9 +215,13 @@ export function CustomerAutocomplete({
       {/* Dropdown */}
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-300 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-          {filteredCustomers.length > 0 ? (
+          {isSearching ? (
+            <div className="px-3 py-3 text-sm text-slate-500 text-center">
+              Đang tìm kiếm...
+            </div>
+          ) : displayCustomers.length > 0 ? (
             <div className="py-1">
-              {filteredCustomers.map((customer) => (
+              {displayCustomers.map((customer) => (
                 <button
                   key={customer.id}
                   onClick={() => handleSelect(customer)}
@@ -203,13 +257,13 @@ export function CustomerAutocomplete({
         </div>
       )}
 
-      {/* Add Customer Dialog */}
+      {/* Add Customer Dialog - Simplified */}
       <Dialog
         open={addCustomerDialogOpen}
         onOpenChange={setAddCustomerDialogOpen}
       >
         <DialogContent
-          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          className="max-w-md"
           aria-describedby={undefined}
         >
           <DialogHeader>
@@ -217,59 +271,14 @@ export function CustomerAutocomplete({
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Customer Type */}
-            <div>
-              <Label className="text-sm font-medium mb-3 block">
-                Loại khách
-              </Label>
-              <RadioGroup value={customerType} onValueChange={setCustomerType}>
-                <div className="flex gap-6">
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="personal" id="personal" />
-                    <Label
-                      htmlFor="personal"
-                      className="font-normal cursor-pointer"
-                    >
-                      Cá nhân
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="company" id="company" />
-                    <Label
-                      htmlFor="company"
-                      className="font-normal cursor-pointer"
-                    >
-                      Công ty
-                    </Label>
-                  </div>
-                </div>
-              </RadioGroup>
-            </div>
-
-            {/* Customer Code */}
-            <div>
-              <Label htmlFor="code" className="text-sm font-medium mb-2 block">
-                Mã khách hàng
-              </Label>
-              <Input
-                id="code"
-                placeholder="Mã máy định"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className="bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2"
-              />
-            </div>
-
             {/* Customer Name */}
             <div>
               <Label htmlFor="name" className="text-sm font-medium mb-2 block">
-                {customerType === "personal" ? "Tên khách hàng" : "Tên công ty"}
+                Tên khách hàng <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="name"
-                placeholder={
-                  customerType === "personal" ? "Họ và tên" : "Tên công ty"
-                }
+                placeholder="Họ và tên"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2"
@@ -279,110 +288,31 @@ export function CustomerAutocomplete({
             {/* Phone */}
             <div>
               <Label htmlFor="phone" className="text-sm font-medium mb-2 block">
-                Điện thoại
+                Điện thoại <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="phone"
-                placeholder="Vị dụ: 0912345678"
+                placeholder="Ví dụ: 0912345678"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2"
               />
             </div>
 
-            {/* Email */}
+            {/* Gender */}
             <div>
-              <Label htmlFor="email" className="text-sm font-medium mb-2 block">
-                Email
+              <Label htmlFor="gender" className="text-sm font-medium mb-2 block">
+                Giới tính
               </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="example@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2"
-              />
-            </div>
-
-            {/* Address */}
-            <div>
-              <Label
-                htmlFor="address"
-                className="text-sm font-medium mb-2 block"
-              >
-                Địa chỉ
-              </Label>
-              <Input
-                id="address"
-                placeholder="Địa chỉ"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className="bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2"
-              />
-            </div>
-
-            {/* City - District - Ward */}
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <Label
-                  htmlFor="city"
-                  className="text-sm font-medium mb-2 block"
-                >
-                  Tính / Thành phố
-                </Label>
-                <Input
-                  id="city"
-                  placeholder="Tính / Thành phố"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2"
-                />
-              </div>
-              <div>
-                <Label
-                  htmlFor="district"
-                  className="text-sm font-medium mb-2 block"
-                >
-                  Quận / Huyện
-                </Label>
-                <Input
-                  id="district"
-                  placeholder="Quận / Huyện"
-                  value={district}
-                  onChange={(e) => setDistrict(e.target.value)}
-                  className="bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2"
-                />
-              </div>
-              <div>
-                <Label
-                  htmlFor="ward"
-                  className="text-sm font-medium mb-2 block"
-                >
-                  Phường / Xã
-                </Label>
-                <Input
-                  id="ward"
-                  placeholder="Phường / Xã"
-                  value={ward}
-                  onChange={(e) => setWard(e.target.value)}
-                  className="bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2"
-                />
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div>
-              <Label htmlFor="notes" className="text-sm font-medium mb-2 block">
-                Ghi chú
-              </Label>
-              <Textarea
-                id="notes"
-                placeholder="Ghi chú"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 text-sm"
-              />
+              <Select value={gender} onValueChange={setGender}>
+                <SelectTrigger className="bg-white border border-slate-300">
+                  <SelectValue placeholder="Chọn giới tính" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">Nam</SelectItem>
+                  <SelectItem value="female">Nữ</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -390,14 +320,16 @@ export function CustomerAutocomplete({
             <Button
               variant="outline"
               onClick={() => setAddCustomerDialogOpen(false)}
+              disabled={isSubmitting}
             >
               Bỏ qua
             </Button>
             <Button
               className="bg-blue-600 hover:bg-blue-700"
               onClick={handleAddCustomer}
+              disabled={isSubmitting}
             >
-              Lưu
+              {isSubmitting ? "Đang lưu..." : "Lưu"}
             </Button>
           </DialogFooter>
         </DialogContent>

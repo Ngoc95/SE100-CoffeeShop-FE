@@ -54,16 +54,25 @@ interface CartItem {
   outOfStockReason?: string;
   customization?: ItemCustomization;
   isCombo?: boolean;
-  comboId?: string;
+  comboId?: string | number;
+  comboName?: string;
+  comboPrice?: number;
   comboItems?: CartItem[];
   comboExpanded?: boolean;
   isTopping?: boolean;
+  // Status breakdown for grouped items
+  statusBreakdown?: {
+    pending: number;
+    preparing: number;
+    completed: number;
+    served: number;
+  };
 }
 
 interface CartItemDisplayProps {
   item: CartItem;
-  onUpdateQuantity: (id: string, change: number) => void;
-  onRemove: (id: string) => void;
+  onUpdateQuantity: (id: string, change: number, reason?: string) => void;
+  onRemove: (id: string, reason?: string) => void;
   onCustomize: (item: CartItem) => void;
   onAddNote: (item: CartItem) => void;
   onToggleComboExpansion?: (comboId: string) => void;
@@ -108,6 +117,12 @@ export function CartItemDisplay({
   ];
 
   const handleDeleteClick = () => {
+    // If pending, direct delete
+    if (!item.status || item.status === 'pending') {
+         onRemove(item.id);
+         return;
+    }
+
     setItemToDelete(item.id);
     setCancelReason("");
     setOtherReason("");
@@ -116,6 +131,13 @@ export function CartItemDisplay({
   };
 
   const handleDecreaseClick = () => {
+    // If pending, direct decrease (which might trigger remove if qty=0 handled by parent, 
+    // but here we just call updateQty)
+    if (!item.status || item.status === 'pending') {
+        onUpdateQuantity(item.id, -1);
+        return;
+    }
+
     setItemToDelete(item.id);
     setCancelReason("");
     setOtherReason("");
@@ -125,19 +147,27 @@ export function CartItemDisplay({
 
   const handleConfirmDelete = () => {
     if (cancelReason && (cancelReason !== "Khác" || otherReason.trim())) {
-      // Remove the item completely
-      onRemove(item.id);
-      setDeleteConfirmOpen(false);
-      setCancelReason("");
-      setOtherReason("");
       setCancelQuantity(1);
+      
+       // Construct final reason
+       const finalReason = cancelReason === "Khác" ? otherReason : cancelReason;
+       onRemove(item.id, finalReason);
+       
+       // Reset
+       setDeleteConfirmOpen(false);
+       setCancelReason("");
+       setOtherReason("");
     }
   };
 
   const handleConfirmDecrease = () => {
     if (cancelReason && (cancelReason !== "Khác" || otherReason.trim())) {
-      // Decrease by cancelQuantity
-      onUpdateQuantity(item.id, -cancelQuantity);
+      setCancelQuantity(1);
+      
+       // Construct final reason
+       const finalReason = cancelReason === "Khác" ? otherReason : cancelReason;
+       onUpdateQuantity(item.id, -cancelQuantity, finalReason);
+
       setDecreaseConfirmOpen(false);
       setCancelReason("");
       setOtherReason("");
@@ -401,8 +431,8 @@ export function CartItemDisplay({
         <CardContent className="p-3">
           <div className="flex items-start justify-between mb-2">
             <div className="flex-1 min-w-0">
-              {/* Item name with status color, icon, and completed count */}
-              <div className="flex items-center gap-2 mb-2">
+              {/* Item name with status badge */}
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <p
                   className={`text-sm font-medium break-words ${getStatusTextColor(
                     item.status
@@ -410,12 +440,49 @@ export function CartItemDisplay({
                 >
                   {item.name}
                 </p>
-                {getCompletedCount() > 0 && (
-                  <div className="flex items-center gap-1 bg-green-100 text-green-700 rounded-md px-1.5 py-0.5 text-xs font-medium">
-                    <CheckCircle2 className="w-3 h-3" />
-                    {getCompletedCount()}
-                  </div>
-                )}
+                {/* Status Badge(s) - show breakdown if available */}
+                {(() => {
+                  const sb = item.statusBreakdown;
+                  if (sb && (sb.pending + sb.preparing + sb.completed + sb.served > 0)) {
+                    // Show breakdown: x(chờ) + y(làm) + z(xong) + w(phục vụ)
+                    const parts: React.ReactNode[] = [];
+                    if (sb.pending > 0) parts.push(
+                      <span key="pending" className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                        {sb.pending} chờ báo
+                      </span>
+                    );
+                    if (sb.preparing > 0) parts.push(
+                      <span key="preparing" className="text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700">
+                        {sb.preparing} đang làm
+                      </span>
+                    );
+                    if (sb.completed > 0) parts.push(
+                      <span key="completed" className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700">
+                        {sb.completed} xong
+                      </span>
+                    );
+                    if (sb.served > 0) parts.push(
+                      <span key="served" className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                        {sb.served} đã phục vụ
+                      </span>
+                    );
+                    return <div className="flex flex-wrap gap-1">{parts}</div>;
+                  }
+                  // Fallback to single status
+                  const statusColor = item.status === 'completed' ? 'bg-green-100 text-green-700' 
+                    : item.status === 'preparing' ? 'bg-yellow-100 text-yellow-700'
+                    : item.status === 'served' ? 'bg-blue-100 text-blue-700'
+                    : 'bg-slate-100 text-slate-600';
+                  const statusLabel = item.status === 'completed' ? 'Xong' 
+                    : item.status === 'preparing' ? 'Đang làm'
+                    : item.status === 'served' ? 'Đã phục vụ'
+                    : 'Chờ báo';
+                  return (
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${statusColor}`}>
+                      {statusLabel}
+                    </span>
+                  );
+                })()}
               </div>
 
               {isRestocked && (
@@ -531,6 +598,8 @@ export function CartItemDisplay({
                 size="sm"
                 onClick={handleDecreaseClick}
                 className="h-7 w-7 p-0 flex-shrink-0"
+                disabled={item.quantity <= 1 && (!item.status || item.status === 'pending')}
+                title={item.quantity <= 1 && (!item.status || item.status === 'pending') ? "Dùng thùng rác để xóa" : "Giảm số lượng"}
               >
                 <Minus className="w-3 h-3" />
               </Button>

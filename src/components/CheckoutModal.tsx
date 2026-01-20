@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -9,8 +9,32 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Banknote, Smartphone, X } from "lucide-react";
+import { Banknote, Smartphone, X, Gift, Percent, Tag, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { getAvailablePromotions } from "../api/promotions";
+
+// Promotion types
+interface GiftItem {
+  id: number;
+  name: string;
+  price: number;
+}
+
+interface AvailablePromotion {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+  typeId: number; // 1=%, 2=fixed, 3=fixed_price, 4=gift
+  typeName: string;
+  discountValue?: number;
+  canApply: boolean;
+  reason?: string;
+  discountPreview?: number;
+  applicableSubtotal?: number;
+  giftCount?: number;
+  giftItems?: GiftItem[];
+}
 
 interface CheckoutItem {
   id: string;
@@ -36,11 +60,15 @@ interface CheckoutModalProps {
   tableArea?: string;
   isTakeaway?: boolean;
   orderCode?: string;
+  orderId?: number; // For fetching promotions
+  customerId?: number | null; // For fetching promotions
   bankAccounts: BankAccount[];
   onAddBankAccount: (bank: string, owner: string, account: string) => void;
   onConfirmPayment: (
     paymentMethod: "cash" | "transfer" | "combined",
-    paymentDetails: any
+    paymentDetails: any,
+    promotionId?: number,
+    selectedGifts?: Array<{itemId: number, quantity: number}>
   ) => void;
 }
 
@@ -54,6 +82,8 @@ export function CheckoutModal({
   tableArea,
   isTakeaway,
   orderCode,
+  orderId,
+  customerId,
   bankAccounts,
   onAddBankAccount,
   onConfirmPayment,
@@ -83,7 +113,50 @@ export function CheckoutModal({
   const [newOwnerName, setNewOwnerName] = useState("");
   const [newAccountNumber, setNewAccountNumber] = useState("");
 
-  const finalAmount = totalAmount - discountAmount;
+  // Promotion state
+  const [availablePromotions, setAvailablePromotions] = useState<AvailablePromotion[]>([]);
+  const [selectedPromotion, setSelectedPromotion] = useState<AvailablePromotion | null>(null);
+  const [selectedGifts, setSelectedGifts] = useState<Array<{itemId: number, quantity: number}>>([]);
+  const [loadingPromotions, setLoadingPromotions] = useState(false);
+
+  // Fetch available promotions when modal opens
+  useEffect(() => {
+    if (open && orderId) {
+      setLoadingPromotions(true);
+      getAvailablePromotions({ orderId, customerId: customerId || undefined })
+        .then((res: any) => {
+          const raw = res?.data?.metaData ?? res?.data ?? res;
+          const allPromos = Array.isArray(raw) ? raw : (raw?.promotions ?? []);
+          // Filter only valid promotions
+          const validPromos = Array.isArray(allPromos) 
+            ? allPromos.filter((p: any) => p.canApply) 
+            : [];
+          setAvailablePromotions(validPromos);
+        })
+        .catch((err) => {
+          console.error('Failed to fetch promotions:', err);
+          setAvailablePromotions([]);
+        })
+        .finally(() => setLoadingPromotions(false));
+    } else {
+      setAvailablePromotions([]);
+      setSelectedPromotion(null);
+      setSelectedGifts([]);
+    }
+  }, [open, orderId, customerId]);
+
+  // Calculate discount from solution selection
+  const promotionDiscount = selectedPromotion?.discountPreview ?? 0;
+  const finalAmount = totalAmount - discountAmount - promotionDiscount;
+
+  // Auto-fill defaults
+  useEffect(() => {
+    if (open) {
+      setReceivedCash(finalAmount);
+      setCombinedCashAmount(finalAmount);
+      setCombinedTransferAmount(0);
+    }
+  }, [open, finalAmount]);
 
   const calculateCustomerPaid = (): number => {
     if (paymentMethod === "cash") return receivedCash;
@@ -96,6 +169,54 @@ export function CheckoutModal({
     const paid = calculateCustomerPaid();
     return Math.max(0, paid - finalAmount);
   };
+
+  // Auto-generate QR Code
+  useEffect(() => {
+    const generateQR = async () => {
+        let amount = 0;
+        let bankId = 0;
+
+        if (paymentMethod === 'transfer') {
+            amount = finalAmount;
+            bankId = selectedTransferBankId;
+        } else if (paymentMethod === 'combined') {
+            amount = combinedTransferAmount;
+            bankId = combinedTransferBankId;
+        } else {
+            setQrImage(null);
+            return;
+        }
+
+        if (amount <= 0 || !bankId) {
+             setQrImage(null);
+             return;
+        }
+
+        // Find bank details (using index as ID for now as implementation uses index)
+        const bank = bankAccounts[bankId];
+        if (!bank) return;
+        
+        // VietQR Format: https://img.vietqr.io/image/<BANK_ID>-<ACCOUNT_NO>-<TEMPLATE>.png?amount=<AMOUNT>&addInfo=<INFO>&accountName=<NAME>
+        // Assuming bank.bank is a valid bin or short name (e.g. MB, TCB, VCB)
+        // Encode URI components
+        
+        // Clean bank name if needed (VietQR expects short name like MB, TCB, VCB, ACB, VPBank, TPBank, etc.)
+        // We will trust the input 'bank' for now.
+        const bankCode = bank.bank; 
+        const accountNo = bank.account;
+        const template = 'compact'; 
+        
+        let url = `https://img.vietqr.io/image/${bankCode}-${accountNo}-${template}.png`;
+        const params = new URLSearchParams();
+        params.append('amount', amount.toString());
+        params.append('addInfo', `${orderCode || 'Thanh toan'} ${tableNumber ? 'Ban ' + tableNumber : ''}`);
+        params.append('accountName', bank.owner);
+        
+        setQrImage(`${url}?${params.toString()}`);
+    };
+
+    generateQR();
+  }, [paymentMethod, finalAmount, combinedTransferAmount, selectedTransferBankId, combinedTransferBankId, bankAccounts, orderCode, tableNumber]);
 
   const canConfirm = (): boolean => {
     if (!paymentMethod) return false;
@@ -112,7 +233,7 @@ export function CheckoutModal({
   const handleConfirm = () => {
     if (!canConfirm()) return;
 
-    const paymentDetails = {
+    const paymentDetails: any = {
       method: paymentMethod,
       amount: finalAmount,
       customerPaid: calculateCustomerPaid(),
@@ -128,9 +249,14 @@ export function CheckoutModal({
       paymentDetails.cashAmount = combinedCashAmount;
       paymentDetails.transferAmount = combinedTransferAmount;
       paymentDetails.transferBankId = combinedTransferBankId;
+      paymentDetails.bankAccountId = combinedTransferBankId;
     }
 
-    onConfirmPayment(paymentMethod, paymentDetails);
+    // Pass promotion data
+    const promoId = selectedPromotion?.id;
+    const gifts = selectedPromotion?.typeId === 4 ? selectedGifts : undefined;
+    
+    onConfirmPayment(paymentMethod, paymentDetails, promoId, gifts);
     toast.success("Thanh toán thành công!");
     onClose();
   };
@@ -152,7 +278,7 @@ export function CheckoutModal({
         aria-describedby={undefined}
       >
         {/* Header */}
-        <DialogHeader className="p-4 border-b bg-blue-50">
+        <DialogHeader className="p-4 border-b bg-blue-50 flex-none">
           <div className="flex items-center justify-between w-full">
             <div>
               <DialogTitle>
@@ -164,6 +290,9 @@ export function CheckoutModal({
               </DialogTitle>
               <p className="text-xs text-slate-500 mt-1">{formatDate()}</p>
             </div>
+            <Button variant="ghost" size="icon" onClick={onClose} className="md:hidden">
+                <X className="w-5 h-5" />
+            </Button>
           </div>
         </DialogHeader>
 
@@ -201,11 +330,143 @@ export function CheckoutModal({
                   {totalAmount.toLocaleString()}₫
                 </span>
               </div>
+              
+              {/* Promotion Selection */}
+              <div className="py-2">
+                <Label className="text-sm font-medium mb-1 block">Khuyến mãi / Voucher</Label>
+                <select 
+                  className="w-full p-2 border rounded-md text-sm bg-white"
+                  value={selectedPromotion?.id || ""}
+                  onChange={(e) => {
+                    const promoId = parseInt(e.target.value);
+                    const promo = availablePromotions.find(p => p.id === promoId) || null;
+                    setSelectedPromotion(promo);
+                    setSelectedGifts([]);
+                  }}
+                  disabled={loadingPromotions}
+                >
+                  <option value="">-- Chọn khuyến mãi --</option>
+                  {availablePromotions.map((promo) => (
+                     <option key={promo.id} value={promo.id}>
+                       {promo.code} - {promo.name} {promo.discountPreview ? `(-${promo.discountPreview.toLocaleString()}₫)` : ''}
+                     </option>
+                  ))}
+                </select>
+                {selectedPromotion && (
+                    <div className="text-xs text-green-600 mt-1">
+                        {selectedPromotion.description}
+                    </div>
+                )}
+              </div>
+
+              {/* Gift Selection UI */}
+              {selectedPromotion?.typeId === 4 && selectedPromotion.giftItems && (
+                <div className="mb-2 bg-pink-50 border border-pink-200 rounded-md p-2">
+                  <div className="text-xs font-semibold text-pink-700 mb-2 flex justify-between items-center">
+                    <span>Chọn quà tặng ({selectedGifts.reduce((a, b) => a + b.quantity, 0)}/{selectedPromotion.giftCount})</span>
+                    <Gift className="w-3 h-3" />
+                  </div>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {selectedPromotion.giftItems.map((gift: any) => {
+                      const selected = selectedGifts.find((g) => g.itemId === gift.id);
+                      const qty = selected ? selected.quantity : 0;
+                      return (
+                        <div
+                          key={gift.id}
+                          className="flex justify-between items-center bg-white p-2 rounded border border-pink-100"
+                        >
+                          <div className="text-xs">
+                            <div className="font-medium">{gift.name}</div>
+                            <div className="text-slate-400 line-through">
+                              {gift.price.toLocaleString()}₫
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={() => {
+                                const current =
+                                  selectedGifts.find((g) => g.itemId === gift.id)
+                                    ?.quantity || 0;
+                                if (current > 0) {
+                                  const newGifts = selectedGifts
+                                    .map((g) =>
+                                      g.itemId === gift.id
+                                        ? { ...g, quantity: g.quantity - 1 }
+                                        : g
+                                    )
+                                    .filter((g) => g.quantity > 0);
+                                  setSelectedGifts(newGifts);
+                                }
+                              }}
+                            >
+                              -
+                            </Button>
+                            <span className="text-xs w-4 text-center">
+                              {qty}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={() => {
+                                const total = selectedGifts.reduce(
+                                  (a, b) => a + b.quantity,
+                                  0
+                                );
+                                if (
+                                  total < (selectedPromotion.giftCount || 0)
+                                ) {
+                                  const existing = selectedGifts.find(
+                                    (g) => g.itemId === gift.id
+                                  );
+                                  if (existing) {
+                                    setSelectedGifts(
+                                      selectedGifts.map((g) =>
+                                        g.itemId === gift.id
+                                          ? { ...g, quantity: g.quantity + 1 }
+                                          : g
+                                      )
+                                    );
+                                  } else {
+                                    setSelectedGifts([
+                                      ...selectedGifts,
+                                      { itemId: gift.id, quantity: 1 },
+                                    ]);
+                                  }
+                                } else {
+                                  toast.error(
+                                    `Tối đa ${selectedPromotion.giftCount} quà`
+                                  );
+                                }
+                              }}
+                            >
+                              +
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+
               {discountAmount > 0 && (
                 <div className="flex justify-between text-sm text-green-600">
-                  <span>Giảm giá</span>
+                  <span>Giảm giá cũ</span>
                   <span className="font-semibold">
                     -{discountAmount.toLocaleString()}₫
+                  </span>
+                </div>
+              )}
+              {promotionDiscount > 0 && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span>KM: {selectedPromotion?.code}</span>
+                  <span className="font-semibold">
+                    -{promotionDiscount.toLocaleString()}₫
                   </span>
                 </div>
               )}
@@ -239,7 +500,8 @@ export function CheckoutModal({
                 className="w-full justify-start"
                 onClick={() => {
                   setPaymentMethod("cash");
-                  setReceivedCash(0);
+                  // Auto-fill if empty
+                  if (receivedCash === 0) setReceivedCash(finalAmount);
                 }}
               >
                 <Banknote className="w-4 h-4 mr-2" />
@@ -256,7 +518,14 @@ export function CheckoutModal({
               <Button
                 variant={paymentMethod === "combined" ? "default" : "outline"}
                 className="w-full justify-start"
-                onClick={() => setPaymentMethod("combined")}
+                onClick={() => {
+                    setPaymentMethod("combined");
+                    // Auto-fill defaults if empty
+                    if (combinedCashAmount === 0 && combinedTransferAmount === 0) {
+                        setCombinedCashAmount(finalAmount);
+                        setCombinedTransferAmount(0);
+                    }
+                }}
               >
                 <div className="w-4 h-4 mr-2 flex items-center justify-center text-sm">
                   +
@@ -271,12 +540,13 @@ export function CheckoutModal({
                 <div>
                   <Label className="text-sm">Khách thanh toán</Label>
                   <Input
-                    type="number"
+                    type="text"
                     placeholder="Nhập số tiền"
-                    value={receivedCash || ""}
-                    onChange={(e) =>
-                      setReceivedCash(Number(e.target.value) || 0)
-                    }
+                    value={receivedCash ? receivedCash.toLocaleString('vi-VN') : ""}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setReceivedCash(Number(val));
+                    }}
                     className="mt-1 text-lg font-semibold"
                   />
                 </div>
@@ -389,12 +659,13 @@ export function CheckoutModal({
                 <div>
                   <Label className="text-xs">Tiền mặt</Label>
                   <Input
-                    type="number"
+                    type="text"
                     placeholder="0"
-                    value={combinedCashAmount || ""}
-                    onChange={(e) =>
-                      setCombinedCashAmount(Number(e.target.value) || 0)
-                    }
+                    value={combinedCashAmount ? combinedCashAmount.toLocaleString('vi-VN') : ""}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setCombinedCashAmount(Number(val));
+                    }}
                     className="mt-1 text-sm"
                   />
                 </div>
@@ -402,12 +673,13 @@ export function CheckoutModal({
                 <div>
                   <Label className="text-xs">Chuyển khoản</Label>
                   <Input
-                    type="number"
+                    type="text"
                     placeholder="0"
-                    value={combinedTransferAmount || ""}
-                    onChange={(e) =>
-                      setCombinedTransferAmount(Number(e.target.value) || 0)
-                    }
+                    value={combinedTransferAmount ? combinedTransferAmount.toLocaleString('vi-VN') : ""}
+                    onChange={(e) => {
+                       const val = e.target.value.replace(/\D/g, '');
+                       setCombinedTransferAmount(Number(val));
+                    }}
                     className="mt-1 text-sm mb-2"
                   />
                   <select
