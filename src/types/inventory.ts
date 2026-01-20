@@ -21,6 +21,21 @@ export interface CompositeIngredient {
   unitCost: number;
 }
 
+export interface ToppingRelation {
+  productId: number;
+  toppingId: number;
+  topping?: {
+    id: number;
+    name: string;
+    sellingPrice: string | null;
+  };
+  product?: {
+    id: number;
+    name: string;
+    sellingPrice: string;
+  };
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -45,5 +60,7 @@ export interface InventoryItem {
   avgUnitCost: number;
   sellingPrice?: number;
   isTopping?: boolean;
-  associatedProductIds?: string[];
+  productIds?: number[];
+  availableToppings?: ToppingRelation[];
+  applicableProducts?: ToppingRelation[];
 }

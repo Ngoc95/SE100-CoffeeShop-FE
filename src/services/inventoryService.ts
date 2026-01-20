@@ -6,7 +6,7 @@ const API_BASE_URL = "http://localhost:4000/api";
    AUTH TOKEN
 ====================== */
 const getAuthToken = (): string | null => {
-  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInRva2VuVHlwZSI6ImFjY2Vzc190b2tlbiIsImlhdCI6MTc2ODkwMjI1MCwiZXhwIjoxNzY4OTAzMTUwfQ.vW-tdpp0I04K9QxCH7ZvQvppfqPJd7-V_PiBLxNhpj0"
+  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInRva2VuVHlwZSI6ImFjY2Vzc190b2tlbiIsImlhdCI6MTc2ODkyMTQyOSwiZXhwIjoxNzY4OTIyMzI5fQ.BDj0Y7ZGBLOpdzzzdHc4_EIY3vSajsecENs1XtDI_YE";
 };
 
 const getHeaders = (): HeadersInit => {
@@ -163,6 +163,23 @@ export const inventoryService = {
     return response.json();
   },
 
+  async createCategory(data: { name: string }) {
+    const response = await fetch(
+      `${API_BASE_URL}/categories`,
+      {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`CREATE category failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
   /* ---------- Units ---------- */
 
   async getUnits() {
@@ -190,6 +207,23 @@ export const inventoryService = {
 
     if (!response.ok) {
       throw new Error(`GET unit ${id} failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async createUnit(data: { name: string; symbol: string }) {
+    const response = await fetch(
+      `${API_BASE_URL}/units`,
+      {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`CREATE unit failed: ${response.status}`);
     }
 
     return response.json();

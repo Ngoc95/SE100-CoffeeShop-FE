@@ -98,6 +98,10 @@ export function Inventory() {
     sellingPrice: 0,
   });
 
+  // State for new Category/Unit creation
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newUnitValues, setNewUnitValues] = useState({ name: "", symbol: "" });
+
   // Categories/Units from API
   const [categoryOptions, setCategoryOptions] = useState<any[]>([]);
   const [unitOptions, setUnitOptions] = useState<any[]>([]);
@@ -206,7 +210,7 @@ export function Inventory() {
     productStatus: undefined as string | undefined,
     ingredients: [] as CompositeIngredient[],
     isTopping: false,
-    associatedProductIds: [] as string[],
+    productIds: [] as number[],
     imageUrl: "",
   });
 
@@ -284,12 +288,20 @@ export function Inventory() {
           productStatus: item.productStatus || "selling",
           imageUrl: item.imageUrl || undefined,
           batches: item.batches || undefined,
-          ingredients: item.ingredients || undefined,
+          ingredients: (item.ingredientOf && Array.isArray(item.ingredientOf))
+            ? item.ingredientOf.map((io: any) => ({
+              ingredientId: String(io.ingredientItemId),
+              ingredientName: io.ingredientItem?.name || "",
+              unit: io.unit || io.ingredientItem?.unit?.name || "",
+              quantity: Number(io.quantity) || 0,
+              unitCost: Number(io.ingredientItem?.avgUnitCost) || 0,
+            }))
+            : (item.ingredients || undefined),
           totalValue: stock * (Number(item.avgUnitCost) || 0),
           avgUnitCost: Number(item.avgUnitCost) || 0,
           sellingPrice: item.sellingPrice ? Number(item.sellingPrice) : undefined,
           isTopping: item.isTopping || false,
-          associatedProductIds: item.associatedProductIds || undefined,
+          productIds: item.productIds || undefined,
         };
       });
 
@@ -418,9 +430,15 @@ export function Inventory() {
         isTopping: addItemType === 'composite' ? isTopping : false,
         // Optional fields
         imageUrl: newItemImage || null,
-        ingredients: addItemType === 'composite' ? selectedIngredients : [],
+        ingredients: addItemType === 'composite'
+          ? selectedIngredients.map(i => ({
+            ingredientItemId: Number(i.ingredientId),
+            quantity: i.quantity,
+            unit: i.unit
+          }))
+          : [],
         // For toppings/extra logic if needed
-        associatedProductIds: (addItemType === 'composite' && isTopping) ? associatedProducts.map(p => p.id) : [],
+        productIds: (addItemType === 'composite' && isTopping) ? associatedProducts.map(p => Number(p.id)) : [],
       };
 
       console.log("[Inventory] Creating item with payload:", payload);
@@ -444,12 +462,20 @@ export function Inventory() {
         productStatus: (created.productStatus as any) || "selling",
         imageUrl: created.imageUrl,
         batches: created.batches || [],
-        ingredients: created.ingredients || [],
+        ingredients: (created.ingredientOf && Array.isArray(created.ingredientOf))
+          ? created.ingredientOf.map((io: any) => ({
+            ingredientId: String(io.ingredientItemId),
+            ingredientName: io.ingredientItem?.name || "",
+            unit: io.unit || io.ingredientItem?.unit?.name || "",
+            quantity: Number(io.quantity) || 0,
+            unitCost: Number(io.ingredientItem?.avgUnitCost) || 0,
+          }))
+          : (created.ingredients || []),
         totalValue: (Number(created.currentStock) || 0) * (Number(created.avgUnitCost) || 0),
         avgUnitCost: Number(created.avgUnitCost) || 0,
         sellingPrice: created.sellingPrice ? Number(created.sellingPrice) : undefined,
         isTopping: created.isTopping || false,
-        associatedProductIds: created.associatedProductIds,
+        productIds: created.productIds,
       };
 
       setItems((prev) => [mapped, ...prev]);
@@ -482,7 +508,40 @@ export function Inventory() {
   // Handle Update Item
   const handleUpdateItem = async (itemId: string, updatedData: any) => {
     try {
-      const updatedItem = await inventoryService.updateItem(itemId, updatedData);
+      const response = await inventoryService.updateItem(itemId, updatedData) as any;
+      const updatedItemRaw = response.metaData || response;
+
+      // Map the updated item
+      const typeMap: Record<number, ItemType> = { 1: "ready-made", 2: "composite", 3: "ingredient" };
+      const updatedItem: InventoryItem = {
+        id: String(updatedItemRaw.id),
+        name: updatedItemRaw.name,
+        type: typeMap[Number(updatedItemRaw.itemTypeId)] || "ingredient",
+        category: updatedItemRaw.category?.name || String(updatedItemRaw.categoryId || ""),
+        currentStock: Number(updatedItemRaw.currentStock) || 0,
+        unit: updatedItemRaw.unit?.name || (typeof updatedItemRaw.unit === "string" ? updatedItemRaw.unit : ""),
+        minStock: Number(updatedItemRaw.minStock) || 0,
+        maxStock: Number(updatedItemRaw.maxStock) || 0,
+        status: Number(updatedItemRaw.currentStock) <= 0 ? "critical" : (Number(updatedItemRaw.currentStock) <= (updatedItemRaw.minStock || 0) ? "low" : "good"),
+        productStatus: updatedItemRaw.productStatus || "selling",
+        imageUrl: updatedItemRaw.imageUrl,
+        batches: updatedItemRaw.batches || [],
+        ingredients: (updatedItemRaw.ingredientOf && Array.isArray(updatedItemRaw.ingredientOf))
+          ? updatedItemRaw.ingredientOf.map((io: any) => ({
+            ingredientId: String(io.ingredientItemId),
+            ingredientName: io.ingredientItem?.name || "",
+            unit: io.unit || io.ingredientItem?.unit?.name || "",
+            quantity: Number(io.quantity) || 0,
+            unitCost: Number(io.ingredientItem?.avgUnitCost) || 0,
+          }))
+          : (updatedItemRaw.ingredients || []),
+        totalValue: (Number(updatedItemRaw.currentStock) || 0) * (Number(updatedItemRaw.avgUnitCost) || 0),
+        avgUnitCost: Number(updatedItemRaw.avgUnitCost) || 0,
+        sellingPrice: updatedItemRaw.sellingPrice ? Number(updatedItemRaw.sellingPrice) : undefined,
+        isTopping: updatedItemRaw.isTopping || false,
+        productIds: updatedItemRaw.productIds || updatedItemRaw.associatedProductIds,
+      };
+
       setItems(items.map(item => item.id === itemId ? updatedItem : item));
       setEditDialogOpen(false);
       setEditingItem(null);
@@ -504,6 +563,37 @@ export function Inventory() {
       const errorMsg = err instanceof Error ? err.message : "Lỗi khi xóa";
       toast.error(errorMsg);
       console.error("Error deleting item:", err);
+    }
+  };
+
+  // Handle Create Category
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    try {
+      const newCat = await inventoryService.createCategory({ name: newCategoryName });
+      setCategoryOptions([...categoryOptions, { ...newCat, id: String(newCat.id) }]);
+      setAddCategoryDialogOpen(false);
+      setNewCategoryName("");
+      toast.success("Thêm danh mục thành công");
+      // Auto select logic could be added here if this was triggered from a select
+    } catch (error) {
+      console.error(error);
+      toast.error("Lỗi khi tạo danh mục");
+    }
+  };
+
+  // Handle Create Unit
+  const handleCreateUnit = async () => {
+    if (!newUnitValues.name.trim() || !newUnitValues.symbol.trim()) return;
+    try {
+      const newUnit = await inventoryService.createUnit(newUnitValues);
+      setUnitOptions([...unitOptions, { ...newUnit, id: String(newUnit.id) }]);
+      setAddUnitDialogOpen(false);
+      setNewUnitValues({ name: "", symbol: "" });
+      toast.success("Thêm đơn vị thành công");
+    } catch (error) {
+      console.error(error);
+      toast.error("Lỗi khi tạo đơn vị");
     }
   };
 
@@ -563,8 +653,44 @@ export function Inventory() {
     return datesWithExpiry.sort()[0];
   };
 
-  const toggleExpand = (itemId: string) => {
-    setExpandedItemId(expandedItemId === itemId ? null : itemId);
+  const toggleExpand = async (itemId: string) => {
+    const isExpanding = expandedItemId !== itemId;
+    setExpandedItemId(isExpanding ? itemId : null);
+
+    if (isExpanding) {
+      const item = items.find((i) => i.id === itemId);
+      // For composite items, fetch details to get toppings/applicable products
+      if (item && item.type === "composite") {
+        try {
+          const res = await inventoryService.getItemById(itemId) as any;
+          const meta = res.metaData || res;
+
+          setItems((prev) =>
+            prev.map((i) =>
+              i.id === itemId
+                ? {
+                  ...i,
+                  availableToppings: meta.availableToppings || [],
+                  applicableProducts: meta.applicableProducts || [],
+                  // Also update ingredients just in case
+                  ingredients: (meta.ingredientOf && Array.isArray(meta.ingredientOf))
+                    ? meta.ingredientOf.map((io: any) => ({
+                      ingredientId: String(io.ingredientItemId),
+                      ingredientName: io.ingredientItem?.name || "",
+                      unit: io.unit || io.ingredientItem?.unit?.name || "",
+                      quantity: Number(io.quantity) || 0,
+                      unitCost: Number(io.ingredientItem?.avgUnitCost) || 0,
+                    }))
+                    : (i.ingredients || []),
+                }
+                : i
+            )
+          );
+        } catch (error) {
+          console.error("Error fetching item details on expand:", error);
+        }
+      }
+    }
   };
 
   const getAddDialogTitle = () => {
@@ -1164,6 +1290,8 @@ export function Inventory() {
                   Tên danh mục <span className="text-red-500">*</span>
                 </Label>
                 <Input
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
                   className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   placeholder="VD: Đồ ăn nhanh"
                 />
@@ -1185,7 +1313,8 @@ export function Inventory() {
               </Button>
               <Button
                 className="bg-blue-600 hover:bg-blue-700"
-                onClick={() => setAddCategoryDialogOpen(false)}
+                onClick={handleCreateCategory}
+                disabled={!newCategoryName.trim()}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Thêm danh mục
@@ -1403,6 +1532,8 @@ export function Inventory() {
                   Tên đơn vị <span className="text-red-500">*</span>
                 </Label>
                 <Input
+                  value={newUnitValues.name}
+                  onChange={(e) => setNewUnitValues(prev => ({ ...prev, name: e.target.value }))}
                   className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   placeholder="VD: Kilogram, Lít, Hộp..."
                 />
@@ -1413,6 +1544,8 @@ export function Inventory() {
                   Ký hiệu <span className="text-red-500">*</span>
                 </Label>
                 <Input
+                  value={newUnitValues.symbol}
+                  onChange={(e) => setNewUnitValues(prev => ({ ...prev, symbol: e.target.value }))}
                   className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   placeholder="VD: kg, L, hộp..."
                 />
@@ -1434,7 +1567,8 @@ export function Inventory() {
               </Button>
               <Button
                 className="bg-blue-600 hover:bg-blue-700"
-                onClick={() => setAddUnitDialogOpen(false)}
+                onClick={handleCreateUnit}
+                disabled={!newUnitValues.name.trim() || !newUnitValues.symbol.trim()}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Thêm đơn vị
@@ -1648,6 +1782,21 @@ export function Inventory() {
             <DialogHeader>
               <DialogTitle>Chỉnh sửa mặt hàng</DialogTitle>
             </DialogHeader>
+
+            {/* Ensure category/unit are set to item's current values when opening */}
+            {editingItem && editDialogOpen && (
+              (() => {
+                // Only update if not already set (avoid infinite loop)
+                if (editValues.category !== editingItem.category || editValues.unit !== editingItem.unit) {
+                  setEditValues((v) => ({
+                    ...v,
+                    category: editingItem.category,
+                    unit: editingItem.unit,
+                  }));
+                }
+                return null;
+              })()
+            )}
 
             <div className="space-y-6 overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
@@ -1970,28 +2119,27 @@ export function Inventory() {
                 className="bg-blue-600 hover:bg-blue-700"
                 onClick={() => {
                   if (!editingItem) return;
-                  setItems((prev) =>
-                    prev.map((it) =>
-                      it.id === editingItem.id
-                        ? {
-                          ...it,
-                          name: editValues.name,
-                          category: editValues.category,
-                          unit: editValues.unit,
-                          minStock: editValues.minStock,
-                          maxStock: editValues.maxStock,
-                          sellingPrice: editValues.sellingPrice,
-                          productStatus: editValues.productStatus as any,
 
-                          ingredients: editValues.ingredients,
-                          imageUrl: editValues.imageUrl,
-                          isTopping: isTopping,
-                          associatedProductIds: associatedProducts.map(p => p.id),
-                        }
-                        : it
-                    )
-                  );
-                  setEditDialogOpen(false);
+                  const payload = {
+                    name: editValues.name,
+                    categoryId: Number(editValues.category),
+                    unitId: Number(editValues.unit),
+                    minStock: Number(editValues.minStock),
+                    maxStock: Number(editValues.maxStock),
+                    sellingPrice: Number(editValues.sellingPrice),
+                    productStatus: editValues.productStatus,
+                    isTopping: isTopping,
+                    // Handle special fields based on type
+                    ingredients: editingItem.type === 'composite' ? editValues.ingredients.map(i => ({
+                      ingredientItemId: Number(i.ingredientId),
+                      quantity: i.quantity,
+                      unit: i.unit
+                    })) : [],
+                    productIds: isTopping ? associatedProducts.map(p => Number(p.id)) : [],
+                    imageUrl: editValues.imageUrl || null
+                  };
+
+                  handleUpdateItem(editingItem.id, payload);
                 }}
               >
                 Lưu
@@ -2443,14 +2591,14 @@ export function Inventory() {
                                           productStatus: item.productStatus,
                                           ingredients: item.ingredients || [],
                                           isTopping: item.isTopping || false,
-                                          associatedProductIds: item.associatedProductIds || [],
+                                          productIds: item.productIds || [],
                                           imageUrl: item.imageUrl || "",
                                         });
                                         setIsTopping(item.isTopping || false);
                                         setAssociatedProducts(
-                                          item.associatedProductIds
+                                          item.productIds
                                             ? items.filter((i) =>
-                                              item.associatedProductIds?.includes(i.id)
+                                              item.productIds?.includes(Number(i.id))
                                             )
                                             : []
                                         );
@@ -2788,7 +2936,7 @@ export function Inventory() {
                                         productStatus: item.productStatus,
                                         ingredients: item.ingredients || [],
                                         isTopping: item.isTopping || false,
-                                        associatedProductIds: item.associatedProductIds || [],
+                                        productIds: item.productIds || [],
                                         imageUrl: item.imageUrl || "",
                                       });
                                       setEditDialogOpen(true);
@@ -3166,7 +3314,7 @@ export function Inventory() {
                                         productStatus: item.productStatus,
                                         ingredients: item.ingredients || [],
                                         isTopping: item.isTopping || false,
-                                        associatedProductIds: item.associatedProductIds || [],
+                                        productIds: item.productIds || [],
                                         imageUrl: item.imageUrl || "",
                                       });
                                       setEditDialogOpen(true);
