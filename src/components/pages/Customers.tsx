@@ -303,7 +303,6 @@ export function Customers() {
     setAddDialogOpen(true);
   };
 
-
   const handleDelete = async (id: number) => {
     if (confirm("Bạn có chắc chắn muốn xóa khách hàng này?")) {
       await deleteCustomer(id)
