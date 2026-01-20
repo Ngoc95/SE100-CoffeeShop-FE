@@ -6,7 +6,7 @@ const API_BASE_URL = "http://localhost:4000/api";
    AUTH TOKEN
 ====================== */
 const getAuthToken = (): string | null => {
-  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInRva2VuVHlwZSI6ImFjY2Vzc190b2tlbiIsImlhdCI6MTc2ODg5MDkwNCwiZXhwIjoxNzY4ODkxODA0fQ.UIIbkH_lBuvj8cM9-ERh11xRmeAeOmxuYwSQM9qtAjw"
+  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInRva2VuVHlwZSI6ImFjY2Vzc190b2tlbiIsImlhdCI6MTc2ODg5MjM3NiwiZXhwIjoxNzY4ODkzMjc2fQ.ckKJNoJLLYU9NctSZHirXW-Q7WxCAxTBgYjg2-dWN3U"
 };
 
 const getHeaders = (): HeadersInit => {

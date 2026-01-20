@@ -182,26 +182,47 @@ export function Inventory() {
         itemsArray = data;
       }
       
-      // Map API response to InventoryItem type
-      const mappedItems: InventoryItem[] = itemsArray.map((item: any) => ({
-        id: String(item.id),
-        code: item.code || "",
-        name: item.name || "",
-        category: item.category?.name || (typeof item.category === "string" ? item.category : ""),
-        unit: item.unit?.name || (typeof item.unit === "string" ? item.unit : ""),
-        currentStock: Number(item.currentStock) || 0,
-        minStock: item.minStock ? Number(item.minStock) : 0,
-        maxStock: item.maxStock ? Number(item.maxStock) : 0,
-        sellingPrice: Number(item.sellingPrice) || 0,
-        productStatus: item.productStatus || "selling",
-        itemType: item.itemType?.name?.toLowerCase() === "ready-made" ? "ready-made" 
-                 : item.itemType?.name?.toLowerCase() === "composite" ? "composite"
-                 : item.itemType?.name?.toLowerCase() === "ingredient" ? "ingredient"
-                 : "ingredient",
-        isTopping: item.isTopping || false,
-        createdAt: item.createdAt || new Date().toISOString(),
-        updatedAt: item.updatedAt || new Date().toISOString(),
-      }));
+
+      // Map API response to InventoryItem type, ensuring 'type' and 'status' are set for filtering
+      const mappedItems: InventoryItem[] = itemsArray.map((item: any) => {
+        // Determine type
+        let type: ItemType = "ingredient";
+        if (item.itemType?.name) {
+          const t = item.itemType.name.toLowerCase();
+          if (t === "ready-made") type = "ready-made";
+          else if (t === "composite") type = "composite";
+          else if (t === "ingredient") type = "ingredient";
+        }
+
+        // Calculate status based on stock
+        let status: InventoryItem["status"] = "good";
+        const stock = Number(item.currentStock) || 0;
+        const minStock = item.minStock ? Number(item.minStock) : 0;
+        if (stock <= 0) status = "critical";
+        else if (stock <= minStock) status = "low";
+        // TODO: Add expiring/expired logic if expiry info available
+
+        return {
+          id: String(item.id),
+          name: item.name || "",
+          type,
+          category: item.category?.name || (typeof item.category === "string" ? item.category : ""),
+          currentStock: stock,
+          unit: item.unit?.name || (typeof item.unit === "string" ? item.unit : ""),
+          minStock,
+          maxStock: item.maxStock ? Number(item.maxStock) : 0,
+          status,
+          productStatus: item.productStatus || "selling",
+          imageUrl: item.imageUrl || undefined,
+          batches: item.batches || undefined,
+          ingredients: item.ingredients || undefined,
+          totalValue: stock * (Number(item.avgUnitCost) || 0),
+          avgUnitCost: Number(item.avgUnitCost) || 0,
+          sellingPrice: item.sellingPrice ? Number(item.sellingPrice) : undefined,
+          isTopping: item.isTopping || false,
+          associatedProductIds: item.associatedProductIds || undefined,
+        };
+      });
       
       console.log("[Inventory] Mapped items:", mappedItems);
       setItems(mappedItems);
@@ -216,38 +237,7 @@ export function Inventory() {
       // Load mock data as fallback
       console.log("[Inventory] Loading fallback mock data...");
       const mockItems: InventoryItem[] = [
-        {
-          id: "1",
-          code: "CF001",
-          name: "Cà phê Arabica",
-          category: "coffee",
-          unit: "kg",
-          currentStock: 50,
-          minStock: 10,
-          maxStock: 100,
-          sellingPrice: 350000,
-          productStatus: "selling",
-          itemType: "ingredient",
-          isTopping: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: "2",
-          code: "MK001",
-          name: "Sữa tươi",
-          category: "dairy",
-          unit: "liter",
-          currentStock: 30,
-          minStock: 5,
-          maxStock: 50,
-          sellingPrice: 0,
-          productStatus: "selling",
-          itemType: "ingredient",
-          isTopping: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
+        
       ];
       setItems(mockItems);
       setError(null); // Don't show error if we have mock data
@@ -473,7 +463,13 @@ export function Inventory() {
         aValue = a.batches?.length || 0;
         bValue = b.batches?.length || 0;
       } else if (sortField === "status") {
-        const statusOrder = { good: 0, low: 1, expiring: 2, critical: 3 };
+        const statusOrder: Record<InventoryItem["status"], number> = {
+          good: 0,
+          low: 1,
+          expiring: 2,
+          expired: 3,
+          critical: 4,
+        };
         aValue = statusOrder[a.status] ?? 0;
         bValue = statusOrder[b.status] ?? 0;
       } else if (sortField === "productStatus") {
