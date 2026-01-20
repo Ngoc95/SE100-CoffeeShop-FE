@@ -280,8 +280,10 @@ export function Inventory() {
           name: item.name || "",
           type,
           category: item.category?.name || (typeof item.category === "string" ? item.category : ""),
+          categoryId: item.category?.id ? Number(item.category.id) : (item.categoryId ? Number(item.categoryId) : undefined),
           currentStock: stock,
           unit: item.unit?.name || (typeof item.unit === "string" ? item.unit : ""),
+          unitId: item.unit?.id ? Number(item.unit.id) : (item.unitId ? Number(item.unitId) : undefined),
           minStock,
           maxStock: item.maxStock ? Number(item.maxStock) : 0,
           status,
@@ -518,8 +520,10 @@ export function Inventory() {
         name: updatedItemRaw.name,
         type: typeMap[Number(updatedItemRaw.itemTypeId)] || "ingredient",
         category: updatedItemRaw.category?.name || String(updatedItemRaw.categoryId || ""),
+        categoryId: Number(updatedItemRaw.categoryId || updatedItemRaw.category?.id || 0),
         currentStock: Number(updatedItemRaw.currentStock) || 0,
         unit: updatedItemRaw.unit?.name || (typeof updatedItemRaw.unit === "string" ? updatedItemRaw.unit : ""),
+        unitId: Number(updatedItemRaw.unitId || updatedItemRaw.unit?.id || 0),
         minStock: Number(updatedItemRaw.minStock) || 0,
         maxStock: Number(updatedItemRaw.maxStock) || 0,
         status: Number(updatedItemRaw.currentStock) <= 0 ? "critical" : (Number(updatedItemRaw.currentStock) <= (updatedItemRaw.minStock || 0) ? "low" : "good"),
@@ -690,6 +694,68 @@ export function Inventory() {
           console.error("Error fetching item details on expand:", error);
         }
       }
+    }
+  };
+
+  const handleStartEdit = async (item: InventoryItem) => {
+    try {
+      // Fetch full details to ensure we have the latest IDs and relations
+      const res = await inventoryService.getItemById(item.id) as any;
+      const meta = res.metaData || res;
+
+      let productIds = meta.productIds || meta.associatedProductIds || [];
+      // If productIds is empty but applicableProducts is present (for toppings)
+      if (productIds.length === 0 && meta.applicableProducts && Array.isArray(meta.applicableProducts)) {
+        productIds = meta.applicableProducts.map((p: any) => p.productId);
+      }
+
+      const fullItem: InventoryItem = {
+        ...item,
+        categoryId: meta.category?.id ? Number(meta.category.id) : (meta.categoryId ? Number(meta.categoryId) : item.categoryId),
+        unitId: meta.unit?.id ? Number(meta.unit.id) : (meta.unitId ? Number(meta.unitId) : item.unitId),
+        isTopping: meta.isTopping || false,
+        productIds: productIds,
+        ingredients: (meta.ingredientOf && Array.isArray(meta.ingredientOf))
+          ? meta.ingredientOf.map((io: any) => ({
+            ingredientId: String(io.ingredientItemId),
+            ingredientName: io.ingredientItem?.name || "",
+            unit: io.unit || io.ingredientItem?.unit?.name || "",
+            quantity: Number(io.quantity) || 0,
+            unitCost: Number(io.ingredientItem?.avgUnitCost) || 0,
+          }))
+          : (meta.ingredients || item.ingredients || []),
+      };
+
+      setEditingItem(fullItem);
+      setEditValues({
+        name: fullItem.name,
+        category: fullItem.categoryId ? String(fullItem.categoryId) : "",
+        unit: fullItem.unitId ? String(fullItem.unitId) : "",
+        minStock: fullItem.minStock,
+        maxStock: fullItem.maxStock,
+        sellingPrice: fullItem.sellingPrice,
+        productStatus: fullItem.productStatus,
+        ingredients: fullItem.ingredients || [],
+        isTopping: fullItem.isTopping || false,
+        productIds: fullItem.productIds || [],
+        imageUrl: fullItem.imageUrl || "",
+      });
+
+      setIsTopping(fullItem.isTopping || false);
+
+      // Map associated products from the items list based on productIds
+      if (fullItem.productIds && fullItem.productIds.length > 0) {
+        setAssociatedProducts(
+          items.filter((i) => fullItem.productIds?.includes(Number(i.id)))
+        );
+      } else {
+        setAssociatedProducts([]);
+      }
+
+      setEditDialogOpen(true);
+    } catch (error) {
+      console.error("Error fetching item details for edit:", error);
+      toast.error("Không thể tải thông tin chi tiết mặt hàng");
     }
   };
 
@@ -929,9 +995,9 @@ export function Inventory() {
                   <Separator />
 
                   {/* Dynamic Form Fields */}
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-3 gap-4 items-start">
                     <div>
-                      <Label>
+                      <Label className="text-sm font-normal leading-5">
                         Mã hàng hóa <span className="text-red-500">*</span>
                       </Label>
                       <div className="flex gap-2 mt-1.5">
@@ -1123,33 +1189,33 @@ export function Inventory() {
                             <div className="space-y-2">
                               <Table>
                                 <TableHeader>
-                                  <TableRow className="bg-blue-100 hover:bg-blue-100">
-                                    <TableHead className="w-12 text-blue-900">STT</TableHead>
-                                    <TableHead className="text-blue-900 text-2xl font-semibold">Mã hàng</TableHead>
-                                    <TableHead className="text-blue-900 text-2xl font-semibold">Tên hàng hóa</TableHead>
-                                    <TableHead className="text-blue-900 text-2xl font-semibold">Đơn vị</TableHead>
-                                    <TableHead className="w-12"></TableHead>
+                                  <TableRow className="bg-blue-100 hover:bg-blue-100 h-9">
+                                    <TableHead className="w-12 text-blue-900 text-xs font-medium">STT</TableHead>
+                                    <TableHead className="text-blue-900 text-xs font-medium">Mã hàng</TableHead>
+                                    <TableHead className="text-blue-900 text-xs font-medium">Tên hàng hóa</TableHead>
+                                    <TableHead className="text-blue-900 text-xs font-medium">Đơn vị</TableHead>
+                                    <TableHead className="w-10"></TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                   {associatedProducts.map((prod, index) => (
-                                    <TableRow key={prod.id} className="bg-white">
-                                      <TableCell>{index + 1}</TableCell>
-                                      <TableCell>{prod.id}</TableCell>
-                                      <TableCell>{prod.name}</TableCell>
-                                      <TableCell>{prod.unit}</TableCell>
+                                    <TableRow key={prod.id} className="bg-white hover:bg-slate-50 border-b border-slate-100 h-11">
+                                      <TableCell className="text-sm text-slate-600">{index + 1}</TableCell>
+                                      <TableCell className="text-sm text-slate-700 font-mono">{prod.id}</TableCell>
+                                      <TableCell className="text-sm text-slate-900 font-medium">{prod.name}</TableCell>
+                                      <TableCell className="text-sm text-slate-600">{prod.unit}</TableCell>
                                       <TableCell>
                                         <Button
                                           variant="ghost"
                                           size="sm"
-                                          className="h-6 w-6 p-0 hover:text-red-600"
+                                          className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
                                           onClick={() => {
                                             setAssociatedProducts((prev) =>
                                               prev.filter((p) => p.id !== prod.id)
                                             );
                                           }}
                                         >
-                                          <X className="w-3 h-3" />
+                                          <X className="w-4 h-4" />
                                         </Button>
                                       </TableCell>
                                     </TableRow>
@@ -1183,22 +1249,22 @@ export function Inventory() {
                           <div className="space-y-2">
                             <Table>
                               <TableHeader>
-                                <TableRow className="bg-purple-100">
-                                  <TableHead className="w-12">STT</TableHead>
-                                  <TableHead>Mã</TableHead>
-                                  <TableHead>Tên nguyên liệu</TableHead>
-                                  <TableHead>Đơn vị</TableHead>
-                                  <TableHead>Số lượng</TableHead>
-                                  <TableHead className="w-12"></TableHead>
+                                <TableRow className="bg-purple-100 h-9">
+                                  <TableHead className="w-12 text-purple-900 text-xs font-medium">STT</TableHead>
+                                  <TableHead className="text-purple-900 text-xs font-medium">Mã</TableHead>
+                                  <TableHead className="text-purple-900 text-xs font-medium">Tên nguyên liệu</TableHead>
+                                  <TableHead className="text-purple-900 text-xs font-medium">Đơn vị</TableHead>
+                                  <TableHead className="text-purple-900 text-xs font-medium">Số lượng</TableHead>
+                                  <TableHead className="w-10"></TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
                                 {selectedIngredients.map((ing: CompositeIngredient, index: number) => (
-                                  <TableRow key={index}>
-                                    <TableCell>{index + 1}</TableCell>
-                                    <TableCell>{ing.ingredientId}</TableCell>
-                                    <TableCell>{ing.ingredientName}</TableCell>
-                                    <TableCell>{ing.unit}</TableCell>
+                                  <TableRow key={index} className="bg-white hover:bg-slate-50 border-b border-purple-50 h-11">
+                                    <TableCell className="text-sm text-slate-600">{index + 1}</TableCell>
+                                    <TableCell className="text-sm text-slate-700 font-mono">{ing.ingredientId}</TableCell>
+                                    <TableCell className="text-sm text-slate-900 font-medium">{ing.ingredientName}</TableCell>
+                                    <TableCell className="text-sm text-slate-600">{ing.unit}</TableCell>
                                     <TableCell>
                                       <Input
                                         type="number"
@@ -1214,21 +1280,21 @@ export function Inventory() {
                                             )
                                           );
                                         }}
-                                        className="h-8 w-24 bg-white border-slate-300"
+                                        className="h-8 w-24 bg-white border-slate-300 text-sm"
                                       />
                                     </TableCell>
                                     <TableCell>
                                       <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="h-6 w-6 p-0"
+                                        className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
                                         onClick={() => {
                                           setSelectedIngredients((prev: CompositeIngredient[]) =>
                                             prev.filter((_, i) => i !== index)
                                           );
                                         }}
                                       >
-                                        <X className="w-3 h-3" />
+                                        <X className="w-4 h-4" />
                                       </Button>
                                     </TableCell>
                                   </TableRow>
@@ -1783,20 +1849,7 @@ export function Inventory() {
               <DialogTitle>Chỉnh sửa mặt hàng</DialogTitle>
             </DialogHeader>
 
-            {/* Ensure category/unit are set to item's current values when opening */}
-            {editingItem && editDialogOpen && (
-              (() => {
-                // Only update if not already set (avoid infinite loop)
-                if (editValues.category !== editingItem.category || editValues.unit !== editingItem.unit) {
-                  setEditValues((v) => ({
-                    ...v,
-                    category: editingItem.category,
-                    unit: editingItem.unit,
-                  }));
-                }
-                return null;
-              })()
-            )}
+            {/* Removed problematic auto-reset block that used names instead of IDs */}
 
             <div className="space-y-6 overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
@@ -1970,33 +2023,33 @@ export function Inventory() {
                         <div className="space-y-2">
                           <Table>
                             <TableHeader>
-                              <TableRow className="bg-blue-100 hover:bg-blue-100">
-                                <TableHead className="w-12 text-blue-900">STT</TableHead>
-                                <TableHead className="text-blue-900 text-2xl font-semibold">Mã hàng</TableHead>
-                                <TableHead className="text-blue-900 text-2xl font-semibold">Tên hàng hóa</TableHead>
-                                <TableHead className="text-blue-900 text-2xl font-semibold">Đơn vị</TableHead>
-                                <TableHead className="w-12"></TableHead>
+                              <TableRow className="bg-blue-100 hover:bg-blue-100 h-9">
+                                <TableHead className="w-12 text-blue-900 text-xs font-medium">STT</TableHead>
+                                <TableHead className="text-blue-900 text-xs font-medium">Mã hàng</TableHead>
+                                <TableHead className="text-blue-900 text-xs font-medium">Tên hàng hóa</TableHead>
+                                <TableHead className="text-blue-900 text-xs font-medium">Đơn vị</TableHead>
+                                <TableHead className="w-10"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {associatedProducts.map((prod, index) => (
-                                <TableRow key={prod.id} className="bg-white">
-                                  <TableCell>{index + 1}</TableCell>
-                                  <TableCell>{prod.id}</TableCell>
-                                  <TableCell>{prod.name}</TableCell>
-                                  <TableCell>{prod.unit}</TableCell>
+                                <TableRow key={prod.id} className="bg-white hover:bg-slate-50 border-b border-slate-100 h-11">
+                                  <TableCell className="text-sm text-slate-600">{index + 1}</TableCell>
+                                  <TableCell className="text-sm text-slate-700 font-mono">{prod.id}</TableCell>
+                                  <TableCell className="text-sm text-slate-900 font-medium">{prod.name}</TableCell>
+                                  <TableCell className="text-sm text-slate-600">{prod.unit}</TableCell>
                                   <TableCell>
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="h-6 w-6 p-0 hover:text-red-600"
+                                      className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
                                       onClick={() => {
                                         setAssociatedProducts((prev) =>
                                           prev.filter((p) => p.id !== prod.id)
                                         );
                                       }}
                                     >
-                                      <X className="w-3 h-3" />
+                                      <X className="w-4 h-4" />
                                     </Button>
                                   </TableCell>
                                 </TableRow>
@@ -2029,22 +2082,22 @@ export function Inventory() {
                       <div className="space-y-2">
                         <Table>
                           <TableHeader>
-                            <TableRow className="bg-purple-100">
-                              <TableHead className="w-12">STT</TableHead>
-                              <TableHead>Mã</TableHead>
-                              <TableHead>Tên nguyên liệu</TableHead>
-                              <TableHead>Đơn vị</TableHead>
-                              <TableHead>Số lượng</TableHead>
-                              <TableHead className="w-12"></TableHead>
+                            <TableRow className="bg-purple-100 h-9">
+                              <TableHead className="w-12 text-purple-900 text-xs font-medium">STT</TableHead>
+                              <TableHead className="text-purple-900 text-xs font-medium">Mã</TableHead>
+                              <TableHead className="text-purple-900 text-xs font-medium">Tên nguyên liệu</TableHead>
+                              <TableHead className="text-purple-900 text-xs font-medium">Đơn vị</TableHead>
+                              <TableHead className="text-purple-900 text-xs font-medium">Số lượng</TableHead>
+                              <TableHead className="w-10"></TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {editValues.ingredients.map((ing: CompositeIngredient, index: number) => (
-                              <TableRow key={index}>
-                                <TableCell>{index + 1}</TableCell>
-                                <TableCell>{ing.ingredientId}</TableCell>
-                                <TableCell>{ing.ingredientName}</TableCell>
-                                <TableCell>{ing.unit}</TableCell>
+                              <TableRow key={index} className="bg-white hover:bg-slate-50 border-b border-purple-50 h-11">
+                                <TableCell className="text-sm text-slate-600">{index + 1}</TableCell>
+                                <TableCell className="text-sm text-slate-700 font-mono">{ing.ingredientId}</TableCell>
+                                <TableCell className="text-sm text-slate-900 font-medium">{ing.ingredientName}</TableCell>
+                                <TableCell className="text-sm text-slate-600">{ing.unit}</TableCell>
                                 <TableCell>
                                   <Input
                                     type="number"
@@ -2062,14 +2115,14 @@ export function Inventory() {
                                         ),
                                       }));
                                     }}
-                                    className="h-8 w-24 bg-white border-slate-300"
+                                    className="h-8 w-24 bg-white border-slate-300 text-sm"
                                   />
                                 </TableCell>
                                 <TableCell>
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-6 w-6 p-0"
+                                    className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
                                     onClick={() => {
                                       setEditValues((prev: any) => ({
                                         ...prev,
@@ -2079,7 +2132,7 @@ export function Inventory() {
                                       }));
                                     }}
                                   >
-                                    <X className="w-3 h-3" />
+                                    <X className="w-4 h-4" />
                                   </Button>
                                 </TableCell>
                               </TableRow>
@@ -2120,26 +2173,57 @@ export function Inventory() {
                 onClick={() => {
                   if (!editingItem) return;
 
-                  const payload = {
-                    name: editValues.name,
-                    categoryId: Number(editValues.category),
-                    unitId: Number(editValues.unit),
-                    minStock: Number(editValues.minStock),
-                    maxStock: Number(editValues.maxStock),
-                    sellingPrice: Number(editValues.sellingPrice),
-                    productStatus: editValues.productStatus,
-                    isTopping: isTopping,
-                    // Handle special fields based on type
-                    ingredients: editingItem.type === 'composite' ? editValues.ingredients.map(i => ({
+                  const payload: any = {};
+
+                  if (editValues.name !== editingItem.name) {
+                    payload.name = editValues.name;
+                  }
+                  // Use updated IDs from item state
+                  if (Number(editValues.category) !== Number(editingItem.categoryId)) {
+                    payload.categoryId = Number(editValues.category);
+                  }
+                  if (Number(editValues.unit) !== Number(editingItem.unitId)) {
+                    payload.unitId = Number(editValues.unit);
+                  }
+                  if (Number(editValues.minStock) !== editingItem.minStock) {
+                    payload.minStock = Number(editValues.minStock);
+                  }
+                  if (Number(editValues.maxStock) !== editingItem.maxStock) {
+                    payload.maxStock = Number(editValues.maxStock);
+                  }
+                  if (editValues.productStatus !== editingItem.productStatus) {
+                    payload.productStatus = editValues.productStatus;
+                  }
+                  if (isTopping !== (editingItem.isTopping || false)) {
+                    payload.isTopping = isTopping;
+                  }
+                  if ((editValues.imageUrl || "") !== (editingItem.imageUrl || "")) {
+                    payload.imageUrl = editValues.imageUrl || null;
+                  }
+
+                  // Always include complex structures if relevant, to ensure consistency
+                  // or implement deep comparison if strictly minimizing payload is required.
+                  if (editingItem.type === 'composite') {
+                    payload.ingredients = editValues.ingredients.map(i => ({
                       ingredientItemId: Number(i.ingredientId),
                       quantity: i.quantity,
                       unit: i.unit
-                    })) : [],
-                    productIds: isTopping ? associatedProducts.map(p => Number(p.id)) : [],
-                    imageUrl: editValues.imageUrl || null
-                  };
+                    }));
+                  }
 
-                  handleUpdateItem(editingItem.id, payload);
+                  if (isTopping) {
+                    payload.productIds = associatedProducts.map(p => Number(p.id));
+                  } else if (editingItem.isTopping && !isTopping) {
+                    // If it was a topping and now is not, clear associations
+                    payload.productIds = [];
+                  }
+
+                  if (Object.keys(payload).length > 0) {
+                    console.log("PATCH payload:", payload);
+                    handleUpdateItem(editingItem.id, payload);
+                  } else {
+                    setEditDialogOpen(false);
+                  }
                 }}
               >
                 Lưu
@@ -2579,31 +2663,7 @@ export function Inventory() {
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => {
-                                        setEditingItem(item);
-                                        setEditValues({
-                                          name: item.name,
-                                          category: item.category,
-                                          unit: item.unit,
-                                          minStock: item.minStock,
-                                          maxStock: item.maxStock,
-                                          sellingPrice: item.sellingPrice,
-                                          productStatus: item.productStatus,
-                                          ingredients: item.ingredients || [],
-                                          isTopping: item.isTopping || false,
-                                          productIds: item.productIds || [],
-                                          imageUrl: item.imageUrl || "",
-                                        });
-                                        setIsTopping(item.isTopping || false);
-                                        setAssociatedProducts(
-                                          item.productIds
-                                            ? items.filter((i) =>
-                                              item.productIds?.includes(Number(i.id))
-                                            )
-                                            : []
-                                        );
-                                        setEditDialogOpen(true);
-                                      }}
+                                      onClick={() => handleStartEdit(item)}
                                     >
                                       <Pencil className="w-4 h-4" />
                                     </Button>
@@ -2924,23 +2984,7 @@ export function Inventory() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => {
-                                      setEditingItem(item);
-                                      setEditValues({
-                                        name: item.name,
-                                        category: item.category,
-                                        unit: item.unit,
-                                        minStock: item.minStock,
-                                        maxStock: item.maxStock,
-                                        sellingPrice: item.sellingPrice,
-                                        productStatus: item.productStatus,
-                                        ingredients: item.ingredients || [],
-                                        isTopping: item.isTopping || false,
-                                        productIds: item.productIds || [],
-                                        imageUrl: item.imageUrl || "",
-                                      });
-                                      setEditDialogOpen(true);
-                                    }}
+                                    onClick={() => handleStartEdit(item)}
                                   >
                                     <Pencil className="w-4 h-4" />
                                   </Button>
@@ -3081,6 +3125,104 @@ export function Inventory() {
                                         </TableBody>
                                       </Table>
                                     </div>
+
+                                    {/* Available Toppings (for Products) */}
+                                    {!item.isTopping && (
+                                      <>
+                                        <Separator className="my-4" />
+                                        <h4 className="text-sm text-slate-900 mb-3">
+                                          Danh sách topping đi kèm
+                                        </h4>
+                                        <div className="border rounded-lg overflow-hidden bg-white">
+                                          <Table>
+                                            <TableHeader>
+                                              <TableRow className="bg-orange-100">
+                                                <TableHead>Mã Topping</TableHead>
+                                                <TableHead>Tên Topping</TableHead>
+                                                <TableHead>Giá bán thêm</TableHead>
+                                              </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                              {item.availableToppings?.length ? (
+                                                item.availableToppings.map((t) => (
+                                                  <TableRow key={t.toppingId}>
+                                                    <TableCell className="text-sm text-slate-600">
+                                                      {t.toppingId}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm text-slate-900">
+                                                      {t.topping?.name}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm text-slate-900">
+                                                      {t.topping?.sellingPrice
+                                                        ? `${Number(t.topping.sellingPrice).toLocaleString()}₫`
+                                                        : "—"}
+                                                    </TableCell>
+                                                  </TableRow>
+                                                ))
+                                              ) : (
+                                                <TableRow>
+                                                  <TableCell
+                                                    colSpan={3}
+                                                    className="text-center text-sm text-slate-500 py-4"
+                                                  >
+                                                    Không có topping đi kèm
+                                                  </TableCell>
+                                                </TableRow>
+                                              )}
+                                            </TableBody>
+                                          </Table>
+                                        </div>
+                                      </>
+                                    )}
+
+                                    {/* Applicable Products (for Toppings) */}
+                                    {item.isTopping && (
+                                      <>
+                                        <Separator className="my-4" />
+                                        <h4 className="text-sm text-slate-900 mb-3">
+                                          Danh sách món đi kèm
+                                        </h4>
+                                        <div className="border rounded-lg overflow-hidden bg-white">
+                                          <Table>
+                                            <TableHeader>
+                                              <TableRow className="bg-green-100">
+                                                <TableHead>Mã Món</TableHead>
+                                                <TableHead>Tên Món</TableHead>
+                                                <TableHead>Giá bán món</TableHead>
+                                              </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                              {item.applicableProducts?.length ? (
+                                                item.applicableProducts.map((p) => (
+                                                  <TableRow key={p.productId}>
+                                                    <TableCell className="text-sm text-slate-600">
+                                                      {p.productId}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm text-slate-900">
+                                                      {p.product?.name}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm text-slate-900">
+                                                      {p.product?.sellingPrice
+                                                        ? `${Number(p.product.sellingPrice).toLocaleString()}₫`
+                                                        : "—"}
+                                                    </TableCell>
+                                                  </TableRow>
+                                                ))
+                                              ) : (
+                                                <TableRow>
+                                                  <TableCell
+                                                    colSpan={3}
+                                                    className="text-center text-sm text-slate-500 py-4"
+                                                  >
+                                                    Không có món đi kèm
+                                                  </TableCell>
+                                                </TableRow>
+                                              )}
+                                            </TableBody>
+                                          </Table>
+                                        </div>
+                                      </>
+                                    )}
                                   </div>
                                 </TableCell>
                               </TableRow>
@@ -3302,23 +3444,7 @@ export function Inventory() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => {
-                                      setEditingItem(item);
-                                      setEditValues({
-                                        name: item.name,
-                                        category: item.category,
-                                        unit: item.unit,
-                                        minStock: item.minStock,
-                                        maxStock: item.maxStock,
-                                        sellingPrice: item.sellingPrice,
-                                        productStatus: item.productStatus,
-                                        ingredients: item.ingredients || [],
-                                        isTopping: item.isTopping || false,
-                                        productIds: item.productIds || [],
-                                        imageUrl: item.imageUrl || "",
-                                      });
-                                      setEditDialogOpen(true);
-                                    }}
+                                    onClick={() => handleStartEdit(item)}
                                   >
                                     <Pencil className="w-4 h-4" />
                                   </Button>

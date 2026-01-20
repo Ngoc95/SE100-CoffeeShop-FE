@@ -41,8 +41,10 @@ export interface InventoryItem {
   name: string;
   type: ItemType;
   category: string;
+  categoryId?: number;
   currentStock: number;
   unit: string;
+  unitId?: number;
   minStock: number;
   maxStock: number;
   status: "good" | "low" | "expiring" | "expired" | "critical";
