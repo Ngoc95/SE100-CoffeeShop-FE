@@ -10,8 +10,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Checkbox } from "../ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { toast } from "sonner";
-import { CustomerGroupFormDialog, EditCustomerGroup } from "../CustomerGroupFormDialog";
-import { deleteCustomerGroup, getCustomerGroups, updateCustomerGroup } from "../../api/customerGroup";
+import { AddCustomerGroup, CustomerGroupAddFormDialog, CustomerGroupEditFormDialog, EditCustomerGroup } from "../CustomerGroupFormDialog";
+import { createCustomerGroup, deleteCustomerGroup, getCustomerGroups, updateCustomerGroup } from "../../api/customerGroup";
 
 interface CustomerGroup {
   id: number,
@@ -38,8 +38,10 @@ export function CustomerGroups() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<EditCustomerGroup>({
     id: 0,
+    code: '',
     name: '',
     description: '',
     priority: 0,
@@ -163,6 +165,26 @@ export function CustomerGroups() {
       toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
       return false;
     }
+
+    if (formData.windowMonths < 1 || formData.windowMonths > 60) {
+      toast.error("Số tháng xét hạng phải từ 1 đến 60");
+      return false;
+    }
+
+    return true;
+  }
+
+  const validateSubmitAdd = (formData: AddCustomerGroup) => {
+    if (!formData.name) {
+      toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
+      return false;
+    }
+
+    if (formData.windowMonths < 1 || formData.windowMonths > 60) {
+      toast.error("Số tháng xét hạng phải từ 1 đến 60");
+      return false;
+    }
+
     return true;
   }
 
@@ -191,22 +213,29 @@ export function CustomerGroups() {
     setEditDialogOpen(false);
   };
 
-  const handleSubmit = (formData: any /*{
-    name: string;
-    status: "active" | "inactive";
-    customers: Customer[];}*/
-  ) => {
-    // const newGroup: CustomerGroup = {
-    //   id: Date.now().toString(),
-    //   code: `NKH${String(groups.length + 1).padStart(3, "0")}`,
-    //   name: formData.name,
-    //   status: formData.status,
-    //   customers: formData.customers,
-    // };
-    // setGroups([...groups, newGroup]);
-    // setDialogOpen(false);
-    // toast.success("Đã thêm nhóm khách hàng mới");
-  };
+  const handleSubmitAdd = async (formData: AddCustomerGroup) => {
+    if (!formData) return;
+
+    if (!validateSubmitAdd(formData)) return;
+
+    try {
+      await createCustomerGroup(
+        formData.name,
+        formData.description,
+        formData.priority,
+        formData.minSpend,
+        formData.minOrders,
+        formData.windowMonths
+      )
+      toast.success("Thêm nhóm khách hàng thành công");
+      await fetchCustomerGroupsData()
+    }
+    catch (error) {
+      toast.error("Thêm nhóm khách hàng thất bại. Lỗi: " + error.response.data.message);
+    }
+
+    setAddDialogOpen(false);
+  }
 
   const handleEdit = (formData: any/*{
     name: string;
@@ -256,7 +285,18 @@ export function CustomerGroups() {
   // };
 
   const openEditDialog = (group: CustomerGroup) => {
-    setEditingGroup(group);
+    const tempEditCustomerGroup: EditCustomerGroup = {
+      id: group.id,
+      code: group.code,
+      name: group.name,
+      description: group.description,
+      priority: group.priority,
+      minSpend: group.minSpend,
+      minOrders: group.minOrders,
+      windowMonths: group.windowMonths
+    }
+
+    setEditingGroup(tempEditCustomerGroup);
     setEditDialogOpen(true);
   };
 
@@ -303,8 +343,7 @@ export function CustomerGroups() {
           <Button
             className="bg-blue-600 hover:bg-blue-700"
             onClick={() => {
-              setEditingGroup(null);
-              setEditDialogOpen(true);
+              setAddDialogOpen(true);
             }}
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -508,14 +547,24 @@ export function CustomerGroups() {
           </div>
         </div>
       </div>
+
       {/*Edit Form Dialog */}
-      <CustomerGroupFormDialog
+      <CustomerGroupEditFormDialog
         open={editDialogOpen}
         onClose={() => {
           setEditDialogOpen(false);
         }}
         onSubmit={(formData) => handleSubmitEdit(formData)}
         editingGroup={editingGroup}
+      />
+
+      {/*Add Form Dialog */}
+      <CustomerGroupAddFormDialog
+        open={addDialogOpen}
+        onClose={() => {
+          setAddDialogOpen(false);
+        }}
+        onSubmit={(formData) => handleSubmitAdd(formData)}
       />
     </div>
   );

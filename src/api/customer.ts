@@ -50,7 +50,6 @@ export const createCustomer = (
     address: address,
     isActive: isActive
   }
-  console.log("Add params: ", params)
   if (params["birthday"] === null || params["birthday"] === "") params["birthday"] = "2026-01-16"
   return axiosClient.post('/customers', params)
 }

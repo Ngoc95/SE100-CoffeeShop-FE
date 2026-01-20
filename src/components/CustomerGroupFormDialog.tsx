@@ -8,6 +8,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 
 export interface EditCustomerGroup {
   id: number;
+  code: string;
+  name: string;
+  description: string,
+  priority: number,
+  minSpend: number,
+  minOrders: number,
+  windowMonths: number
+}
+
+export interface AddCustomerGroup {
   name: string;
   description: string,
   priority: number,
@@ -23,9 +33,16 @@ interface CustomerGroupEditFormDialogProps {
   editingGroup: EditCustomerGroup;
 }
 
-export function CustomerGroupFormDialog(props: CustomerGroupEditFormDialogProps) {
+interface CustomerGroupAddFormDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (formData: AddCustomerGroup) => void;
+}
+
+export function CustomerGroupEditFormDialog(props: CustomerGroupEditFormDialogProps) {
   const [formData, setFormData] = useState<EditCustomerGroup>({
     id: 0,
+    code: '',
     name: '',
     description: '',
     priority: 0,
@@ -37,6 +54,7 @@ export function CustomerGroupFormDialog(props: CustomerGroupEditFormDialogProps)
   useEffect(() => {
     setFormData({
       id: props.editingGroup.id,
+      code: props.editingGroup.code,
       name: props.editingGroup.name,
       description: props.editingGroup.description,
       priority: props.editingGroup.priority,
@@ -61,9 +79,22 @@ export function CustomerGroupFormDialog(props: CustomerGroupEditFormDialogProps)
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Mã nhóm */}
+          <div>
+            <Label>Mã nhóm khách hàng <Label className="text-red-600">*</Label></Label>
+            <Input
+              type="text"
+              disabled={true}
+              value={formData.code}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="VD: Khách hàng VIP"
+              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+            />
+          </div>
+
           {/* Tên nhóm */}
           <div>
-            <Label>Tên nhóm khách hàng</Label>
+            <Label>Tên nhóm khách hàng <Label className="text-red-600">*</Label></Label>
             <Input
               type="text"
               value={formData.name}
@@ -145,6 +176,132 @@ export function CustomerGroupFormDialog(props: CustomerGroupEditFormDialogProps)
             className="bg-blue-600 hover:bg-blue-700"
           >
             Cập nhật
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function CustomerGroupAddFormDialog(props: CustomerGroupAddFormDialogProps) {
+  const [formData, setFormData] = useState<AddCustomerGroup>({
+    name: '',
+    description: '',
+    priority: 0,
+    minSpend: 0,
+    minOrders: 0,
+    windowMonths: 0
+  });
+
+  useEffect(() => {
+    setFormData({
+      name: "",
+      description: "",
+      priority: 0,
+      minSpend: 0,
+      minOrders: 0,
+      windowMonths: 0
+    }
+
+    )
+  }, [props.open]);
+
+  const handleSubmit = () => {
+    props.onSubmit(formData);
+  };
+  return (
+    <Dialog open={props.open} onOpenChange={props.onClose}>
+      <DialogContent className="max-w-[600px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle className="text-lg font-semibold">
+            Thêm nhóm khách hàng
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Tên nhóm */}
+          <div>
+            <Label>Tên nhóm khách hàng <Label className="text-red-600">*</Label></Label>
+            <Input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="VD: Khách hàng VIP"
+              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+            />
+          </div>
+
+          {/* Mô tả */}
+          <div>
+            <Label>Mô tả</Label>
+            <Input
+              type="text"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="VD: Mô tả ngắn gọn về nhóm khách hàng"
+              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+            />
+          </div>
+
+          {/* Độ ưu tiên */}
+          <div>
+            <Label>Độ ưu tiên</Label>
+            <Input
+              type="text"
+              value={formData.priority}
+              onChange={(e) => { if (!Number.isNaN(Number(e.target.value))) setFormData({ ...formData, priority: Number(e.target.value) }) }}
+              placeholder="VD: 0"
+              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+            />
+          </div>
+
+          {/* Chi tiêu tối thiểu */}
+          <div>
+            <Label>Chi tiêu tối thiểu</Label>
+            <Input
+              type="text"
+              value={formData.minSpend}
+              onChange={(e) => { if (!Number.isNaN(Number(e.target.value))) setFormData({ ...formData, minSpend: Number(e.target.value) }) }}
+              placeholder="VD: 0"
+              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+            />
+          </div>
+
+          {/* Số đơn tối thiểu */}
+          <div>
+            <Label>Số đơn tối thiểu</Label>
+            <Input
+              type="text"
+              value={formData.minOrders}
+              onChange={(e) => { if (!Number.isNaN(Number(e.target.value))) setFormData({ ...formData, minOrders: Number(e.target.value) }) }}
+              placeholder="VD: 0"
+              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+            />
+          </div>
+
+          {/* Tháng xét hạng */}
+          <div>
+            <Label>Số tháng xét hạng</Label>
+            <Input
+              type="text"
+              value={formData.windowMonths}
+              onChange={(e) => { if (!Number.isNaN(Number(e.target.value))) setFormData({ ...formData, windowMonths: Number(e.target.value) }) }}
+              placeholder="VD: 0"
+              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+            />
+          </div>
+
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={props.onClose}>
+            Hủy
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Thêm
           </Button>
         </DialogFooter>
       </DialogContent>

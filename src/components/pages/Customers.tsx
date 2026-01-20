@@ -261,8 +261,6 @@ export function Customers() {
 
     if (!validateSubmitAdd(formData)) return;
 
-    let res;
-
     try {
       await createCustomer(
         formData.name,
