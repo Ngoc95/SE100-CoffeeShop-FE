@@ -23,7 +23,7 @@ export const getOrderByTable = (tableId: number) => {
 // };
 
 // POS: Create new order
-export const createOrder = (payload: { tableId: number; items: any[] }) => {
+export const createOrder = (payload: { tableId: number | null; items?: any[] }) => {
   return axiosClient.post('/orders', payload);
 };
 
@@ -107,9 +107,41 @@ export const splitOrder = (orderId: number, payload: { newTableId: number; items
   return axiosClient.post(`/orders/${orderId}/split`, payload);
 };
 
-// Kitchen: Get items for kitchen display (requires kitchen:access)
-export const getKitchenItems = () => {
-  return axiosClient.get('/orders/kitchen/items');
+// Kitchen: Get items for kitchen display (supports optional query params)
+export const getKitchenItems = (params?: Record<string, any>) => {
+  return axiosClient.get('/orders/kitchen/items', { params });
+};
+
+// POS: Fetch current takeaway order (server decides current active takeaway)
+export const getTakeawayOrder = () => {
+  return axiosClient.get('/orders/takeaway');
+};
+
+// POS: Update whole order (e.g., attach customer)
+export const updateOrder = (orderId: number, payload: any) => {
+  return axiosClient.patch(`/orders/${orderId}`, payload);
+};
+
+// POS: Update a single order item row
+export const updateOrderItem = (orderId: number, orderItemId: number, payload: any) => {
+  return axiosClient.patch(`/orders/${orderId}/items/${orderItemId}`, payload);
+};
+
+// POS: Permanently remove a pending order item (no quantity payload)
+export const removeOrderItem = (orderId: number, orderItemId: number) => {
+  return axiosClient.delete(`/orders/${orderId}/items/${orderItemId}`);
+};
+
+// POS: Reduce quantity or cancel an already-sent item, with reason
+// Payload conforms to ReduceItemDto: { quantity?: number; reason?: string }
+export const deleteOrderItem = (
+  orderId: number,
+  orderItemId: number | string,
+  payload?: { quantity?: number; reason?: string }
+) => {
+  return axiosClient.delete(`/orders/${orderId}/items/${orderItemId}` as string, {
+    data: payload ?? {},
+  });
 };
 
 // Kitchen: Report out-of-stock for an item
