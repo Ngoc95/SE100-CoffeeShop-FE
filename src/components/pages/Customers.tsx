@@ -9,8 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Label } from "../ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { toast } from "sonner";
-import { CustomerFormDialog } from "../CustomerFormDialog";
-import { getCustomers } from "../../api/customer";
+import { CustomerEditFormDialog, EditCustomer } from "../CustomerFormDialog";
+import { deleteCustomer, getCustomers, updateCustomer } from "../../api/customer";
 import { getCustomerGroups } from "../../api/customerGroup";
 
 interface Customer {
@@ -18,7 +18,7 @@ interface Customer {
   code: string,
   name: string,
   gender: string,
-  birthday: Date,
+  birthday: string,
   phone: string,
   address: string,
   city: "TP. Hồ Chí Minh",
@@ -30,7 +30,7 @@ interface Customer {
   updatedAt: "2026-01-17T08:36:16.868Z"
 }
 
-export const genders = ["Nam", "Nữ"];
+export const genders = ["male", "female"];
 export const cities = [
   "Hồ Chí Minh",
   "Hà Nội",
@@ -68,8 +68,19 @@ export function Customers() {
 
   const [sortBy, setSortBy] = useState<string | null>();
   const [sortOrder, setSortOrder] = useState<"+" | "-" | "none">("none");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<EditCustomer>({
+    id: 0,
+    code: '',
+    name: '',
+    phone: '',
+    city: '',
+    gender: '',
+    birthday: '',
+    address: '',
+    isActive: true
+  });
   const [showFilters, setShowFilters] = useState(false);
 
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -82,8 +93,11 @@ export function Customers() {
   const fetchCustomersData = async () => {
     const res = await getCustomers(fetchCustomersParams)
     if (!res) return;
-    const { customers, statistics } = res.data.metaData
+    let { customers, statistics } = res.data.metaData
     if (customers) {
+      customers.map((customer: EditCustomer) => {
+        if (customer.birthday) customer.birthday = customer.birthday.split("T")[0]
+      })
       setCustomers(customers)
       setTotalRevenue(statistics.totalRevenue)
     }
@@ -187,57 +201,68 @@ export function Customers() {
     fetchCustomersData()
   }
 
-  const handleSubmit = (formData: any) => {
-    // if (!formData.name || !formData.phone || !formData.group) {
-    //   toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
-    //   return;
-    // }
+  const validateSumbitEdit = (formData: EditCustomer) => {
+    if (!formData.name || !formData.phone) {
+      toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
+      return false;
+    }
 
-    // if (editingCustomer) {
-    //   // Update existing customer
-    //   setCustomers(
-    //     customers.map((customer) =>
-    //       customer.id === editingCustomer.id
-    //         ? { ...customer, ...formData }
-    //         : customer
-    //     )
-    //   );
-    //   toast.success("Cập nhật khách hàng thành công");
-    // } else {
-    //   // Add new customer
-    //   const newCustomer: Customer = {
-    //     id: Date.now().toString(),
-    //     code: `KH${String(customers.length + 1).padStart(3, "0")}`,
-    //     name: formData.name,
-    //     gender: formData.gender,
-    //     birthday: formData.birthday,
-    //     phone: formData.phone,
-    //     email: formData.email,
-    //     city: formData.city,
-    //     address: formData.address,
-    //     group: formData.group,
-    //     orders: 0,
-    //     totalSpent: 0,
-    //     status: "active",
-    //   };
-    //   setCustomers([...customers, newCustomer]);
-    //   toast.success("Thêm khách hàng mới thành công");
-    // }
+    if (!/^\d+$/.test(formData.phone) || formData.phone.length !== 10) {
+      toast.error("SĐT phải có 10 ký tự và chỉ có chữ số!");
+      return false;
+    }
 
-    // setDialogOpen(false);
-    // resetForm();
+    return true;
+  }
+
+  const handleSubmitEdit = async (formData: EditCustomer) => {
+    if (!formData) return;
+
+    if (!validateSumbitEdit(formData)) return;
+
+    try {
+      await updateCustomer(
+        formData.id,
+        formData.name,
+        formData.phone,
+        formData.city,
+        formData.gender,
+        formData.birthday,
+        formData.address,
+        formData.isActive
+      )
+      toast.success("Cập nhật khách hàng thành công");
+      await fetchCustomersData()
+    }
+    catch (error) {
+      toast.error("Cập nhật khách hàng thất bại. Error: " + error);
+    }
+
+    setEditDialogOpen(false);
+    resetForm();
   };
 
   const handleEdit = (customer: Customer) => {
-    // setEditingCustomer(customer);
-    // setDialogOpen(true);
+    const tempEditCustomer: EditCustomer = {
+      id: customer.id,
+      code: customer.code,
+      name: customer.name,
+      phone: customer.phone,
+      city: customer.city,
+      gender: customer.gender,
+      birthday: customer.birthday,
+      address: customer.address,
+      isActive: customer.isActive
+    }
+    setEditingCustomer(tempEditCustomer);
+    setEditDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    // if (confirm("Bạn có chắc chắn muốn xóa khách hàng này?")) {
-    //   setCustomers(customers.filter((customer) => customer.id !== id));
-    //   toast.success("Xóa khách hàng thành công");
-    // }
+  const handleDelete = async (id: number) => {
+    if (confirm("Bạn có chắc chắn muốn xóa khách hàng này?")) {
+      await deleteCustomer(id)
+      fetchCustomersData()
+    }
   };
 
   // const handleToggleStatus = (id: string) => {
@@ -317,10 +342,10 @@ export function Customers() {
           {canCreate && (
             <Button
               className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                setEditingCustomer(null);
-                setDialogOpen(true);
-              }}
+            // onClick={() => {
+            //   setEditingCustomer(null);
+            //   setDialogOpen(true);
+            // }}
             >
               <Plus className="w-4 h-4 mr-2" />
               Thêm khách hàng
@@ -581,7 +606,7 @@ export function Customers() {
                         {customer.gender}
                       </TableCell>
                       <TableCell className="text-slate-600">
-                        {(customer.birthday ? customer.birthday : new Date()).toDateString()}
+                        {customer.birthday}
                       </TableCell>
                       <TableCell className="text-slate-600">
                         {customer.phone}
@@ -622,7 +647,7 @@ export function Customers() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              // onClick={() => handleDelete(customer.id)}
+                              onClick={() => handleDelete(customer.id)}
                               className="text-red-600 hover:text-red-700 hover:bg-red-50"
                               title="Xóa"
                             >
@@ -658,15 +683,15 @@ export function Customers() {
         </div>
       </div>
       {/* Customer Form Dialog */}
-      {/* <CustomerFormDialog
-        open={dialogOpen}
+      <CustomerEditFormDialog
+        open={editDialogOpen}
         onClose={() => {
-          setDialogOpen(false);
+          setEditDialogOpen(false);
           resetForm();
         }}
-        onSubmit={handleSubmit}
+        onSubmit={(customers: EditCustomer) => handleSubmitEdit(customers)}
         editingCustomer={editingCustomer}
-      /> */}
+      />
     </div >
   );
 }

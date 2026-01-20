@@ -1,106 +1,107 @@
 import { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { Label } from './ui/label';
 import { Input } from './ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from './ui/select';
 import { Button } from './ui/button';
+import { cities, genders } from './pages/Customers';
 
-interface Customer {
-  id: string;
-  code: string;
-  name: string;
-  gender: string;
-  birthday: string;
-  phone: string;
-  email: string;
-  city: string;
-  address: string;
-  group: string;
-  orders: number;
-  totalSpent: number;
-  status: 'active' | 'inactive';
+export interface EditCustomer {
+  id: number,
+  code: string,
+  name: string,
+  phone: string,
+  city: string,
+  gender: string,
+  birthday: string,
+  address: string,
+  isActive: boolean
 }
 
-interface CustomerFormDialogProps {
+export interface AddCustomer {
+  name: string,
+  phone: string,
+  city: string,
+  gender: string,
+  birthday: string,
+  address: string,
+  isActive: boolean
+}
+
+interface CustomerEditFormDialogProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (formData: {
-    name: string;
-    gender: string;
-    birthday: string;
-    phone: string;
-    city: string;
-    address: string;
-  }) => void;
-  editingCustomer: Customer | null;
+  onSubmit: (customer: EditCustomer) => void;
+  editingCustomer: EditCustomer;
 }
 
-export function CustomerFormDialog({ open, onClose, onSubmit, editingCustomer }: CustomerFormDialogProps) {
-  const [formData, setFormData] = useState({
+interface CustomerAddFormDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (customer: AddCustomer) => void;
+}
+
+export function CustomerEditFormDialog(props: CustomerEditFormDialogProps) {
+  const [formData, setFormData] = useState<EditCustomer>({
+    id: 0,
+    code: '',
     name: '',
-    gender: '',
-    birthday: '',
     phone: '',
     city: '',
+    gender: '',
+    birthday: '',
     address: '',
+    isActive: true
   });
 
   useEffect(() => {
-    if (editingCustomer) {
-      setFormData({
-        name: editingCustomer.name,
-        gender: editingCustomer.gender,
-        birthday: editingCustomer.birthday,
-        phone: editingCustomer.phone,
-        city: editingCustomer.city,
-        address: editingCustomer.address,
-      });
-    } else {
-      setFormData({
-        name: '',
-        gender: '',
-        birthday: '',
-        phone: '',
-        city: '',
-        address: '',
-      });
-    }
-  }, [editingCustomer, open]);
+    setFormData({
+      id: props.editingCustomer.id,
+      code: props.editingCustomer.code,
+      name: props.editingCustomer.name,
+      phone: props.editingCustomer.phone,
+      city: props.editingCustomer.city,
+      gender: props.editingCustomer.gender,
+      birthday: props.editingCustomer.birthday,
+      address: props.editingCustomer.address,
+      isActive: props.editingCustomer.isActive
+    })
+  }, [props.editingCustomer, props.open]);
 
   const handleSubmit = () => {
-    onSubmit(formData);
+    props.onSubmit(formData);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={props.open} onOpenChange={props.onClose}>
       <DialogContent className="max-w-[600px]" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
-            {editingCustomer ? 'Chỉnh sửa khách hàng' : 'Thêm khách hàng mới'}
+            Chỉnh sửa khách hàng
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Mã khách hàng */}
+          <div>
+            <Label>Mã khách hàng</Label>
+            <Input
+              type="text"
+              disabled={true}
+              placeholder="KH001"
+              value={formData.code}
+              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+            />
+          </div>
+
           {/* Tên khách hàng */}
           <div>
-            <Label>Tên khách hàng</Label>
+            <Label>Tên khách hàng <Label className="text-red-600">*</Label></Label>
             <Input
               type="text"
               placeholder="VD: Nguyễn Văn A"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => { setFormData({ ...formData, name: e.target.value }) }}
               className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
@@ -110,14 +111,21 @@ export function CustomerFormDialog({ open, onClose, onSubmit, editingCustomer }:
             <Label>Giới tính</Label>
             <Select
               value={formData.gender}
-              onValueChange={(value) => setFormData({ ...formData, gender: value })}
+              onValueChange={(value: string) => setFormData({ ...formData, gender: value })}
             >
               <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
                 <SelectValue placeholder="Chọn giới tính" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Nam">Nam</SelectItem>
-                <SelectItem value="Nữ">Nữ</SelectItem>
+                {
+                  genders.map((gender, index) => (
+                    <SelectItem key={index} value={gender}>
+                      {gender}
+                    </SelectItem>
+                  ))
+                }
+                {/* <SelectItem value="Nam">Nam</SelectItem>
+                <SelectItem value="Nữ">Nữ</SelectItem> */}
               </SelectContent>
             </Select>
           </div>
@@ -125,18 +133,18 @@ export function CustomerFormDialog({ open, onClose, onSubmit, editingCustomer }:
           {/* Ngày sinh */}
           <div>
             <Label>Ngày sinh</Label>
-            <Input
-              type="text"
+            <input
+              type="date"
               placeholder="VD: 15/01/1990"
-              value={formData.birthday}
-              onChange={(e) => setFormData({ ...formData, birthday: e.target.value })}
+              value={formData.birthday ? formData.birthday : "2026-01-16"}
+              onChange={(e) => { setFormData({ ...formData, birthday: e.target.value }) }}
               className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
 
           {/* Số điện thoại */}
           <div>
-            <Label>Số điện thoại</Label>
+            <Label>Số điện thoại <Label className="text-red-600">*</Label></Label>
             <Input
               type="tel"
               placeholder="VD: 0901234567"
@@ -151,20 +159,19 @@ export function CustomerFormDialog({ open, onClose, onSubmit, editingCustomer }:
             <Label>Tỉnh / Thành phố</Label>
             <Select
               value={formData.city}
-              onValueChange={(value) => setFormData({ ...formData, city: value })}
+              onValueChange={(value: string) => setFormData({ ...formData, city: value })}
             >
               <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
                 <SelectValue placeholder="Chọn tỉnh/thành phố" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Hồ Chí Minh">Hồ Chí Minh</SelectItem>
-                <SelectItem value="Hà Nội">Hà Nội</SelectItem>
-                <SelectItem value="Đà Nẵng">Đà Nẵng</SelectItem>
-                <SelectItem value="Cần Thơ">Cần Thơ</SelectItem>
-                <SelectItem value="Hải Phòng">Hải Phòng</SelectItem>
-                <SelectItem value="Nha Trang">Nha Trang</SelectItem>
-                <SelectItem value="Huế">Huế</SelectItem>
-                <SelectItem value="Vũng Tàu">Vũng Tàu</SelectItem>
+                {
+                  cities.map((city, index) => (
+                    <SelectItem key={index} value={city}>
+                      {city}
+                    </SelectItem>
+                  ))
+                }
               </SelectContent>
             </Select>
           </div>
@@ -183,14 +190,14 @@ export function CustomerFormDialog({ open, onClose, onSubmit, editingCustomer }:
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={props.onClose}>
             Hủy
           </Button>
           <Button
             onClick={handleSubmit}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            {editingCustomer ? 'Cập nhật khách hàng' : 'Thêm khách hàng'}
+            Cập nhật khách hàng
           </Button>
         </DialogFooter>
       </DialogContent>
