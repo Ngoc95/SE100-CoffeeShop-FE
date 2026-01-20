@@ -253,9 +253,14 @@ export function Inventory() {
         let type: ItemType = "ingredient";
         if (item.itemType?.name) {
           const t = item.itemType.name.toLowerCase();
-          if (t === "ready-made") type = "ready-made";
+          if (t === "ready-made" || t === "ready_made") type = "ready-made";
           else if (t === "composite") type = "composite";
           else if (t === "ingredient") type = "ingredient";
+        } else if (item.itemTypeId || item.item_type_id) {
+          const typeId = Number(item.itemTypeId || item.item_type_id);
+          if (typeId === 1) type = "ready-made";
+          else if (typeId === 2) type = "composite";
+          else if (typeId === 3) type = "ingredient";
         }
 
         // Calculate status based on stock
@@ -933,17 +938,6 @@ export function Inventory() {
                       </div>
                     </div>
                   )}
-
-                  <div>
-                    <Label>Giá bán</Label>
-                    <Input
-                      type="number"
-                      value={addDialogValues.sellingPrice}
-                      onChange={(e) => setAddDialogValues(prev => ({ ...prev, sellingPrice: Number(e.target.value) }))}
-                      className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                      placeholder="0"
-                    />
-                  </div>
 
                   {/* Image Upload Section */}
                   <div>
