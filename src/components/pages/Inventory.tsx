@@ -27,7 +27,7 @@ import { inventoryService } from "../../services/inventoryService";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
-import { exportToCSV } from "../utils/export";
+
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Checkbox } from "../ui/checkbox";
@@ -74,11 +74,74 @@ import {
 
 import { useAuth } from "../../contexts/AuthContext";
 
+type AddFailureEntry = {
+  id: string;
+  name: string;
+  reason: string;
+  timestamp: string;
+  itemType?: ItemType;
+};
+
 export function Inventory() {
+
   const { hasPermission, user } = useAuth();
   const canCreate = hasPermission('goods_inventory:create');
   const canUpdate = hasPermission('goods_inventory:update');
   const canDelete = hasPermission('goods_inventory:delete');
+
+  const [addDialogValues, setAddDialogValues] = useState({
+    name: "",
+    categoryId: "",
+    unitId: "",
+    minStock: 0,
+    maxStock: 0,
+    sellingPrice: 0,
+  });
+
+  // Categories/Units from API
+  const [categoryOptions, setCategoryOptions] = useState<any[]>([]);
+  const [unitOptions, setUnitOptions] = useState<any[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [loadingUnits, setLoadingUnits] = useState(false);
+
+  // Load categories from API
+  useEffect(() => {
+    setLoadingCategories(true);
+    inventoryService.getCategories()
+      .then((res) => {
+        // API có thể trả { metaData: [...] } hoặc { metaData: { items: [...] } } hoặc { items: [...] } hoặc [...]
+        let arr: any[] = [];
+        if (Array.isArray(res?.metaData)) arr = res.metaData;
+        else if (res?.metaData?.items && Array.isArray(res.metaData.items)) arr = res.metaData.items;
+        else if (res?.items && Array.isArray(res.items)) arr = res.items;
+        else if (Array.isArray(res)) arr = res;
+        // Đảm bảo id là string cho Select
+        setCategoryOptions(arr.map((c) => ({ ...c, id: String(c.id) })));
+      })
+      .catch(() => setCategoryOptions([]))
+      .finally(() => setLoadingCategories(false));
+  }, []);
+
+  // Load units from API
+  useEffect(() => {
+    setLoadingUnits(true);
+    inventoryService
+      .getUnits()
+      .then((res) => {
+        const units = Array.isArray(res?.metaData)
+          ? res.metaData
+          : Array.isArray(res)
+            ? res
+            : [];
+
+        setUnitOptions(units.map((unit: any) => ({
+          ...unit,
+          id: String(unit.id),
+        })));
+      })
+      .catch(() => setUnitOptions([]))
+      .finally(() => setLoadingUnits(false));
+  }, []);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([
@@ -103,6 +166,7 @@ export function Inventory() {
     "hot",
   ]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addFailureEntries, setAddFailureEntries] = useState<AddFailureEntry[]>([]);
   const [addItemType, setAddItemType] = useState<ItemType>("ready-made");
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -161,19 +225,19 @@ export function Inventory() {
       setLoading(true);
       setError(null);
       console.log("[Inventory] Fetching items...");
-      
+
       // Check if user is authenticated
       if (!user) {
         console.warn("[Inventory] User not authenticated, loading mock data...");
         throw new Error("Not authenticated");
       }
-      
+
       const data = await inventoryService.getItems();
       console.log("[Inventory] API Response:", data);
-      
+
       // Handle API response structure: { metaData: { items: [...] } }
       let itemsArray: any[] = [];
-      
+
       if (data?.metaData?.items && Array.isArray(data.metaData.items)) {
         itemsArray = data.metaData.items;
       } else if (data?.items && Array.isArray(data.items)) {
@@ -181,7 +245,7 @@ export function Inventory() {
       } else if (Array.isArray(data)) {
         itemsArray = data;
       }
-      
+
 
       // Map API response to InventoryItem type, ensuring 'type' and 'status' are set for filtering
       const mappedItems: InventoryItem[] = itemsArray.map((item: any) => {
@@ -223,21 +287,21 @@ export function Inventory() {
           associatedProductIds: item.associatedProductIds || undefined,
         };
       });
-      
+
       console.log("[Inventory] Mapped items:", mappedItems);
       setItems(mappedItems);
-      
+
       if (mappedItems.length === 0) {
         console.warn("[Inventory] No items returned from API");
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Lỗi khi tải dữ liệu";
       console.error("Error fetching inventory:", err);
-      
+
       // Load mock data as fallback
       console.log("[Inventory] Loading fallback mock data...");
       const mockItems: InventoryItem[] = [
-        
+
       ];
       setItems(mockItems);
       setError(null); // Don't show error if we have mock data
@@ -309,17 +373,104 @@ export function Inventory() {
     );
   };
 
-  // Handle Add Item
-  const handleAddItem = async (newItem: InventoryItem) => {
+  const getItemTypeLabel = (type?: ItemType) => {
+    switch (type) {
+      case "ready-made":
+        return "Hàng bán sẵn";
+      case "composite":
+        return "Hàng cấu thành";
+      case "ingredient":
+        return "Nguyên liệu";
+      default:
+        return "Không xác định";
+    }
+  };
+
+  // Handle Add New Item (API Integration)
+  const handleAddNewItem = async () => {
     try {
-      const createdItem = await inventoryService.createItem(newItem);
-      setItems([...items, createdItem]);
+      // Validate
+      if (!addDialogValues.name || !addDialogValues.categoryId || !addDialogValues.unitId) {
+        toast.error("Vui lòng điền đầy đủ thông tin bắt buộc (Tên, Danh mục, Đơn vị)");
+        return;
+      }
+
+      const itemTypeIdMap: Record<string, number> = {
+        "ready-made": 1,
+        "composite": 2,
+        "ingredient": 3
+      };
+
+      const payload = {
+        name: addDialogValues.name,
+        itemTypeId: itemTypeIdMap[addItemType],
+        categoryId: Number(addDialogValues.categoryId),
+        unitId: Number(addDialogValues.unitId),
+        minStock: Number(addDialogValues.minStock),
+        maxStock: Number(addDialogValues.maxStock),
+        sellingPrice: Number(addDialogValues.sellingPrice),
+        productStatus: "selling", // Default as per requirement
+        isTopping: addItemType === 'composite' ? isTopping : false,
+        // Optional fields
+        imageUrl: newItemImage || null,
+        ingredients: addItemType === 'composite' ? selectedIngredients : [],
+        // For toppings/extra logic if needed
+        associatedProductIds: (addItemType === 'composite' && isTopping) ? associatedProducts.map(p => p.id) : [],
+      };
+
+      console.log("[Inventory] Creating item with payload:", payload);
+
+      const response = await inventoryService.createItem(payload as any) as any;
+      const created = response.metaData || response;
+
+      // Map response to UI model
+      const getName = (val: any) => (typeof val === "object" && val && typeof val.name === "string") ? val.name : (typeof val === "string" ? val : "");
+
+      const mapped: InventoryItem = {
+        id: String(created.id),
+        name: created.name,
+        type: addItemType,
+        category: getName(created.category) || (categories.find(c => String(c.id) === String(created.categoryId))?.name || ""),
+        currentStock: Number(created.currentStock) || 0,
+        unit: getName(created.unit) || (unitOptions.find(u => String(u.id) === String(created.unitId))?.name || ""),
+        minStock: Number(created.minStock) || 0,
+        maxStock: Number(created.maxStock) || 0,
+        status: "good",
+        productStatus: (created.productStatus as any) || "selling",
+        imageUrl: created.imageUrl,
+        batches: created.batches || [],
+        ingredients: created.ingredients || [],
+        totalValue: (Number(created.currentStock) || 0) * (Number(created.avgUnitCost) || 0),
+        avgUnitCost: Number(created.avgUnitCost) || 0,
+        sellingPrice: created.sellingPrice ? Number(created.sellingPrice) : undefined,
+        isTopping: created.isTopping || false,
+        associatedProductIds: created.associatedProductIds,
+      };
+
+      setItems((prev) => [mapped, ...prev]);
       setAddDialogOpen(false);
-      toast.success("Thêm mặt hàng thành công");
+
+      // Reset form
+      setAddDialogValues({
+        name: "",
+        categoryId: "",
+        unitId: "",
+        minStock: 0,
+        maxStock: 0,
+        sellingPrice: 0,
+      });
+      setNewItemImage("");
+      setSelectedIngredients([]);
+      setIsTopping(false);
+      setAssociatedProducts([]);
+
+      toast.success("Tạo sản phẩm thành công");
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Lỗi khi thêm mặt hàng";
-      toast.error(errorMsg);
       console.error("Error creating item:", err);
+      toast.error(errorMsg);
+
+      // Add check for failure entry creation if needed, or keeping simple
     }
   };
 
@@ -544,8 +695,8 @@ export function Inventory() {
               <AlertCircle className="w-8 h-8 text-red-600" />
               <p className="text-red-700 text-center font-medium">Lỗi khi tải dữ liệu</p>
               <p className="text-red-600 text-sm text-center">{error}</p>
-              <Button 
-                onClick={fetchInventoryItems} 
+              <Button
+                onClick={fetchInventoryItems}
                 className="mt-4 w-full bg-red-600 hover:bg-red-700"
               >
                 Thử lại
@@ -577,13 +728,13 @@ export function Inventory() {
           </div>
           <div className="flex items-center gap-2">
             {canCreate && (
-            <Button
-              variant="outline"
-              onClick={() => setImportDialogOpen(true)}
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Nhập file
-            </Button>
+              <Button
+                variant="outline"
+                onClick={() => setImportDialogOpen(true)}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Nhập file
+              </Button>
             )}
             <Button
               variant="outline"
@@ -595,10 +746,10 @@ export function Inventory() {
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
               <DialogTrigger asChild>
                 {canCreate && (
-                <Button className="bg-blue-600 hover:bg-blue-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Thêm hàng hóa
-                </Button>
+                  <Button className="bg-blue-600 hover:bg-blue-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Thêm hàng hóa
+                  </Button>
                 )}
               </DialogTrigger>
               <DialogContent className="min-w-[1100px] max-w-[1300px] w-[100vw] max-h-[90vh] flex flex-col" aria-describedby={undefined}>
@@ -614,7 +765,7 @@ export function Inventory() {
                     </Label>
                     <Select
                       value={addItemType}
-                      onValueChange={(value) =>
+                      onValueChange={(value: string) =>
                         setAddItemType(value as ItemType)
                       }
                     >
@@ -677,6 +828,8 @@ export function Inventory() {
                         <span className="text-red-500">*</span>
                       </Label>
                       <Input
+                        value={addDialogValues.name}
+                        onChange={(e) => setAddDialogValues(prev => ({ ...prev, name: e.target.value }))}
                         className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                         placeholder={`VD: ${addItemType === "composite"
                           ? "Cà phê Latte"
@@ -704,18 +857,20 @@ export function Inventory() {
                           Thêm danh mục
                         </Button>
                       </div>
-                      <Select>
+                      <Select
+                        value={addDialogValues.categoryId}
+                        onValueChange={(value: string) => setAddDialogValues((v: any) => ({ ...v, categoryId: value }))}
+                        disabled={loadingCategories || categoryOptions.length === 0}
+                      >
                         <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
-                          <SelectValue placeholder="Chọn danh mục" />
+                          <SelectValue placeholder={loadingCategories ? "Đang tải..." : "Chọn danh mục"} />
                         </SelectTrigger>
                         <SelectContent>
-                          {categories
-                            .filter((c) => c.id !== "all")
-                            .map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>
-                                {cat.name}
-                              </SelectItem>
-                            ))}
+                          {categoryOptions.map((cat: any) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -735,19 +890,20 @@ export function Inventory() {
                           Thêm đơn vị
                         </Button>
                       </div>
-                      <Select>
+                      <Select
+                        value={addDialogValues.unitId}
+                        onValueChange={(value: string) => setAddDialogValues((v: any) => ({ ...v, unitId: value }))}
+                        disabled={loadingUnits || unitOptions.length === 0}
+                      >
                         <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
-                          <SelectValue placeholder="Chọn" />
+                          <SelectValue placeholder={loadingUnits ? "Đang tải..." : "Chọn đơn vị"} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="kg">Kilogram (kg)</SelectItem>
-                          <SelectItem value="g">Gram (g)</SelectItem>
-                          <SelectItem value="l">Lít (L)</SelectItem>
-                          <SelectItem value="ml">Mililit (ml)</SelectItem>
-                          <SelectItem value="box">Hộp</SelectItem>
-                          <SelectItem value="bottle">Chai</SelectItem>
-                          <SelectItem value="piece">Cái</SelectItem>
-                          <SelectItem value="cup">Ly</SelectItem>
+                          {unitOptions.map((unit: any) => (
+                            <SelectItem key={unit.id} value={unit.id}>
+                              {unit.name} {unit.symbol ? `(${unit.symbol})` : ""}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -759,6 +915,8 @@ export function Inventory() {
                         <Label>Tồn kho tối thiểu</Label>
                         <Input
                           type="number"
+                          value={addDialogValues.minStock}
+                          onChange={(e) => setAddDialogValues(prev => ({ ...prev, minStock: Number(e.target.value) }))}
                           className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                           placeholder="0"
                         />
@@ -767,12 +925,25 @@ export function Inventory() {
                         <Label>Tồn kho tối đa</Label>
                         <Input
                           type="number"
+                          value={addDialogValues.maxStock}
+                          onChange={(e) => setAddDialogValues(prev => ({ ...prev, maxStock: Number(e.target.value) }))}
                           className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                           placeholder="0"
                         />
                       </div>
                     </div>
                   )}
+
+                  <div>
+                    <Label>Giá bán</Label>
+                    <Input
+                      type="number"
+                      value={addDialogValues.sellingPrice}
+                      onChange={(e) => setAddDialogValues(prev => ({ ...prev, sellingPrice: Number(e.target.value) }))}
+                      className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                      placeholder="0"
+                    />
+                  </div>
 
                   {/* Image Upload Section */}
                   <div>
@@ -965,14 +1136,17 @@ export function Inventory() {
                     Hủy
                   </Button>
                   {canCreate && (
-                  <Button className="bg-blue-600 hover:bg-blue-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    {addItemType === "composite"
-                      ? "Thêm hàng hóa"
-                      : addItemType === "ready-made"
+                    <Button
+                      className="bg-blue-600 hover:bg-blue-700"
+                      onClick={handleAddNewItem}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      {addItemType === "composite"
                         ? "Thêm hàng hóa"
-                        : "Thêm nguyên liệu"}
-                  </Button>
+                        : addItemType === "ready-made"
+                          ? "Thêm hàng hóa"
+                          : "Thêm nguyên liệu"}
+                    </Button>
                   )}
                 </DialogFooter>
               </DialogContent>
@@ -1278,7 +1452,7 @@ export function Inventory() {
         {/* Add Associated Product Dialog */}
         <Dialog
           open={addAssociatedProductDialogOpen}
-          onOpenChange={(open) => {
+          onOpenChange={(open: boolean) => {
             setAddAssociatedProductDialogOpen(open);
             if (open) setAssociatedProductsToAdd([]);
           }}
@@ -1350,7 +1524,7 @@ export function Inventory() {
                               )
                               .every((item) => associatedProductsToAdd.includes(item.id))
                           }
-                          onCheckedChange={(checked) => {
+                          onCheckedChange={(checked: boolean) => {
                             const filteredItems = items.filter(
                               (item) =>
                                 (item.type === "ready-made" || item.type === "composite") &&
@@ -1471,7 +1645,7 @@ export function Inventory() {
 
         <Dialog
           open={editDialogOpen}
-          onOpenChange={(open) => {
+          onOpenChange={(open: boolean) => {
             setEditDialogOpen(open);
             if (!open) setEditingItem(null);
           }}
@@ -1498,7 +1672,7 @@ export function Inventory() {
                   <Label>Trạng thái</Label>
                   <Select
                     value={editValues.productStatus || "selling"}
-                    onValueChange={(val) =>
+                    onValueChange={(val: string) =>
                       setEditValues((v) => ({ ...v, productStatus: val }))
                     }
                   >
@@ -1528,21 +1702,20 @@ export function Inventory() {
                   </div>
                   <Select
                     value={editValues.category}
-                    onValueChange={(val) =>
+                    onValueChange={(val: string) =>
                       setEditValues((v) => ({ ...v, category: val }))
                     }
+                    disabled={loadingCategories || categoryOptions.length === 0}
                   >
                     <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
-                      <SelectValue />
+                      <SelectValue placeholder={loadingCategories ? "Đang tải..." : "Chọn danh mục"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories
-                        .filter((c) => c.id !== "all")
-                        .map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id}>
-                            {cat.name}
-                          </SelectItem>
-                        ))}
+                      {categoryOptions.map((cat: any) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1561,22 +1734,20 @@ export function Inventory() {
                   </div>
                   <Select
                     value={editValues.unit}
-                    onValueChange={(val) =>
+                    onValueChange={(val: string) =>
                       setEditValues((v) => ({ ...v, unit: val }))
                     }
+                    disabled={loadingUnits || unitOptions.length === 0}
                   >
                     <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
-                      <SelectValue />
+                      <SelectValue placeholder={loadingUnits ? "Đang tải..." : "Chọn đơn vị"} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="kg">Kilogram (kg)</SelectItem>
-                      <SelectItem value="g">Gram (g)</SelectItem>
-                      <SelectItem value="l">Lít (L)</SelectItem>
-                      <SelectItem value="ml">Mililit (ml)</SelectItem>
-                      <SelectItem value="box">Hộp</SelectItem>
-                      <SelectItem value="bottle">Chai</SelectItem>
-                      <SelectItem value="piece">Cái</SelectItem>
-                      <SelectItem value="cup">Ly</SelectItem>
+                      {unitOptions.map((unit: any) => (
+                        <SelectItem key={unit.id} value={unit.id}>
+                          {unit.name} {unit.symbol ? `(${unit.symbol})` : ""}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1780,8 +1951,8 @@ export function Inventory() {
 
               <div className="flex justify-left">
                 <ImageUploadWithCrop
-                  currentImage={editValues.imageUrl}
-                  onImageChange={(url) =>
+                  value={editValues.imageUrl as string}
+                  onChange={(url: string) =>
                     setEditValues((prev) => ({ ...prev, imageUrl: url }))
                   }
                 />
@@ -1916,10 +2087,10 @@ export function Inventory() {
                   Bộ lọc
                   {(!selectedCategories.includes('all') || selectedTypes.length < 3 || selectedStockStatuses.length < 5 || selectedProductStatuses.length < 4) && (
                     <Badge className="ml-1 bg-blue-500 text-white px-1.5 py-0.5 text-xs">
-                      {(!selectedCategories.includes('all') ? selectedCategories.length : 0) + 
-                       (selectedTypes.length < 3 ? (3 - selectedTypes.length) : 0) +
-                       (selectedStockStatuses.length < 5 ? (5 - selectedStockStatuses.length) : 0) +
-                       (selectedProductStatuses.length < 4 ? (4 - selectedProductStatuses.length) : 0)}
+                      {(!selectedCategories.includes('all') ? selectedCategories.length : 0) +
+                        (selectedTypes.length < 3 ? (3 - selectedTypes.length) : 0) +
+                        (selectedStockStatuses.length < 5 ? (5 - selectedStockStatuses.length) : 0) +
+                        (selectedProductStatuses.length < 4 ? (4 - selectedProductStatuses.length) : 0)}
                     </Badge>
                   )}
                 </Button>
@@ -1936,8 +2107,8 @@ export function Inventory() {
                         {categories.map((cat) => (
                           <div key={cat.id} className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
-                              <Checkbox 
-                                id={cat.id} 
+                              <Checkbox
+                                id={cat.id}
                                 checked={selectedCategories.includes(cat.id)}
                                 onCheckedChange={() => toggleCategory(cat.id)}
                                 className="border-slate-300"
@@ -1962,7 +2133,7 @@ export function Inventory() {
                           { id: 'ingredient', label: 'Nguyên liệu' },
                         ].map((type) => (
                           <div key={type.id} className="flex items-center space-x-2">
-                            <Checkbox 
+                            <Checkbox
                               id={type.id}
                               checked={selectedTypes.includes(type.id as ItemType)}
                               onCheckedChange={() => toggleType(type.id as ItemType)}
@@ -1988,7 +2159,7 @@ export function Inventory() {
                           { id: "expired", label: "Hết hạn" },
                         ].map((status) => (
                           <div key={status.id} className="flex items-center space-x-2">
-                            <Checkbox 
+                            <Checkbox
                               id={`stock-${status.id}`}
                               checked={selectedStockStatuses.includes(status.id)}
                               onCheckedChange={() => toggleStockStatus(status.id)}
@@ -2013,7 +2184,7 @@ export function Inventory() {
                           { id: "paused", label: "Tạm ngưng" },
                         ].map((status) => (
                           <div key={status.id} className="flex items-center space-x-2">
-                            <Checkbox 
+                            <Checkbox
                               id={`prod-${status.id}`}
                               checked={selectedProductStatuses.includes(status.id)}
                               onCheckedChange={() => toggleProductStatus(status.id)}
@@ -2054,7 +2225,7 @@ export function Inventory() {
         {/* Tabs */}
         <Tabs
           value={activeTab}
-          onValueChange={(value) => setActiveTab(value as ItemType)}
+          onValueChange={(value: string) => setActiveTab(value as ItemType)}
           className="w-full"
         >
           <TabsList className="grid w-full grid-cols-3 mb-6">
@@ -2301,7 +2472,7 @@ export function Inventory() {
                                       size="sm"
                                       onClick={() => {
                                         if (confirm(`Bạn có chắc muốn xóa ${item.name}?`)) {
-                                          setItems(items.filter((i) => i.id !== item.id));
+                                          handleDeleteItem(item.id);
                                         }
                                       }}
                                     >
@@ -2631,9 +2802,19 @@ export function Inventory() {
                                   >
                                     <Pencil className="w-4 h-4" />
                                   </Button>
-                                  <Button variant="ghost" size="sm">
-                                    <Trash2 className="w-4 h-4 text-red-600" />
-                                  </Button>
+                                  {canDelete && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        if (confirm(`Bạn có chắc muốn xóa ${item.name}?`)) {
+                                          handleDeleteItem(item.id);
+                                        }
+                                      }}
+                                    >
+                                      <Trash2 className="w-4 h-4 text-red-600" />
+                                    </Button>
+                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -2999,9 +3180,19 @@ export function Inventory() {
                                   >
                                     <Pencil className="w-4 h-4" />
                                   </Button>
-                                  <Button variant="ghost" size="sm">
-                                    <Trash2 className="w-4 h-4 text-red-600" />
-                                  </Button>
+                                  {canDelete && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        if (confirm(`Bạn có chắc muốn xóa ${item.name}?`)) {
+                                          handleDeleteItem(item.id);
+                                        }
+                                      }}
+                                    >
+                                      <Trash2 className="w-4 h-4 text-red-600" />
+                                    </Button>
+                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>
