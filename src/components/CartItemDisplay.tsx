@@ -62,8 +62,8 @@ interface CartItem {
 
 interface CartItemDisplayProps {
   item: CartItem;
-  onUpdateQuantity: (id: string, change: number) => void;
-  onRemove: (id: string) => void;
+  onUpdateQuantity: (id: string, change: number, opts?: { reason?: string }) => void;
+  onRemove: (id: string, opts?: { reason?: string }) => void;
   onCustomize: (item: CartItem) => void;
   onAddNote: (item: CartItem) => void;
   onToggleComboExpansion?: (comboId: string) => void;
@@ -72,6 +72,8 @@ interface CartItemDisplayProps {
   restockedItems?: string[];
   glowingItems?: string[];
   appliedPromoCode?: string;
+  // Payment status to control confirmation behavior
+  paymentStatus?: 'unpaid' | 'partial' | 'paid';
 }
 
 export function CartItemDisplay({
@@ -86,6 +88,7 @@ export function CartItemDisplay({
   restockedItems = [],
   glowingItems = [],
   appliedPromoCode = "",
+  paymentStatus = 'unpaid',
 }: CartItemDisplayProps) {
   const isRestocked = restockedItems.includes(item.id);
   const isGlowing = glowingItems.includes(item.id);
@@ -108,25 +111,21 @@ export function CartItemDisplay({
   ];
 
   const handleDeleteClick = () => {
-    setItemToDelete(item.id);
-    setCancelReason("");
-    setOtherReason("");
-    setCancelQuantity(item.quantity); // Default: delete all
-    setDeleteConfirmOpen(true);
+    // Pre-payment or paid: perform immediate removal without reason prompts
+    // Trash button removes entire item
+    onRemove(item.id, {});
   };
 
   const handleDecreaseClick = () => {
-    setItemToDelete(item.id);
-    setCancelReason("");
-    setOtherReason("");
-    setCancelQuantity(1); // Default: decrease by 1
-    setDecreaseConfirmOpen(true);
+    // Pre-payment or paid: decrease immediately by 1 without reason prompts
+    onUpdateQuantity(item.id, -1, {});
   };
 
   const handleConfirmDelete = () => {
     if (cancelReason && (cancelReason !== "Khác" || otherReason.trim())) {
       // Remove the item completely
-      onRemove(item.id);
+      const reasonText = cancelReason === "Khác" ? otherReason.trim() : cancelReason;
+      onRemove(item.id, { reason: reasonText });
       setDeleteConfirmOpen(false);
       setCancelReason("");
       setOtherReason("");
@@ -137,7 +136,8 @@ export function CartItemDisplay({
   const handleConfirmDecrease = () => {
     if (cancelReason && (cancelReason !== "Khác" || otherReason.trim())) {
       // Decrease by cancelQuantity
-      onUpdateQuantity(item.id, -cancelQuantity);
+      const reasonText = cancelReason === "Khác" ? otherReason.trim() : cancelReason;
+      onUpdateQuantity(item.id, -cancelQuantity, { reason: reasonText });
       setDecreaseConfirmOpen(false);
       setCancelReason("");
       setOtherReason("");
@@ -159,8 +159,9 @@ export function CartItemDisplay({
 
   // Calculate topping extras
   const getToppingExtras = (customization?: ItemCustomization) => {
-    if (!customization || !customization.toppings.length) return 0;
-    return customization.toppings.reduce((sum, t) => sum + t.price, 0);
+    const topps = customization?.toppings ?? [];
+    if (!Array.isArray(topps) || topps.length === 0) return 0;
+    return topps.reduce((sum, t) => sum + (Number(t.price) || 0), 0);
   };
 
   // Get text color based on status
@@ -291,9 +292,9 @@ export function CartItemDisplay({
                               </span>
                             </div>
 
-                            {subItem.customization.toppings.length > 0 && (
+                            {(subItem.customization?.toppings ?? []).length > 0 && (
                               <div className="flex gap-1 flex-wrap">
-                                {subItem.customization.toppings.map(
+                                {(subItem.customization?.toppings ?? []).map(
                                   (topping, tIdx) => (
                                     <Badge
                                       key={tIdx}
@@ -448,9 +449,9 @@ export function CartItemDisplay({
                     </span>
                   </div>
 
-                  {item.customization.toppings.length > 0 && (
+                  {(item.customization?.toppings ?? []).length > 0 && (
                     <div className="flex gap-1 flex-wrap">
-                      {item.customization.toppings.map((topping, idx) => (
+                      {(item.customization?.toppings ?? []).map((topping, idx) => (
                         <Badge
                           key={idx}
                           variant="outline"

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Clock,
   ChevronRight,
@@ -21,6 +21,8 @@ import {
 import { Label } from "../ui/label";
 import { Checkbox } from "../ui/checkbox";
 import { Textarea } from "../ui/textarea";
+import { getKitchenItems, updateItemStatus, reportOutOfStock } from "../../api/order";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface KitchenItem {
   id: string;
@@ -33,6 +35,8 @@ interface KitchenItem {
   outOfStock: boolean;
   outOfStockReason?: string;
   outOfStockIngredients?: string[];
+  orderItemId?: string | number; // BE order item id for /orders/items/:id/status
+  kitchenItemId?: string | number; // BE kitchen ticket id for /orders/kitchen/items/:id/status
 }
 
 interface Recipe {
@@ -44,6 +48,7 @@ interface Recipe {
 }
 
 export function KitchenDisplay() {
+  const { hasPermission } = useAuth();
   // Out of stock modal states
   const [outOfStockModalOpen, setOutOfStockModalOpen] = useState(false);
   const [selectedItemForStock, setSelectedItemForStock] = useState<
@@ -241,94 +246,212 @@ export function KitchenDisplay() {
     "Kem tươi",
     "Đào",
   ];
+  const [items, setItems] = useState<KitchenItem[]>([]);
+  // Local cache to keep OOS tickets visible even if backend hides them temporarily
+  const oosCacheRef = useRef<Record<string, KitchenItem>>({});
+  const [isLoading, setIsLoading] = useState(false);
 
-  const [items, setItems] = useState<KitchenItem[]>([
-    {
-      id: "1",
-      itemName: "Cà phê sữa đá",
-      totalQuantity: 3,
-      completedQuantity: 0,
-      table: "Bàn 3",
-      timestamp: new Date(Date.now() - 12 * 60000),
-      outOfStock: false,
-    },
-    {
-      id: "2",
-      itemName: "Bạc xỉu",
-      totalQuantity: 1,
-      completedQuantity: 0,
-      table: "Bàn 3",
-      timestamp: new Date(Date.now() - 12 * 60000),
-      notes: "Ít đường",
-      outOfStock: false,
-    },
-    {
-      id: "3",
-      itemName: "Trà đào cam sả",
-      totalQuantity: 2,
-      completedQuantity: 1,
-      table: "Bàn 7",
-      timestamp: new Date(Date.now() - 8 * 60000),
-      outOfStock: false,
-    },
-    {
-      id: "4",
-      itemName: "Sinh tố bơ",
-      totalQuantity: 2,
-      completedQuantity: 2,
-      table: "Bàn 7",
-      timestamp: new Date(Date.now() - 8 * 60000),
-      outOfStock: false,
-    },
-    {
-      id: "5",
-      itemName: "Trà sữa trân châu",
-      totalQuantity: 2,
-      completedQuantity: 0,
-      table: "Bàn 12",
-      timestamp: new Date(Date.now() - 5 * 60000),
-      notes: "Extra trân châu",
-      outOfStock: true,
-      outOfStockReason: "Trân châu",
-      outOfStockIngredients: ["Trân châu"],
-    },
-    {
-      id: "6",
-      itemName: "Bánh croissant",
-      totalQuantity: 2,
-      completedQuantity: 0,
-      table: "Bàn 12",
-      timestamp: new Date(Date.now() - 5 * 60000),
-      outOfStock: false,
-    },
-    {
-      id: "7",
-      itemName: "Cà phê đen",
-      totalQuantity: 3,
-      completedQuantity: 2,
-      table: "Mang về",
-      timestamp: new Date(Date.now() - 6 * 60000),
-      outOfStock: false,
-    },
-    {
-      id: "8",
-      itemName: "Sinh tố dâu",
-      totalQuantity: 1,
-      completedQuantity: 0,
-      table: "Bàn 5",
-      timestamp: new Date(Date.now() - 2 * 60000),
-      outOfStock: false,
-    },
-    {
-      id: "9",
-      itemName: "Matcha latte",
-      totalQuantity: 2,
-      completedQuantity: 0,
-      table: "Bàn 4",
-      timestamp: new Date(Date.now() - 2 * 60000),
-      outOfStock: false,
-    },
-  ]);
+  // Persist OOS cache across navigation using localStorage
+  const OOS_CACHE_STORAGE_KEY = "kds_oos_cache";
+  const loadOOSCache = (): Record<string, KitchenItem> => {
+    try {
+      const raw = localStorage.getItem(OOS_CACHE_STORAGE_KEY);
+      if (!raw) return {};
+      const parsed: Record<string, any> = JSON.parse(raw);
+      const repaired: Record<string, KitchenItem> = {};
+      Object.keys(parsed || {}).forEach((k) => {
+        const v = parsed[k];
+        repaired[k] = {
+          ...v,
+          timestamp: v?.timestamp ? new Date(v.timestamp) : new Date(),
+          outOfStock: Boolean(v?.outOfStock),
+        } as KitchenItem;
+      });
+      return repaired;
+    } catch {
+      return {};
+    }
+  };
+  const saveOOSCache = (cache: Record<string, KitchenItem>) => {
+    try {
+      localStorage.setItem(OOS_CACHE_STORAGE_KEY, JSON.stringify(cache));
+    } catch {}
+  };
+
+  const extractItems = (res: any): any[] => {
+    const data = res?.data ?? res;
+
+    // Common direct arrays
+    let items = data?.metaData?.items ?? data?.items ?? data?.data;
+    if (Array.isArray(items)) return items;
+    if (Array.isArray(data?.metaData)) return data.metaData;
+    if (Array.isArray(data)) return data;
+
+    // Named collections frequently used by backends
+    const md = data?.metaData ?? {};
+    if (Array.isArray(md.kitchenItems)) return md.kitchenItems;
+    if (Array.isArray(md.tickets)) return md.tickets;
+
+    // Orders shape: metaData.orders[] with nested items
+    const orders = md.orders ?? data?.orders;
+    if (Array.isArray(orders)) {
+      const flat: any[] = [];
+      orders.forEach((ord: any) => {
+        const tableName = ord?.table?.tableName ?? ord?.tableName ?? ord?.table ?? ord?.orderCode ?? "Bàn";
+        const orderItems: any[] = ord?.items ?? ord?.orderItems ?? [];
+        orderItems.forEach((it: any) => {
+          flat.push({
+            ...it,
+            table: tableName,
+            orderId: ord?.id ?? ord?.orderId,
+          });
+        });
+      });
+      return flat;
+    }
+
+    return [];
+  };
+
+  const mapKitchenItem = (it: any): KitchenItem => {
+    const tableName = it?.table?.tableName ?? it?.tableName ?? it?.table ?? it?.orderCode ?? "Bàn";
+
+    // Try multiple field names for quantities
+    const rawQty = Number(
+      it?.pendingQuantity ??
+      it?.waitingQuantity ??
+      it?.quantity ??
+      it?.totalQuantity ??
+      0
+    );
+
+    const rawCompleted = Number(
+      it?.completedQuantity ??
+      it?.doneQuantity ??
+      it?.readyQuantity ??
+      0
+    );
+
+    // Some APIs only give orderedQuantity + completed → infer pending
+    const ordered = Number(it?.orderedQuantity ?? 0);
+    const inferredPending = ordered > 0 ? Math.max(ordered - rawCompleted, 0) : undefined;
+
+    const pendingQty = inferredPending ?? rawQty;
+    const doneQty = rawCompleted;
+
+    const ts = it?.updatedAt ?? it?.createdAt ?? Date.now();
+
+    // Detect ids used by different endpoints
+    const orderItemId = (
+      it?.orderItemId ??
+      it?.order_item_id ??
+      it?.orderItem?.id ??
+      it?.orderItemID ??
+      it?.order_itemID ??
+      it?.order_itemId
+    );
+    const kitchenItemId = it?.id ?? it?.ticketId ?? it?.kitchenItemId;
+
+    return {
+      // Prefer orderItemId so generic /orders/items/:id/status works
+      id: String(orderItemId ?? kitchenItemId ?? `${tableName}-${it?.inventoryItemId ?? Date.now()}`),
+      itemName: it?.itemName ?? it?.name ?? it?.inventoryItem?.name ?? "Món",
+      totalQuantity: isNaN(pendingQty) ? 0 : pendingQty,
+      completedQuantity: isNaN(doneQty) ? 0 : doneQty,
+      table: String(tableName),
+      timestamp: new Date(ts),
+      notes: it?.notes ?? undefined,
+      outOfStock: Boolean(it?.outOfStock ?? false),
+      outOfStockReason: it?.outOfStockReason ?? undefined,
+      outOfStockIngredients: Array.isArray(it?.outOfStockIngredients) ? it.outOfStockIngredients : undefined,
+      orderItemId: orderItemId ? String(orderItemId) : undefined,
+      kitchenItemId: kitchenItemId ? String(kitchenItemId) : undefined,
+    };
+  };
+
+  const refreshKitchenItems = async () => {
+    if (!hasPermission("kitchen:access" as any)) return;
+    setIsLoading(true);
+    try {
+      const res = await getKitchenItems();
+      const arr = extractItems(res);
+      const fetched = arr.map(mapKitchenItem);
+
+      // Merge with local OOS cache to preserve OOS flags (do NOT resurrect missing items)
+      const mapByKey: Record<string, KitchenItem> = {};
+      const getKey = (i: KitchenItem) => String(i.kitchenItemId ?? i.orderItemId ?? i.id);
+
+      fetched.forEach((i) => {
+        mapByKey[getKey(i)] = i;
+      });
+
+      // Only overlay OOS flags onto items that exist in the latest feed
+      const cache = oosCacheRef.current;
+      Object.keys(cache).forEach((key) => {
+        if (mapByKey[key] && cache[key].outOfStock) {
+          mapByKey[key] = {
+            ...mapByKey[key],
+            outOfStock: true,
+            outOfStockReason: cache[key].outOfStockReason,
+            outOfStockIngredients: cache[key].outOfStockIngredients,
+          };
+        }
+      });
+
+      setItems(Object.values(mapByKey));
+    } catch (err: any) {
+      toast.error("Không tải được danh sách món bếp", {
+        description: err?.message || "Lỗi kết nối API",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Initial load + visibility-aware polling (no WebSocket yet)
+  useEffect(() => {
+    if (!hasPermission("kitchen:access" as any)) return;
+
+    let intervalId: any;
+    const ACTIVE_MS = 5000; // poll every 5s when tab is visible
+
+    const startPolling = () => {
+      if (intervalId) return;
+      intervalId = setInterval(() => refreshKitchenItems(), ACTIVE_MS);
+    };
+    const stopPolling = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    // Load persisted OOS cache so items remain visible across navigation
+    oosCacheRef.current = loadOOSCache();
+    // Always fetch once on mount
+    refreshKitchenItems();
+
+    // Start polling only when the document is visible
+    if (!document.hidden) startPolling();
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        startPolling();
+        // quick refresh upon returning to tab
+        refreshKitchenItems();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      stopPolling();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasPermission]);
 
   const getElapsedTime = (timestamp: Date) => {
     const minutes = Math.floor((Date.now() - timestamp.getTime()) / 60000);
@@ -338,46 +461,37 @@ export function KitchenDisplay() {
   const advanceOneUnit = (itemId: string) => {
     const item = items.find((i) => i.id === itemId);
     if (!item || item.totalQuantity <= 0) return;
-
-    const newTotalQty = item.totalQuantity - 1;
-
-    setItems((prev) =>
-      prev.map((i) =>
-        i.id === itemId
-          ? {
-              ...i,
-              totalQuantity: newTotalQty,
-              completedQuantity: item.completedQuantity + 1,
-            }
-          : i
-      )
-    );
-
-    toast.success(`Hoàn thành 1 ly ${item.itemName} (Còn ${newTotalQty} ly)`);
+    if (!item.orderItemId) {
+      toast.error("Thiếu orderItemId từ API, không thể cập nhật trạng thái");
+      return;
+    }
+    const payload = { action: "complete", quantity: 1 };
+    updateItemStatus(item.orderItemId as any, payload)
+      .then(() => {
+        toast.success(`Hoàn thành 1 ly ${item.itemName}`);
+        refreshKitchenItems();
+      })
+      .catch((err: any) => {
+        toast.error("Cập nhật trạng thái thất bại", { description: err?.message || "API lỗi" });
+      });
   };
 
   const advanceAllUnits = (itemId: string) => {
     const item = items.find((i) => i.id === itemId);
     if (!item || item.totalQuantity <= 0) return;
-
-    setItems((prev) =>
-      prev.map((i) =>
-        i.id === itemId
-          ? {
-              ...i,
-              totalQuantity: 0,
-              completedQuantity: item.completedQuantity + item.totalQuantity,
-            }
-          : i
-      )
-    );
-
-    toast.success(
-      `${item.itemName} hoàn thành tất cả ${item.totalQuantity} ly`,
-      {
-        icon: <Bell className="w-4 h-4" />,
-      }
-    );
+    if (!item.orderItemId) {
+      toast.error("Thiếu orderItemId từ API, không thể cập nhật trạng thái");
+      return;
+    }
+    const payload = { action: "complete", quantity: item.totalQuantity };
+    updateItemStatus(item.orderItemId as any, payload)
+      .then(() => {
+        toast.success(`${item.itemName} hoàn thành tất cả`, { icon: <Bell className="w-4 h-4" /> });
+        refreshKitchenItems();
+      })
+      .catch((err: any) => {
+        toast.error("Cập nhật trạng thái thất bại", { description: err?.message || "API lỗi" });
+      });
   };
 
   const openOutOfStockModal = (itemId: string) => {
@@ -394,43 +508,83 @@ export function KitchenDisplay() {
     }
 
     if (!selectedItemForStock) return;
-
-    const reasonText =
-      selectedIngredients.length > 0
-        ? selectedIngredients.join(", ")
-        : otherReason;
-
-    setItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== selectedItemForStock) return item;
-        return {
-          ...item,
-          outOfStock: true,
-          outOfStockReason: reasonText,
-          outOfStockIngredients: selectedIngredients,
-        };
+    const reasonText = selectedIngredients.length > 0 ? selectedIngredients.join(", ") : otherReason;
+    reportOutOfStock(selectedItemForStock, {
+      ingredients: selectedIngredients,
+      reason: otherReason.trim() || reasonText,
+    })
+      .then(() => {
+        toast.error(`Đã báo hết nguyên liệu: ${reasonText}`);
+        // Optimistically mark and cache the item as out-of-stock so it stays visible
+        setItems((prev) => {
+          const updated = prev.map((i) => {
+            const key = String(i.kitchenItemId ?? i.orderItemId ?? i.id);
+            if (key === String(selectedItemForStock)) {
+              const oosItem = {
+                ...i,
+                outOfStock: true,
+                outOfStockReason: reasonText,
+                outOfStockIngredients: selectedIngredients,
+                // When OOS, keep at least one unit visible even if backend sets pending to 0
+                totalQuantity: Math.max(i.totalQuantity, 0),
+              };
+              oosCacheRef.current[key] = oosItem;
+              saveOOSCache(oosCacheRef.current);
+              return oosItem;
+            }
+            return i;
+          });
+          return updated;
+        });
+        setOutOfStockModalOpen(false);
+        setSelectedItemForStock(null);
+        refreshKitchenItems();
       })
-    );
-
-    toast.error(`Đã báo hết nguyên liệu: ${reasonText}`);
-    setOutOfStockModalOpen(false);
-    setSelectedItemForStock(null);
+      .catch((err: any) => {
+        toast.error("Báo hết nguyên liệu thất bại", { description: err?.message || "API lỗi" });
+      });
   };
 
-  const markIngredientsRestocked = (itemId: string) => {
-    setItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== itemId) return item;
-        return {
-          ...item,
-          outOfStock: false,
-          outOfStockReason: undefined,
-          outOfStockIngredients: undefined,
-        };
-      })
-    );
+  const markIngredientsRestocked = async (itemId: string) => {
+    const item = items.find((i) => i.id === itemId);
+    if (!item) return;
+    if (!item.orderItemId) {
+      toast.error("Thiếu orderItemId từ API, không thể cập nhật trạng thái");
+      return;
+    }
 
-    toast.success("Đã bổ sung nguyên liệu, tiếp tục làm món");
+    // Prefer explicit status transition understood by most backends
+    try {
+      await updateItemStatus(item.orderItemId as any, { status: "preparing" });
+      toast.success("Đã bổ sung nguyên liệu, tiếp tục làm món");
+      // Remove from local OOS cache and clear flags locally
+      const key = String(item.kitchenItemId ?? item.orderItemId ?? item.id);
+      delete oosCacheRef.current[key];
+      saveOOSCache(oosCacheRef.current);
+      setItems((prev) => prev.map((i) => {
+        const k = String(i.kitchenItemId ?? i.orderItemId ?? i.id);
+        return k === key ? { ...i, outOfStock: false, outOfStockReason: undefined, outOfStockIngredients: undefined } : i;
+      }));
+      await refreshKitchenItems();
+      return;
+    } catch (e1: any) {
+      // Fallback to action-based API if backend expects it
+      try {
+        await updateItemStatus(item.orderItemId as any, { action: "ingredients-restocked" });
+        toast.success("Đã bổ sung nguyên liệu, tiếp tục làm món");
+        const key = String(item.kitchenItemId ?? item.orderItemId ?? item.id);
+        delete oosCacheRef.current[key];
+        saveOOSCache(oosCacheRef.current);
+        setItems((prev) => prev.map((i) => {
+          const k = String(i.kitchenItemId ?? i.orderItemId ?? i.id);
+          return k === key ? { ...i, outOfStock: false, outOfStockReason: undefined, outOfStockIngredients: undefined } : i;
+        }));
+        await refreshKitchenItems();
+        return;
+      } catch (e2: any) {
+        toast.error("Cập nhật nguyên liệu thất bại", { description: e2?.message || e1?.message || "API lỗi" });
+      }
+    }
   };
 
   const toggleIngredient = (ingredient: string) => {
@@ -447,17 +601,31 @@ export function KitchenDisplay() {
   };
 
   // Separate items into two columns
-  const pendingItems = items.filter((item) => item.totalQuantity > 0);
+  // Keep out-of-stock items visible even if backend sets quantity to 0
+  const pendingItems = items.filter((item) => item.totalQuantity > 0 || item.outOfStock);
   const inProgressItems = items.filter((item) => item.completedQuantity > 0);
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
       {/* Header */}
       <div className="bg-white border-b shadow-sm px-4 lg:px-6 py-3">
-        <h1 className="text-blue-900 text-2xl font-semibold mb-1">Màn hình pha chế - Theo món</h1>
-        <p className="text-sm text-slate-600">
-          {pendingItems.length} món chờ • {inProgressItems.length} món đang làm
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-blue-900 text-2xl font-semibold mb-1">Màn hình pha chế - Theo món</h1>
+            <p className="text-sm text-slate-600">
+              {pendingItems.length} món chờ • {inProgressItems.length} món đang làm
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={refreshKitchenItems}
+            title="Làm mới"
+          >
+            Làm mới
+          </Button>
+        </div>
       </div>
 
       {/* Two Column Layout */}
@@ -467,7 +635,7 @@ export function KitchenDisplay() {
           <div className="flex flex-col h-full border-r border-slate-200 bg-slate-50">
             <div className="px-4 lg:px-6 py-2.5 border-b bg-white flex-shrink-0">
               <h3 className="text-slate-900">
-                Chờ chế biến ({pendingItems.length})
+                {isLoading ? "Đang tải..." : `Chờ chế biến (${pendingItems.length})`}
               </h3>
             </div>
 
@@ -526,6 +694,8 @@ export function KitchenDisplay() {
                               variant="outline"
                               className="h-8 px-3 text-xs bg-green-50 border-green-300 text-green-700 hover:bg-green-100"
                               onClick={() => markIngredientsRestocked(item.id)}
+                              disabled={!item.orderItemId}
+                              title={!item.orderItemId ? "Thiếu orderItemId từ API" : undefined}
                             >
                               Đã bổ sung
                             </Button>
@@ -535,6 +705,8 @@ export function KitchenDisplay() {
                                 size="sm"
                                 className="h-9 w-9 rounded-full p-0 bg-blue-600 hover:bg-blue-700"
                                 onClick={() => advanceOneUnit(item.id)}
+                                disabled={!item.orderItemId}
+                                title={!item.orderItemId ? "Thiếu orderItemId từ API" : "Hoàn thành 1"}
                                 title="Hoàn thành 1"
                               >
                                 <ChevronRight className="w-4 h-4" />
@@ -543,6 +715,8 @@ export function KitchenDisplay() {
                                 size="sm"
                                 className="h-9 w-9 rounded-full p-0 bg-blue-600 hover:bg-blue-700"
                                 onClick={() => advanceAllUnits(item.id)}
+                                disabled={!item.orderItemId}
+                                title={!item.orderItemId ? "Thiếu orderItemId từ API" : "Hoàn thành tất cả"}
                                 title="Hoàn thành tất cả"
                               >
                                 <ChevronsRight className="w-4 h-4" />
@@ -562,7 +736,7 @@ export function KitchenDisplay() {
                             size="sm"
                             variant="ghost"
                             className="h-8 w-8 p-0 text-slate-400 hover:text-red-600"
-                            onClick={() => openOutOfStockModal(item.id)}
+                            onClick={() => openOutOfStockModal(String((item as any).kitchenItemId ?? item.id))}
                           >
                             <AlertCircle className="w-4 h-4" />
                           </Button>
@@ -636,6 +810,8 @@ export function KitchenDisplay() {
                             size="sm"
                             className="h-9 w-9 rounded-full p-0 bg-blue-600 hover:bg-blue-700"
                             onClick={() => advanceOneUnit(item.id)}
+                            disabled={!item.orderItemId}
+                            title={!item.orderItemId ? "Thiếu orderItemId từ API" : undefined}
                           >
                             <ChevronRight className="w-4 h-4" />
                           </Button>
@@ -643,6 +819,8 @@ export function KitchenDisplay() {
                             size="sm"
                             className="h-9 w-9 rounded-full p-0 bg-blue-600 hover:bg-blue-700"
                             onClick={() => advanceAllUnits(item.id)}
+                            disabled={!item.orderItemId}
+                            title={!item.orderItemId ? "Thiếu orderItemId từ API" : undefined}
                           >
                             <ChevronsRight className="w-4 h-4" />
                           </Button>

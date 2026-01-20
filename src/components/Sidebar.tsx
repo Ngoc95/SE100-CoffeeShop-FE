@@ -69,6 +69,8 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
     logout();
   };
 
+  
+
   // Check permission for a specific page
   const hasAccess = (page: PageType) => {
     if (!user) return false;
@@ -328,6 +330,8 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
                   Tài khoản
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                
+                <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
                   <LogOut className="w-4 h-4 mr-2" />
                   Đăng xuất
@@ -433,6 +437,8 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
                 <User className="w-4 h-4 mr-2" />
                 Tài khoản
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
                 <LogOut className="w-4 h-4 mr-2" />

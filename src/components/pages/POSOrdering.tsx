@@ -100,7 +100,7 @@ import { getActiveCombos } from "../../api/combo";
 import { AccountProfileModal } from "../AccountProfileModal";
 import { useAuth } from "../../contexts/AuthContext";
 import { getCategories } from "../../api/category";
-import { getOrderByTable, getOrders, sendOrderToKitchen, checkoutOrder, mapOrderToCartItems, mapOrdersToReadyItems } from "../../api/order";
+import { getOrderByTable, getOrders, sendOrderToKitchen, checkoutOrder, mapOrderToCartItems, mapOrdersToReadyItems, sendOrderToKitchenWithItems, createOrder, addOrderItem, getKitchenItems, updateOrderItems, updateOrderItem, removeOrderItem } from "../../api/order";
 import { getAreas } from "../../api/area";
 import { getBankAccounts as fetchBankAccounts, createBankAccount as createBankAccountApi } from "../../api/finance";
 import { getCustomers } from "../../api/customer";
@@ -312,7 +312,8 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
   id: t.id,
   // Normalize to remove leading "Bàn" to avoid duplicate label "Bàn Bàn 01"
   name: (t.tableName ?? String(t.id)).replace(/^Bàn\s*/i, ''),
-  number: Number(t.tableName.replace(/\D/g, '')),
+  // Guard: some BE rows may not have tableName → avoid calling replace on undefined
+  number: Number(String(t.tableName ?? t.id).replace(/\D/g, '')),
   capacity: t.capacity,
   status: (t.currentStatus === 'OCCUPIED' ? 'occupied' : 'available') as Table['status'],
   area: (t.area?.id ?? (t as any).areaId) as number,
@@ -401,10 +402,13 @@ useEffect(() => {
   const [outOfStockItem, setOutOfStockItem] = useState<CartItem | null>(null);
   const [outOfStockIngredient, setOutOfStockIngredient] = useState<string>("");
   const [replaceItemModalOpen, setReplaceItemModalOpen] = useState(false);
-  const [globalOutOfStock, setGlobalOutOfStock] = useState<string[]>([
-    "Sữa tươi",
-    "Trân châu",
-  ]); // Mock data // itemId -> quantity to split
+  // IMPORTANT: inventoryOutageIngredients represents store-level outages coming from inventory,
+  // not kitchen per-order incidents. Keep kitchen outages scoped to the affected order item only.
+  const [inventoryOutageIngredients, setInventoryOutageIngredients] = useState<string[]>([]);
+  // UI-only kitchen outage flags (per item). These gray out product cards and ask for confirmation.
+  const [kitchenOutageItemIds, setKitchenOutageItemIds] = useState<string[]>([]);
+  const [outageConfirmOpen, setOutageConfirmOpen] = useState(false);
+  const [pendingOutageProduct, setPendingOutageProduct] = useState<(typeof products)[0] | null>(null);
   const [splitDestinationTable, setSplitDestinationTable] =
     useState<Table | null>(null);
 
@@ -433,6 +437,8 @@ useEffect(() => {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   // Track last payment method for receipt
   const [lastPaymentMethod, setLastPaymentMethod] = useState<string>("Tiền mặt");
+  // Track current order payment status to control cart adjustment behavior
+  const [orderPaymentStatus, setOrderPaymentStatus] = useState<'unpaid' | 'partial' | 'paid'>('unpaid');
 
   // Restock notification states
   const [restockedItems, setRestockedItems] = useState<string[]>([]);
@@ -666,6 +672,98 @@ useEffect(() => {
     };
     fetchToppings();
   }, []);
+
+  // Backend-linked: keep kitchen outage flags in sync with items marked OUT_OF_STOCK
+  useEffect(() => {
+    let timer: any;
+    let active = true;
+    const refreshKitchenOutages = async () => {
+      try {
+        const res = await getKitchenItems({ status: 'all' } as any);
+        const items = extractItems(res);
+        // Prefer inventoryItemId (or equivalent id fields) when backend provides it; fallback to name matching
+        const flaggedIds = (items as any[])
+          .filter((it: any) => {
+            const s = String(it.status || '').toUpperCase();
+            return s === 'OUT_OF_STOCK' || s === 'OUT-OF-STOCK';
+          })
+          .map((it: any) => {
+            const idCandidates = [
+              it.inventoryItemId,
+              it.inventoryItemID,
+              it.inventory_item_id,
+              it.itemId,
+              it.itemID,
+              it.item_id,
+              it?.item?.id,
+              it?.inventoryItem?.id,
+              it?.inventoryItem?.inventoryItemId,
+            ].filter((v: any) => v !== undefined && v !== null && String(v).length > 0);
+
+            if (idCandidates.length > 0) {
+              return String(idCandidates[0]);
+            }
+
+            // Fallback to name-based matching if no id available
+            const name = String(it.itemName || it.name || '');
+            if (!name) return null;
+            const p = products.find(
+              (x) => String(x.name).toLowerCase() === name.toLowerCase()
+            );
+            return p ? String(p.id) : null;
+          })
+          .filter((id: any): id is string => Boolean(id));
+
+        // Stable, deduped list for consistent equality checks
+        const unique = Array.from(new Set(flaggedIds)).sort();
+        // Deduplicate state updates to avoid render loops
+        if (active) {
+          setKitchenOutageItemIds((prev) => {
+            if (prev.length === unique.length && prev.every((v, i) => v === unique[i])) {
+              return prev;
+            }
+            return unique;
+          });
+        }
+      } catch (_) {
+        // Silent; POS can operate without kitchen feed
+      }
+    };
+    const start = () => {
+      refreshKitchenOutages();
+      timer = setInterval(refreshKitchenOutages, 10000);
+    };
+    const stop = () => {
+      if (timer) clearInterval(timer);
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') start();
+      else stop();
+    };
+    // Start only when visible
+    handleVisibility();
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      active = false;
+      stop();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [products]);
+
+  // Fallback: if cannot fetch global kitchen items (e.g., lack permission),
+  // still grey items that are OUT_OF_STOCK in the currently selected table's cart.
+  useEffect(() => {
+    const cart = getCurrentCart();
+    const localOutageIds = cart
+      .filter((it) => (it.status || '').toLowerCase() === 'out-of-stock')
+      .map((it) => String(it.id).split('-')[0]);
+    if (localOutageIds.length > 0) {
+      setKitchenOutageItemIds((prev) => {
+        const set = new Set([...prev, ...localOutageIds]);
+        return Array.from(set);
+      });
+    }
+  }, [selectedTable, tableOrders]);
 
   const filteredProducts = products.filter((p) => {
     const matchesCategory =
@@ -1055,7 +1153,8 @@ useEffect(() => {
     };
 
     const ingredients = productIngredients[product.id] || [];
-    return ingredients.some((ing) => globalOutOfStock.includes(ing));
+    // Gate menu items only by inventory-level outages, not by kitchen per-order events
+    return ingredients.some((ing) => inventoryOutageIngredients.includes(ing));
   };
 
   const checkComboDetection = (
@@ -1158,7 +1257,13 @@ useEffect(() => {
     return null;
   };
 
-  const addToCart = (product: (typeof products)[0]) => {
+  const addToCart = (product: (typeof products)[0], overrideOutage: boolean = false) => {
+    // If kitchen has reported temporary shortage for this item, ask for confirmation
+    if (kitchenOutageItemIds.includes(String(product.id)) && !overrideOutage) {
+      setPendingOutageProduct(product);
+      setOutageConfirmOpen(true);
+      return;
+    }
     // Check if product is out of stock
     if (isProductOutOfStock(product)) {
       toast.error("Món này tạm thời không thể phục vụ do hết nguyên liệu");
@@ -1188,6 +1293,39 @@ useEffect(() => {
     updateCurrentCart([...cart, newItem]);
     setIsKitchenUpdateNeeded(true); // Enable send to kitchen button
 
+    // Persist immediately to backend order (for logs + consistency)
+    if (selectedTable?.order_id) {
+      const payload: any = {
+        // BE AddOrderItemDto expects numeric itemId
+        itemId: Number(product.id),
+        quantity: 1,
+        // default customization (will be updated later if user customizes)
+        customization: product.category !== 'pastry' ? { sugarLevel: '100%', iceLevel: '100%', toppings: [] } : undefined,
+      };
+      addOrderItem(Number(selectedTable.order_id), payload)
+        .then((res: any) => {
+          // Try to extract the created order item id in robust ways
+          const md = res?.data?.metaData ?? res?.data ?? res;
+          const created = md?.orderItem ?? md?.item ?? md?.created ?? md;
+          const orderItemId = created?.id ?? created?.orderItemId ?? created?.itemId;
+          // Update the just-added local item with hidden identifiers
+          if (orderItemId) {
+            const invId = String(product.id);
+            const current = getCurrentCart();
+            const updated = current.map((ci) =>
+              ci.id === newItem.id
+                ? { ...ci, __orderItemId: String(orderItemId), __inventoryItemId: invId }
+                : ci
+            );
+            updateCurrentCart(updated);
+          }
+        })
+        .catch((err: any) => {
+          // Non-blocking; keep local cart even if BE add fails
+          toast.error("Không đồng bộ món với đơn hiện tại", { description: err?.message || 'API lỗi' });
+        });
+    }
+
     // Open customization modal only for non-pastry items
     if (product.category !== "pastry") {
       setSelectedItemForCustomization(newItem);
@@ -1197,14 +1335,18 @@ useEffect(() => {
     }
   };
 
-  const updateQuantity = (id: string, change: number) => {
+  const updateQuantity = (id: string, change: number, opts?: { reason?: string }) => {
     const cart = getCurrentCart();
+    const target = cart.find((i) => i.id === id);
     updateCurrentCart(
       cart
         .map((item) => {
           if (item.id === id) {
             const newQuantity = item.quantity + change;
-            return newQuantity > 0 ? { ...item, quantity: newQuantity } : item;
+            // Ensure items with quantity <= 0 are removed by setting to 0 before filtering
+            return newQuantity > 0
+              ? { ...item, quantity: newQuantity }
+              : { ...item, quantity: 0 };
           }
           return item;
         })
@@ -1214,10 +1356,64 @@ useEffect(() => {
     if (change > 0) {
       setIsKitchenUpdateNeeded(true);
     }
+
+    // Sync decrease/update to backend for persistence & logs
+    try {
+      const orderId = selectedTable?.order_id;
+      if (orderId && target) {
+        const orderItemId = (target as any).__orderItemId;
+        const inferredInventoryId = String(target.id).includes("-") ? String(target.id).split("-")[0] : undefined;
+        const inventoryItemId = (target as any).__inventoryItemId ?? inferredInventoryId;
+        const newQty = (target.quantity + change);
+        const changeType = newQty > 0 ? "update" : "remove";
+
+        // Prefer single-row endpoints when we know orderItemId
+        if (orderItemId) {
+          if (change < 0) {
+            const removedQty = Math.min(target.quantity, Math.abs(change));
+            // Partial cancel: DELETE with quantity (+ optional reason)
+            removeOrderItem(Number(orderId), String(orderItemId), { quantity: removedQty, reason: opts?.reason }).catch(() => {});
+          } else if (newQty > 0) {
+            // Increase: update to new quantity (if backend supports)
+            updateOrderItem(Number(orderId), String(orderItemId), { quantity: newQty }).catch(() => {});
+          }
+        } else if (inventoryItemId) {
+          // Fallback to batch payload by inventoryItemId
+          const persistItem: any = {
+            inventoryItemId,
+            quantity: newQty > 0 ? newQty : undefined,
+            changeType,
+          };
+          updateOrderItems(Number(orderId), [persistItem]).catch(() => {});
+        }
+
+        // Best-effort kitchen log for change
+        const payloadItem: any = {
+          inventoryItemId: inventoryItemId ?? inferredInventoryId,
+          name: target.name,
+          quantity: newQty > 0 ? newQty : 0,
+          changeType,
+        };
+        const payload = {
+          order: {
+            orderId: Number(orderId),
+            orderCode: selectedTable?.currentOrder,
+            orderType,
+            table: selectedTable ? { id: selectedTable.id, name: selectedTable.name, areaId: selectedTable.area, areaName: areas.find((a) => a.id === selectedTable.area)?.name } : undefined,
+            createdBy: user ? { id: user.id, name: user.fullName, role: user.roleLabel } : undefined,
+          },
+          items: [payloadItem],
+        } as any;
+        sendOrderToKitchenWithItems(Number(orderId), payload).catch(() => {});
+      }
+    } catch (_) {
+      // Non-blocking
+    }
   };
 
-  const removeFromCart = (id: string) => {
+  const removeFromCart = (id: string, opts?: { reason?: string }) => {
     const cart = getCurrentCart();
+    const target = cart.find((i) => i.id === id);
     // When removing an item, also remove all its attached toppings
     const updatedCart = cart
       .filter((item) => {
@@ -1238,6 +1434,42 @@ useEffect(() => {
         return item;
       });
     updateCurrentCart(updatedCart);
+
+    // Sync removal to backend for persistence & logs
+    try {
+      const orderId = selectedTable?.order_id;
+      if (orderId && target) {
+        const orderItemId = (target as any).__orderItemId;
+        const inferredInventoryId = String(target.id).includes("-") ? String(target.id).split("-")[0] : undefined;
+        const inventoryItemId = (target as any).__inventoryItemId ?? inferredInventoryId;
+        if (orderItemId) {
+          // Cancel whole item: DELETE without quantity (optionally include reason)
+          removeOrderItem(Number(orderId), String(orderItemId), opts?.reason ? { reason: opts.reason } : {}).catch(() => {});
+        } else if (inventoryItemId) {
+          updateOrderItems(Number(orderId), [{ inventoryItemId, changeType: "remove" }]).catch(() => {});
+        }
+
+        const payloadItem: any = {
+          inventoryItemId: inventoryItemId ?? inferredInventoryId,
+          name: target.name,
+          quantity: 0,
+          changeType: "remove",
+        };
+        const payload = {
+          order: {
+            orderId: Number(orderId),
+            orderCode: selectedTable?.currentOrder,
+            orderType,
+            table: selectedTable ? { id: selectedTable.id, name: selectedTable.name, areaId: selectedTable.area, areaName: areas.find((a) => a.id === selectedTable.area)?.name } : undefined,
+            createdBy: user ? { id: user.id, name: user.fullName, role: user.roleLabel } : undefined,
+          },
+          items: [payloadItem],
+        } as any;
+        sendOrderToKitchenWithItems(Number(orderId), payload).catch(() => {});
+      }
+    } catch (_) {
+      // Non-blocking
+    }
   };
   const handleSelectArea = (areaId: number | null) => {
   setSelectedAreaId(areaId)
@@ -1267,8 +1499,46 @@ useEffect(() => {
     getOrderByTable(table.id)
       .then((res: any) => {
         const payload = res?.data?.metaData?.order ?? res?.data?.metaData ?? res?.data?.order ?? res?.data;
+        const liveOrderId = Number(payload?.id ?? payload?.orderId);
+        // Capture payment status if available from backend
+        const pStatusRaw = (payload?.paymentStatus ?? payload?.payment_status ?? payload?.status?.payment ?? payload?.payment?.status);
+        const pStatus = String(pStatusRaw || '').toLowerCase();
+        if (pStatus === 'paid' || pStatus === 'partial' || pStatus === 'unpaid') {
+          setOrderPaymentStatus(pStatus as 'paid' | 'partial' | 'unpaid');
+        } else {
+          // Default to unpaid if unknown
+          setOrderPaymentStatus('unpaid');
+        }
+        // When no active order, auto-create one for this table
+        if (!liveOrderId) {
+          return createOrder({ tableId: table.id, orderType: 'dine-in', items: [] })
+            .then((cr: any) => {
+              const created = cr?.data?.metaData?.order ?? cr?.data?.metaData ?? cr?.data?.order ?? cr?.data;
+              const createdId = Number(created?.id ?? created?.orderId);
+              const createdCode = created?.orderCode ?? created?.code ?? created?.order_code;
+              setTableOrders((prev) => ({ ...prev, [table.id]: [] }));
+              setSelectedTable((prev) =>
+                prev && prev.id === table.id
+                  ? { ...prev, order_id: createdId, currentOrder: createdCode || prev.currentOrder }
+                  : prev
+              );
+              setTables((prev) => prev.map((t) => t.id === table.id ? { ...t, order_id: createdId, currentOrder: createdCode || t.currentOrder, status: 'occupied' } : t));
+              toast.success(`Đã tạo đơn mới cho Bàn ${table.name}`);
+            });
+        }
+
         const items = mapOrderToCartItems(payload ?? {});
         setTableOrders((prev) => ({ ...prev, [table.id]: items }));
+        if (items.length > 0) setIsKitchenUpdateNeeded(true);
+        const liveOrderCode = payload?.orderCode ?? payload?.code ?? payload?.order_code;
+        if (liveOrderId && (table.order_id !== liveOrderId || table.currentOrder !== liveOrderCode)) {
+          setSelectedTable((prev) =>
+            prev && prev.id === table.id
+              ? { ...prev, order_id: liveOrderId, currentOrder: liveOrderCode || prev.currentOrder }
+              : prev
+          );
+          setTables((prev) => prev.map((t) => t.id === table.id ? { ...t, order_id: liveOrderId, currentOrder: liveOrderCode || t.currentOrder } : t));
+        }
       })
       .catch((err: any) => {
         toast.error("Không tải được đơn hàng của bàn", {
@@ -1276,6 +1546,7 @@ useEffect(() => {
         });
         // Ensure key exists even if empty so UI renders predictably
         setTableOrders((prev) => ({ ...prev, [table.id]: [] }));
+        setOrderPaymentStatus('unpaid');
       });
   };
 
@@ -1322,9 +1593,9 @@ useEffect(() => {
 
   const handleSendToKitchen = () => {
     const cart = getCurrentCart();
-    // Include items with any status except "served" (items that need to be sent to kitchen)
+    // Include items with any status except "served"/"canceled" and exclude attached toppings
     const itemsToSend = cart.filter(
-      (item) => item.status !== "served" && item.status !== "canceled"
+      (item) => item.status !== "served" && item.status !== "canceled" && !item.parentItemId
     );
 
     if (itemsToSend.length === 0) {
@@ -1356,11 +1627,119 @@ useEffect(() => {
     };
     setOrderHistory((prev) => [historyEntry, ...prev]);
 
-    // Attempt backend send-to-kitchen if we have current order id
+    // Attempt backend send-to-kitchen with detailed payload when we have current order id
     const orderId = selectedTable?.order_id;
     if (orderId) {
-      sendOrderToKitchen(Number(orderId)).catch((err: any) => {
-        toast.error("Gửi bếp thất bại", { description: err?.message || "API lỗi" });
+      try {
+        // Build detailed payload for kitchen
+        const payloadItems = itemsToSend.map((item) => {
+          const baseId = String(item.id).split("-")[0];
+          const product = products.find((p) => String(p.id) === baseId);
+          const customizationToppings = (item.customization?.toppings || []).map((t: any) => ({
+            id: t.id,
+            name: t.name,
+            quantity: t.quantity ?? 1,
+            price: Number(t.price) ?? 0,
+          }));
+          const attachedToppings = (item.attachedToppings || []).map((t) => ({
+            id: String(t.id).split("-")[0],
+            name: t.name,
+            quantity: t.quantity,
+            price: Number(t.price) ?? 0,
+          }));
+
+          const stationHint = product?.category === "coffee"
+            ? "coffee"
+            : product?.category === "tea"
+            ? "tea"
+            : product?.category === "pastry"
+            ? "pastry"
+            : undefined;
+
+          // Combo mapping
+          if (item.isCombo && item.comboItems && item.comboItems.length > 0) {
+            return {
+              inventoryItemId: baseId,
+              name: item.name,
+              quantity: item.quantity,
+              categoryId: product?.category,
+              notes: item.notes,
+              customization: {
+                sugarLevel: item.customization?.sugarLevel,
+                iceLevel: item.customization?.iceLevel,
+                toppings: [...customizationToppings, ...attachedToppings],
+              },
+              isCombo: true,
+              comboId: item.comboId,
+              comboItems: item.comboItems.map((ci) => {
+                const ciBaseId = String(ci.id).split("-")[0];
+                return {
+                  inventoryItemId: ciBaseId,
+                  name: ci.name,
+                  quantity: ci.quantity,
+                  customization: ci.customization
+                    ? {
+                        sugarLevel: ci.customization?.sugarLevel,
+                        iceLevel: ci.customization?.iceLevel,
+                        toppings: (ci.customization?.toppings || []).map((t: any) => ({
+                          id: t.id,
+                          name: t.name,
+                          quantity: t.quantity ?? 1,
+                          price: Number(t.price) ?? 0,
+                        })),
+                      }
+                    : undefined,
+                };
+              }),
+              stationHint,
+              priority: "normal",
+              changeType: "add",
+            } as any;
+          }
+
+          // Regular item
+          return {
+            inventoryItemId: baseId,
+            name: item.name,
+            quantity: item.quantity,
+            categoryId: product?.category,
+            notes: item.notes,
+            customization: {
+              sugarLevel: item.customization?.sugarLevel,
+              iceLevel: item.customization?.iceLevel,
+              toppings: [...customizationToppings, ...attachedToppings],
+            },
+            stationHint,
+            priority: "normal",
+            changeType: "add",
+          } as any;
+        });
+
+        const payload = {
+          order: {
+            orderId: Number(orderId),
+            orderCode: selectedTable?.currentOrder || (isTakeaway ? "TAKEAWAY" : undefined),
+            orderType,
+            table: selectedTable
+              ? { id: selectedTable.id, name: selectedTable.name, areaId: selectedTable.area, areaName: areas.find((a) => a.id === selectedTable.area)?.name }
+              : undefined,
+            createdBy: user ? { id: user.id, name: user.fullName, role: user.roleLabel } : undefined,
+          },
+          items: payloadItems,
+        };
+
+        sendOrderToKitchenWithItems(Number(orderId), payload).catch((err: any) => {
+          // Fallback to legacy endpoint without payload
+          sendOrderToKitchen(Number(orderId)).catch(() => {
+            toast.error("Gửi bếp thất bại", { description: err?.message || "API lỗi" });
+          });
+        });
+      } catch (err: any) {
+        toast.error("Chuẩn bị dữ liệu gửi bếp thất bại", { description: err?.message || "Lỗi không xác định" });
+      }
+    } else {
+      toast.error("Không tìm thấy mã đơn hiện tại để gửi bếp", {
+        description: isTakeaway ? "Đơn mang về cần tạo mã đơn từ backend trước khi gửi bếp" : "Vui lòng chọn bàn có đơn hiện tại",
       });
     }
 
@@ -1813,6 +2192,10 @@ useEffect(() => {
       setOutOfStockIngredient(randomIngredient);
       setOutOfStockWarningOpen(true);
 
+      // Mark this product id as temporarily out via kitchen to gray in POS
+      const baseId = String(randomItem.id).split("-")[0];
+      setKitchenOutageItemIds((prev) => (prev.includes(baseId) ? prev : [...prev, baseId]));
+
       // Add to order history
       const historyEntry = {
         time: new Date().toLocaleTimeString("vi-VN", {
@@ -1874,6 +2257,10 @@ useEffect(() => {
             : item
         )
       );
+
+      // Remove kitchen outage flag for this product on POS
+      const baseId = String(itemToRestock.id).split("-")[0];
+      setKitchenOutageItemIds((prev) => prev.filter((id) => id !== baseId));
 
       // Add to restocked and glowing lists for visual effects
       setRestockedItems([itemToRestock.id]);
@@ -1976,7 +2363,7 @@ useEffect(() => {
     // Coerce base price to number to prevent string concatenation (e.g., "42000" + 8000)
     const basePrice = Number(item.price) || 0;
     const customizationToppingsPrice =
-      item.customization?.toppings.reduce(
+      item.customization?.toppings?.reduce(
         (sum, t) => sum + (Number(t.price) || 0) * (t.quantity ?? 1),
         0
       ) || 0;
@@ -2291,6 +2678,7 @@ useEffect(() => {
                     restockedItems={restockedItems}
                     glowingItems={glowingItems}
                     appliedPromoCode={appliedPromoCode}
+                    paymentStatus={orderPaymentStatus}
                   />
 
                   {/* Attached Toppings - Indented */}
@@ -2792,23 +3180,29 @@ useEffect(() => {
 
               {/* Products Grid */}
               <div
-                className={`grid ${
+                    className={`grid ${
                   viewMode === "grid"
                     ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
                     : "grid-cols-1"
                 } gap-2`}
               >
-                {filteredProducts.map((product) => {
-                  const isOutOfStock = isProductOutOfStock(product);
+                    {filteredProducts.map((product) => {
+                      const isOutOfStock = isProductOutOfStock(product);
+                      const isKitchenOutage = kitchenOutageItemIds.includes(String(product.id));
                   return (
                     <Card
                       key={product.id}
-                      className={`transition-shadow border-blue-200 relative ${
-                        isOutOfStock
-                          ? "opacity-50 cursor-not-allowed bg-gray-50"
-                          : "cursor-pointer hover:shadow-lg hover:border-blue-400"
-                      }`}
-                      onClick={() => !isOutOfStock && addToCart(product)}
+                          className={`transition-shadow border-blue-200 relative ${
+                            isOutOfStock
+                              ? "opacity-50 cursor-not-allowed bg-gray-50"
+                              : isKitchenOutage
+                              ? "opacity-60 bg-slate-50 cursor-pointer hover:shadow-md hover:border-blue-300"
+                              : "cursor-pointer hover:shadow-lg hover:border-blue-400"
+                          }`}
+                          onClick={() => {
+                            if (isOutOfStock) return;
+                            addToCart(product);
+                          }}
                     >
                       <CardContent className="p-2">
                         <div className="text-3xl mb-1 text-center">
@@ -2832,6 +3226,14 @@ useEffect(() => {
                             Tạm ngưng
                           </Badge>
                         )}
+                            {!isOutOfStock && isKitchenOutage && (
+                              <Badge
+                                variant="outline"
+                                className="absolute top-1 right-1 bg-amber-50 text-amber-700 border-amber-300 text-[10px] flex items-center gap-1"
+                              >
+                                <AlertCircle className="w-3 h-3" /> Thiếu NL
+                              </Badge>
+                            )}
                         {!isOutOfStock && (product as any).isNew && (
                           <Badge className="absolute top-1 right-1 bg-green-500 text-white text-[10px]">
                             Mới
@@ -3151,6 +3553,8 @@ useEffect(() => {
             combined: "Kết hợp",
           };
           setLastPaymentMethod(methodLabelMap[paymentMethod] || "Tiền mặt");
+          // Set payment status to PAID locally after confirming payment
+          setOrderPaymentStatus('paid');
           // Best-effort backend checkout before printing
           const orderId = selectedTable?.order_id;
           if (orderId) {
@@ -3220,6 +3624,54 @@ useEffect(() => {
             >
               <Bell className="w-4 h-4 mr-1" />
               Báo khách
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Kitchen Outage Confirm Dialog */}
+      <Dialog open={outageConfirmOpen} onOpenChange={setOutageConfirmOpen}>
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700">
+              <AlertCircle className="w-5 h-5" />
+              Cảnh báo thiếu nguyên liệu
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg">
+              <p className="text-sm text-amber-800">
+                ⚠️ Món này hiện đang thiếu nguyên liệu. Bạn có muốn tiếp tục bán?
+              </p>
+              {pendingOutageProduct && (
+                <p className="text-xs text-amber-700 mt-1">
+                  {pendingOutageProduct.name} • {pendingOutageProduct.price.toLocaleString("vi-VN")}đ
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setOutageConfirmOpen(false);
+                setPendingOutageProduct(null);
+              }}
+            >
+              Hủy
+            </Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 w-full"
+              onClick={() => {
+                if (pendingOutageProduct) {
+                  addToCart(pendingOutageProduct, true);
+                }
+                setOutageConfirmOpen(false);
+                setPendingOutageProduct(null);
+              }}
+            >
+              Vẫn bán
             </Button>
           </DialogFooter>
         </DialogContent>
