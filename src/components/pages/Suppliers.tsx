@@ -1,64 +1,42 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import * as React from "react";
 import { useAuth } from "../../contexts/AuthContext";
-import {
-  Plus,
-  Search,
-  Pencil,
-  Trash2,
-  Filter,
-  X,
-  Power,
-  PowerOff,
-  ArrowUpDown,
-  Upload,
-  Download,
-  Printer,
-  ArrowUp,
-  ArrowDown,
-  ChevronDown,
-  ChevronRight,
-} from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Filter, X, Power, PowerOff, ArrowUpDown, Upload, Download, Printer, ArrowUp, ArrowDown, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Label } from "../ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { toast } from "sonner";
 import { SupplierFormDialog } from "../SupplierFormDialog";
+import { cities } from "./Customers";
+import { getSuppliers } from "../../api/supplier";
 
 interface Supplier {
-  id: string;
-  code: string;
-  name: string;
-  category: string;
-  contact: string;
-  phone: string;
-  email: string;
-  address: string;
-  city: string;
-  debt: number;
-  status: "active" | "inactive";
+  id: 1,
+  code: "NCC001",
+  name: "Trung Nguyên",
+  contactPerson: "Nguyễn Văn A",
+  phone: "0281234567",
+  email: "contact@trungnguyen.com",
+  address: "123 Nguyễn Huệ",
+  city: "Hồ Chí Minh",
+  category: "Cà phê",
+  status: "active" | "inactive",
+  totalDebt: 0,
+  totalPurchaseAmount: 0,
+  purchaseOrderCount: 0,
+  createdAt: "2026-01-19T05:46:56.829Z",
+  recentOrders: []
 }
 
 export function Suppliers() {
   const { hasPermission } = useAuth();
+  let fetchSuppliersParams: Record<string, any> = { "sort": "+code" }
+
   const canCreate = hasPermission('suppliers:create');
   const canUpdate = hasPermission('suppliers:update');
   const canDelete = hasPermission('suppliers:delete');
@@ -67,81 +45,25 @@ export function Suppliers() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedCity, setSelectedCity] = useState("all");
-  const [sortBy, setSortBy] = useState<"name" | "debt" | null>(null);
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc" | "none">("none");
+  const [sortBy, setSortBy] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<"+" | "-" | "none">("none");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Mock data
-  const [suppliers, setSuppliers] = useState<Supplier[]>([
-    {
-      id: "1",
-      code: "NCC001",
-      name: "Trung Nguyên",
-      category: "Cà phê",
-      contact: "Nguyễn Văn A",
-      phone: "0281234567",
-      email: "contact@trungnguyen.com",
-      address: "Đường Hoàng Văn Thụ, Phường 15",
-      city: "Hồ Chí Minh",
-      debt: 15000000,
-      status: "active",
-    },
-    {
-      id: "2",
-      code: "NCC002",
-      name: "Vinamilk",
-      category: "Sữa & Kem",
-      contact: "Trần Thị B",
-      phone: "0282345678",
-      email: "sales@vinamilk.com",
-      address: "Quận 1, Đường Nguyễn Huệ",
-      city: "Hồ Chí Minh",
-      debt: 8500000,
-      status: "active",
-    },
-    {
-      id: "3",
-      code: "NCC003",
-      name: "Phúc Long",
-      category: "Trà",
-      contact: "Lê Văn C",
-      phone: "0283456789",
-      email: "info@phuclong.com",
-      address: "Quận 3, Đường Lý Chính Thắng",
-      city: "Hồ Chí Minh",
-      debt: 5200000,
-      status: "active",
-    },
-    {
-      id: "4",
-      code: "NCC004",
-      name: "Bao bì Minh Anh",
-      category: "Bao bì",
-      contact: "Phạm Thị D",
-      phone: "0284567890",
-      email: "sales@minhanh.com",
-      address: "Quận Bình Thạnh, Đường Xô Viết Nghệ Tĩnh",
-      city: "Hồ Chí Minh",
-      debt: 0,
-      status: "inactive",
-    },
-    {
-      id: "5",
-      code: "NCC005",
-      name: "Highlands Coffee",
-      category: "Cà phê",
-      contact: "Hoàng Văn E",
-      phone: "0285678901",
-      email: "supplier@highlands.com.vn",
-      address: "Quận Hoàn Kiếm, Đường Tràng Tiền",
-      city: "Hà Nội",
-      debt: 12000000,
-      status: "active",
-    },
-  ]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+
+  //functions
+  const fetchSuppliersData = async () => {
+    const res = await getSuppliers(fetchSuppliersParams);
+    if (!res) return;
+    const { suppliers } = res.data.metaData
+    if (suppliers) {
+      setSuppliers(suppliers)
+    }
+  }
 
   const toggleExpand = (id: string) => {
     setExpandedRows((prev) =>
@@ -149,128 +71,126 @@ export function Suppliers() {
     );
   };
 
-  const categories = Array.from(new Set(suppliers.map((s) => s.category)));
-  const cities = Array.from(new Set(suppliers.map((s) => s.city)));
+  useEffect(() => {
+    try {
+      fetchSuppliersData()
+    }
+    catch (error) {
+      console.log("Error when fetching supplier: ", error);
+    }
+  }, [])
 
-  let filteredSuppliers = suppliers.filter((supplier) => {
-    const matchesSearch =
-      supplier.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      supplier.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      supplier.phone.includes(searchQuery) ||
-      supplier.contact.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory =
-      selectedCategory === "all" || supplier.category === selectedCategory;
-    const matchesStatus =
-      selectedStatus === "all" || supplier.status === selectedStatus;
-    const matchesCity =
-      selectedCity === "all" || supplier.city === selectedCity;
-    return matchesSearch && matchesCategory && matchesStatus && matchesCity;
-  });
-
-  // Apply sorting
-  if (sortBy && sortOrder !== "none") {
-    filteredSuppliers = [...filteredSuppliers].sort((a, b) => {
-      let aValue: string | number = "";
-      let bValue: string | number = "";
-
-      if (sortBy === "name") {
-        aValue = a.name;
-        bValue = b.name;
-      } else if (sortBy === "debt") {
-        aValue = a.debt;
-        bValue = b.debt;
-      }
-
-      if (typeof aValue === "string" && typeof bValue === "string") {
-        return sortOrder === "asc"
-          ? aValue.localeCompare(bValue, "vi")
-          : bValue.localeCompare(aValue, "vi");
-      }
-
-      return sortOrder === "asc"
-        ? (aValue as number) - (bValue as number)
-        : (bValue as number) - (aValue as number);
-    });
+  const handleSearch = () => {
+    if (!searchQuery) delete fetchSuppliersParams["search"]
+    else fetchSuppliersParams["search"] = searchQuery
+    fetchSuppliersData()
   }
 
-  const handleSort = (column: "name" | "debt") => {
-    if (sortBy === column) {
+  const handleSort = (field: string) => {
+    let tempSortBy = sortBy;
+    let tempSortOrder = sortOrder;
+    if (sortBy === field) {
       // Cycle through: asc -> desc -> none -> asc
-      if (sortOrder === "asc") {
-        setSortOrder("desc");
-      } else if (sortOrder === "desc") {
+      if (sortOrder === "+") {
+        setSortOrder("-");
+
+        tempSortOrder = "-"
+      }
+      else if (sortOrder === "-") {
         setSortOrder("none");
         setSortBy(null);
+
+        tempSortBy = null;
       } else {
-        setSortBy(column);
-        setSortOrder("asc");
+        setSortOrder("+");
+
+        tempSortOrder = "+"
       }
     } else {
-      setSortBy(column);
-      setSortOrder("asc");
+      setSortBy(field);
+      setSortOrder("+");
+
+      tempSortBy = field;
+      tempSortOrder = "+"
     }
+
+    if (tempSortBy && tempSortOrder) {
+      fetchSuppliersParams["sort"] = tempSortOrder + tempSortBy;
+    }
+    else {
+      fetchSuppliersParams["sort"] = "+code"
+    }
+
+    fetchSuppliersData();
   };
 
-  const getSortIcon = (column: "name" | "debt") => {
-    if (sortBy !== column || sortOrder === "none") return null;
-    if (sortOrder === "asc") {
+  const getSortIcon = (field: string) => {
+    if (sortBy !== field || sortOrder === "none") return null;
+    if (sortOrder === "+") {
       return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
     }
     return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
   };
 
   const handleAddSupplier = (formData: Omit<Supplier, "id" | "code">) => {
-    const newSupplier: Supplier = {
-      id: Date.now().toString(),
-      code: `NCC${String(suppliers.length + 1).padStart(3, "0")}`,
-      ...formData,
-    };
-    setSuppliers([...suppliers, newSupplier]);
-    setDialogOpen(false);
-    toast.success("Đã thêm nhà cung cấp mới");
+    // const newSupplier: Supplier = {
+    //   id: Date.now().toString(),
+    //   code: `NCC${String(suppliers.length + 1).padStart(3, "0")}`,
+    //   ...formData,
+    // };
+    // setSuppliers([...suppliers, newSupplier]);
+    // setDialogOpen(false);
+    // toast.success("Đã thêm nhà cung cấp mới");
   };
 
   const handleEditSupplier = (formData: Omit<Supplier, "id" | "code">) => {
-    if (!editingSupplier) return;
-    setSuppliers(
-      suppliers.map((s) =>
-        s.id === editingSupplier.id ? { ...s, ...formData } : s
-      )
-    );
-    setEditingSupplier(null);
-    setDialogOpen(false);
-    toast.success("Đã cập nhật nhà cung cấp");
+    // if (!editingSupplier) return;
+    // setSuppliers(
+    //   suppliers.map((s) =>
+    //     s.id === editingSupplier.id ? { ...s, ...formData } : s
+    //   )
+    // );
+    // setEditingSupplier(null);
+    // setDialogOpen(false);
+    // toast.success("Đã cập nhật nhà cung cấp");
   };
 
   const handleDeleteSupplier = (id: string) => {
-    if (confirm("Bạn có chắc chắn muốn xóa nhà cung cấp này?")) {
-      setSuppliers(suppliers.filter((s) => s.id !== id));
-      toast.success("Đã xóa nhà cung cấp");
-    }
+    // if (confirm("Bạn có chắc chắn muốn xóa nhà cung cấp này?")) {
+    //   setSuppliers(suppliers.filter((s) => s.id !== id));
+    //   toast.success("Đã xóa nhà cung cấp");
+    // }
   };
 
-  const handleToggleStatus = (id: string) => {
-    setSuppliers(
-      suppliers.map((supplier) => {
-        if (supplier.id === id) {
-          const newStatus =
-            supplier.status === "active" ? "inactive" : "active";
-          toast.success(
-            newStatus === "active"
-              ? "Đã kích hoạt nhà cung cấp"
-              : "Đã vô hiệu hóa nhà cung cấp"
-          );
-          return { ...supplier, status: newStatus };
-        }
-        return supplier;
-      })
-    );
-  };
+  // const handleToggleStatus = (id: string) => {
+  //   setSuppliers(
+  //     suppliers.map((supplier) => {
+  //       if (supplier.id === id) {
+  //         const newStatus =
+  //           supplier.status === "active" ? "inactive" : "active";
+  //         toast.success(
+  //           newStatus === "active"
+  //             ? "Đã kích hoạt nhà cung cấp"
+  //             : "Đã vô hiệu hóa nhà cung cấp"
+  //         );
+  //         return { ...supplier, status: newStatus };
+  //       }
+  //       return supplier;
+  //     })
+  //   );
+  // };
 
   const openEditDialog = (e: React.MouseEvent, supplier: Supplier) => {
     e.stopPropagation();
     setEditingSupplier(supplier);
     setDialogOpen(true);
+  };
+
+  const getStatusBadge = (status: "active" | "inactive") => {
+    if (status === "active") {
+      return <Badge className="bg-emerald-500">Hoạt động</Badge>;
+    }
+    return <Badge className="bg-red-500">Không hoạt động</Badge>;
   };
 
   const formatCurrency = (amount: number) => {
@@ -281,17 +201,13 @@ export function Suppliers() {
   };
 
   const totalSuppliers = suppliers.length;
-  const activeSuppliers = suppliers.filter((s) => s.status === "active").length;
-  const inactiveSuppliers = suppliers.filter(
-    (s) => s.status === "inactive"
-  ).length;
-  const totalDebt = suppliers.reduce((sum, s) => sum + s.debt, 0);
+  // const activeSuppliers = suppliers.filter((s) => s.isA === "active").length;
 
-  const transactions = [
-    { id: "PN001", date: "2023-10-26", amount: 5000000 },
-    { id: "PN002", date: "2023-11-12", amount: 7500000 },
-    { id: "PN003", date: "2023-12-05", amount: 3200000 },
-  ];
+  // const transactions = [
+  //   { id: "PN001", date: "2023-10-26", amount: 5000000 },
+  //   { id: "PN002", date: "2023-11-12", amount: 7500000 },
+  //   { id: "PN003", date: "2023-12-05", amount: 3200000 },
+  // ];
 
   return (
     <div className="p-6 space-y-6">
@@ -356,12 +272,29 @@ export function Suppliers() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                 <Input
-                  placeholder="Tìm kiếm theo tên, mã, số điện thoại..."
+                  placeholder="Tìm kiếm theo tên, mã, tên liên hệ, số điện thoại..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      handleSearch();
+                    }
+                  }}
                   className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
+                <X
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 w-5 h-5"
+                  onClick={() => setSearchQuery("")}
+                />
               </div>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  handleSearch();
+                }}
+              >
+                <Search className="w-4 h-4" />
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => setShowFilters(!showFilters)}
@@ -380,7 +313,7 @@ export function Suppliers() {
             {/* Collapsible Filter Panel */}
             {showFilters && (
               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   {/* Category Filter */}
                   <div className="space-y-2">
                     <Label className="text-xs text-slate-600">Danh mục</Label>
@@ -436,25 +369,6 @@ export function Suppliers() {
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {/* Stats */}
-                  <div className="space-y-2">
-                    <Label className="text-xs text-slate-600">Thống kê</Label>
-                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-1">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Tổng:</span>
-                        <span className="font-medium text-slate-900">{totalSuppliers}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Hoạt động:</span>
-                        <span className="font-medium text-emerald-600">{activeSuppliers}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Công nợ:</span>
-                        <span className="font-medium text-red-600">{formatCurrency(totalDebt)}</span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
                 {/* Clear Filters Button */}
@@ -483,7 +397,7 @@ export function Suppliers() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
-            Danh sách nhà cung cấp ({filteredSuppliers.length})
+            Danh sách nhà cung cấp ({suppliers.length})
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -493,7 +407,15 @@ export function Suppliers() {
                 <TableRow className="bg-blue-100">
                   <TableHead className="w-12"></TableHead>
                   <TableHead className="w-16 text-sm text-center">STT</TableHead>
-                  <TableHead className="text-sm">Mã NCC</TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("code")}
+                  >
+                    <div className="flex items-center">
+                      Mã NCC
+                      {getSortIcon("code")}
+                    </div>
+                  </TableHead>
                   <TableHead
                     className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
                     onClick={() => handleSort("name")}
@@ -508,19 +430,19 @@ export function Suppliers() {
                   <TableHead className="text-sm">Liên hệ</TableHead>
                   <TableHead
                     className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => handleSort("debt")}
+                    onClick={() => handleSort("totalDebt")}
                   >
                     <div className="flex items-center">
                       Công nợ
-                      {getSortIcon("debt")}
+                      {getSortIcon("totalDebt")}
                     </div>
                   </TableHead>
                   <TableHead className="text-sm">Trạng thái</TableHead>
-                  <TableHead className="text-sm text-right">Thao tác</TableHead>
+                  <TableHead className="text-sm text-center">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSuppliers.length === 0 ? (
+                {suppliers.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={10}
@@ -530,21 +452,21 @@ export function Suppliers() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredSuppliers.map((supplier, index) => {
-                    const isExpanded = expandedRows.includes(supplier.id);
+                  suppliers.map((supplier, index) => {
+                    const isExpanded = expandedRows.includes(supplier.code);
                     return (
-                      <React.Fragment key={supplier.id}>
+                      <React.Fragment key={supplier.code}>
                         <TableRow
-                          onClick={() => toggleExpand(supplier.id)}
+                          onClick={() => toggleExpand(supplier.code)}
                           className="cursor-pointer hover:bg-slate-50"
                         >
                           <TableCell>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleExpand(supplier.id);
+                              onClick={(event: React.MouseEvent) => {
+                                event.stopPropagation();
+                                toggleExpand(supplier.code);
                               }}
                               className="h-8 w-8 p-0"
                             >
@@ -579,7 +501,7 @@ export function Suppliers() {
                           </TableCell>
                           <TableCell className="text-sm text-slate-700">
                             <div className="flex flex-col gap-0.5">
-                              <span>{supplier.contact}</span>
+                              <span>{supplier.contactPerson}</span>
                               <span className="text-xs text-slate-500">
                                 {supplier.phone}
                               </span>
@@ -588,39 +510,22 @@ export function Suppliers() {
                           <TableCell className="text-sm text-slate-900">
                             <span
                               className={
-                                supplier.debt > 0
+                                supplier.totalDebt > 0
                                   ? "text-red-600"
                                   : "text-slate-600"
                               }
                             >
-                              {formatCurrency(supplier.debt)}
+                              {formatCurrency(supplier.totalDebt)}
                             </span>
                           </TableCell>
-                          <TableCell className="text-sm">
-                            <Badge
-                              variant={
-                                supplier.status === "active"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                              className={
-                                supplier.status === "active"
-                                  ? "bg-emerald-500"
-                                  : "bg-red-500 text-white hover:bg-red-500"
-                              }
-                            >
-                              {supplier.status === "active"
-                                ? "Hoạt động"
-                                : "Không hoạt động"}
-                            </Badge>
-                          </TableCell>
+                          <TableCell>{getStatusBadge(supplier.status)}</TableCell>
                           <TableCell className="text-sm text-right">
-                            <div className="flex items-center justify-end gap-2">
+                            <div className="flex items-center justify-center gap-2">
                               {canUpdate && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={(e) => openEditDialog(e, supplier)}
+                                  onClick={(event: React.MouseEvent) => openEditDialog(event, supplier)}
                                   className="hover:bg-blue-100"
                                 >
                                   <Pencil className="w-4 h-4" />
@@ -630,22 +535,22 @@ export function Suppliers() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteSupplier(supplier.id);
+                                  onClick={(event: React.MouseEvent) => {
+                                    event.stopPropagation();
+                                    handleDeleteSupplier(supplier.code);
                                   }}
                                   className="hover:bg-red-50"
                                 >
                                   <Trash2 className="w-4 h-4 text-red-600" />
                                 </Button>
                               )}
-                              {canUpdate && (
+                              {/* {canUpdate && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleToggleStatus(supplier.id);
+                                    handleToggleStatus(supplier.code);
                                   }}
                                   className={
                                     supplier.status === "active"
@@ -664,7 +569,7 @@ export function Suppliers() {
                                     <Power className="w-4 h-4" />
                                   )}
                                 </Button>
-                              )}
+                              )} */}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -688,7 +593,7 @@ export function Suppliers() {
                                       <span className="font-semibold">Danh mục:</span> {supplier.category}
                                     </div>
                                     <div className="text-sm">
-                                      <span className="font-semibold">Người liên hệ:</span> {supplier.contact}
+                                      <span className="font-semibold">Người liên hệ:</span> {supplier.contactPerson}
                                     </div>
                                     <div className="text-sm">
                                       <span className="font-semibold">Điện thoại:</span> {supplier.phone}
@@ -696,12 +601,18 @@ export function Suppliers() {
                                     <div className="text-sm">
                                       <span className="font-semibold">Email:</span> {supplier.email}
                                     </div>
-                                    <div className="text-sm col-span-2">
+                                    <div className="text-sm">
                                       <span className="font-semibold">Địa chỉ:</span> {supplier.address}, {supplier.city}
                                     </div>
                                     <div className="text-sm">
                                       <span className="font-semibold">Công nợ:</span>{" "}
-                                      <span className="text-red-600">{formatCurrency(supplier.debt)}</span>
+                                      <span className={supplier.totalDebt > 0
+                                        ? "text-red-600"
+                                        : "text-slate-600"}>{formatCurrency(supplier.totalDebt)}</span>
+                                    </div>
+                                    <div className="text-sm">
+                                      <span className="font-semibold">Tổng thanh toán:</span>{" "}
+                                      <span>{formatCurrency(supplier.totalPurchaseAmount)}</span>
                                     </div>
                                     <div className="text-sm">
                                       <span className="font-semibold">Trạng thái:</span>{" "}
@@ -719,7 +630,7 @@ export function Suppliers() {
                                   </div>
                                 </TabsContent>
                                 <TabsContent value="history">
-                                  <div className="py-4">
+                                  {/* <div className="py-4">
                                     <div className="border rounded-md">
                                       <div className="grid grid-cols-3 p-2 font-semibold bg-gray-100">
                                         <div>Mã nhập</div>
@@ -734,7 +645,7 @@ export function Suppliers() {
                                         </div>
                                       ))}
                                     </div>
-                                  </div>
+                                  </div> */}
                                 </TabsContent>
                               </Tabs>
                             </TableCell>
@@ -749,9 +660,26 @@ export function Suppliers() {
           </div>
         </CardContent>
       </Card>
-
+      {/* Stats */}
+      <div className="space-y-2">
+        <Label className="text-xs text-slate-600">Thống kê</Label>
+        <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-1">
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-600">Tổng:</span>
+            <span className="font-medium text-slate-900">{totalSuppliers}</span>
+          </div>
+          {/* <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Hoạt động:</span>
+                        <span className="font-medium text-emerald-600">{activeSuppliers}</span>
+                      </div> */}
+          {/* <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Công nợ:</span>
+                        <span className="font-medium text-red-600">{formatCurrency(totalDebt)}</span>
+                      </div> */}
+        </div>
+      </div>
       {/* Form Dialog */}
-      <SupplierFormDialog
+      {/* <SupplierFormDialog
         open={dialogOpen}
         onClose={() => {
           setDialogOpen(false);
@@ -759,7 +687,7 @@ export function Suppliers() {
         }}
         onSubmit={editingSupplier ? handleEditSupplier : handleAddSupplier}
         editingSupplier={editingSupplier}
-      />
+      /> */}
     </div>
   );
 }

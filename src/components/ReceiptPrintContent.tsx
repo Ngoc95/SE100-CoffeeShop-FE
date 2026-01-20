@@ -243,17 +243,10 @@ export function ReceiptPrintContent({
       <div className="receipt-customer-info">
         <div>
           <span className="receipt-customer-label">Khách hàng:</span>
-          <span className="receipt-customer-value"> {customerName}</span>
+          <span className="receipt-customer-value"> {customerName || "Khách vãng lai"}</span>
         </div>
-        <div>
-          <span className="receipt-customer-label">Địa chỉ:</span>
-        </div>
-        <div>
-          <span className="receipt-customer-label">Thời gian giao hàng:</span>
-        </div>
-        <div>
-          <span className="receipt-customer-label">Điện thoại:</span>
-        </div>
+        {/* Only show address/phone if provided and valid (assuming they are passed but seemingly not part of props yet, skipping placeholders) */}
+        {/* Placeholder fields removed as per request */}
       </div>
 
       {/* Waiter Info */}
