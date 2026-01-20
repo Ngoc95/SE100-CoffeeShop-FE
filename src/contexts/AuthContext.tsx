@@ -88,7 +88,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        const parsed: any = JSON.parse(storedUser);
+        // If permissions missing or empty, hydrate from local role/account maps
+        if (!Array.isArray(parsed.permissions) || parsed.permissions.length === 0) {
+          const account = initialAccounts.find((acc) => acc.username === parsed.username);
+          let hydrated: Permission[] | undefined;
+          if (account?.customPermissions && account.customPermissions.length > 0) {
+            hydrated = account.customPermissions;
+          } else {
+            const roleId = parsed.roleId || account?.roleId;
+            const role = roleId ? initialRoles.find((r) => r.id === roleId) : undefined;
+            hydrated = role?.permissions;
+          }
+          parsed.permissions = hydrated ?? [];
+          localStorage.setItem('user', JSON.stringify(parsed));
+        }
+        setUser(parsed as User);
+      } catch {
+        setUser(null);
+      }
     }
   }, []);
 
@@ -135,10 +154,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Lưu token
     localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('user', JSON.stringify(user));
+    // Fallback: ensure permissions present; if missing, hydrate from local role definitions
+    let hydratedPermissions: Permission[] | undefined = Array.isArray((user as any)?.permissions)
+      ? ((user as any).permissions as Permission[])
+      : undefined;
 
-    // Set state
-    setUser(user);
+    if (!hydratedPermissions || hydratedPermissions.length === 0) {
+      // Try customPermissions from accountData if username matches
+      const account = initialAccounts.find((acc) => acc.username === username);
+      if (account?.customPermissions && account.customPermissions.length > 0) {
+        hydratedPermissions = account.customPermissions;
+      } else {
+        // Map by roleId from backend payload when available
+        const roleId = (user as any).roleId || account?.roleId;
+        const role = roleId ? initialRoles.find((r) => r.id === roleId) : undefined;
+        hydratedPermissions = role?.permissions;
+      }
+    }
+
+    const finalUser: User = {
+      id: String((user as any).id),
+      username: (user as any).username ?? username,
+      fullName: (user as any).fullName ?? (user as any).name ?? username,
+      role: (user as any).role ?? (account ? (account as any).role : 'manager'),
+      roleLabel: (user as any).roleLabel ?? (initialRoles.find((r) => r.id === (user as any).roleId)?.name ?? 'Quản lý'),
+      roleId: (user as any).roleId ?? (account?.roleId ?? 'role-manager'),
+      permissions: (hydratedPermissions ?? []) as Permission[],
+    };
+
+    localStorage.setItem('user', JSON.stringify(finalUser));
+    setUser(finalUser);
   };
 
   const logout = () => {

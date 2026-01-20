@@ -84,6 +84,16 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
           { id: 'goods_recipe:update', name: 'Cập nhật' },
         ],
       },
+      {
+        id: 'combos',
+        name: 'Combo',
+        permissions: [
+          { id: 'combos:view', name: 'Xem danh sách' },
+          { id: 'combos:create', name: 'Thêm mới' },
+          { id: 'combos:update', name: 'Cập nhật' },
+          { id: 'combos:delete', name: 'Xóa' },
+        ],
+      },
     ],
   },
   {

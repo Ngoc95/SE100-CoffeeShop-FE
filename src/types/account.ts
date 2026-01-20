@@ -10,6 +10,7 @@ export type Permission =
   | 'goods_new_items:view' | 'goods_new_items:update'
   | 'goods_import_export:view' | 'goods_import_export:create'
   | 'goods_recipe:view' | 'goods_recipe:update'
+  | 'combos:view' | 'combos:create' | 'combos:update' | 'combos:delete'
   // Phòng bàn
   | 'tables:view' | 'tables:create' | 'tables:update' | 'tables:delete'
   // Đối tác
