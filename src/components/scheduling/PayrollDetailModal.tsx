@@ -23,6 +23,7 @@ import {
 interface PayrollDetail {
   staffId: string;
   staffName: string;
+  baseSalary: number;
   totalAmount: number;
   bonus: number;
   penalty: number;
@@ -38,9 +39,9 @@ interface PayrollDetailModalProps {
   payrollName: string;
   workRange: string;
   details: PayrollDetail[];
-  status: "draft" | "closed";
-  onSave: (details: PayrollDetail[]) => void;
-  onFinalize: () => void;
+  status: "draft" | "finalized";
+  onSave: (details: PayrollDetail[]) => Promise<void> | void;
+  onFinalize: () => Promise<void> | void;
   onViewBreakdown?: (staffId: string) => void;
   readOnly?: boolean;
 }
@@ -117,7 +118,7 @@ export function PayrollDetailModal({
     setLocalDetails((prev) =>
       prev.map((d) => {
         if (d.staffId === staffId) {
-          const finalAmount = d.totalAmount + (d.overtimeAmount || 0) + numValue - d.penalty;
+          const finalAmount = d.baseSalary + numValue - d.penalty;
           const remainingAmount = finalAmount - d.paidAmount;
           return { ...d, bonus: numValue, bonusStr: formattedValue, finalAmount, remainingAmount };
         }
@@ -156,7 +157,7 @@ export function PayrollDetailModal({
     setLocalDetails((prev) =>
       prev.map((d) => {
         if (d.staffId === staffId) {
-          const finalAmount = d.totalAmount + (d.overtimeAmount || 0) + d.bonus - numValue;
+          const finalAmount = d.baseSalary + d.bonus - numValue;
           const remainingAmount = finalAmount - d.paidAmount;
           return { ...d, penalty: numValue, penaltyStr: formattedValue, finalAmount, remainingAmount };
         }
@@ -177,7 +178,11 @@ export function PayrollDetailModal({
   };
 
   const handleSave = () => {
-    onSave(localDetails);
+    onSave(localDetails.map(d => ({
+        ...d,
+        bonus: Number(d.bonus || 0),
+        penalty: Number(d.penalty || 0)
+    })));
     onOpenChange(false);
   };
 
@@ -185,8 +190,20 @@ export function PayrollDetailModal({
     setFinalizeDialogOpen(true);
   };
 
-  const confirmFinalize = () => {
-    onFinalize();
+  const confirmFinalize = async () => {
+    // 1. Save changes first
+    const mappedDetails = localDetails.map(d => ({
+        ...d,
+        bonus: Number(d.bonus || 0),
+        penalty: Number(d.penalty || 0)
+    }));
+    
+    // We can show a loading state here if desired
+    await onSave(mappedDetails);
+
+    // 2. Then finalize
+    await onFinalize();
+    
     setFinalizeDialogOpen(false);
     onOpenChange(false);
   };
@@ -194,9 +211,9 @@ export function PayrollDetailModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto"
+        <DialogContent className="max-w-[2xl] max-h-[90vh] overflow-y-auto"
         style={{
-          maxWidth: '90vw',
+          maxWidth: '60vw',
         }}>
           <DialogHeader>
             <DialogTitle className="text-xl">
@@ -216,9 +233,7 @@ export function PayrollDetailModal({
                     <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">
                       Lương chính
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">
-                      Làm thêm
-                    </th>
+
                     <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">
                       Thưởng
                     </th>
@@ -253,12 +268,10 @@ export function PayrollDetailModal({
                           className="hover:underline hover:text-blue-600 font-medium"
                           onClick={() => onViewBreakdown?.(d.staffId)}
                         >
-                          {d.totalAmount.toLocaleString()}₫
+                          {d.baseSalary.toLocaleString()}₫
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-right text-sm text-blue-600">
-                        {(d.overtimeAmount || 0).toLocaleString()}₫
-                      </td>
+
                       <td className="px-4 py-3 text-right text-sm">
                         {status === "draft" && !readOnly ? (
                           <Input
@@ -313,7 +326,7 @@ export function PayrollDetailModal({
                   <div className="text-slate-600">Tổng lương cần trả</div>
                   <div className="text-lg font-semibold text-slate-900">
                     {localDetails
-                      .reduce((sum, d) => sum + d.finalAmount, 0)
+                      .reduce((sum, d) => sum + Number(d.finalAmount || 0), 0)
                       .toLocaleString()}
                     ₫
                   </div>
@@ -322,7 +335,7 @@ export function PayrollDetailModal({
                   <div className="text-slate-600">Đã thanh toán</div>
                   <div className="text-lg font-semibold text-emerald-600">
                     {localDetails
-                      .reduce((sum, d) => sum + d.paidAmount, 0)
+                      .reduce((sum, d) => sum + Number(d.paidAmount || 0), 0)
                       .toLocaleString()}
                     ₫
                   </div>
@@ -331,7 +344,7 @@ export function PayrollDetailModal({
                   <div className="text-slate-600">Còn lại</div>
                   <div className="text-lg font-semibold text-blue-600">
                     {localDetails
-                      .reduce((sum, d) => sum + d.remainingAmount, 0)
+                      .reduce((sum, d) => sum + Number(d.remainingAmount || 0), 0)
                       .toLocaleString()}
                     ₫
                   </div>

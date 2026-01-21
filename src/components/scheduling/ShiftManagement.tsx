@@ -39,7 +39,9 @@ import {
   TableRow,
 } from "../ui/table";
 import { Badge } from "../ui/badge";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
+import { Shift, CreateShiftDto, UpdateShiftDto } from "../../types/hr";
+import shiftApi from "../../api/shiftApi";
 
 // Generate time options from 00:00 to 23:45 with 15-minute intervals
 const generateTimeOptions = () => {
@@ -57,22 +59,12 @@ const generateTimeOptions = () => {
 
 const timeOptions = generateTimeOptions();
 
-interface Shift {
-  id: string;
-  name: string;
-  startTime: string;
-  endTime: string;
-  checkInTime?: string;
-  checkOutTime?: string;
-  active?: boolean;
-}
-
 interface ShiftManagementProps {
   shifts: Shift[];
-  setShifts: (shifts: Shift[]) => void;
+  onRefresh: () => void;
 }
 
-export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
+export function ShiftManagement({ shifts, onRefresh }: ShiftManagementProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
   
@@ -89,13 +81,25 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
     endTime: "",
     checkInTime: "",
     checkOutTime: "",
-    active: true,
+    isActive: true,
   });
 
   const handleOpenDialog = (shift?: Shift) => {
     if (shift) {
       setEditingShift(shift);
-      setFormData(shift);
+      
+      const getTimeString = (isoString?: string) => {
+        if (!isoString) return "";
+        return isoString.includes("T") ? isoString.split("T")[1].substring(0, 5) : isoString.substring(0, 5);
+      };
+
+      setFormData({
+         ...shift,
+         startTime: getTimeString(shift.startTime),
+         endTime: getTimeString(shift.endTime),
+         checkInTime: getTimeString(shift.checkInTime),
+         checkOutTime: getTimeString(shift.checkOutTime),
+      });
     } else {
       setEditingShift(null);
       setFormData({
@@ -104,48 +108,84 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
         endTime: "",
         checkInTime: "",
         checkOutTime: "",
-        active: true,
+        isActive: true, // Default active
       });
     }
     setDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name || !formData.startTime || !formData.endTime) {
       toast.error("Vui lòng điền đầy đủ thông tin");
       return;
     }
 
-    if (editingShift) {
-      // Update existing shift
-      setShifts(
-        shifts.map((s) =>
-          s.id === editingShift.id ? ({ ...formData, id: s.id } as Shift) : s
-        )
-      );
-    } else {
-      // Create new shift
-      const newShift: Shift = {
-        ...(formData as Shift),
-        id: Date.now().toString(),
-      };
-      setShifts([...shifts, newShift]);
+    try {
+        if (editingShift) {
+            // Update
+            const updateDto: UpdateShiftDto = {
+                name: formData.name,
+                startTime: formData.startTime,
+                endTime: formData.endTime,
+                checkInTime: formData.checkInTime || formData.startTime,
+                checkOutTime: formData.checkOutTime || formData.endTime,
+                isActive: formData.isActive
+            };
+            await shiftApi.update(editingShift.id, updateDto);
+            toast.success("Cập nhật ca làm việc thành công");
+        } else {
+            // Create
+            const createDto: CreateShiftDto = {
+                name: formData.name,
+                startTime: formData.startTime,
+                endTime: formData.endTime,
+                checkInTime: formData.checkInTime || formData.startTime,
+                checkOutTime: formData.checkOutTime || formData.endTime,
+                isActive: formData.isActive !== false // defaults to true
+            };
+            await shiftApi.create(createDto);
+            toast.success("Thêm ca làm việc thành công");
+        }
+        setDialogOpen(false);
+        onRefresh();
+    } catch (error: any) {
+        toast.error(error.response?.data?.message || "Lỗi lưu ca làm việc");
     }
-
-    setDialogOpen(false);
-    toast.success("Đã lưu ca làm việc");
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm("Bạn có chắc muốn xóa ca làm việc này?")) {
-      setShifts(shifts.filter((s) => s.id !== id));
-      toast.success("Đã xóa ca làm việc");
+  const handleDelete = async (id: number) => {
+    const shiftToDelete = shifts.find(s => s.id === id);
+    if (!shiftToDelete) return false;
+    
+    if (confirm(`Bạn có chắc muốn xóa ca làm việc "${shiftToDelete.name}"?`)) {
+      try {
+        await shiftApi.delete(id);
+        toast.success("Đã xóa ca làm việc");
+        onRefresh();
+        return true;
+      } catch (error) {
+        toast.error("Không thể xóa ca đang có lịch làm việc");
+      }
     }
+    return false;
   };
 
   const calculateShiftDuration = (start: string, end: string) => {
-    const [startHour, startMin] = start.split(":").map(Number);
-    const [endHour, endMin] = end.split(":").map(Number);
+    if (!start || !end) return { hours: 0, minutes: 0, isOvernight: false };
+    
+    // Helper to extract HH:mm from ISO or HH:mm string
+    const extractTime = (timeStr: string) => {
+       if (timeStr.includes("T")) {
+           return timeStr.split("T")[1].substring(0, 5);
+       }
+       return timeStr;
+    };
+
+    const startStr = extractTime(start);
+    const endStr = extractTime(end);
+
+    const [startHour, startMin] = startStr.split(":").map(Number);
+    const [endHour, endMin] = endStr.split(":").map(Number);
 
     let hours = endHour - startHour;
     let mins = endMin - startMin;
@@ -153,7 +193,6 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
     const isOvernight = startHour > endHour || (startHour === endHour && startMin > endMin);
 
     if (isOvernight) {
-      // Handle overnight shifts
       hours = (24 - startHour) + endHour;
       mins = endMin - startMin;
       if (mins < 0) {
@@ -172,8 +211,14 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
 
   const formatTime = (time: string) => {
     if (!time) return "";
-    const [hour, minute] = time.split(":");
-    return `${hour}:${minute}`;
+    try {
+        if (time.includes("T")) {
+            return time.split("T")[1].substring(0, 5);
+        }
+        return time.substring(0, 5);
+    } catch {
+        return time;
+    }
   };
 
   // Calculate end time (start time + 4 hours)
@@ -209,22 +254,18 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
       .padStart(2, "0")}`;
   };
 
-  const handleToggleStatus = (id: string) => {
-    setShifts(
-      shifts.map((s) =>
-        s.id === id ? { ...s, active: s.active === false ? true : false } : s
-      )
-    );
-    toast.success(
-      shifts.find((s) => s.id === id)?.active === false
-        ? "Đã vô hiệu hóa ca làm việc"
-        : "Đã kích hoạt ca làm việc"
-    );
+  const handleToggleStatus = async (id: number, currentStatus: boolean) => {
+    try {
+        await shiftApi.toggleActive(id);
+        toast.success(currentStatus ? "Đã vô hiệu hóa ca" : "Đã kích hoạt ca");
+        onRefresh();
+    } catch (error) {
+        toast.error("Lỗi cập nhật trạng thái");
+    }
   };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      // Cycle through: asc -> desc -> none -> asc
       if (sortOrder === "asc") {
         setSortOrder("desc");
       } else if (sortOrder === "desc") {
@@ -262,13 +303,17 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
         aValue = a.name;
         bValue = b.name;
       } else if (sortField === "startTime") {
-        const [aHour, aMin] = a.startTime.split(":").map(Number);
-        const [bHour, bMin] = b.startTime.split(":").map(Number);
+        const tA = formatTime(a.startTime);
+        const tB = formatTime(b.startTime);
+        const [aHour, aMin] = tA.split(":").map(Number);
+        const [bHour, bMin] = tB.split(":").map(Number);
         aValue = aHour * 60 + aMin;
         bValue = bHour * 60 + bMin;
       } else if (sortField === "endTime") {
-        const [aHour, aMin] = a.endTime.split(":").map(Number);
-        const [bHour, bMin] = b.endTime.split(":").map(Number);
+        const tA = formatTime(a.endTime);
+        const tB = formatTime(b.endTime);
+        const [aHour, aMin] = tA.split(":").map(Number);
+        const [bHour, bMin] = tB.split(":").map(Number);
         aValue = aHour * 60 + aMin;
         bValue = bHour * 60 + bMin;
       } else if (sortField === "duration") {
@@ -277,9 +322,8 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
         aValue = aDuration.hours * 60 + aDuration.minutes;
         bValue = bDuration.hours * 60 + bDuration.minutes;
       } else if (sortField === "status") {
-        // Sort by active status: true (active) = 0, false (inactive) = 1
-        aValue = a.active === false ? 1 : 0;
-        bValue = b.active === false ? 1 : 0;
+        aValue = a.isActive === false ? 1 : 0;
+        bValue = b.isActive === false ? 1 : 0;
       }
 
       if (typeof aValue === "string" && typeof bValue === "string") {
@@ -375,7 +419,7 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
                   })()}
                 </TableCell>
                 <TableCell className="text-sm">
-                  {shift.active !== false ? (
+                  {shift.isActive !== false ? (
                     <Badge className="bg-emerald-500">Hoạt động</Badge>
                   ) : (
                     <Badge variant="secondary">Ngừng hoạt động</Badge>
@@ -403,18 +447,18 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
                       variant="ghost"
                       size="sm"
                       className={
-                        shift.active !== false
+                        shift.isActive !== false
                           ? "text-red-600 hover:text-red-700 hover:bg-red-50"
                           : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
                       }
                       onClick={() => {
-                        handleToggleStatus(shift.id);
+                        handleToggleStatus(shift.id, shift.isActive || true);
                       }}
                       title={
-                        shift.active !== false ? "Ngừng hoạt động" : "Hoạt động"
+                        shift.isActive !== false ? "Ngừng hoạt động" : "Hoạt động"
                       }
                     >
-                      {shift.active !== false ? (
+                      {shift.isActive !== false ? (
                         <PowerOff className="w-4 h-4" />
                       ) : (
                         <Power className="w-4 h-4" />
@@ -576,9 +620,9 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
               <div className="space-y-2">
                 <Label>Trạng thái</Label>
                 <RadioGroup
-                  value={formData.active !== false ? "active" : "inactive"}
+                  value={formData.isActive !== false ? "active" : "inactive"}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, active: value === "active" })
+                    setFormData({ ...formData, isActive: value === "active" })
                   }
                 >
                   <div className="flex items-center space-x-2">
@@ -608,9 +652,9 @@ export function ShiftManagement({ shifts, setShifts }: ShiftManagementProps) {
             {editingShift && (
               <Button
                 variant="destructive"
-                onClick={() => {
-                  if (confirm("Bạn có chắc muốn xóa ca làm việc này?")) {
-                    handleDelete(editingShift.id);
+                onClick={async () => {
+                  const success = await handleDelete(editingShift.id);
+                  if (success) {
                     setDialogOpen(false);
                   }
                 }}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import * as React from "react";
 import {
   ArrowLeftRight,
@@ -41,17 +41,13 @@ import { Badge } from "../ui/badge";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Calendar } from "../ui/calendar";
-import { toast } from "sonner@2.0.3";
-import { staffMembers, initialSchedule } from "../../data/staffData";
+import { toast } from "sonner";
 import { BulkAttendanceDialog } from "./BulkAttendanceDialog";
 
-interface Shift {
-  id: string;
-  name: string;
-  startTime: string;
-  endTime: string;
-  active?: boolean;
-}
+import scheduleApi from '../../api/scheduleApi';
+import timekeepingApi from '../../api/timekeepingApi';
+import { Timekeeping, Shift } from '../../types/hr'; // Import Shift directly
+import { format } from 'date-fns';
 
 interface StaffMember {
   id: string;
@@ -61,31 +57,15 @@ interface StaffMember {
 }
 
 export interface TimekeepingEntry {
+  leaveType: string;
+  id?: number; // Added ID from backend
   staffId: string;
   shiftId: string;
   date: string;
   checkIn?: string;
   checkOut?: string;
-  status: "on-time" | "late-early" | "missing" | "not-checked" | "day-off";
+  status: "on-time" | "late-early" | "missing" | "not-checked" | "day-off" | "absent";
   note?: string;
-  // Loại nghỉ
-  leaveType?: "approved-leave" | "unapproved-leave";
-  // Làm thêm trước ca
-  overtimeBefore?: boolean;
-  overtimeBeforeHours?: number;
-  overtimeBeforeMinutes?: number;
-  // Làm thêm sau ca
-  overtimeAfter?: boolean;
-  overtimeAfterHours?: number;
-  overtimeAfterMinutes?: number;
-  // Đi muộn
-  late?: boolean;
-  lateHours?: number;
-  lateMinutes?: number;
-  // Về sớm
-  early?: boolean;
-  earlyHours?: number;
-  earlyMinutes?: number;
 }
 
 export interface TimekeepingBoardProps {
@@ -119,13 +99,23 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
   const { shifts, schedule: propsSchedule, setSchedule: setPropsSchedule, staffList, value, onChange } =
     props;
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
+  const [selectedStaff, setSelectedStaff] = useState<any[]>([]);
+  // Use any[] for selectedStaff to match usage if it was string[] before but logic implies Set or Array. 
+  // Actually line 119 says `useState<string[]>([])`. Let's keep it safe or check usage.
+  // Wait, previous view showed: `const [selectedStaff, setSelectedStaff] = useState<string[]>([]);`
+  // I will just insert rawSchedules below it.
+  
   const [currentWeek, setCurrentWeek] = useState(new Date());
+  
+  // Store raw schedules to lookup IDs
+  const [rawSchedules, setRawSchedules] = useState<any[]>([]);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [timekeepingDialogOpen, setTimekeepingDialogOpen] = useState(false);
   const [swapShiftDialogOpen, setSwapShiftDialogOpen] = useState(false);
+  const [fromDateOpen, setFromDateOpen] = useState(false);
+  const [toDateOpen, setToDateOpen] = useState(false);
   const [swapShiftData, setSwapShiftData] = useState({
     fromStaffId: "",
     fromDate: new Date(),
@@ -141,51 +131,97 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
     date: string;
   } | null>(null);
   const [timekeepingStatus, setTimekeepingStatus] = useState<
-    "working" | "approved-leave" | "unapproved-leave"
+    "working" | "absent"
   >("working");
+  const [currentSelectedStaff, setCurrentSelectedStaff] = useState<any>(null);
   const [checkInEnabled, setCheckInEnabled] = useState(true);
   const [checkOutEnabled, setCheckOutEnabled] = useState(true);
-  const [checkInTime, setCheckInTime] = useState("07:00");
-  const [checkOutTime, setCheckOutTime] = useState("11:00");
+  const [checkInTime, setCheckInTime] = useState<string>("");
+  const [checkOutTime, setCheckOutTime] = useState<string>("");
   const [note, setNote] = useState("");
-  // Làm thêm trước ca
-  const [overtimeBefore, setOvertimeBefore] = useState(false);
-  const [overtimeBeforeHours, setOvertimeBeforeHours] = useState(0);
-  const [overtimeBeforeMinutes, setOvertimeBeforeMinutes] = useState(0);
-  // Làm thêm sau ca
-  const [overtimeAfter, setOvertimeAfter] = useState(false);
-  const [overtimeAfterHours, setOvertimeAfterHours] = useState(0);
-  const [overtimeAfterMinutes, setOvertimeAfterMinutes] = useState(0);
-  // Đi muộn
-  const [late, setLate] = useState(false);
-  const [lateHours, setLateHours] = useState(0);
-  const [lateMinutes, setLateMinutes] = useState(0);
-  // Về sớm
-  const [early, setEarly] = useState(false);
-  const [earlyHours, setEarlyHours] = useState(0);
-  const [earlyMinutes, setEarlyMinutes] = useState(0);
+  // Local schedule state in case props doesn't provide it
+  const [localSchedule, setLocalSchedule] = useState<Record<string, Record<string, string[]>>>({});
+  const schedule = propsSchedule || localSchedule;
 
-  // Sử dụng staffMembers từ staffData và loại bỏ quản lý (manager)
-  const currentStaffList = staffList || staffMembers;
-  const staff: StaffMember[] = currentStaffList
-    .filter((s) => s.position !== "manager")
-    .slice(0, 4)
-    .map((s) => ({
-      id: s.id,
+
+  // Sử dụng staffList từ props và loại bỏ quản lý (manager)
+  const currentStaffList = staffList || [];
+      const staff: StaffMember[] = currentStaffList
+    .map((s: any) => ({
+      id: s.id.toString(),
       name: s.fullName,
       code: s.staffCode,
-      role: s.positionLabel,
+      role: s.positionLabel || s.position,
     }));
 
-  // Sử dụng schedule từ props hoặc initialSchedule
-  const schedule = propsSchedule || initialSchedule;
+  // Fetch schedule if not provided
+  // Define fetchSchedules outside useEffect for reuse
+  const fetchSchedules = async () => {
+    try {
+      const from = format(weekDates[0], 'yyyy-MM-dd');
+      const to = format(weekDates[6], 'yyyy-MM-dd');
+      const response = await scheduleApi.getAll({ from, to });
+      const responseData = response.data as any;
+      const schedules = responseData.metaData || responseData || [];
+      
+      setRawSchedules(schedules); // Store raw data
+
+      const newSchedule: Record<string, Record<string, string[]>> = {};
+
+      if (Array.isArray(schedules)) {
+        const daysOfWeek = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+        schedules.forEach((s: any) => { 
+          const date = new Date(s.workDate);
+          const dayIndex = date.getDay();
+          const dayLabel = daysOfWeek[dayIndex];
+          const staffId = s.staffId.toString();
+          const shiftId = s.shiftId?.toString();
+
+          if (!shiftId) return;
+
+          if (!newSchedule[staffId]) newSchedule[staffId] = {};
+          if (!newSchedule[staffId][dayLabel]) newSchedule[staffId][dayLabel] = [];
+          if (!newSchedule[staffId][dayLabel].includes(shiftId)) {
+            newSchedule[staffId][dayLabel].push(shiftId);
+          }
+        });
+      }
+      
+      if (setPropsSchedule) {
+          // If parent provides setter, use it (although structure might mismatch if parent expects different format, assuming it matches local logic)
+          // Actually propsSchedule is usually the processed object. 
+          // If setPropsSchedule expects the processed object:
+          setPropsSchedule(newSchedule);
+      } else {
+          setLocalSchedule(newSchedule);
+      }
+    } catch (error) {
+      console.error("Error fetching schedules for timekeeping:", error);
+    }
+  };
+
+  // Fetch schedule if not provided or on mount/change
+  useEffect(() => {
+    // We always fetch if we need to refresh, but usually rely on provided schedule. 
+    // If propsSchedule is null, we fetch.
+    if (!propsSchedule) {
+      fetchSchedules();
+    }
+    // Also fetch raw schedules even if propsSchedule is provided, because we need IDs for deletion!
+    // But ideally we should avoid double fetching if parent passes everything. 
+    // Since parent only passes processed schedule (dates/shifts), it probably doesn't pass IDs.
+    // So we MUST fetch raw schedules ourselves to support deletion.
+    if (propsSchedule) {
+         fetchSchedules();
+    }
+  }, [currentWeek]); 
 
   // Filter staff based on search query (for display in dropdown)
   const filteredStaffForDropdown = searchQuery
     ? staff.filter(
         (s) =>
-          s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.code.toLowerCase().includes(searchQuery.toLowerCase())
+          s.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          s.code?.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : staff;
 
@@ -247,10 +283,75 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
       .padStart(2, "0")}`;
   };
 
-  // Chưa có ai chấm công hết
+  const formatTimeStr = (time: string | undefined) => {
+    if (!time) return "";
+    if (time.includes("T")) {
+      return time.split("T")[1].substring(0, 5);
+    }
+    // Remove seconds if present (HH:mm:ss -> HH:mm)
+    if (time.length >= 5) {
+        return time.substring(0, 5);
+    }
+    return time;
+  };
+
+  // Timekeeping data state
   const [timekeepingData, setTimekeepingData] = useState<
     Record<string, Record<string, Record<string, TimekeepingEntry>>>
   >(value || {});
+
+  // Fetch timekeeping data
+  useEffect(() => {
+    fetchTimekeeping();
+  }, [currentWeek]);
+
+  const fetchTimekeeping = async () => {
+    try {
+      const from = format(weekDates[0], 'yyyy-MM-dd');
+      const to = format(weekDates[6], 'yyyy-MM-dd');
+
+      const response = await timekeepingApi.getAll({ from, to });
+      const responseData = response.data as any;
+      const data = responseData.metaData || [];
+      console.log(data)
+      const newData: Record<string, Record<string, Record<string, TimekeepingEntry>>> = {};
+
+      if (Array.isArray(data)) {
+        data.forEach((tk: any) => {
+          // Use format from date-fns to respect local timezone
+          const dateStr = format(new Date(tk.workDate), 'yyyy-MM-dd');
+          const shiftId = tk.shiftId?.toString() || "";
+          const staffId = tk.staffId.toString();
+
+          if (!shiftId) return;
+
+          // Correct structure: dateStr -> shiftId -> staffId
+          if (!newData[dateStr]) newData[dateStr] = {};
+          if (!newData[dateStr][shiftId]) newData[dateStr][shiftId] = {};
+          
+          let status: TimekeepingEntry["status"] = "not-checked"; 
+          if (['late', 'early', 'on-time'].includes(tk.status)) status = 'on-time';
+          else if (['absent', 'unapproved-leave', 'approved-leave'].includes(tk.status)) status = 'day-off';
+          else status = 'not-checked';
+
+          newData[dateStr][shiftId][staffId] = {
+            id: tk.id,
+            staffId: staffId, // ensure ID is string
+            shiftId: shiftId,
+            date: dateStr,
+            checkIn: tk.clockIn,
+            checkOut: tk.clockOut,
+            status: status,
+            note: tk.notes,
+          };
+        });
+      }
+      setTimekeepingData(newData);
+    } catch (error) {
+      console.error("Error fetching timekeeping:", error);
+      toast.error("Không thể tải bảng chấm công");
+    }
+  };
 
   const handleSwapShift = () => {
     if (
@@ -297,7 +398,7 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
       return;
     }
 
-    if (setPropsSchedule && schedule) {
+    if (schedule) {
       const fromStaffId = swapShiftData.fromStaffId;
       const toStaffId = swapShiftData.toStaffId;
       const fromShiftId = swapShiftData.fromShiftId;
@@ -342,61 +443,39 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
         }
       }
 
-      const newSchedule: Record<string, Record<string, string[]>> = JSON.parse(
-        JSON.stringify(schedule)
-      );
+      // Call API to swap shifts
+      const swapShifts = async () => {
+        try {
+          await scheduleApi.swap(
+            {
+              staffId: Number(fromStaffId),
+              shiftId: Number(fromShiftId),
+              workDate: formatDateInput(swapShiftData.fromDate),
+            },
+            {
+              staffId: Number(toStaffId),
+              shiftId: Number(toShiftId),
+              workDate: formatDateInput(swapShiftData.toDate),
+            }
+          );
 
-      if (!newSchedule[fromStaffId]) {
-        newSchedule[fromStaffId] = {};
-      }
-      if (!newSchedule[toStaffId]) {
-        newSchedule[toStaffId] = {};
-      }
-      if (!newSchedule[fromStaffId][fromDay]) {
-        newSchedule[fromStaffId][fromDay] = [];
-      }
-      if (!newSchedule[toStaffId][toDay]) {
-        newSchedule[toStaffId][toDay] = [];
-      }
-      if (!newSchedule[fromStaffId][toDay]) {
-        newSchedule[fromStaffId][toDay] = newSchedule[fromStaffId][toDay] || [];
-      }
-      if (!newSchedule[toStaffId][fromDay]) {
-        newSchedule[toStaffId][fromDay] = newSchedule[toStaffId][fromDay] || [];
-      }
-
-      newSchedule[fromStaffId][fromDay] = (
-        newSchedule[fromStaffId][fromDay] || []
-      ).filter((id: string) => id !== fromShiftId);
-
-      newSchedule[toStaffId][toDay] = (
-        newSchedule[toStaffId][toDay] || []
-      ).filter((id: string) => id !== toShiftId);
-
-      const targetFromDayShifts = [
-        ...(newSchedule[fromStaffId][toDay] || []),
-      ];
-      if (!targetFromDayShifts.includes(toShiftId)) {
-        targetFromDayShifts.push(toShiftId);
-      }
-      newSchedule[fromStaffId][toDay] = targetFromDayShifts;
-
-      const targetToDayShifts = [
-        ...(newSchedule[toStaffId][fromDay] || []),
-      ];
-      if (!targetToDayShifts.includes(fromShiftId)) {
-        targetToDayShifts.push(fromShiftId);
-      }
-      newSchedule[toStaffId][fromDay] = targetToDayShifts;
-
-      setPropsSchedule(newSchedule);
-      toast.success("Đã đổi ca thành công");
-    } else {
-      toast.success("Đã gửi yêu cầu đổi ca (Mock)");
+          toast.success("Đổi ca thành công");
+          setSwapShiftDialogOpen(false);
+          
+          // Refresh data
+          await Promise.all([
+            fetchTimekeeping(),
+            fetchSchedules() // Call the extracted fetch function
+          ]);
+        } catch (error) {
+          console.error("Swap shift error:", error);
+          toast.error("Lỗi khi đổi ca");
+        }
+      };
+      
+      swapShifts();
     }
 
-    setSwapShiftDialogOpen(false);
-    setTimekeepingDialogOpen(false);
   };
 
   const handleOpenSwapFromTimekeeping = () => {
@@ -411,6 +490,7 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
       toDate: date,
       toShiftId: "",
     }));
+    setTimekeepingDialogOpen(false);
     setSwapShiftDialogOpen(true);
   };
 
@@ -419,7 +499,7 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
     shiftId: string,
     date: string
   ): TimekeepingEntry | null => {
-    return value?.[date]?.[shiftId]?.[staffId] || null;
+    return timekeepingData?.[date]?.[shiftId]?.[staffId] || null;
   };
 
   const handleOpenTimekeeping = (
@@ -427,248 +507,84 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
     shiftId: string,
     date: string
   ) => {
-    console.log(date)
     setSelectedTimekeeping({ staffId, shiftId, date });
-    const entry = getTimekeepingEntry(staffId, shiftId, date);
-    const shift = shifts.find((s) => s.id === shiftId);
+    const shift = shifts.find((s) => s.id.toString() === shiftId); 
+    setCurrentSelectedStaff(staff.find(s => s.id === staffId));
 
-    if (entry) {
-      setTimekeepingStatus(
-        entry.status === "day-off" ? "approved-leave" : "working"
-      );
-      setCheckInTime(entry.checkIn || shift?.startTime || "07:00");
-      setCheckOutTime(entry.checkOut || shift?.endTime || "11:00");
-      setCheckInEnabled(!!entry.checkIn);
-      setCheckOutEnabled(!!entry.checkOut);
+    const entry = getTimekeepingEntry(staffId, shiftId, date);
+
+    if (entry && entry.status !== "not-checked") {
+      if (entry.status === "day-off" || entry.status === "absent" as any) {
+          setTimekeepingStatus("absent");
+      } else {
+          setTimekeepingStatus("working");
+      }
+
+      setCheckInTime(entry.checkIn ? formatTimeStr(entry.checkIn) : (shift?.startTime ? formatTimeStr(shift.startTime) : "07:00"));
+      setCheckOutTime(entry.checkOut ? formatTimeStr(entry.checkOut) : (shift?.endTime ? formatTimeStr(shift.endTime) : "11:00"));
+      
+      setCheckInEnabled(true);
+      setCheckOutEnabled(true);
       setNote(entry.note || "");
-      setOvertimeBefore(entry.overtimeBefore || false);
-      setOvertimeBeforeHours(entry.overtimeBeforeHours || 0);
-      setOvertimeBeforeMinutes(entry.overtimeBeforeMinutes || 0);
-      setOvertimeAfter(entry.overtimeAfter || false);
-      setOvertimeAfterHours(entry.overtimeAfterHours || 0);
-      setOvertimeAfterMinutes(entry.overtimeAfterMinutes || 0);
-      setLate(entry.late || false);
-      setLateHours(entry.lateHours || 0);
-      setLateMinutes(entry.lateMinutes || 0);
-      setEarly(entry.early || false);
-      setEarlyHours(entry.earlyHours || 0);
-      setEarlyMinutes(entry.earlyMinutes || 0);
     } else {
       setTimekeepingStatus("working");
-      setCheckInTime(shift?.startTime || "07:00");
-      setCheckOutTime(shift?.endTime || "11:00");
+      setCheckInTime(shift?.startTime ? formatTimeStr(shift.startTime) : "07:00");
+      setCheckOutTime(shift?.endTime ? formatTimeStr(shift.endTime) : "11:00");
       setCheckInEnabled(true);
       setCheckOutEnabled(true);
       setNote("");
-      setOvertimeBefore(false);
-      setOvertimeBeforeHours(0);
-      setOvertimeBeforeMinutes(0);
-      setOvertimeAfter(false);
-      setOvertimeAfterHours(0);
-      setOvertimeAfterMinutes(0);
-      setLate(false);
-      setLateHours(0);
-      setLateMinutes(0);
-      setEarly(false);
-      setEarlyHours(0);
-      setEarlyMinutes(0);
     }
     setTimekeepingDialogOpen(true);
   };
 
-  const handleSaveTimekeeping = () => {
+  const handleSaveTimekeeping = async () => {
     if (!selectedTimekeeping) return;
 
-    // Nếu uncheck vào hoặc ra thì set status là chưa chấm công
-    if (!checkInEnabled || !checkOutEnabled) {
-      const entry: TimekeepingEntry = {
-        staffId: selectedTimekeeping.staffId,
-        shiftId: selectedTimekeeping.shiftId,
-        date: selectedTimekeeping.date,
-        checkIn: checkInEnabled ? checkInTime : undefined,
-        checkOut: checkOutEnabled ? checkOutTime : undefined,
-        status: "not-checked",
-        note,
-      };
-
-      const next = {
-        ...value,
-        [selectedTimekeeping.date]: {
-          ...(value?.[selectedTimekeeping.date] || {}),
-          [selectedTimekeeping.shiftId]: {
-            ...(value?.[selectedTimekeeping.date]?.[selectedTimekeeping.shiftId] || {}),
-            [selectedTimekeeping.staffId]: entry,
-          },
-        },
-      };
-      if (onChange) {
-        onChange(next);
-      }
-
-      toast.success("Đã lưu chấm công");
-      setTimekeepingDialogOpen(false);
-      return;
-    }
-
-    // Nếu là nghỉ làm
-    if (
-      timekeepingStatus === "approved-leave" ||
-      timekeepingStatus === "unapproved-leave"
-    ) {
-      const entry: TimekeepingEntry = {
-        staffId: selectedTimekeeping.staffId,
-        shiftId: selectedTimekeeping.shiftId,
-        date: selectedTimekeeping.date,
-        checkIn: checkInTime,
-        checkOut: checkOutTime,
-        status: "day-off",
-        leaveType:
-          timekeepingStatus === "approved-leave"
-            ? "approved-leave"
-            : "unapproved-leave",
-        note,
-      };
-
-      const next = {
-        ...value,
-        [selectedTimekeeping.date]: {
-          ...(value?.[selectedTimekeeping.date] || {}),
-          [selectedTimekeeping.shiftId]: {
-            ...(value?.[selectedTimekeeping.date]?.[selectedTimekeeping.shiftId] || {}),
-            [selectedTimekeeping.staffId]: entry,
-          },
-        },
-      };
-      if (onChange) {
-        onChange(next);
-      }
-
-      toast.success("Đã lưu chấm công");
-      setTimekeepingDialogOpen(false);
-      return;
-    }
-
-    // Tính toán status dựa trên thời gian chấm công và làm thêm/đi muộn/về sớm
-    const shift = shifts.find((s) => s.id === selectedTimekeeping.shiftId);
-    let status: TimekeepingEntry["status"] = "on-time";
-    let calculatedOvertimeBeforeHours = 0;
-    let calculatedOvertimeBeforeMinutes = 0;
-    let calculatedOvertimeAfterHours = 0;
-    let calculatedOvertimeAfterMinutes = 0;
-    let calculatedLateHours = 0;
-    let calculatedLateMinutes = 0;
-    let calculatedEarlyHours = 0;
-    let calculatedEarlyMinutes = 0;
-
-    if (shift) {
-      const checkInTimeNum = checkInTime.split(":").map(Number);
-      const checkOutTimeNum = checkOutTime.split(":").map(Number);
-      const shiftStartNum = shift.startTime.split(":").map(Number);
-      const shiftEndNum = shift.endTime.split(":").map(Number);
-
-      const checkInMinutes = checkInTimeNum[0] * 60 + checkInTimeNum[1];
-      const checkOutMinutes = checkOutTimeNum[0] * 60 + checkOutTimeNum[1];
-      const shiftStartMinutes = shiftStartNum[0] * 60 + shiftStartNum[1];
-      const shiftEndMinutes = shiftEndNum[0] * 60 + shiftEndNum[1];
-
-      // Làm thêm trước ca (vào sớm)
-      if (checkInMinutes < shiftStartMinutes) {
-        const diffMinutes = shiftStartMinutes - checkInMinutes;
-        calculatedOvertimeBeforeHours = Math.floor(diffMinutes / 60);
-        calculatedOvertimeBeforeMinutes = diffMinutes % 60;
-      }
-
-      // Làm thêm sau ca (ra trễ)
-      if (checkOutMinutes > shiftEndMinutes) {
-        const diffMinutes = checkOutMinutes - shiftEndMinutes;
-        calculatedOvertimeAfterHours = Math.floor(diffMinutes / 60);
-        calculatedOvertimeAfterMinutes = diffMinutes % 60;
-      }
-
-      // Đi muộn
-      if (checkInMinutes > shiftStartMinutes) {
-        const diffMinutes = checkInMinutes - shiftStartMinutes;
-        calculatedLateHours = Math.floor(diffMinutes / 60);
-        calculatedLateMinutes = diffMinutes % 60;
-        status = "late-early";
-      }
-
-      // Về sớm
-      if (checkOutMinutes < shiftEndMinutes) {
-        const diffMinutes = shiftEndMinutes - checkOutMinutes;
-        calculatedEarlyHours = Math.floor(diffMinutes / 60);
-        calculatedEarlyMinutes = diffMinutes % 60;
-        status = "late-early";
-      }
-    }
-
-    const entry: TimekeepingEntry = {
-      staffId: selectedTimekeeping.staffId,
-      shiftId: selectedTimekeeping.shiftId,
-      date: selectedTimekeeping.date,
-      checkIn: checkInTime,
-      checkOut: checkOutTime,
-      status,
-      note,
-      overtimeBefore: overtimeBefore && checkInEnabled ? true : undefined,
-      overtimeBeforeHours:
-        overtimeBefore && checkInEnabled
-          ? calculatedOvertimeBeforeHours
-          : undefined,
-      overtimeBeforeMinutes:
-        overtimeBefore && checkInEnabled
-          ? calculatedOvertimeBeforeMinutes
-          : undefined,
-      overtimeAfter: overtimeAfter && checkOutEnabled ? true : undefined,
-      overtimeAfterHours:
-        overtimeAfter && checkOutEnabled
-          ? calculatedOvertimeAfterHours
-          : undefined,
-      overtimeAfterMinutes:
-        overtimeAfter && checkOutEnabled
-          ? calculatedOvertimeAfterMinutes
-          : undefined,
-      late: late && checkInEnabled ? true : undefined,
-      lateHours: late && checkInEnabled ? calculatedLateHours : undefined,
-      lateMinutes: late && checkInEnabled ? calculatedLateMinutes : undefined,
-      early: early && checkOutEnabled ? true : undefined,
-      earlyHours: early && checkOutEnabled ? calculatedEarlyHours : undefined,
-      earlyMinutes:
-        early && checkOutEnabled ? calculatedEarlyMinutes : undefined,
+    const payload: any = {
+        notes: note
     };
 
-    const next = {
-      ...value,
-      [selectedTimekeeping.date]: {
-        ...(value?.[selectedTimekeeping.date] || {}),
-        [selectedTimekeeping.shiftId]: {
-          ...(value?.[selectedTimekeeping.date]?.[selectedTimekeeping.shiftId] || {}),
-          [selectedTimekeeping.staffId]: entry,
-        },
-      },
-    };
-    if (onChange) {
-      onChange(next);
+    if (timekeepingStatus === 'working') {
+        if (checkInTime) payload.checkIn = checkInTime;
+        if (checkOutTime) payload.checkOut = checkOutTime;
+    } else {
+        payload.status = 'absent';
     }
 
-    toast.success("Đã lưu chấm công");
-    setTimekeepingDialogOpen(false);
+    try {
+        const existingEntry = getTimekeepingEntry(selectedTimekeeping.staffId, selectedTimekeeping.shiftId, selectedTimekeeping.date);
+
+        if (existingEntry && existingEntry.id) {
+            await timekeepingApi.update(existingEntry.id, payload);
+        } else {
+             await timekeepingApi.create({
+                staffId: Number(selectedTimekeeping.staffId),
+                shiftId: Number(selectedTimekeeping.shiftId),
+                workDate: selectedTimekeeping.date,
+                ...payload
+             });
+        }
+        
+        fetchTimekeeping();
+        toast.success("Đã cập nhật");
+        setTimekeepingDialogOpen(false);
+    } catch (err) {
+        console.error(err);
+        toast.error("Lỗi cập nhật");
+    }
   };
 
   const getStatusIcon = (status: TimekeepingEntry["status"]) => {
     switch (status) {
       case "on-time":
         return <CheckCircle2 className="w-4 h-4 text-blue-600" />;
-      case "late-early":
-        return <AlertCircle className="w-4 h-4 text-purple-600" />;
-      case "missing":
-        return <XCircle className="w-4 h-4 text-red-600" />;
-      case "not-checked":
-        return <Clock className="w-4 h-4 text-orange-600" />;
       case "day-off":
         return <Ban className="w-4 h-4 text-slate-400" />;
+      case "not-checked":
+        return <Clock className="w-4 h-4 text-orange-600" />;
       default:
-        return null;
+        // Fallback for any other status to avoid crash, map to check or clock
+        return <Clock className="w-4 h-4 text-slate-400" />;
     }
   };
 
@@ -689,44 +605,37 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
   };
 
   // Handle bulk attendance save
-  const handleBulkSave = (data: {
+  const handleBulkSave = async (data: {
     date: Date;
-    shiftId: string;
+    shiftId: number;
     checkIn: string;
     checkOut: string;
-    selectedStaff: string[];
+    selectedStaff: number[];
   }) => {
     const { date, shiftId, checkIn, checkOut, selectedStaff } = data;
     const dateStr = formatDateInput(date);
 
-    // Create timekeeping entries for all selected staff
-    const newData = { ...value };
-    
-    selectedStaff.forEach(staffId => {
-      if (!newData[dateStr]) {
-        newData[dateStr] = {};
-      }
-      if (!newData[dateStr][shiftId]) {
-        newData[dateStr][shiftId] = {};
-      }
-
-      newData[dateStr][shiftId][staffId] = {
-        staffId,
-        shiftId,
-        date: dateStr,
-        checkIn,
-        checkOut,
-        status: 'on-time',
-      };
-    });
-
-    if (onChange) {
-      onChange(newData);
+    try {
+        await timekeepingApi.bulkCheckIn({
+            date: dateStr,
+            shiftId: shiftId,
+            checkIn,
+            checkOut,
+            staffIds: selectedStaff
+        });
+        
+        fetchTimekeeping();
+        toast.success("Đã chấm công hàng loạt");
+        setBulkDialogOpen(false);
+    } catch (err) {
+        toast.error("Lỗi chấm công hàng loạt");
+        console.error(err);
     }
   };
 
   // Chỉ lấy các ca đang hoạt động
-  const activeShifts = shifts.filter((s) => s.active !== false);
+  // const activeShifts = shifts.filter((s) => s.active !== false); // active property might not exist on HRShift, or check HRShift definition
+  const activeShifts = shifts; // Assume all fetched shifts are active or filter by status if available
 
   return (
     <div className="space-y-4">
@@ -890,7 +799,7 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
                 <Calendar
                   mode="single"
                   selected={currentWeek}
-                  onSelect={(date) => {
+                  onSelect={(date: Date | undefined) => {
                     if (date) {
                       setCurrentWeek(date);
                       setCalendarOpen(false);
@@ -957,32 +866,35 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
                       <div className="font-medium text-slate-900">
                         {shift.name}
                       </div>
-                      {shift.active === false && (
+                      {shift.isActive === false && (
                         <div className="text-xs text-red-600">
                           (Ngừng hoạt động)
                         </div>
                       )}
                       <div className="text-xs text-slate-500">
-                        {shift.startTime} - {shift.endTime}
+                        {formatTimeStr(shift.startTime)} - {formatTimeStr(shift.endTime)}
                       </div>
                     </div>
                   </td>
                   {daysOfWeek.map((day, dayIndex) => {
                     const date = weekDates[dayIndex];
-                    const year = date.getFullYear();
-                    const month = String(date.getMonth() + 1).padStart(2, "0");
-                    const dayOfMonth = String(date.getDate()).padStart(2, "0");
-                    const dateStr = `${year}-${month}-${dayOfMonth}`;
-                    // Chỉ hiển thị nhân viên có lịch làm việc trong schedule
+                    const dateStr = formatDateInput(date); // Use formatDateInput for consistency
+                    // Chỉ hiển thị nhân viên có lịch làm việc trong schedule HOẶC có chấm công
                     const staffWithSchedule = filteredStaff.filter((s) => {
                       if (
                         selectedStaff.length > 0 &&
                         !selectedStaff.includes(s.id)
                       )
                         return false;
-                      // Kiểm tra xem nhân viên có lịch làm việc trong ca này không
+                      
                       const staffShifts = schedule[s.id]?.[day] || [];
-                      return staffShifts.includes(shift.id);
+                      const hasSchedule = staffShifts.includes(shift.id.toString());
+                      
+                      // Check timekeeping existence
+                      const entry = getTimekeepingEntry(s.id, shift.id.toString(), dateStr);
+                      const hasTimekeeping = !!entry;
+
+                      return hasSchedule || hasTimekeeping;
                     });
 
                     // Kiểm tra xem có nhân viên nào có lịch làm việc không
@@ -1002,9 +914,10 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
                         <div className="flex flex-col gap-1 min-h-[60px]">
                           {hasSchedule
                             ? staffWithSchedule.map((staffMember) => {
+                                // Fix type mismatch by converting shift.id (number) to string
                                 const entry = getTimekeepingEntry(
                                   staffMember.id,
-                                  shift.id,
+                                  shift.id.toString(),
                                   dateStr
                                 );
                                 const status = entry?.status || "not-checked";
@@ -1012,30 +925,24 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
                                   "on-time":
                                     "bg-blue-100 border-blue-200 text-blue-800",
                                   "late-early":
-                                    "bg-purple-100 border-purple-200 text-purple-800",
+                                    "bg-blue-100 border-blue-200 text-blue-800",
                                   missing:
                                     "bg-red-100 border-red-200 text-red-800",
                                   "not-checked":
                                     "bg-orange-100 border-orange-200 text-orange-800",
                                   "day-off":
                                     "bg-slate-100 border-slate-200 text-slate-600",
+                                  "absent":
+                                    "bg-slate-100 border-slate-200 text-slate-600",
                                 };
                                 // Xác định label cho status
                                 let statusLabel = "";
-                                if (status === "day-off") {
-                                  if (entry?.leaveType === "approved-leave") {
-                                    statusLabel = "Nghỉ có phép";
-                                  } else if (
-                                    entry?.leaveType === "unapproved-leave"
-                                  ) {
-                                    statusLabel = "Nghỉ không phép";
-                                  } else {
-                                    statusLabel = "Nghỉ làm";
-                                  }
+                                if (status === "day-off" || status === "absent") {
+                                  statusLabel = "Nghỉ";
                                 } else {
                                   const statusLabels: Record<string, string> = {
-                                    "on-time": "Đúng giờ",
-                                    "late-early": "Đi muộn / Về sớm",
+                                    "on-time": "Đã chấm công",
+                                    "late-early": "Đã chấm công",
                                     missing: "Chấm công thiếu",
                                     "not-checked": "Chưa chấm công",
                                   };
@@ -1052,7 +959,7 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
                                       e.stopPropagation();
                                       handleOpenTimekeeping(
                                         staffMember.id,
-                                        shift.id,
+                                        shift.id.toString(), // Fix type mismatch
                                         dateStr
                                       );
                                     }}
@@ -1061,31 +968,13 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
                                       {staffMember.name}
                                     </div>
                                     <div className="text-slate-600 mt-1">
-                                      {entry?.checkIn || shift.startTime} -{" "}
-                                      {entry?.checkOut || shift.endTime}
+                                      {formatTimeStr(entry?.checkIn) ||
+                                        formatTimeStr(shift.startTime)}{" "}
+                                      -{" "}
+                                      {formatTimeStr(entry?.checkOut) ||
+                                        formatTimeStr(shift.endTime)}
                                     </div>
-                                    {/* Hiển thị làm thêm TC nếu vào sớm và có check làm thêm */}
-                                    {entry?.overtimeBefore &&
-                                      entry.overtimeBeforeHours !== undefined &&
-                                      entry.overtimeBeforeMinutes !==
-                                        undefined && (
-                                        <div className="text-xs mt-1">
-                                          Làm thêm TC:{" "}
-                                          {entry.overtimeBeforeHours}h{" "}
-                                          {entry.overtimeBeforeMinutes}p
-                                        </div>
-                                      )}
-                                    {/* Hiển thị làm thêm SC nếu ra trễ và có check làm thêm */}
-                                    {entry?.overtimeAfter &&
-                                      entry.overtimeAfterHours !== undefined &&
-                                      entry.overtimeAfterMinutes !==
-                                        undefined && (
-                                        <div className="text-xs mt-1">
-                                          Làm thêm SC:{" "}
-                                          {entry.overtimeAfterHours}h{" "}
-                                          {entry.overtimeAfterMinutes}p
-                                        </div>
-                                      )}
+
                                     {/* Dòng trạng thái chấm công */}
                                     <div className="text-xs mt-1 font-medium border-t pt-1">
                                       {statusLabel}
@@ -1109,15 +998,7 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-blue-600" />
-          <span className="text-sm text-slate-700">Đúng giờ</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-purple-600" />
-          <span className="text-sm text-slate-700">Đi muộn / Về sớm</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <XCircle className="w-4 h-4 text-red-600" />
-          <span className="text-sm text-slate-700">Chấm công thiếu</span>
+          <span className="text-sm text-slate-700">Đã chấm công</span>
         </div>
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 text-orange-600" />
@@ -1125,14 +1006,14 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
         </div>
         <div className="flex items-center gap-2">
           <Ban className="w-4 h-4 text-slate-400" />
-          <span className="text-sm text-slate-700">Nghỉ làm</span>
+          <span className="text-sm text-slate-700">Nghỉ</span>
         </div>
       </div>
 
       {/* Swap Shift Dialog */}
       <Dialog
         open={swapShiftDialogOpen}
-        onOpenChange={(open) => {
+        onOpenChange={(open: boolean) => {
           setSwapShiftDialogOpen(open);
           if (!open) {
             setSwapShiftData({
@@ -1150,7 +1031,7 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
           <DialogHeader>
             <DialogTitle>Đổi ca làm việc</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-[1fr,auto,1fr] gap-6 items-start py-4">
+          <div className="grid grid-cols-2 gap-6 items-start py-4">
             {/* From Staff */}
             <div className="space-y-4">
               <h3 className="font-medium text-slate-900 border-b pb-2">
@@ -1159,20 +1040,40 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
 
               <div className="space-y-2">
                 <Label>Ngày làm việc</Label>
-                <div className="relative">
-                  <Input
-                    type="date"
-                    value={formatDateInput(swapShiftData.fromDate)}
-                    onChange={(e) => {
-                      const nextDate = new Date(e.target.value);
-                      setSwapShiftData((prev) => ({
-                        ...prev,
-                        fromDate: nextDate,
-                        fromShiftId: "",
-                      }));
-                    }}
-                  />
-                </div>
+                <Popover open={fromDateOpen} onOpenChange={setFromDateOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={`w-full justify-start text-left font-normal ${
+                        !swapShiftData.fromDate && "text-muted-foreground"
+                      }`}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {swapShiftData.fromDate ? (
+                        format(swapShiftData.fromDate, "dd/MM/yyyy")
+                      ) : (
+                        <span>Chọn ngày</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={swapShiftData.fromDate}
+                      onSelect={(date: Date | undefined) => {
+                         if (date) {
+                            setSwapShiftData((prev) => ({
+                              ...prev,
+                              fromDate: date,
+                              fromShiftId: "",
+                            }));
+                            setFromDateOpen(false);
+                         }
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="space-y-2">
@@ -1191,7 +1092,7 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
                 <Label>Ca</Label>
                 <Select
                   value={swapShiftData.fromShiftId}
-                  onValueChange={(value) =>
+                  onValueChange={(value: string) =>
                     setSwapShiftData((prev) => ({
                       ...prev,
                       fromShiftId: value,
@@ -1207,22 +1108,17 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
                       const staffShifts =
                         schedule[swapShiftData.fromStaffId]?.[day] || [];
                       const availableShifts = activeShifts.filter((shift) =>
-                        staffShifts.includes(shift.id)
+                        staffShifts.includes(shift.id.toString())
                       );
                       return availableShifts.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.name} ({s.startTime} - {s.endTime})
+                        <SelectItem key={s.id} value={s.id.toString()}>
+                          {s.name} ({formatTimeStr(s.startTime)} - {formatTimeStr(s.endTime)})
                         </SelectItem>
                       ));
                     })()}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            {/* Divider */}
-            <div className="flex flex-col items-center justify-center h-full pt-8">
-              <div className="w-px h-full bg-slate-200 min-h-[200px] border-l border-dashed border-slate-300"></div>
             </div>
 
             {/* To Staff */}
@@ -1233,28 +1129,48 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
 
               <div className="space-y-2">
                 <Label>Ngày làm việc</Label>
-                <div className="relative">
-                  <Input
-                    type="date"
-                    value={formatDateInput(swapShiftData.toDate)}
-                    onChange={(e) => {
-                      const nextDate = new Date(e.target.value);
-                      setSwapShiftData((prev) => ({
-                        ...prev,
-                        toDate: nextDate,
-                        toStaffId: "",
-                        toShiftId: "",
-                      }));
-                    }}
-                  />
-                </div>
+                <Popover open={toDateOpen} onOpenChange={setToDateOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={`w-full justify-start text-left font-normal ${
+                        !swapShiftData.toDate && "text-muted-foreground"
+                      }`}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {swapShiftData.toDate ? (
+                        format(swapShiftData.toDate, "dd/MM/yyyy")
+                      ) : (
+                        <span>Chọn ngày</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={swapShiftData.toDate}
+                      onSelect={(date: Date | undefined) => {
+                        if (date) {
+                            setSwapShiftData((prev) => ({
+                              ...prev,
+                              toDate: date,
+                              toStaffId: "",
+                              toShiftId: "",
+                            }));
+                            setToDateOpen(false);
+                        }
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="space-y-2">
                 <Label>Nhân viên</Label>
                 <Select
                   value={swapShiftData.toStaffId}
-                  onValueChange={(value) =>
+                  onValueChange={(value: string) =>
                     setSwapShiftData((prev) => ({
                       ...prev,
                       toStaffId: value,
@@ -1293,7 +1209,7 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
                 <Label>Ca</Label>
                 <Select
                   value={swapShiftData.toShiftId}
-                  onValueChange={(value) =>
+                  onValueChange={(value: string) =>
                     setSwapShiftData((prev) => ({
                       ...prev,
                       toShiftId: value,
@@ -1311,11 +1227,11 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
                           ? schedule[swapShiftData.toStaffId]?.[day] || []
                           : [];
                       const availableShifts = activeShifts.filter((shift) =>
-                        staffShifts.includes(shift.id)
+                        staffShifts.includes(shift.id.toString())
                       );
                       return availableShifts.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.name} ({s.startTime} - {s.endTime})
+                        <SelectItem key={s.id} value={s.id.toString()}>
+                          {s.name} ({formatTimeStr(s.startTime)} - {formatTimeStr(s.endTime)})
                         </SelectItem>
                       ));
                     })()}
@@ -1383,32 +1299,36 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
                         icon: (
                           <CheckCircle2 className="w-3 h-3 mr-1 text-blue-600" />
                         ),
-                        label: "Đúng giờ",
+                        label: "Đã chấm công",
                         color: "text-blue-600",
-                      },
-                      "late-early": {
-                        icon: (
-                          <AlertCircle className="w-3 h-3 mr-1 text-purple-600" />
-                        ),
-                        label: "Đi muộn / Về sớm",
-                        color: "text-purple-600",
-                      },
-                      missing: {
-                        icon: <XCircle className="w-3 h-3 mr-1 text-red-600" />,
-                        label: "Chấm công thiếu",
-                        color: "text-red-600",
                       },
                       "not-checked": {
                         icon: (
                           <Clock className="w-3 h-3 mr-1 text-orange-600" />
                         ),
-                        label: "Chưa chấm công",
+                        label: "Chưa chấm công", // or "Chưa chấm"
                         color: "text-orange-600",
                       },
                       "day-off": {
                         icon: <Ban className="w-3 h-3 mr-1 text-slate-400" />,
                         label: "Nghỉ làm",
                         color: "text-slate-400",
+                      },
+                      // Keep old keys just in case, but map them to new labels if needed
+                      "late-early": {
+                         icon: <AlertCircle className="w-3 h-3 mr-1 text-purple-600" />,
+                         label: "Đã chấm công", // Map to same as on-time
+                         color: "text-purple-600",
+                      },
+                      "missing": {
+                         icon: <XCircle className="w-3 h-3 mr-1 text-red-600" />,
+                         label: "Chưa chấm công",
+                         color: "text-red-600",
+                      },
+                      "absent": {
+                         icon: <Ban className="w-3 h-3 mr-1 text-slate-400" />,
+                         label: "Nghỉ",
+                         color: "text-slate-400",
                       },
                     };
                     const badge =
@@ -1420,8 +1340,8 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
                           {badge.label}
                         </Badge>
                         {(!entry ||
-                          entry.status === "not-checked" ||
-                          entry.status === "missing") && (
+                          entry?.status === "not-checked" ||
+                          entry?.status === "missing") && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -1459,647 +1379,135 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
                     Ca làm việc
                   </Label>
                   <div className="text-sm font-medium">
-                    {
-                      shifts.find((s) => s.id === selectedTimekeeping.shiftId)
-                        ?.name
-                    }{" "}
-                    (
-                    {
-                      shifts.find((s) => s.id === selectedTimekeeping.shiftId)
-                        ?.startTime
-                    }{" "}
-                    -{" "}
-                    {
-                      shifts.find((s) => s.id === selectedTimekeeping.shiftId)
-                        ?.endTime
-                    }
-                    )
+                     {(() => {
+                       // Find schedule if possible for accurate shift? Or just use ID match on shifts
+                       const sId = Number(selectedTimekeeping.shiftId);
+                       const shift = shifts.find(s => s.id === sId);
+                       return shift ? `${shift.name} (${formatTimeStr(shift.startTime)} - ${formatTimeStr(shift.endTime)})` : 'N/A';
+                     })()}
                   </div>
                 </div>
               </div>
 
-              {/* Status Selection */}
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-sm font-medium text-slate-700 mb-3 block">
-                    Trạng thái
-                  </Label>
-                  <RadioGroup
-                    value={timekeepingStatus}
-                    onValueChange={(
-                      v: "working" | "approved-leave" | "unapproved-leave"
-                    ) => setTimekeepingStatus(v)}
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="working" id="working" className="border-slate-300" />
-                        <Label
-                          htmlFor="working"
-                          className="cursor-pointer font-normal"
+               <div className="space-y-4 pt-4">
+                 <div className="space-y-3">
+                    <Label>Trạng thái</Label>
+                    <RadioGroup
+                        value={timekeepingStatus}
+                        onValueChange={(val: any) => setTimekeepingStatus(val)}
+                        className="flex gap-6"
+                    >
+                        <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="working" id="working" />
+                        <Label htmlFor="working">Đi làm</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="absent" id="absent" />
+                        <Label htmlFor="absent">Nghỉ</Label>
+                        </div>
+                    </RadioGroup>
+                 </div>
+
+                 {timekeepingStatus === "working" && (
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                        <Label>Giờ vào</Label>
+                        <Select
+                            value={checkInTime}
+                            onValueChange={setCheckInTime}
+                            disabled={!checkInEnabled}
                         >
-                          Đi làm
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem
-                          value="approved-leave"
-                          id="approved-leave"
-                          className="border-slate-300"
-                        />
-                        <div className="flex items-center gap-2">
-                          <Label
-                            htmlFor="approved-leave"
-                            className="cursor-pointer font-normal"
-                          >
-                            Nghỉ có phép
-                          </Label>
+                            <SelectTrigger>
+                            <SelectValue placeholder="Chọn giờ" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-[200px]">
+                            {timeOptions.map((time) => (
+                                <SelectItem key={`in-${time}`} value={time}>
+                                {time}
+                                </SelectItem>
+                            ))}
+                            </SelectContent>
+                        </Select>
                         </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem
-                          value="unapproved-leave"
-                          id="unapproved-leave"
-                          className="border-slate-300"
-                        />
-                        <div className="flex items-center gap-2">
-                          <Label
-                            htmlFor="unapproved-leave"
-                            className="cursor-pointer font-normal"
-                          >
-                            Nghỉ không phép
-                          </Label>
+
+                        <div className="space-y-2">
+                        <Label>Giờ ra</Label>
+                        <Select
+                            value={checkOutTime}
+                            onValueChange={setCheckOutTime}
+                            disabled={!checkOutEnabled}
+                        >
+                            <SelectTrigger>
+                            <SelectValue placeholder="Chọn giờ" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-[200px]">
+                            {timeOptions.map((time) => (
+                                <SelectItem key={`out-${time}`} value={time}>
+                                {time}
+                                </SelectItem>
+                            ))}
+                            </SelectContent>
+                        </Select>
                         </div>
-                      </div>
                     </div>
-                  </RadioGroup>
-                </div>
+                 )}
 
-                {/* Check-in/Check-out */}
-                {timekeepingStatus === "working" &&
-                  selectedTimekeeping &&
-                  (() => {
-                    const shift = shifts.find(
-                      (s) => s.id === selectedTimekeeping.shiftId
-                    );
-                    const shiftStartTime = shift?.startTime || "07:00";
-                    const shiftEndTime = shift?.endTime || "11:00";
-
-                    // Tính toán đi muộn/về sớm
-                    const checkInTimeNum = checkInTime.split(":").map(Number);
-                    const checkOutTimeNum = checkOutTime.split(":").map(Number);
-                    const shiftStartNum = shiftStartTime.split(":").map(Number);
-                    const shiftEndNum = shiftEndTime.split(":").map(Number);
-
-                    const checkInMinutes =
-                      checkInTimeNum[0] * 60 + checkInTimeNum[1];
-                    const checkOutMinutes =
-                      checkOutTimeNum[0] * 60 + checkOutTimeNum[1];
-                    const shiftStartMinutes =
-                      shiftStartNum[0] * 60 + shiftStartNum[1];
-                    const shiftEndMinutes =
-                      shiftEndNum[0] * 60 + shiftEndNum[1];
-
-                    const isLate = checkInMinutes > shiftStartMinutes;
-                    const lateDiffMinutes = isLate
-                      ? checkInMinutes - shiftStartMinutes
-                      : 0;
-                    const calculatedLateHours = Math.floor(
-                      lateDiffMinutes / 60
-                    );
-                    const calculatedLateMins = lateDiffMinutes % 60;
-
-                    const isEarly = checkOutMinutes < shiftEndMinutes;
-                    const earlyDiffMinutes = isEarly
-                      ? shiftEndMinutes - checkOutMinutes
-                      : 0;
-                    const calculatedEarlyHours = Math.floor(
-                      earlyDiffMinutes / 60
-                    );
-                    const calculatedEarlyMins = earlyDiffMinutes % 60;
-
-                    const isOvertimeBefore = checkInMinutes < shiftStartMinutes;
-                    const overtimeBeforeDiffMinutes = isOvertimeBefore
-                      ? shiftStartMinutes - checkInMinutes
-                      : 0;
-                    const calculatedOvertimeBeforeHours = Math.floor(
-                      overtimeBeforeDiffMinutes / 60
-                    );
-                    const calculatedOvertimeBeforeMins =
-                      overtimeBeforeDiffMinutes % 60;
-
-                    const isOvertimeAfter = checkOutMinutes > shiftEndMinutes;
-                    const overtimeAfterDiffMinutes = isOvertimeAfter
-                      ? checkOutMinutes - shiftEndMinutes
-                      : 0;
-                    const calculatedOvertimeAfterHours = Math.floor(
-                      overtimeAfterDiffMinutes / 60
-                    );
-                    const calculatedOvertimeAfterMins =
-                      overtimeAfterDiffMinutes % 60;
-
-                    return (
-                      <div className="space-y-3">
-                        {/* Vào */}
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-3">
-                            <Checkbox
-                              checked={checkInEnabled}
-                              onCheckedChange={(checked) => {
-                                setCheckInEnabled(checked);
-                                if (checked) {
-                                  // Khi check lại, set về giờ ca làm
-                                  setCheckInTime(shiftStartTime);
-                                  // Reset làm thêm và đi muộn
-                                  setOvertimeBefore(false);
-                                  setOvertimeBeforeHours(0);
-                                  setOvertimeBeforeMinutes(0);
-                                  setLate(false);
-                                  setLateHours(0);
-                                  setLateMinutes(0);
-                                } else {
-                                  // Khi uncheck, reset làm thêm và đi muộn
-                                  setOvertimeBefore(false);
-                                  setOvertimeBeforeHours(0);
-                                  setOvertimeBeforeMinutes(0);
-                                  setLate(false);
-                                  setLateHours(0);
-                                  setLateMinutes(0);
-                                }
-                              }}
-                            />
-                            <Label className="flex-1">Vào</Label>
-                            <Select
-                              value={checkInTime}
-                              onValueChange={(value) => {
-                                setCheckInTime(value);
-                                // Tự động tính và check làm thêm/đi muộn
-                                const checkInTimeNum = value
-                                  .split(":")
-                                  .map(Number);
-                                const shiftStartNum = shiftStartTime
-                                  .split(":")
-                                  .map(Number);
-                                const checkInMinutes =
-                                  checkInTimeNum[0] * 60 + checkInTimeNum[1];
-                                const shiftStartMinutes =
-                                  shiftStartNum[0] * 60 + shiftStartNum[1];
-
-                                if (checkInMinutes < shiftStartMinutes) {
-                                  // Vào sớm - làm thêm
-                                  const diffMinutes =
-                                    shiftStartMinutes - checkInMinutes;
-                                  setOvertimeBefore(true);
-                                  setOvertimeBeforeHours(
-                                    Math.floor(diffMinutes / 60)
-                                  );
-                                  setOvertimeBeforeMinutes(diffMinutes % 60);
-                                  setLate(false);
-                                  setLateHours(0);
-                                  setLateMinutes(0);
-                                } else if (checkInMinutes > shiftStartMinutes) {
-                                  // Đi muộn
-                                  const diffMinutes =
-                                    checkInMinutes - shiftStartMinutes;
-                                  setLate(true);
-                                  setLateHours(Math.floor(diffMinutes / 60));
-                                  setLateMinutes(diffMinutes % 60);
-                                  setOvertimeBefore(false);
-                                  setOvertimeBeforeHours(0);
-                                  setOvertimeBeforeMinutes(0);
-                                } else {
-                                  // Đúng giờ
-                                  setOvertimeBefore(false);
-                                  setOvertimeBeforeHours(0);
-                                  setOvertimeBeforeMinutes(0);
-                                  setLate(false);
-                                  setLateHours(0);
-                                  setLateMinutes(0);
-                                }
-                              }}
-                            >
-                              <SelectTrigger className="w-32 bg-white border-slate-300 shadow-none">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="max-h-[200px]">
-                                {timeOptions.map((time) => (
-                                  <SelectItem key={time} value={time}>
-                                    {time}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Clock className="w-4 h-4 text-slate-400" />
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <MoreVertical className="w-4 h-4" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-48">
-                                <div className="space-y-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="w-full justify-start"
-                                  >
-                                    Chỉnh sửa
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="w-full justify-start"
-                                  >
-                                    Xóa
-                                  </Button>
-                                </div>
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-                          {/* Làm thêm trước ca */}
-                          {isOvertimeBefore && checkInEnabled && (
-                            <div className="flex items-center gap-3 ml-7">
-                              <Checkbox
-                                checked={overtimeBefore}
-                                onCheckedChange={(checked) => {
-                                  setOvertimeBefore(checked);
-                                  if (!checked) {
-                                    setOvertimeBeforeHours(0);
-                                    setOvertimeBeforeMinutes(0);
-                                  }
-                                }}
-                              />
-                              <Label className="flex-1">Làm thêm</Label>
-                              <Input
-                                type="number"
-                                value={calculatedOvertimeBeforeHours}
-                                className="w-16 h-8 bg-white border-slate-300 shadow-none"
-                                min="0"
-                                disabled={true}
-                                readOnly
-                              />
-                              <span className="text-sm text-slate-600">
-                                giờ
-                              </span>
-                              <Input
-                                type="number"
-                                value={calculatedOvertimeBeforeMins}
-                                className="w-16 h-8 bg-white border-slate-300 shadow-none"
-                                min="0"
-                                max="59"
-                                disabled={true}
-                                readOnly
-                              />
-                              <span className="text-sm text-slate-600">
-                                phút
-                              </span>
-                            </div>
-                          )}
-                          {/* Đi muộn */}
-                          {isLate && checkInEnabled && (
-                            <div className="flex items-center gap-3 ml-7">
-                              <Checkbox
-                                checked={late}
-                                onCheckedChange={(checked) => {
-                                  setLate(checked);
-                                  if (!checked) {
-                                    setLateHours(0);
-                                    setLateMinutes(0);
-                                  }
-                                }}
-                              />
-                              <Label className="flex-1">Đi muộn</Label>
-                              <Input
-                                type="number"
-                                value={calculatedLateHours}
-                                className="w-16 h-8 bg-white border-slate-300 shadow-none"
-                                min="0"
-                                disabled={true}
-                                readOnly
-                              />
-                              <span className="text-sm text-slate-600">
-                                giờ
-                              </span>
-                              <Input
-                                type="number"
-                                value={calculatedLateMins}
-                                className="w-16 h-8 bg-white border-slate-300 shadow-none"
-                                min="0"
-                                max="59"
-                                disabled={true}
-                                readOnly
-                              />
-                              <span className="text-sm text-slate-600">
-                                phút
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Ra */}
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-3">
-                            <Checkbox
-                              checked={checkOutEnabled}
-                              onCheckedChange={(checked) => {
-                                setCheckOutEnabled(checked);
-                                if (checked) {
-                                  // Khi check lại, set về giờ ca làm
-                                  setCheckOutTime(shiftEndTime);
-                                  // Reset làm thêm và về sớm
-                                  setOvertimeAfter(false);
-                                  setOvertimeAfterHours(0);
-                                  setOvertimeAfterMinutes(0);
-                                  setEarly(false);
-                                  setEarlyHours(0);
-                                  setEarlyMinutes(0);
-                                } else {
-                                  // Khi uncheck, reset làm thêm và về sớm
-                                  setOvertimeAfter(false);
-                                  setOvertimeAfterHours(0);
-                                  setOvertimeAfterMinutes(0);
-                                  setEarly(false);
-                                  setEarlyHours(0);
-                                  setEarlyMinutes(0);
-                                }
-                              }}
-                            />
-                            <Label className="flex-1">Ra</Label>
-                            <Select
-                              value={checkOutTime}
-                              onValueChange={(value) => {
-                                setCheckOutTime(value);
-                                // Tự động tính và check làm thêm/về sớm
-                                const checkOutTimeNum = value
-                                  .split(":")
-                                  .map(Number);
-                                const shiftEndNum = shiftEndTime
-                                  .split(":")
-                                  .map(Number);
-                                const checkOutMinutes =
-                                  checkOutTimeNum[0] * 60 + checkOutTimeNum[1];
-                                const shiftEndMinutes =
-                                  shiftEndNum[0] * 60 + shiftEndNum[1];
-
-                                if (checkOutMinutes > shiftEndMinutes) {
-                                  // Ra trễ - làm thêm
-                                  const diffMinutes =
-                                    checkOutMinutes - shiftEndMinutes;
-                                  setOvertimeAfter(true);
-                                  setOvertimeAfterHours(
-                                    Math.floor(diffMinutes / 60)
-                                  );
-                                  setOvertimeAfterMinutes(diffMinutes % 60);
-                                  setEarly(false);
-                                  setEarlyHours(0);
-                                  setEarlyMinutes(0);
-                                } else if (checkOutMinutes < shiftEndMinutes) {
-                                  // Về sớm
-                                  const diffMinutes =
-                                    shiftEndMinutes - checkOutMinutes;
-                                  setEarly(true);
-                                  setEarlyHours(Math.floor(diffMinutes / 60));
-                                  setEarlyMinutes(diffMinutes % 60);
-                                  setOvertimeAfter(false);
-                                  setOvertimeAfterHours(0);
-                                  setOvertimeAfterMinutes(0);
-                                } else {
-                                  // Đúng giờ
-                                  setOvertimeAfter(false);
-                                  setOvertimeAfterHours(0);
-                                  setOvertimeAfterMinutes(0);
-                                  setEarly(false);
-                                  setEarlyHours(0);
-                                  setEarlyMinutes(0);
-                                }
-                              }}
-                            >
-                              <SelectTrigger className="w-32 bg-white border-slate-300 shadow-none">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="max-h-[200px]">
-                                {timeOptions.map((time) => (
-                                  <SelectItem key={time} value={time}>
-                                    {time}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Clock className="w-4 h-4 text-slate-400" />
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <MoreVertical className="w-4 h-4" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-48">
-                                <div className="space-y-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="w-full justify-start"
-                                  >
-                                    Chỉnh sửa
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="w-full justify-start"
-                                  >
-                                    Xóa
-                                  </Button>
-                                </div>
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-                          {/* Làm thêm sau ca */}
-                          {isOvertimeAfter && checkOutEnabled && (
-                            <div className="flex items-center gap-3 ml-7">
-                              <Checkbox
-                                checked={overtimeAfter}
-                                onCheckedChange={(checked) => {
-                                  setOvertimeAfter(checked);
-                                  if (!checked) {
-                                    setOvertimeAfterHours(0);
-                                    setOvertimeAfterMinutes(0);
-                                  }
-                                }}
-                              />
-                              <Label className="flex-1">Làm thêm</Label>
-                              <Input
-                                type="number"
-                                value={calculatedOvertimeAfterHours}
-                                className="w-16 h-8 bg-white border-slate-300 shadow-none"
-                                min="0"
-                                disabled={true}
-                                readOnly
-                              />
-                              <span className="text-sm text-slate-600">
-                                giờ
-                              </span>
-                              <Input
-                                type="number"
-                                value={calculatedOvertimeAfterMins}
-                                className="w-16 h-8 bg-white border-slate-300 shadow-none"
-                                min="0"
-                                max="59"
-                                disabled={true}
-                                readOnly
-                              />
-                              <span className="text-sm text-slate-600">
-                                phút
-                              </span>
-                            </div>
-                          )}
-                          {/* Về sớm */}
-                          {isEarly && checkOutEnabled && (
-                            <div className="flex items-center gap-3 ml-7">
-                              <Checkbox
-                                checked={early}
-                                onCheckedChange={(checked) => {
-                                  setEarly(checked);
-                                  if (!checked) {
-                                    setEarlyHours(0);
-                                    setEarlyMinutes(0);
-                                  }
-                                }}
-                              />
-                              <Label className="flex-1">Về sớm</Label>
-                              <Input
-                                type="number"
-                                value={calculatedEarlyHours}
-                                className="w-16 h-8 bg-white border-slate-300 shadow-none"
-                                min="0"
-                                disabled={true}
-                                readOnly
-                              />
-                              <span className="text-sm text-slate-600">
-                                giờ
-                              </span>
-                              <Input
-                                type="number"
-                                value={calculatedEarlyMins}
-                                className="w-16 h-8 bg-white border-slate-300 shadow-none"
-                                min="0"
-                                max="59"
-                                disabled={true}
-                                readOnly
-                              />
-                              <span className="text-sm text-slate-600">
-                                phút
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })()}
-              </div>
-
-              {/* Note */}
-              <div className="pt-4 border-t">
-                <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                  Ghi chú
-                </Label>
-                <Input
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="Nhập ghi chú..."
-                  className="w-full bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                />
-              </div>
+                 <div className="space-y-2">
+                    <Label>Ghi chú</Label>
+                    <Input
+                        placeholder="Nhập ghi chú..."
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                    />
+                 </div>
+               </div>
             </div>
           )}
 
-          <DialogFooter className="gap-2">
+                  <DialogFooter className="gap-2">
             <Button
               variant="destructive"
-              onClick={() => {
+              onClick={async () => {
                 if (
                   selectedTimekeeping &&
                   confirm(
-                    "Bạn có chắc muốn hủy ca làm việc của nhân viên này? Hành động này sẽ xóa chấm công và không thể hoàn tác."
+                    "Bạn có chắc muốn hủy ca làm việc của nhân viên này? Hành động này sẽ xóa chấm công và lịch làm việc."
                   )
                 ) {
-                  setTimekeepingData((prev) => {
-                    const newData = { ...prev };
-                    if (
-                      newData[selectedTimekeeping.staffId]?.[
-                        selectedTimekeeping.shiftId
-                      ]?.[selectedTimekeeping.date]
-                    ) {
-                      delete newData[selectedTimekeeping.staffId][
-                        selectedTimekeeping.shiftId
-                      ][selectedTimekeeping.date];
-                      // Nếu không còn entry nào trong shift này, xóa shift
-                      if (
-                        Object.keys(
-                          newData[selectedTimekeeping.staffId]?.[
-                            selectedTimekeeping.shiftId
-                          ] || {}
-                        ).length === 0
-                      ) {
-                        delete newData[selectedTimekeeping.staffId][
-                          selectedTimekeeping.shiftId
-                        ];
-                      }
-                      // Nếu không còn shift nào, xóa staff
-                      if (
-                        Object.keys(newData[selectedTimekeeping.staffId] || {})
-                          .length === 0
-                      ) {
-                        delete newData[selectedTimekeeping.staffId];
-                      }
-                    }
-                    return newData;
-                  });
+                   try {
+                     // User requested to DELETE SCHEDULE ONLY. Backend will cascade delete Timekeeping.
+                     
+                     if (rawSchedules) {
+                        const scheduleToDelete = rawSchedules.find((s: any) => 
+                            s.staffId.toString() === selectedTimekeeping.staffId && 
+                            s.shiftId?.toString() === selectedTimekeeping.shiftId &&
+                            formatDateInput(new Date(s.workDate)) === selectedTimekeeping.date
+                        );
+                        
+                        if (scheduleToDelete) {
+                            await scheduleApi.delete(scheduleToDelete.id);
+                            toast.success("Đã hủy ca làm việc");
+                        } else {
+                            // Only if schedule not found, we might consider deleting timekeeping if it's an orphan?
+                            // But user said "delete schedule only".
+                            // If it's a manual timekeeping (no schedule), creating it creates a 'schedule' implicitly?
+                            // Backend 'create' timekeeping (status pending) requires shift.
+                            // If we can't find schedule, we probably can't delete it via schedule API.
+                            // Let's assume sync is good.
+                            toast.error("Không tìm thấy lịch làm việc gốc");
+                        }
+                     }
+                     
+                     setTimekeepingDialogOpen(false);
+                     
+                     // Refresh
+                     fetchTimekeeping();
+                     fetchSchedules();
 
-                  // Xóa ca khỏi schedule
-                  if (setPropsSchedule && selectedTimekeeping) {
-                    const date = new Date(selectedTimekeeping.date);
-                    const dayIndex = date.getDay();
-                    // Chuyển đổi từ Sunday (0) sang Monday (0) format
-                    const dayMap: Record<number, string> = {
-                      0: "CN", // Sunday
-                      1: "T2", // Monday
-                      2: "T3", // Tuesday
-                      3: "T4", // Wednesday
-                      4: "T5", // Thursday
-                      5: "T6", // Friday
-                      6: "T7", // Saturday
-                    };
-                    const day = dayMap[dayIndex];
-
-                    if (day && schedule[selectedTimekeeping.staffId]?.[day]) {
-                      const newSchedule = { ...schedule };
-                      const staffShifts = [
-                        ...(newSchedule[selectedTimekeeping.staffId]?.[day] ||
-                          []),
-                      ];
-                      const shiftIndex = staffShifts.indexOf(
-                        selectedTimekeeping.shiftId
-                      );
-
-                      if (shiftIndex !== -1) {
-                        staffShifts.splice(shiftIndex, 1);
-                        newSchedule[selectedTimekeeping.staffId] = {
-                          ...newSchedule[selectedTimekeeping.staffId],
-                          [day]: staffShifts,
-                        };
-                        setPropsSchedule(newSchedule);
-                      }
-                    }
-                  }
-
-                  toast.success("Đã hủy ca làm việc");
-                  setTimekeepingDialogOpen(false);
+                   } catch (e) {
+                      console.error(e);
+                      toast.error("Có lỗi xảy ra khi hủy");
+                   }
                 }
               }}
             >
@@ -2128,7 +1536,7 @@ export function TimekeepingBoard(props: TimekeepingBoardProps) {
         onOpenChange={setBulkDialogOpen}
         shifts={shifts}
         staffList={staff.map(s => ({
-          id: s.id,
+          id: Number(s.id),
           fullName: s.name,
           staffCode: s.code,
           position: s.role,

@@ -4,6 +4,9 @@ import { refreshToken } from './authApi';
 const axiosClient = axios.create({
   baseURL: 'http://localhost:4000/api',
   withCredentials: true, // 🔥 bắt buộc để gửi cookie
+  paramsSerializer: {
+    indexes: null // Serializes arrays as 'a=1&a=2' instead of 'a[]=1&a[]=2'
+  }
 });
 
 // Gắn access token

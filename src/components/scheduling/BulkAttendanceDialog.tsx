@@ -12,14 +12,15 @@ import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 
 interface Shift {
-  id: string;
+  id: number | string;
   name: string;
   startTime: string;
   endTime: string;
+  active?: boolean;
 }
 
 interface StaffMember {
-  id: string;
+  id: number | string;
   fullName: string;
   staffCode: string;
   position: string;
@@ -34,10 +35,10 @@ interface BulkAttendanceDialogProps {
   schedule: Record<string, Record<string, string[]>>;
   onSave: (data: {
     date: Date;
-    shiftId: string;
+    shiftId: number;
     checkIn: string;
     checkOut: string;
-    selectedStaff: string[];
+    selectedStaff: number[];
   }) => void;
 }
 
@@ -67,7 +68,7 @@ export function BulkAttendanceDialog({
   const [selectedShift, setSelectedShift] = useState<string>('');
   const [checkInTime, setCheckInTime] = useState<string>('');
   const [checkOutTime, setCheckOutTime] = useState<string>('');
-  const [selectedStaff, setSelectedStaff] = useState<Set<string>>(new Set());
+  const [selectedStaff, setSelectedStaff] = useState<Set<number>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
 
@@ -99,14 +100,14 @@ export function BulkAttendanceDialog({
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
     if (checked) {
-      setSelectedStaff(new Set(availableStaff.map(s => s.id)));
+      setSelectedStaff(new Set(availableStaff.map(s => Number(s.id))));
     } else {
       setSelectedStaff(new Set());
     }
   };
 
   // Handle individual staff selection
-  const handleStaffToggle = (staffId: string) => {
+  const handleStaffToggle = (staffId: number) => {
     const newSelected = new Set(selectedStaff);
     if (newSelected.has(staffId)) {
       newSelected.delete(staffId);
@@ -114,7 +115,7 @@ export function BulkAttendanceDialog({
       newSelected.add(staffId);
     }
     setSelectedStaff(newSelected);
-    setSelectAll(newSelected.size === availableStaff.length);
+    setSelectAll(newSelected.size === availableStaff.length && availableStaff.length > 0);
   };
 
   // Handle save
@@ -134,7 +135,7 @@ export function BulkAttendanceDialog({
 
     onSave({
       date: selectedDate,
-      shiftId: selectedShift,
+      shiftId: Number(selectedShift),
       checkIn: checkInTime,
       checkOut: checkOutTime,
       selectedStaff: Array.from(selectedStaff),
@@ -154,10 +155,13 @@ export function BulkAttendanceDialog({
   // Auto-fill check-in/out times when shift is selected
   const handleShiftChange = (shiftId: string) => {
     setSelectedShift(shiftId);
-    const shift = shifts.find(s => s.id === shiftId);
+    const shift = shifts.find(s => s.id.toString() === shiftId);
     if (shift) {
-      setCheckInTime(shift.startTime);
-      setCheckOutTime(shift.endTime);
+      // Format time to HH:mm for Select match
+      const startTime = shift.startTime.includes('T') ? shift.startTime.split('T')[1].substring(0, 5) : shift.startTime.substring(0, 5);
+      const endTime = shift.endTime.includes('T') ? shift.endTime.split('T')[1].substring(0, 5) : shift.endTime.substring(0, 5);
+      setCheckInTime(startTime);
+      setCheckOutTime(endTime);
     }
     // Reset staff selection when shift changes
     setSelectedStaff(new Set());
@@ -186,7 +190,7 @@ export function BulkAttendanceDialog({
                 <Calendar
                   mode="single"
                   selected={selectedDate}
-                  onSelect={(date) => {
+                  onSelect={(date: Date | undefined) => {
                     if (date) {
                       setSelectedDate(date);
                       setCalendarOpen(false);
@@ -207,8 +211,8 @@ export function BulkAttendanceDialog({
               </SelectTrigger>
               <SelectContent>
                 {shifts.filter(s => s.active !== false).map(shift => (
-                  <SelectItem key={shift.id} value={shift.id}>
-                    {shift.name} ({shift.startTime} - {shift.endTime})
+                  <SelectItem key={shift.id} value={shift.id.toString()}>
+                    {shift.name} ({shift.startTime.includes('T') ? shift.startTime.split('T')[1].substring(0, 5) : shift.startTime.substring(0, 5)} - {shift.endTime.includes('T') ? shift.endTime.split('T')[1].substring(0, 5) : shift.endTime.substring(0, 5)})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -274,26 +278,29 @@ export function BulkAttendanceDialog({
                     Không có nhân viên nào được phân ca này
                   </p>
                 ) : (
-                  availableStaff.map(staff => (
-                    <div key={staff.id} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded">
-                      <Checkbox
-                        id={`staff-${staff.id}`}
-                        checked={selectedStaff.has(staff.id)}
-                        onCheckedChange={() => handleStaffToggle(staff.id)}
-                      />
-                      <Label
-                        htmlFor={`staff-${staff.id}`}
-                        className="flex-1 cursor-pointer font-normal"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span>{staff.fullName}</span>
-                          <span className="text-xs text-slate-500">
-                            {staff.staffCode} - {staff.positionLabel}
-                          </span>
+                  availableStaff.map(staff => {
+                    const sid = Number(staff.id);
+                    return (
+                        <div 
+                            key={staff.id} 
+                            className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer transition-colors"
+                            onClick={() => handleStaffToggle(sid)}
+                        >
+                          <Checkbox
+                            checked={selectedStaff.has(sid)}
+                            className="pointer-events-none"
+                          />
+                          <div className="flex-1 pointer-events-none">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-normal">{staff.fullName}</span>
+                              <span className="text-xs text-slate-500">
+                                {staff.staffCode} - {staff.positionLabel}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                      </Label>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
               

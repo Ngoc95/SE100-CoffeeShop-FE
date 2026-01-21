@@ -22,6 +22,8 @@ import {
 import { toast } from 'sonner';
 import { Role } from '../../types/account';
 import { initialRoles } from '../../data/roleData';
+import roleApi from '../../api/roleApi';
+import React from 'react';
 import { RoleFormDialog } from '../role/RoleFormDialog';
 import { useAuth } from "../../contexts/AuthContext";
 import { Badge } from '../ui/badge';
@@ -33,12 +35,38 @@ export function Accounts() {
   const canUpdate = hasPermission('system_users:update');
   const canDelete = hasPermission('system_users:delete');
 
-  const [roles, setRoles] = useState<Role[]>(initialRoles);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
-  const [expandedRoleId, setExpandedRoleId] = useState<string | null>(null);
-  const [editingPermissionsRoleId, setEditingPermissionsRoleId] = useState<string | null>(null);
+  const [expandedRoleId, setExpandedRoleId] = useState<number | null>(null);
+  const [editingPermissionsRoleId, setEditingPermissionsRoleId] = useState<number | null>(null);
   const [tempPermissions, setTempPermissions] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch roles on mount
+  const fetchRoles = async () => {
+    try {
+      setLoading(true);
+      const res = await roleApi.getAll();
+      const rolesData = res.data.metaData?.roles || [];
+      // Ensure rolesData is an array
+      setRoles(Array.isArray(rolesData) ? rolesData : []);
+    } catch (error) {
+       console.error("Error fetching roles:", error);
+       toast.error("Không thể tải danh sách vai trò");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useState(() => {
+    fetchRoles();
+  }); // Using useState initializer as a mount effect alternative or standard useEffect
+
+  // Actually switch to useEffect for fetching
+  React.useEffect(() => {
+    fetchRoles();
+  }, []);
 
   const handleAddRole = () => {
     setEditingRole(null);
@@ -51,7 +79,7 @@ export function Accounts() {
     setRoleDialogOpen(true);
   };
 
-  const handleDeleteRole = (role: Role, e: React.MouseEvent) => {
+  const handleDeleteRole = async (role: Role, e: React.MouseEvent) => {
     e.stopPropagation();
     if (role.isSystem) {
       toast.error('Không thể xóa vai trò hệ thống');
@@ -59,40 +87,47 @@ export function Accounts() {
     }
 
     if (confirm(`Bạn có chắc muốn xóa vai trò "${role.name}"?`)) {
-      setRoles(roles.filter((r) => r.id !== role.id));
-      toast.success('Đã xóa vai trò');
+      try {
+        await roleApi.delete(role.id);
+        toast.success('Đã xóa vai trò');
+        fetchRoles();
+      } catch (error) {
+        console.error(error);
+        toast.error('Lỗi khi xóa vai trò');
+      }
     }
   };
 
-  const handleSaveRole = (roleData: Omit<Role, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (editingRole) {
-      const updatedRoles = roles.map((r) =>
-        r.id === editingRole.id
-          ? {
-            ...r,
-            ...roleData,
-            updatedAt: new Date().toISOString(),
-          }
-          : r
-      );
-      setRoles(updatedRoles);
-      toast.success('Đã cập nhật vai trò');
-    } else {
-      const newRole: Role = {
-        ...roleData,
-        id: `role-${Date.now()}`,
-        // Custom roles are not system roles
-        isSystem: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setRoles([...roles, newRole]);
-      toast.success('Đã tạo vai trò mới');
+  const handleSaveRole = async (roleData: Omit<Role, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      if (editingRole) {
+        // Update existing role
+        await roleApi.update(editingRole.id, {
+          name: roleData.name,
+          description: roleData.description,
+          permissions: roleData.permissions
+        });
+        toast.success('Đã cập nhật vai trò');
+      } else {
+        // Create new role
+        await roleApi.create({
+           name: roleData.name,
+           description: roleData.description,
+           permissions: roleData.permissions,
+           isSystem: false
+        });
+        toast.success('Đã tạo vai trò mới');
+      }
+      setRoleDialogOpen(false);
+      setEditingRole(null);
+      fetchRoles();
+    } catch (error) {
+      console.error(error);
+      toast.error(editingRole ? 'Lỗi khi cập nhật vai trò' : 'Lỗi khi tạo vai trò');
     }
-    setEditingRole(null);
   };
 
-  const toggleExpand = (roleId: string) => {
+  const toggleExpand = (roleId: number) => {
     if (expandedRoleId === roleId) {
       setExpandedRoleId(null);
       setEditingPermissionsRoleId(null);
@@ -112,11 +147,19 @@ export function Accounts() {
     setTempPermissions([]);
   };
 
-  const saveEditPermissions = (role: Role) => {
-    setRoles(roles.map(r => r.id === role.id ? { ...r, permissions: tempPermissions, updatedAt: new Date().toISOString() } : r));
-    setEditingPermissionsRoleId(null);
-    setTempPermissions([]);
-    toast.success('Đã cập nhật quyền hạn');
+  const saveEditPermissions = async (role: Role) => {
+    try {
+      await roleApi.update(role.id, {
+        permissions: tempPermissions as any // Cast if type mismatch on strict checks
+      });
+      toast.success('Đã cập nhật quyền hạn');
+      setEditingPermissionsRoleId(null);
+      setTempPermissions([]);
+      fetchRoles();
+    } catch (error) {
+      console.error(error);
+      toast.error('Lỗi khi cập nhật quyền hạn');
+    }
   };
 
   return (

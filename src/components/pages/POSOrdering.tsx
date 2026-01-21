@@ -382,6 +382,7 @@ useEffect(() => {
         const res = await fetchBankAccounts();
         const items = extractItems(res);
         const mapped = (items as any[]).map((ba: any) => ({
+          id: ba.id,
           bank: ba.bankFullName ?? ba.bankName ?? ba.bank ?? "Ngân hàng",
           owner: ba.owner ?? ba.ownerName ?? ba.accountOwner ?? "",
           account: ba.accountNumber ?? ba.number ?? ba.account ?? "",
@@ -4244,6 +4245,8 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
                   setTakeawayOrders([]);
                   setTakeawayOrderCode(null);
                   localStorage.removeItem("pos_takeaway_order_id");
+                  setOrderSubtotal(0);
+                  setOrderTotalAmount(0);
               } else {
                   // If Dine-in, refresh tables and clear selection
                   // Refresh tables
@@ -4270,6 +4273,8 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
                   updateCurrentCart([]);
                   setSelectedTable(null);
                   setSelectedCustomer(null);
+                  setOrderSubtotal(0);
+                  setOrderTotalAmount(0);
               }
 
               // Open Print Modal

@@ -52,6 +52,7 @@ interface CheckoutItem {
 }
 
 interface BankAccount {
+  id?: number | string;
   bank: string;
   owner: string;
   account: string;
@@ -113,6 +114,12 @@ export function CheckoutModal({
     useState<number>(0);
   const [combinedTransferBankId, setCombinedTransferBankId] =
     useState<number | null>(null);
+
+  console.log("CheckoutModal Render State:", {
+    selectedTransferBankId,
+    combinedTransferBankId,
+    paymentMethod
+  });
 
   // New account dialog
   const [newAccountOpen, setNewAccountOpen] = useState(false);
@@ -198,8 +205,8 @@ export function CheckoutModal({
           return
         }
 
-        // Find bank details (using index as ID for now as implementation uses index)
-        const bank = bankAccounts[bankId];
+        // Find bank details (by ID)
+        const bank = bankAccounts.find(b => b.id === bankId) || bankAccounts[Number(bankId)];
         if (!bank) return;
         
         // VietQR Format: https://img.vietqr.io/image/<BANK_ID>-<ACCOUNT_NO>-<TEMPLATE>.png?amount=<AMOUNT>&addInfo=<INFO>&accountName=<NAME>
@@ -257,6 +264,14 @@ export function CheckoutModal({
       paymentDetails.transferBankId = combinedTransferBankId;
       paymentDetails.bankAccountId = combinedTransferBankId;
     }
+
+    console.log("CheckoutModal Confirm Payment Data:", {
+        paymentMethod,
+        paymentDetails,
+        bankAccounts,
+        selectedTransferBankId,
+        combinedTransferBankId
+    });
 
     // Pass promotion data
     const promoId = selectedPromotion?.id;
@@ -677,17 +692,18 @@ export function CheckoutModal({
                 <div>
                   <Label className="text-sm">Tài khoản nhận tiền</Label>
                   <select
-                    value={selectedTransferBankId ?? ""}
-                    onChange={(e) =>
-                      setSelectedTransferBankId(Number(e.target.value))
-                    }
+                    value={selectedTransferBankId !== null ? String(selectedTransferBankId) : ""}
+                    onChange={(e) => {
+                        const val = e.target.value;
+                        setSelectedTransferBankId(val === "" ? null : Number(val));
+                    }}
                     className="w-full p-2 border border-blue-300 rounded-lg bg-white text-sm mt-1"
                   >
                     <option value="" disabled>
                       -- Chọn tài khoản --
                     </option>
                     {bankAccounts.map((acc, idx) => (
-                      <option key={idx} value={idx}>
+                      <option key={acc.id || idx} value={acc.id || idx}>
                         {acc.bank} - {acc.owner}
                       </option>
                     ))}
@@ -732,17 +748,18 @@ export function CheckoutModal({
                     className="mt-1 text-sm mb-2"
                   />
                   <select
-                    value={combinedTransferBankId ?? ""}
-                    onChange={(e) =>
-                      setCombinedTransferBankId(Number(e.target.value))
-                    }
+                    value={combinedTransferBankId !== null ? String(combinedTransferBankId) : ""}
+                    onChange={(e) => {
+                       const val = e.target.value;
+                       setCombinedTransferBankId(val === "" ? null : Number(val));
+                    }}
                     className="w-full p-2 border border-green-300 rounded-lg bg-white text-sm"
                   >
                     <option value="" disabled>
                         -- Chọn tài khoản --
                     </option>
                     {bankAccounts.map((acc, idx) => (
-                      <option key={idx} value={idx}>
+                      <option key={acc.id || idx} value={acc.id || idx}>
                         {acc.bank} - {acc.owner}
                       </option>
                     ))}
