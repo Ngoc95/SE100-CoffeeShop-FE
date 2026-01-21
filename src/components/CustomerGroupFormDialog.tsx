@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { CurrencyInput } from './CurrencyInput';
 
 export interface EditCustomerGroup {
   id: number;
@@ -118,7 +119,7 @@ export function CustomerGroupEditFormDialog(props: CustomerGroupEditFormDialogPr
 
           {/* Độ ưu tiên */}
           <div>
-            <Label>Độ ưu tiên</Label>
+            <Label>Độ ưu tiên<Label className="text-red-600">*</Label></Label>
             <Input
               type="text"
               value={formData.priority}
@@ -131,10 +132,9 @@ export function CustomerGroupEditFormDialog(props: CustomerGroupEditFormDialogPr
           {/* Chi tiêu tối thiểu */}
           <div>
             <Label>Chi tiêu tối thiểu</Label>
-            <Input
-              type="text"
+            <CurrencyInput
               value={formData.minSpend}
-              onChange={(e) => { if (!Number.isNaN(Number(e.target.value))) setFormData({ ...formData, minSpend: Number(e.target.value) }) }}
+              onValueChange={(value) => setFormData({ ...formData, minSpend: value })}
               placeholder="VD: 0"
               className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
@@ -154,7 +154,7 @@ export function CustomerGroupEditFormDialog(props: CustomerGroupEditFormDialogPr
 
           {/* Tháng xét hạng */}
           <div>
-            <Label>Số tháng xét hạng</Label>
+            <Label>Số tháng xét hạng<Label className="text-red-600">*</Label></Label>
             <Input
               type="text"
               value={formData.windowMonths}
@@ -245,7 +245,7 @@ export function CustomerGroupAddFormDialog(props: CustomerGroupAddFormDialogProp
 
           {/* Độ ưu tiên */}
           <div>
-            <Label>Độ ưu tiên</Label>
+            <Label>Độ ưu tiên<Label className="text-red-600">*</Label></Label>
             <Input
               type="text"
               value={formData.priority}
@@ -258,10 +258,9 @@ export function CustomerGroupAddFormDialog(props: CustomerGroupAddFormDialogProp
           {/* Chi tiêu tối thiểu */}
           <div>
             <Label>Chi tiêu tối thiểu</Label>
-            <Input
-              type="text"
+             <CurrencyInput
               value={formData.minSpend}
-              onChange={(e) => { if (!Number.isNaN(Number(e.target.value))) setFormData({ ...formData, minSpend: Number(e.target.value) }) }}
+              onValueChange={(value) => setFormData({ ...formData, minSpend: value })}
               placeholder="VD: 0"
               className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
@@ -281,7 +280,7 @@ export function CustomerGroupAddFormDialog(props: CustomerGroupAddFormDialogProp
 
           {/* Tháng xét hạng */}
           <div>
-            <Label>Số tháng xét hạng</Label>
+            <Label>Số tháng xét hạng<Label className="text-red-600">*</Label></Label>
             <Input
               type="text"
               value={formData.windowMonths}

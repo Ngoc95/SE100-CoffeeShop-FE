@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { AddCustomer, CustomerAddFormDialog, CustomerEditFormDialog, EditCustomer } from "../CustomerFormDialog";
 import { createCustomer, deleteCustomer, getCustomers, updateCustomer } from "../../api/customer";
 import { getCustomerGroups } from "../../api/customerGroup";
+import { useDebounce } from "../../hooks/useDebounce";
 
 interface Customer {
   id: number,
@@ -61,6 +62,7 @@ export function Customers() {
   const canDelete = hasPermission('customers:delete');
 
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
   const [filterGroup, setFilterGroup] = useState("all");
   const [filterActive, setFilterActive] = useState("all");
   const [filterGender, setFilterGender] = useState("all");
@@ -112,22 +114,46 @@ export function Customers() {
   }
 
   useEffect(() => {
+    // Combine fetch logic for debounce and filters
+    if (debouncedSearchQuery) {
+        fetchCustomersParams["search"] = debouncedSearchQuery
+    } else {
+        delete fetchCustomersParams["search"]
+    }
+
+    if (filterActive != "all") {
+      fetchCustomersParams["isActive"] = filterActive === "Hoạt động" ? true : false
+    }
+    else delete fetchCustomersParams["isActive"]
+    if (filterGroup != "all") {
+      fetchCustomersParams["groupId"] = filterGroup
+    }
+    else delete fetchCustomersParams["groupId"]
+    if (filterGender != "all") {
+      fetchCustomersParams["gender"] = filterGender
+    }
+    else delete fetchCustomersParams["gender"]
+    if (filterCity != "all") {
+      fetchCustomersParams["city"] = filterCity
+    }
+    else delete fetchCustomersParams["city"]
+
     try {
       fetchCustomersData()
     }
     catch (error) {
       console.log("Error when fetching customers: ", error);
     }
+  }, [debouncedSearchQuery, filterGroup, filterActive, filterGender, filterCity])
 
+  useEffect(() => {
     try {
       fetchCustomerGroupsData()
     }
     catch (error) {
       console.log("Error when fetching customer groups: ", error);
     }
-
-  }, []
-  )
+  }, [])
 
   const handleSort = (field: string) => {
     let tempSortBy = sortBy;
@@ -248,7 +274,7 @@ export function Customers() {
       toast.success("Cập nhật khách hàng thành công");
       await fetchCustomersData()
     }
-    catch (error) {
+    catch (error: any) {
       toast.error("Cập nhật khách hàng thất bại. Lỗi: " + error.response.data.message);
     }
 
@@ -274,7 +300,7 @@ export function Customers() {
       toast.success("Thêm khách hàng thành công");
       await fetchCustomersData()
     }
-    catch (error) {
+    catch (error: any) {
       toast.error("Thêm khách hàng thất bại. Lỗi: " + error.response.data.message);
     }
 
@@ -396,6 +422,27 @@ export function Customers() {
         </div>
       </div>
 
+      {/* Stats */}
+      <div className="space-y-2">
+        <Label className="text-xs text-slate-600">Thống kê</Label>
+        <div className="bg-white border border-slate-200 rounded-lg p-3 flex gap-8 w-fit items-center shadow-sm">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-600">Tổng số khách hàng:</span>
+            <span className="font-medium text-slate-900">{totalCustomers}</span>
+          </div>
+           <div className="h-4 w-px bg-slate-200"></div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-600">Đang hoạt động:</span>
+            <span className="font-medium text-emerald-600">{activeCustomers}</span>
+          </div>
+          <div className="h-4 w-px bg-slate-200"></div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-600">Tổng doanh thu:</span>
+            <span className="font-medium text-blue-600">{formatCurrency(totalRevenue)}</span>
+          </div>
+        </div>
+      </div>
+
       {/* Search and Filter Bar */}
       <Card>
         <CardContent className="pt-6">
@@ -408,26 +455,15 @@ export function Customers() {
                   placeholder="Tìm kiếm theo tên, mã và số điện thoại"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      handleSearch();
-                    }
-                  }}
                   className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
-                <X
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 w-5 h-5"
-                  onClick={() => setSearchQuery("")}
-                />
+                {searchQuery && (
+                    <X
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 w-5 h-5 cursor-pointer"
+                    onClick={() => setSearchQuery("")}
+                    />
+                )}
               </div>
-              <Button
-                className="bg-blue-600 hover:bg-blue-700"
-                onClick={() => {
-                  handleSearch();
-                }}
-              >
-                <Search className="w-4 h-4" />
-              </Button>
               <Button
                 variant="outline"
                 onClick={() => setShowFilters(!showFilters)}
@@ -462,7 +498,7 @@ export function Customers() {
                         {
                           genders.map((gender, index) => (
                             <SelectItem key={index} value={gender}>
-                              {gender}
+                              {gender === 'male' ? 'Nam' : (gender === 'female' ? 'Nữ' : gender)}
                             </SelectItem>
                           ))
                         }
@@ -536,9 +572,9 @@ export function Customers() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="bg-blue-600 hover:bg-blue-700 text-white hover:text-white"
+                    className="bg-blue-600 hover:bg-blue-700 text-white hover:text-white hidden"
                     onClick={() => {
-                      handleApplyFilter();
+                        // handleApplyFilter(); // No longer needed
                     }}
                   >
                     Áp dụng bộ lọc
@@ -645,7 +681,7 @@ export function Customers() {
                         {customer.name}
                       </TableCell>
                       <TableCell className="text-slate-600">
-                        {customer.gender}
+                        {customer.gender === 'male' ? 'Nam' : (customer.gender === 'female' ? 'Nữ' : customer.gender)}
                       </TableCell>
                       <TableCell className="text-slate-600">
                         {customer.birthday}
@@ -706,24 +742,7 @@ export function Customers() {
           </div>
         </CardContent>
       </Card>
-      {/* Stats */}
-      <div className="space-y-2">
-        <Label className="text-xs text-slate-600">Thống kê</Label>
-        <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-1">
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-600">Tổng:</span>
-            <span className="font-medium text-slate-900">{totalCustomers}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-600">Hoạt động:</span>
-            <span className="font-medium text-emerald-600">{activeCustomers}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-600">Doanh thu:</span>
-            <span className="font-medium text-blue-600 text-xs">{formatCurrency(totalRevenue)}</span>
-          </div>
-        </div>
-      </div>
+
 
 
       {/* Customer Edit Form Dialog */}

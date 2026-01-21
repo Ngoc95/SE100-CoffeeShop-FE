@@ -13,7 +13,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { toast } from "sonner";
 import { EditSupplier, SupplierEditFormDialog } from "../SupplierFormDialog";
 import { cities } from "./Customers";
-import { deleteSupplier, getSuppliers, updateSupplier } from "../../api/supplier";
+import { deleteSupplier, getSuppliers, updateSupplier, getSupplierCategories, createSupplier } from "../../api/supplier";
+import { useDebounce } from "../../hooks/useDebounce";
 
 interface Supplier {
   id: 1,
@@ -30,7 +31,16 @@ interface Supplier {
   totalPurchaseAmount: 0,
   purchaseOrderCount: 0,
   createdAt: "2026-01-19T05:46:56.829Z",
-  recentOrders: []
+  recentOrders: {
+    id: number;
+    code: string;
+    orderDate: string;
+    totalAmount: number;
+    paidAmount: number;
+    debtAmount: number;
+    status: string;
+    paymentStatus: string;
+  }[]
 }
 
 export function Suppliers() {
@@ -41,7 +51,10 @@ export function Suppliers() {
   const canUpdate = hasPermission('suppliers:update');
   const canDelete = hasPermission('suppliers:delete');
 
+  /* FILTER STATE */
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedCity, setSelectedCity] = useState("all");
@@ -69,6 +82,21 @@ export function Suppliers() {
 
   //functions
   const fetchSuppliersData = async () => {
+    // Only set params if they are different from default/empty
+    if (debouncedSearchQuery) fetchSuppliersParams["search"] = debouncedSearchQuery;
+    else delete fetchSuppliersParams["search"];
+
+    if (selectedCategory !== "all") fetchSuppliersParams["category"] = selectedCategory;
+    else delete fetchSuppliersParams["category"];
+
+    if (selectedCity !== "all") fetchSuppliersParams["city"] = selectedCity;
+    else delete fetchSuppliersParams["city"];
+
+    if (selectedStatus !== "all") fetchSuppliersParams["status"] = selectedStatus;
+    else delete fetchSuppliersParams["status"];
+    
+    if (sortBy && sortOrder !== "none") fetchSuppliersParams["sort"] = sortOrder + sortBy;
+
     const res = await getSuppliers(fetchSuppliersParams);
     if (!res) return;
     const { suppliers } = res.data.metaData
@@ -77,11 +105,25 @@ export function Suppliers() {
     }
   }
 
+  const fetchCategories = async () => {
+    try {
+      const res = await getSupplierCategories();
+      const { categories } = res.data.metaData;
+      if (categories) setCategories(categories);
+    } catch (err) {
+      console.error("Failed to fetch categories", err);
+    }
+  };
+
   const toggleExpand = (id: string) => {
     setExpandedRows((prev) =>
       prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
     );
   };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     try {
@@ -90,50 +132,30 @@ export function Suppliers() {
     catch (error) {
       console.log("Error when fetching supplier: ", error);
     }
-  }, [])
+  }, [debouncedSearchQuery, selectedCategory, selectedCity, selectedStatus, sortBy, sortOrder])
 
-  const handleSearch = () => {
-    if (!searchQuery) delete fetchSuppliersParams["search"]
-    else fetchSuppliersParams["search"] = searchQuery
-    fetchSuppliersData()
-  }
+  // Removed manual handleSearch as it's now auto-triggered via effect
 
+  // handleSort logic improved for auto-fetch
   const handleSort = (field: string) => {
     let tempSortBy = sortBy;
     let tempSortOrder = sortOrder;
+    
     if (sortBy === field) {
-      // Cycle through: asc -> desc -> none -> asc
       if (sortOrder === "+") {
         setSortOrder("-");
-
-        tempSortOrder = "-"
       }
       else if (sortOrder === "-") {
         setSortOrder("none");
         setSortBy(null);
-
-        tempSortBy = null;
       } else {
         setSortOrder("+");
-
-        tempSortOrder = "+"
       }
     } else {
       setSortBy(field);
       setSortOrder("+");
-
-      tempSortBy = field;
-      tempSortOrder = "+"
     }
-
-    if (tempSortBy && tempSortOrder) {
-      fetchSuppliersParams["sort"] = tempSortOrder + tempSortBy;
-    }
-    else {
-      fetchSuppliersParams["sort"] = "+code"
-    }
-
-    fetchSuppliersData();
+    // Effect will trigger fetch
   };
 
   const getSortIcon = (field: string) => {
@@ -144,15 +166,24 @@ export function Suppliers() {
     return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
   };
 
-  const handleAddSupplier = (formData: Omit<Supplier, "id" | "code">) => {
-    // const newSupplier: Supplier = {
-    //   id: Date.now().toString(),
-    //   code: `NCC${String(suppliers.length + 1).padStart(3, "0")}`,
-    //   ...formData,
-    // };
-    // setSuppliers([...suppliers, newSupplier]);
-    // setDialogOpen(false);
-    // toast.success("Đã thêm nhà cung cấp mới");
+  const handleAddSupplier = async (formData: EditSupplier) => {
+    try {
+      await createSupplier(
+        formData.name,
+        formData.contactPerson,
+        formData.phone,
+        formData.email,
+        formData.address,
+        formData.city,
+        formData.category,
+        formData.status
+      );
+      toast.success("Đã thêm nhà cung cấp mới");
+      setAddDialogOpen(false);
+      fetchSuppliersData();
+    } catch (error: any) {
+      toast.error("Thêm nhà cung cấp thất bại: " + (error?.response?.data?.message || error.message));
+    }
   };
 
   const handleEdit = (supplier: Supplier) => {
@@ -213,7 +244,7 @@ export function Suppliers() {
       toast.success("Cập nhật nhà cung cấp thành công");
       await fetchSuppliersData()
     }
-    catch (error) {
+    catch (error: any) {
       toast.error("Cập nhật nhà cung cấp thất bại. Lỗi: " + error.response.data.message);
     }
 
@@ -286,7 +317,7 @@ export function Suppliers() {
             <Button
               className="bg-blue-600 hover:bg-blue-700"
               onClick={() => {
-                // setDialogOpen(true);
+                 setAddDialogOpen(true);
               }}
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -295,7 +326,16 @@ export function Suppliers() {
           )}
         </div>
       </div>
-
+      {/* Stats */}
+      <div className="space-y-2">
+        <Label className="text-xs text-slate-600">Thống kê</Label>
+        <div className="bg-white border border-slate-200 rounded-lg p-3 flex gap-8 w-fit items-center shadow-sm">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-600">Tổng số nhà cung cấp:</span>
+            <span className="font-medium text-slate-900">{totalSuppliers}</span>
+          </div>
+        </div>
+      </div>
       {/* Search and Filter Bar */}
       <Card>
         <CardContent className="pt-6">
@@ -308,26 +348,17 @@ export function Suppliers() {
                   placeholder="Tìm kiếm theo tên, mã, tên liên hệ, số điện thoại..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      handleSearch();
-                    }
-                  }}
                   className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
-                <X
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 w-5 h-5"
-                  onClick={() => setSearchQuery("")}
-                />
+                {searchQuery && (
+                  <X
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 w-4 h-4 cursor-pointer"
+                    onClick={() => setSearchQuery("")}
+                  />
+                )}
               </div>
-              <Button
-                className="bg-blue-600 hover:bg-blue-700"
-                onClick={() => {
-                  handleSearch();
-                }}
-              >
-                <Search className="w-4 h-4" />
-              </Button>
+              {/* Removed manual search button as it is auto-fetched */}
+              
               <Button
                 variant="outline"
                 onClick={() => setShowFilters(!showFilters)}
@@ -346,7 +377,7 @@ export function Suppliers() {
             {/* Collapsible Filter Panel */}
             {showFilters && (
               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   {/* Category Filter */}
                   <div className="space-y-2">
                     <Label className="text-xs text-slate-600">Danh mục</Label>
@@ -491,6 +522,7 @@ export function Suppliers() {
                       <React.Fragment key={supplier.code}>
                         <TableRow
                           className="cursor-pointer hover:bg-slate-50"
+                          onClick={() => toggleExpand(supplier.code)}
                         >
                           <TableCell>
                             <Button
@@ -662,22 +694,47 @@ export function Suppliers() {
                                   </div>
                                 </TabsContent>
                                 <TabsContent value="history">
-                                  {/* <div className="py-4">
-                                    <div className="border rounded-md">
-                                      <div className="grid grid-cols-3 p-2 font-semibold bg-gray-100">
-                                        <div>Mã nhập</div>
-                                        <div>Ngày</div>
-                                        <div className="text-right">Số tiền</div>
-                                      </div>
-                                      {transactions.map((imp) => (
-                                        <div key={imp.id} className="grid grid-cols-3 p-2 border-t">
-                                          <div>{imp.id}</div>
-                                          <div>{imp.date}</div>
-                                          <div className="text-right">{formatCurrency(imp.amount)}</div>
-                                        </div>
-                                      ))}
+                                  {supplier.recentOrders && supplier.recentOrders.length > 0 ? (
+                                    <div className="py-4">
+                                    <div className="rounded-md border">
+                                      <Table>
+                                        <TableHeader className="bg-gray-100">
+                                          <TableRow>
+                                            <TableHead className="w-[100px]">Mã đơn</TableHead>
+                                            <TableHead>Ngày nhập</TableHead>
+                                            <TableHead className="text-right">Tổng tiền</TableHead>
+                                            <TableHead className="text-right">Đã trả</TableHead>
+                                            <TableHead className="text-right">Còn nợ</TableHead>
+                                            <TableHead className="text-center">Trạng thái</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {supplier.recentOrders.map((imp) => (
+                                            <TableRow key={imp.id}>
+                                              <TableCell className="font-medium">{imp.code}</TableCell>
+                                              <TableCell>{new Date(imp.orderDate).toLocaleString('vi-VN')}</TableCell>
+                                              <TableCell className="text-right font-medium">{formatCurrency(imp.totalAmount)}</TableCell>
+                                              <TableCell className="text-right text-emerald-600">{formatCurrency(imp.paidAmount)}</TableCell>
+                                              <TableCell className="text-right text-red-600">{formatCurrency(imp.debtAmount)}</TableCell>
+                                              <TableCell className="text-center">
+                                                <Badge 
+                                                  variant={imp.status === 'completed' ? 'default' : 'secondary'} 
+                                                  className={imp.status === 'completed' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}
+                                                >
+                                                  {imp.status === 'completed' ? 'Hoàn thành' : imp.status}
+                                                </Badge>
+                                              </TableCell>
+                                            </TableRow>
+                                          ))}
+                                        </TableBody>
+                                      </Table>
                                     </div>
-                                  </div> */}
+                                    </div>
+                                  ) : (
+                                    <div className="py-8 text-center text-slate-500 italic">
+                                      Chưa có lịch sử nhập hàng
+                                    </div>
+                                  )}
                                 </TabsContent>
                               </Tabs>
                             </TableCell>
@@ -692,24 +749,7 @@ export function Suppliers() {
           </div>
         </CardContent>
       </Card>
-      {/* Stats */}
-      <div className="space-y-2">
-        <Label className="text-xs text-slate-600">Thống kê</Label>
-        <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-1">
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-600">Tổng:</span>
-            <span className="font-medium text-slate-900">{totalSuppliers}</span>
-          </div>
-          {/* <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Hoạt động:</span>
-                        <span className="font-medium text-emerald-600">{activeSuppliers}</span>
-                      </div> */}
-          {/* <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Công nợ:</span>
-                        <span className="font-medium text-red-600">{formatCurrency(totalDebt)}</span>
-                      </div> */}
-        </div>
-      </div>
+
       {/* Form Dialog */}
       <SupplierEditFormDialog
         open={editDialogOpen}
@@ -718,6 +758,27 @@ export function Suppliers() {
         }}
         onSubmit={(supplier) => handleSubmitEdit(supplier)}
         editingSupplier={editingSupplier}
+        title="Chỉnh sửa nhà cung cấp"
+      />
+      <SupplierEditFormDialog
+        open={addDialogOpen}
+        onClose={() => {
+          setAddDialogOpen(false);
+        }}
+        onSubmit={(supplier) => handleAddSupplier(supplier)}
+        editingSupplier={{
+          id: 0,
+          code: "",
+          name: "",
+          contactPerson: "",
+          phone: "",
+          email: "",
+          address: "",
+          city: "",
+          category: "",
+          status: 'active'
+        }}
+        title="Thêm nhà cung cấp"
       />
     </div>
   );

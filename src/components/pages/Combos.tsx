@@ -3,7 +3,7 @@ import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
-import { PackageCheck, Plus, Pencil, Trash2, Search, ToggleLeft, ToggleRight, ArrowUp, ArrowDown, Download, Upload, Filter, X } from "lucide-react";
+import { PackageCheck, Plus, Pencil, Trash2, Search, ToggleLeft, ToggleRight, ArrowUp, ArrowDown, Download, Upload, Filter, X, PowerOff, Power } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
 import { Label } from "../ui/label";
@@ -60,6 +60,39 @@ const extractItems = (res: any): any[] => {
   if (Array.isArray(data?.metaData)) return data.metaData;
   if (Array.isArray(data)) return data;
   return [];
+};
+
+const CurrencyInput = ({ value, onChange, className, placeholder, disabled }: { value: number | undefined; onChange: (val: number) => void; className?: string; placeholder?: string; disabled?: boolean }) => {
+  const [display, setDisplay] = useState("");
+
+  useEffect(() => {
+    setDisplay(value !== undefined ? value.toLocaleString("vi-VN") : "");
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\./g, "").replace(/,/g, "");
+    if (!raw) {
+      setDisplay("");
+      onChange(0);
+      return;
+    }
+    if (/^\d+$/.test(raw)) {
+      const num = parseInt(raw, 10);
+      setDisplay(num.toLocaleString("vi-VN"));
+      onChange(num);
+    }
+  };
+
+  return (
+    <Input
+      type="text"
+      value={display}
+      onChange={handleChange}
+      className={className}
+      placeholder={placeholder}
+      disabled={disabled}
+    />
+  );
 };
 
 export function Combos() {
@@ -417,11 +450,51 @@ export function Combos() {
     })();
   };
 
+
+
+   // Auto-calculate original price for new combos
+   useEffect(() => {
+    if (!editing && groups.length > 0) {
+      let totalOriginal = 0;
+      groups.forEach(g => {
+        if (g.items.length > 0) {
+          // Average price of items in the group
+          const avgItemPrice = g.items.reduce((sum, item) => {
+             // Try to find the original item price from inventoryOptions if not present in item object
+             // Note: item.extraPrice is separate. We need the base price.
+             // We can find base price from inventoryOptions by itemId
+             const invItem = inventoryOptions.find(op => op.id === item.itemId);
+             return sum + (invItem?.price || 0);
+          }, 0) / g.items.length;
+          
+          // Multiply by "Select" quantity (minChoices) or 1 if 0
+          const quantity = Math.max(1, g.minChoices); 
+          totalOriginal += avgItemPrice * quantity;
+        }
+      });
+      setForm(prev => ({ ...prev, originalPrice: Math.round(totalOriginal) }));
+    }
+  }, [groups, editing, inventoryOptions]);
+
+
   const handleSave = async () => {
     if (!form.name.trim()) {
       toast.error("Vui lòng nhập tên combo");
       return;
     }
+    if (!form.price && form.price !== 0) {
+        toast.error("Vui lòng nhập giá combo");
+        return;
+    }
+    if (!form.startDate) {
+        toast.error("Vui lòng nhập ngày bắt đầu");
+         return;
+    }
+    if (!form.endDate) {
+        toast.error("Vui lòng nhập ngày kết thúc");
+         return;
+    }
+
     // Validate groups for both create and edit
     if (groups.length === 0) {
       toast.error("Vui lòng thêm ít nhất 1 nhóm cho combo");
@@ -450,8 +523,8 @@ export function Combos() {
         comboPrice: Number(form.price) || 0,
         imageUrl: form.imageUrl?.trim() || undefined,
         originalPrice: form.originalPrice != null && form.originalPrice > 0 ? Number(form.originalPrice) : undefined,
-        startDate: form.startDate ? form.startDate : undefined,
-        endDate: form.endDate ? form.endDate : undefined,
+        startDate: form.startDate,
+        endDate: form.endDate,
       };
       if (editing) {
         // Include groups in PATCH payload
@@ -755,7 +828,12 @@ export function Combos() {
 
           {/* Pagination Controls */}
           <div className="flex items-center justify-between mt-3">
-            <div className="text-xs text-slate-600">Tổng: {total.toLocaleString('vi-VN')} combo</div>
+            <div className="bg-white border border-slate-200 rounded-lg p-3 flex gap-8 w-fit items-center shadow-sm">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-600">Tổng số combo:</span>
+            <span className="font-medium text-slate-900">{total}</span>
+          </div>
+        </div>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -933,9 +1011,9 @@ export function Combos() {
                                 disabled={!canUpdateCombo}
                               >
                                 {row.isActive ? (
-                                  <ToggleLeft className="w-4 h-4" />
+                                  <PowerOff className="w-4 h-4" />
                                 ) : (
-                                  <ToggleRight className="w-4 h-4" />
+                                  <Power className="w-4 h-4" />
                                 )}
                               </Button>
                             </div>
@@ -1154,21 +1232,21 @@ export function Combos() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Giá combo</Label>
-                <Input
-                  type="number"
+                <Label>Giá combo <span className="text-red-500">*</span></Label>
+                <CurrencyInput
                   value={form.price}
-                  onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+                  onChange={(val) => setForm({ ...form, price: val })}
                   className="mt-1"
+                  placeholder="0"
                 />
               </div>
               <div>
                 <Label>Giá gốc (tùy chọn)</Label>
-                <Input
-                  type="number"
+                <CurrencyInput
                   value={form.originalPrice ?? 0}
-                  onChange={(e) => setForm({ ...form, originalPrice: Number(e.target.value) || undefined })}
+                  onChange={(val) => setForm({ ...form, originalPrice: val || undefined })}
                   className="mt-1"
+                  placeholder={editing ? "Nhập giá gốc" : "Tự động tính"}
                 />
               </div>
             </div>
@@ -1183,7 +1261,7 @@ export function Combos() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Ngày bắt đầu (tùy chọn)</Label>
+                <Label>Ngày bắt đầu <span className="text-red-500">*</span></Label>
                 <Input
                   type="date"
                   value={form.startDate || ""}
@@ -1192,7 +1270,7 @@ export function Combos() {
                 />
               </div>
               <div>
-                <Label>Ngày kết thúc (tùy chọn)</Label>
+                <Label>Ngày kết thúc <span className="text-red-500">*</span></Label>
                 <Input
                   type="date"
                   value={form.endDate || ""}
@@ -1267,7 +1345,11 @@ export function Combos() {
                                   <div className="text-sm text-slate-900">{it.name}</div>
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs text-slate-600">Phụ thu</span>
-                                    <Input type="number" value={it.extraPrice} onChange={(e) => updateItemExtraPrice(g.id, it.id, Number(e.target.value)||0)} className="w-24 h-8" />
+                                    <CurrencyInput
+                                      value={it.extraPrice}
+                                      onChange={(val) => updateItemExtraPrice(g.id, it.id, val)} 
+                                      className="w-24 h-8"
+                                    />
                                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-600" onClick={() => removeItemFromGroup(g.id, it.id)} title="Xóa">
                                       <Trash2 className="w-4 h-4" />
                                     </Button>

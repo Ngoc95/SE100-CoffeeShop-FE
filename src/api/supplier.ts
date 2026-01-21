@@ -12,6 +12,29 @@ export const deleteSupplier = (id: number) => {
     return axiosClient.delete(`/suppliers/${id}`)
 }
 
+export const createSupplier = (
+    name: string,
+    contactPerson: string,
+    phone: string,
+    email: string,
+    address: string,
+    city: string,
+    category: string,
+    status: string
+) => {
+    const params = {
+        name,
+        contactPerson,
+        phone,
+        email,
+        address,
+        city,
+        category,
+        status
+    }
+    return axiosClient.post('/suppliers', params)
+}
+
 export const updateSupplier = (
     id: number,
     name?: string,

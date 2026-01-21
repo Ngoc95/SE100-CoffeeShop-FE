@@ -120,7 +120,7 @@ export function CustomerEditFormDialog(props: CustomerEditFormDialogProps) {
                 {
                   genders.map((gender, index) => (
                     <SelectItem key={index} value={gender}>
-                      {gender}
+                      {gender === 'male' ? 'Nam' : (gender === 'female' ? 'Nữ' : gender)}
                     </SelectItem>
                   ))
                 }
@@ -131,7 +131,7 @@ export function CustomerEditFormDialog(props: CustomerEditFormDialogProps) {
           {/* Ngày sinh */}
           <div>
             <Label>Ngày sinh</Label>
-            <input
+            <Input
               type="date"
               placeholder="VD: 15/01/1990"
               value={formData.birthday ? formData.birthday : "2026-01-16"}
@@ -283,7 +283,7 @@ export function CustomerAddFormDialog(props: CustomerAddFormDialogProps) {
                 {
                   genders.map((gender, index) => (
                     <SelectItem key={index} value={gender}>
-                      {gender}
+                      {gender === 'male' ? 'Nam' : (gender === 'female' ? 'Nữ' : gender)}
                     </SelectItem>
                   ))
                 }
@@ -294,7 +294,7 @@ export function CustomerAddFormDialog(props: CustomerAddFormDialogProps) {
           {/* Ngày sinh */}
           <div>
             <Label>Ngày sinh</Label>
-            <input
+            <Input
               type="date"
               placeholder="VD: 15/01/1990"
               value={formData.birthday ? formData.birthday : "2026-01-16"}

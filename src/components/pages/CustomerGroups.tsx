@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { toast } from "sonner";
 import { AddCustomerGroup, CustomerGroupAddFormDialog, CustomerGroupEditFormDialog, EditCustomerGroup } from "../CustomerGroupFormDialog";
 import { createCustomerGroup, deleteCustomerGroup, getCustomerGroups, updateCustomerGroup } from "../../api/customerGroup";
+import { useDebounce } from "../../hooks/useDebounce";
 
 interface CustomerGroup {
   id: number,
@@ -37,6 +38,7 @@ export function CustomerGroups() {
   const canDelete = hasPermission('customer_groups:delete');
 
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<EditCustomerGroup>({
@@ -70,13 +72,18 @@ export function CustomerGroups() {
   }
 
   useEffect(() => {
+    if (debouncedSearchQuery) {
+        fetchCustomerGroupsParams["search"] = debouncedSearchQuery
+    } else {
+        delete fetchCustomerGroupsParams["search"]
+    }
     try {
       fetchCustomerGroupsData()
     }
     catch (error) {
       console.log("Error when fetching customer groups: ", error);
     }
-  }, [])
+  }, [debouncedSearchQuery])
 
   const handleSort = (field: string) => {
     let tempSortBy = sortBy;
@@ -166,7 +173,12 @@ export function CustomerGroups() {
       return false;
     }
 
-    if (formData.windowMonths < 1 || formData.windowMonths > 60) {
+    if (formData.priority === 0) {
+      toast.error("Độ ưu tiên phải khác 0");
+      return false;
+    }
+
+    if (!formData.windowMonths || formData.windowMonths < 1 || formData.windowMonths > 60) {
       toast.error("Số tháng xét hạng phải từ 1 đến 60");
       return false;
     }
@@ -180,7 +192,12 @@ export function CustomerGroups() {
       return false;
     }
 
-    if (formData.windowMonths < 1 || formData.windowMonths > 60) {
+    if (formData.priority === 0) {
+        toast.error("Độ ưu tiên phải khác 0");
+        return false;
+      }
+
+    if (!formData.windowMonths || formData.windowMonths < 1 || formData.windowMonths > 60) {
       toast.error("Số tháng xét hạng phải từ 1 đến 60");
       return false;
     }
@@ -352,10 +369,21 @@ export function CustomerGroups() {
         </div>
       </div>
 
+      {/* Stats */}
+      <div className="space-y-2">
+        <Label className="text-xs text-slate-600">Thống kê</Label>
+        <div className="bg-white border border-slate-200 rounded-lg p-3 flex gap-8 w-fit items-center shadow-sm">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-600">Tổng số nhóm khách hàng:</span>
+            <span className="font-medium text-slate-900">{totalGroups}</span>
+          </div>
+        </div>
+      </div>
+
       {/* Search and Filter Bar */}
       <Card>
         <CardContent className="pt-6">
-          <div className="space-y-4">
+
             {/* Search and Filter Toggle */}
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
@@ -364,28 +392,16 @@ export function CustomerGroups() {
                   placeholder="Tìm kiếm theo tên nhóm và mô tả nhóm"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      handleSearch();
-                    }
-                  }}
                   className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
-                <X
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 w-5 h-5"
-                  onClick={() => setSearchQuery("")}
-                />
+                {searchQuery && (
+                   <X
+                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 w-5 h-5 cursor-pointer"
+                   onClick={() => setSearchQuery("")}
+                 /> 
+                )}
               </div>
-              <Button
-                className="bg-blue-600 hover:bg-blue-700"
-                onClick={() => {
-                  handleSearch();
-                }}
-              >
-                <Search className="w-4 h-4" />
-              </Button>
             </div>
-          </div>
         </CardContent>
       </Card>
 
@@ -537,16 +553,7 @@ export function CustomerGroups() {
           </div>
         </CardContent>
       </Card>
-      {/* Stats */}
-      <div className="space-y-2">
-        <Label className="text-xs text-slate-600">Thống kê</Label>
-        <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-1">
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-600">Tổng:</span>
-            <span className="font-medium text-slate-900">{totalGroups}</span>
-          </div>
-        </div>
-      </div>
+
 
       {/*Edit Form Dialog */}
       <CustomerGroupEditFormDialog

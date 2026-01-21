@@ -9,6 +9,8 @@ import { Button } from './ui/button';
 import { cities } from './pages/Customers';
 import { getSupplierCategories } from '../api/supplier';
 
+import { toast } from 'sonner';
+
 export interface EditSupplier {
   id: number;
   code: string;
@@ -27,6 +29,7 @@ interface SupplierEditFormDialogProps {
   onClose: () => void;
   onSubmit: (formData: EditSupplier) => void;
   editingSupplier: EditSupplier;
+  title?: string;
 }
 
 export function SupplierEditFormDialog(props: SupplierEditFormDialogProps) {
@@ -71,7 +74,18 @@ export function SupplierEditFormDialog(props: SupplierEditFormDialogProps) {
   }, [props.editingSupplier, props.open]);
 
   const handleSubmit = () => {
-    props.onSubmit(formData);
+    if (!formData.name.trim()) return toast.error("Tên nhà cung cấp là bắt buộc");
+    if (!formData.category.trim()) return toast.error("Danh mục là bắt buộc");
+    if (!formData.contactPerson.trim()) return toast.error("Người liên hệ là bắt buộc");
+    if (!formData.phone.trim()) return toast.error("Số điện thoại là bắt buộc");
+    
+    // Clean up optional fields
+    const cleanedData = { ...formData };
+    if (!cleanedData.email.trim()) (cleanedData as any).email = undefined;
+    if (!cleanedData.address.trim()) (cleanedData as any).address = undefined;
+    if (!cleanedData.city || cleanedData.city === 'all') (cleanedData as any).city = undefined;
+
+    props.onSubmit(cleanedData);
   };
 
   return (
@@ -79,11 +93,12 @@ export function SupplierEditFormDialog(props: SupplierEditFormDialogProps) {
       <DialogContent className="max-w-[700px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
-            Chỉnh sửa nhà cung cấp
+            {props.title || "Chỉnh sửa nhà cung cấp"}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
+          {props.editingSupplier.id !== 0 && (
           <div>
             <Label>
               Mã nhà cung cấp
@@ -96,6 +111,7 @@ export function SupplierEditFormDialog(props: SupplierEditFormDialogProps) {
               className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
+          )}
           {/*Tên NCC & Danh mục */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -112,31 +128,21 @@ export function SupplierEditFormDialog(props: SupplierEditFormDialogProps) {
             </div>
 
             <div>
-              <Label>Danh mục</Label>
-              <Select
+              <Label>Danh mục <span className="text-red-500">*</span></Label>
+              <Input
+                type="text"
                 value={formData.category}
-                onValueChange={(value: string) => setFormData({ ...formData, category: value })}
-              >
-                <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
-                  <SelectValue placeholder="Chọn danh mục" />
-                </SelectTrigger>
-                <SelectContent>
-                  {
-                    supplierCategories.map((category, index) => (
-                      <SelectItem key={index} value={category}>
-                        {category}
-                      </SelectItem>
-                    ))
-                  }
-                </SelectContent>
-              </Select>
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                placeholder="Nhập danh mục"
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              />
             </div>
           </div>
 
           {/* Row 2: Người liên hệ & Số điện thoại */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Người liên hệ</Label>
+              <Label>Người liên hệ <span className="text-red-500">*</span></Label>
               <Input
                 type="text"
                 value={formData.contactPerson}
@@ -242,7 +248,7 @@ export function SupplierEditFormDialog(props: SupplierEditFormDialogProps) {
             // disabled={!formData.name || !formData.phone}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            Cập nhật
+            {props.editingSupplier.id === 0 ? "Thêm" : "Cập nhật"}
           </Button>
         </DialogFooter>
       </DialogContent>
