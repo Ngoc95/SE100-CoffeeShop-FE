@@ -200,7 +200,7 @@ interface Table {
   updatedAt?: number; // timestamp of last update
   deletedAt?: number; // timestamp when table was freed
   isActive: boolean;
-  order_id: number;
+  order_id?: number;
 }
 
 interface TableOrders {
@@ -331,7 +331,7 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
   updatedAt?: string
   deletedAt?: string
   isActive: boolean
-  order_id: number
+  order_id?: number
 }) => ({
   id: t.id,
   // Normalize to remove leading "Bàn" to avoid duplicate label "Bàn Bàn 01"
@@ -647,9 +647,9 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
     // Gate by permission to avoid 403 for roles without table access
     if (!hasPermission("tables:view" as any)) return;
     try {
-      const res = await getTables();
-      const items = extractItems(res);
-      setTables(items.map(mapTableFromBE));
+      const res = await getTables({ isActive: true });
+      const items = res?.metaData?.items || extractItems(res); // Prioritize metaData.items
+      setTables((items || []).map(mapTableFromBE));
     } catch (err: any) {
       console.error("Failed to refresh tables:", err);
     }
