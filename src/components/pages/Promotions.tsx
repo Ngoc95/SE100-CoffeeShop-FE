@@ -11,8 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { toast } from "sonner";
-import { PromotionFormDialog } from "../PromotionFormDialog";
-import { getPromotions as fetchPromotions, createPromotion, updatePromotion, deletePromotion, getPromotions, PromotionsQuery, getPromotionById } from "../../api/promotions";
+import { AddPromotion, EditPromotion, PromotionAddFormDialog, PromotionEditFormDialog } from "../PromotionFormDialog";
+import { createPromotion, updatePromotion, deletePromotion, getPromotions, PromotionsQuery, getPromotionById, updatePercentagePromotion, updateAmountPromotion, updateSamePricePromotion, updateGiftPromotion, createPercentagePromotion, createAmountPromotion, createSamePricePromotion, createGiftPromotion } from "../../api/promotions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
 export const PromotionTypes: Record<number, string> = {
@@ -91,21 +91,6 @@ export interface Promotion {
   typeName: string
 }
 
-// const getPromotionTypeLabel = (type: PromotionType) => {
-//   switch (type) {
-//     case "percentage":
-//       return "Theo phần trăm";
-//     case "amount":
-//       return "Theo số tiền";
-//     case "fixed-price":
-//       return "Đồng giá";
-//     case "free-item":
-//       return "Tặng món";
-//     default:
-//       return "";
-//   }
-// };
-
 const formatCurrency = (value: number) => {
   if (typeof value !== "number") return value;
   return new Intl.NumberFormat("vi-VN", {
@@ -113,8 +98,6 @@ const formatCurrency = (value: number) => {
     currency: "VND",
   }).format(value);
 };
-
-
 
 // const PromotionDetails = ({ promotion }: { promotion: Promotion }) => {
 //   const DetailItem = ({
@@ -282,10 +265,43 @@ export function Promotions() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(
-    null
-  );
+  const [ediDialogOpen, setEditDialogOpen] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editingPromotion, setEditingPromotion] = useState<EditPromotion>({
+    id: 0,
+    code: "",
+    name: "",
+    description: "",
+    discountValue: 0,
+    minOrderValue: 0,
+    maxDiscount: 0,
+    buyQuantity: 0,
+    getQuantity: 0,
+    requireSameItem: false,
+    startDateTime: "2026-01-01T00:00:00Z",
+    endDateTime: "2026-01-01T00:00:00Z",
+    maxTotalUsage: 0,
+    maxUsagePerCustomer: 0,
+    currentTotalUsage: 0,
+    isActive: true,
+
+    applyToAllItems: false,
+    applyToAllCategories: false,
+    applyToAllCombos: false,
+    applyToAllCustomers: false,
+    applyToAllCustomerGroups: false,
+    applyToWalkIn: false,
+
+    applicableItemIds: [],
+    applicableCategoryIds: [],
+    applicableComboIds: [],
+    applicableCustomerIds: [],
+    applicableCustomerGroupIds: [],
+    giftItemIds: [],
+
+    typeId: 1
+
+  });
   const [expandedRows, setExpandedRows] = useState<string>();
   const [currentApplicableDetail, setCurrentApplicableDetail] = useState<ApplicableDetail>()
 
@@ -614,35 +630,273 @@ export function Promotions() {
     // }
   };
 
-  const handleEditPromotion = async (formData: Omit<Promotion, "id" | "code">) => {
-    // if (!editingPromotion) return;
-    // try {
-    //   const payload = {
-    //     name: formData.name,
-    //     type: formData.type === "percentage" ? "percentage" : formData.type === "amount" ? "fixed" : formData.type === "free-item" ? "item" : "fixed",
-    //     value: Number(formData.promotionValue || 0),
-    //     minOrderValue: Number(formData.minOrderValue || 0),
-    //     isActive: formData.status === "active",
-    //   };
-    //   await updatePromotion(editingPromotion.id, payload as any);
-    //   toast.success("Đã cập nhật khuyến mại");
-    //   setEditingPromotion(null);
-    //   setDialogOpen(false);
-    //   loadPromotions();
-    // } catch (err: any) {
-    //   toast.error("Cập nhật khuyến mãi thất bại", { description: err?.message || "API lỗi" });
-    // }
+  const validateSubmitEdit = (formData: EditPromotion) => {
+    return true;
+  }
+
+  const validateSubmitAdd = (formData: AddPromotion) => {
+    return true;
+  }
+
+  const handleSubmitEdit = async (formData: EditPromotion) => {
+    if (!formData) return;
+
+    if (!validateSubmitEdit(formData)) return;
+
+    console.log("Edit form: ", formData)
+
+    try {
+      switch (formData.typeId) {
+        case 1:
+          await updatePercentagePromotion(formData.id, {
+            name: formData.name,
+            description: formData.description,
+            typeId: formData.typeId,
+            discountValue: formData.discountValue,
+            minOrderValue: formData.minOrderValue,
+            maxDiscount: formData.maxDiscount,
+            startDateTime: formData.startDateTime,
+            endDateTime: formData.endDateTime,
+            maxTotalUsage: formData.maxTotalUsage,
+            maxUsagePerCustomer: formData.maxUsagePerCustomer,
+            isActive: formData.isActive,
+            applyToAllItems: formData.applyToAllItems,
+            applyToAllCategories: formData.applyToAllCategories,
+            applyToAllCombos: formData.applyToAllCombos,
+            applyToAllCustomers: formData.applyToAllCustomers,
+            applyToAllCustomerGroups: formData.applyToAllCustomerGroups,
+            applyToWalkIn: formData.applyToWalkIn,
+            applicableItemIds: formData.applicableItemIds,
+            applicableCategoryIds: formData.applicableCategoryIds,
+            applicableComboIds: formData.applicableComboIds,
+            applicableCustomerIds: formData.applicableCustomerIds,
+            applicableCustomerGroupIds: formData.applicableCustomerGroupIds,
+            giftItemIds: formData.giftItemIds
+          })
+          break;
+        case 2:
+          await updateAmountPromotion(formData.id, {
+            name: formData.name,
+            description: formData.description,
+            typeId: formData.typeId,
+            discountValue: formData.discountValue,
+            minOrderValue: formData.minOrderValue,
+            startDateTime: formData.startDateTime,
+            endDateTime: formData.endDateTime,
+            maxTotalUsage: formData.maxTotalUsage,
+            maxUsagePerCustomer: formData.maxUsagePerCustomer,
+            isActive: formData.isActive,
+            applyToAllItems: formData.applyToAllItems,
+            applyToAllCategories: formData.applyToAllCategories,
+            applyToAllCombos: formData.applyToAllCombos,
+            applyToAllCustomers: formData.applyToAllCustomers,
+            applyToAllCustomerGroups: formData.applyToAllCustomerGroups,
+            applyToWalkIn: formData.applyToWalkIn,
+            applicableItemIds: formData.applicableItemIds,
+            applicableCategoryIds: formData.applicableCategoryIds,
+            applicableComboIds: formData.applicableComboIds,
+            applicableCustomerIds: formData.applicableCustomerIds,
+            applicableCustomerGroupIds: formData.applicableCustomerGroupIds,
+            giftItemIds: formData.giftItemIds
+          })
+          break;
+        case 3:
+          await updateSamePricePromotion(formData.id, {
+            name: formData.name,
+            description: formData.description,
+            typeId: formData.typeId,
+            discountValue: formData.discountValue,
+            minOrderValue: formData.minOrderValue,
+            startDateTime: formData.startDateTime,
+            endDateTime: formData.endDateTime,
+            maxTotalUsage: formData.maxTotalUsage,
+            maxUsagePerCustomer: formData.maxUsagePerCustomer,
+            isActive: formData.isActive,
+            applyToAllItems: formData.applyToAllItems,
+            applyToAllCategories: formData.applyToAllCategories,
+            applyToAllCombos: formData.applyToAllCombos,
+            applyToAllCustomers: formData.applyToAllCustomers,
+            applyToAllCustomerGroups: formData.applyToAllCustomerGroups,
+            applyToWalkIn: formData.applyToWalkIn,
+            applicableItemIds: formData.applicableItemIds,
+            applicableCategoryIds: formData.applicableCategoryIds,
+            applicableComboIds: formData.applicableComboIds,
+            applicableCustomerIds: formData.applicableCustomerIds,
+            applicableCustomerGroupIds: formData.applicableCustomerGroupIds,
+            giftItemIds: formData.giftItemIds
+          }
+          )
+          break;
+        case 4:
+          await updateGiftPromotion(formData.id, {
+            name: formData.name,
+            description: formData.description,
+            typeId: formData.typeId,
+            buyQuantity: formData.buyQuantity,
+            getQuantity: formData.getQuantity,
+            requireSameItem: formData.requireSameItem, //nếu true thì phải là 2 ly phải là cùng 1 item trong danh sách sản phẩm áp dụng
+            startDateTime: formData.startDateTime,
+            endDateTime: formData.endDateTime,
+            maxTotalUsage: formData.maxTotalUsage,
+            maxUsagePerCustomer: formData.maxUsagePerCustomer,
+            isActive: formData.isActive,
+            applyToAllItems: formData.applyToAllItems,
+            applyToAllCategories: formData.applyToAllCategories,
+            applyToAllCombos: formData.applyToAllCombos,
+            applyToAllCustomers: formData.applyToAllCustomers,
+            applyToAllCustomerGroups: formData.applyToAllCustomerGroups,
+            applyToWalkIn: formData.applyToWalkIn,
+            applicableItemIds: formData.applicableItemIds,
+            applicableCategoryIds: formData.applicableCategoryIds,
+            applicableComboIds: formData.applicableComboIds,
+            applicableCustomerIds: formData.applicableCustomerIds,
+            applicableCustomerGroupIds: formData.applicableCustomerGroupIds,
+            giftItemIds: formData.giftItemIds
+          })
+          break;
+      }
+
+      toast.success("Cập nhật khuyến mại thành công");
+      await fetchPromotionData()
+      setEditDialogOpen(false);
+    }
+    catch (error) {
+      toast.error("Cập nhật khuyến mại thất bại. Lỗi: " + error.response.data.message);
+    }
   };
 
-  const handleDeletePromotion = async (id: string) => {
-    // if (!confirm("Bạn có chắc chắn muốn xóa khuyến mại này?")) return;
-    // try {
-    //   await deletePromotion(id);
-    //   toast.success("Đã xóa khuyến mại");
-    //   loadPromotions();
-    // } catch (err: any) {
-    //   toast.error("Xóa khuyến mãi thất bại", { description: err?.message || "API lỗi" });
-    // }
+  const handleSubmitAdd = async (formData: AddPromotion) => {
+    if (!formData) return;
+
+    if (!validateSubmitAdd(formData)) return;
+
+    console.log("Add form: ", formData)
+
+    try {
+      switch (formData.typeId) {
+        case 1:
+          await createPercentagePromotion({
+            name: formData.name,
+            description: formData.description,
+            typeId: formData.typeId,
+            discountValue: formData.discountValue,
+            minOrderValue: formData.minOrderValue,
+            maxDiscount: formData.maxDiscount,
+            startDateTime: formData.startDateTime,
+            endDateTime: formData.endDateTime,
+            maxTotalUsage: formData.maxTotalUsage,
+            maxUsagePerCustomer: formData.maxUsagePerCustomer,
+            isActive: formData.isActive,
+            applyToAllItems: formData.applyToAllItems,
+            applyToAllCategories: formData.applyToAllCategories,
+            applyToAllCombos: formData.applyToAllCombos,
+            applyToAllCustomers: formData.applyToAllCustomers,
+            applyToAllCustomerGroups: formData.applyToAllCustomerGroups,
+            applyToWalkIn: formData.applyToWalkIn,
+            applicableItemIds: formData.applicableItemIds,
+            applicableCategoryIds: formData.applicableCategoryIds,
+            applicableComboIds: formData.applicableComboIds,
+            applicableCustomerIds: formData.applicableCustomerIds,
+            applicableCustomerGroupIds: formData.applicableCustomerGroupIds,
+            giftItemIds: formData.giftItemIds
+          })
+          break;
+        case 2:
+          await createAmountPromotion({
+            name: formData.name,
+            description: formData.description,
+            typeId: formData.typeId,
+            discountValue: formData.discountValue,
+            minOrderValue: formData.minOrderValue,
+            startDateTime: formData.startDateTime,
+            endDateTime: formData.endDateTime,
+            maxTotalUsage: formData.maxTotalUsage,
+            maxUsagePerCustomer: formData.maxUsagePerCustomer,
+            isActive: formData.isActive,
+            applyToAllItems: formData.applyToAllItems,
+            applyToAllCategories: formData.applyToAllCategories,
+            applyToAllCombos: formData.applyToAllCombos,
+            applyToAllCustomers: formData.applyToAllCustomers,
+            applyToAllCustomerGroups: formData.applyToAllCustomerGroups,
+            applyToWalkIn: formData.applyToWalkIn,
+            applicableItemIds: formData.applicableItemIds,
+            applicableCategoryIds: formData.applicableCategoryIds,
+            applicableComboIds: formData.applicableComboIds,
+            applicableCustomerIds: formData.applicableCustomerIds,
+            applicableCustomerGroupIds: formData.applicableCustomerGroupIds,
+            giftItemIds: formData.giftItemIds
+          })
+          break;
+        case 3:
+          await createSamePricePromotion({
+            name: formData.name,
+            description: formData.description,
+            typeId: formData.typeId,
+            discountValue: formData.discountValue,
+            minOrderValue: formData.minOrderValue,
+            startDateTime: formData.startDateTime,
+            endDateTime: formData.endDateTime,
+            maxTotalUsage: formData.maxTotalUsage,
+            maxUsagePerCustomer: formData.maxUsagePerCustomer,
+            isActive: formData.isActive,
+            applyToAllItems: formData.applyToAllItems,
+            applyToAllCategories: formData.applyToAllCategories,
+            applyToAllCombos: formData.applyToAllCombos,
+            applyToAllCustomers: formData.applyToAllCustomers,
+            applyToAllCustomerGroups: formData.applyToAllCustomerGroups,
+            applyToWalkIn: formData.applyToWalkIn,
+            applicableItemIds: formData.applicableItemIds,
+            applicableCategoryIds: formData.applicableCategoryIds,
+            applicableComboIds: formData.applicableComboIds,
+            applicableCustomerIds: formData.applicableCustomerIds,
+            applicableCustomerGroupIds: formData.applicableCustomerGroupIds,
+            giftItemIds: formData.giftItemIds
+          }
+          )
+          break;
+        case 4:
+          await createGiftPromotion({
+            name: formData.name,
+            description: formData.description,
+            typeId: formData.typeId,
+            buyQuantity: formData.buyQuantity,
+            getQuantity: formData.getQuantity,
+            requireSameItem: formData.requireSameItem, //nếu true thì phải là 2 ly phải là cùng 1 item trong danh sách sản phẩm áp dụng
+            startDateTime: formData.startDateTime,
+            endDateTime: formData.endDateTime,
+            maxTotalUsage: formData.maxTotalUsage,
+            maxUsagePerCustomer: formData.maxUsagePerCustomer,
+            isActive: formData.isActive,
+            applyToAllItems: formData.applyToAllItems,
+            applyToAllCategories: formData.applyToAllCategories,
+            applyToAllCombos: formData.applyToAllCombos,
+            applyToAllCustomers: formData.applyToAllCustomers,
+            applyToAllCustomerGroups: formData.applyToAllCustomerGroups,
+            applyToWalkIn: formData.applyToWalkIn,
+            applicableItemIds: formData.applicableItemIds,
+            applicableCategoryIds: formData.applicableCategoryIds,
+            applicableComboIds: formData.applicableComboIds,
+            applicableCustomerIds: formData.applicableCustomerIds,
+            applicableCustomerGroupIds: formData.applicableCustomerGroupIds,
+            giftItemIds: formData.giftItemIds
+          })
+          break;
+      }
+
+      toast.success("Thêm khuyến mại thành công");
+      await fetchPromotionData()
+      setAddDialogOpen(false);
+    }
+    catch (error) {
+      toast.error("Thêm khuyến mại thất bại. Lỗi: " + error.response.data.message);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (confirm("Bạn có chắc chắn muốn xóa khuyến mại này?")) {
+      await deletePromotion(id)
+      fetchPromotionData()
+    }
   };
 
   // const handleToggleStatus = async (id: string) => {
@@ -658,9 +912,39 @@ export function Promotions() {
   //   }
   // };
 
-  const openEditDialog = (promo: Promotion) => {
-    setEditingPromotion(promo);
-    setDialogOpen(true);
+  const handleEdit = (promo: Promotion) => {
+    setEditingPromotion({
+      id: promo.id,
+      code: promo.code,
+      name: promo.name,
+      description: promo.description,
+      discountValue: promo.discountValue,
+      minOrderValue: promo.minOrderValue,
+      maxDiscount: promo.maxDiscount,
+      buyQuantity: promo.buyQuantity,
+      getQuantity: promo.getQuantity,
+      requireSameItem: promo.requireSameItem,
+      startDateTime: promo.startDateTime,
+      endDateTime: promo.endDateTime,
+      maxTotalUsage: promo.maxTotalUsage,
+      maxUsagePerCustomer: promo.maxUsagePerCustomer,
+      currentTotalUsage: promo.currentTotalUsage,
+      isActive: promo.isActive,
+      applyToAllItems: promo.applyToAllItems,
+      applyToAllCategories: promo.applyToAllCategories,
+      applyToAllCombos: promo.applyToAllCombos,
+      applyToAllCustomers: promo.applyToAllCustomers,
+      applyToAllCustomerGroups: promo.applyToAllCustomerGroups,
+      applyToWalkIn: promo.applyToWalkIn,
+      applicableItemIds: [],
+      applicableCategoryIds: [],
+      applicableComboIds: [],
+      applicableCustomerIds: [],
+      applicableCustomerGroupIds: [],
+      giftItemIds: [],
+      typeId: promo.typeId
+    });
+    setEditDialogOpen(true);
   };
 
   // const getPromotionTypeLabel = (type: PromotionType) => {
@@ -754,8 +1038,8 @@ export function Promotions() {
             <Button
               className="bg-blue-600 hover:bg-blue-700"
               onClick={() => {
-                setEditingPromotion(null);
-                setDialogOpen(true);
+                // setEditingPromotion(null);
+                setAddDialogOpen(true);
               }}
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -1047,7 +1331,7 @@ export function Promotions() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  // onClick={() => openEditDialog(promo)}
+                                  onClick={() => handleEdit(promo)}
                                   className="hover:bg-blue-100"
                                 >
                                   <Pencil className="w-4 h-4" />
@@ -1057,7 +1341,7 @@ export function Promotions() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  // onClick={() => handleDeletePromotion(promo.id)}
+                                  onClick={() => handleDelete(promo.id)}
                                   className="hover:bg-red-50"
                                 >
                                   <Trash2 className="w-4 h-4 text-red-600" />
@@ -1331,14 +1615,27 @@ export function Promotions() {
       </div>
 
       {/* Form Dialog */}
-      <PromotionFormDialog
-        open={dialogOpen}
+
+      <PromotionEditFormDialog
+        open={ediDialogOpen}
         onClose={() => {
-          setDialogOpen(false);
-          setEditingPromotion(null);
+          setEditDialogOpen(false);
+          // setEditingPromotion(editingPromotion);
         }}
-        onSubmit={editingPromotion ? handleEditPromotion : handleAddPromotion}
+        onSubmit={(editingPromotion) => { handleSubmitEdit(editingPromotion) }}
+        // onSubmit={editingPromotion ? handleEditPromotion : handleAddPromotion}
         editingPromotion={editingPromotion}
+      />
+
+
+      <PromotionAddFormDialog
+        open={addDialogOpen}
+        onClose={() => {
+          setEditDialogOpen(false);
+          // setEditingPromotion(editingPromotion);
+        }}
+        onSubmit={(addPromotion) => { handleSubmitAdd(addPromotion) }}
+      // onSubmit={editingPromotion ? handleEditPromotion : handleAddPromotion}
       />
     </div >
   );

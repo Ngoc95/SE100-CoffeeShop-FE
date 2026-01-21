@@ -66,10 +66,14 @@ export const getItemById = (id: number | string) => {
   return axios.get(`/inventory-items/${id}`)
 }
 
+export const getInventoryItemCategories = () => {
+  return axios.get('/categories')
+}
+
 // Helper to extract items from API response
 export const extractInventoryItems = (res: any): { items: InventoryItem[]; pagination?: any } => {
   const data = res?.data?.metaData ?? res?.data ?? res
-  
+
   // If response has items array
   if (data?.items) {
     return {
@@ -81,11 +85,11 @@ export const extractInventoryItems = (res: any): { items: InventoryItem[]; pagin
       }
     }
   }
-  
+
   // If response is array directly
   if (Array.isArray(data)) {
     return { items: data }
   }
-  
+
   return { items: [] }
 }
