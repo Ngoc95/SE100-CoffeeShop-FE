@@ -6,7 +6,7 @@ const API_BASE_URL = "http://localhost:4000/api";
    AUTH TOKEN
 ====================== */
 const getAuthToken = (): string | null => {
-  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInRva2VuVHlwZSI6ImFjY2Vzc190b2tlbiIsImlhdCI6MTc2ODkyMTQyOSwiZXhwIjoxNzY4OTIyMzI5fQ.BDj0Y7ZGBLOpdzzzdHc4_EIY3vSajsecENs1XtDI_YE";
+  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInRva2VuVHlwZSI6ImFjY2Vzc190b2tlbiIsImlhdCI6MTc2ODk2NTU1NywiZXhwIjoxNzY4OTY2NDU3fQ.8zQw6BvZZxDizToxsfdD9jqE1ATASzFez6Pu4CBUPuc";
 };
 
 const getHeaders = (): HeadersInit => {
@@ -224,6 +224,104 @@ export const inventoryService = {
 
     if (!response.ok) {
       throw new Error(`CREATE unit failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  /* ---------- Stock Checks ---------- */
+
+  async getStockChecks() {
+    const response = await fetch(
+      `${API_BASE_URL}/stock-checks`,
+      {
+        headers: getHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`GET stock-checks failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async getStockCheckById(id: number | string) {
+    const response = await fetch(
+      `${API_BASE_URL}/stock-checks/${id}`,
+      {
+        headers: getHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`GET stock-check ${id} failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async createStockCheck(data: any) {
+    const response = await fetch(
+      `${API_BASE_URL}/stock-checks`,
+      {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`CREATE stock-check failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async updateStockCheck(id: number | string, data: any) {
+    const response = await fetch(
+      `${API_BASE_URL}/stock-checks/${id}`,
+      {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`UPDATE stock-check ${id} failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async completeStockCheck(id: number | string) {
+    const response = await fetch(
+      `${API_BASE_URL}/stock-checks/${id}/complete`,
+      {
+        method: "PATCH",
+        headers: getHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`COMPLETE stock-check ${id} failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async cancelStockCheck(id: number | string) {
+    const response = await fetch(
+      `${API_BASE_URL}/stock-checks/${id}/cancel`,
+      {
+        method: "PATCH",
+        headers: getHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`CANCEL stock-check ${id} failed: ${response.status}`);
     }
 
     return response.json();
