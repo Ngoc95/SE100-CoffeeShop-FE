@@ -77,7 +77,21 @@ import {
   endOfYear
 } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { getFinanceTransactions, getFinanceCategories, getBankAccounts, getFinancePersons } from '../../api/finance';
+import { 
+  getFinanceTransactions, 
+  getFinanceCategories, 
+  getBankAccounts, 
+  getFinancePersons,
+  createFinanceTransaction,
+  createFinanceCategory,
+  deleteFinanceCategory,
+  createBankAccount,
+  deleteBankAccount,
+  createFinancePerson,
+  exportFinanceTransactions
+} from '../../api/finance';
+import staffApi from '../../api/staffApi';
+import { supplierApi } from '../../api/supplierApi';
 import { toast } from 'sonner';
 
 export function Finance() {
@@ -86,8 +100,8 @@ export function Finance() {
 
   // New States for Top Filter
   const [dateRangeType, setDateRangeType] = useState<'preset' | 'custom'>('preset');
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date(2025, 11, 1));
-  const [dateTo, setDateTo] = useState<Date | undefined>(new Date(2025, 11, 31));
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
+  const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['income', 'expense']);
   const [selectedMethods, setSelectedMethods] = useState<string[]>(['cash', 'transfer']);
@@ -152,6 +166,11 @@ export function Finance() {
   const [editingCategoryType, setEditingCategoryType] = useState<'receipt' | 'payment'>('receipt');
   const [addBankAccountDialogOpen, setAddBankAccountDialogOpen] = useState(false);
   
+  // Export Modal State
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportDateFrom, setExportDateFrom] = useState<Date | undefined>(new Date());
+  const [exportDateTo, setExportDateTo] = useState<Date | undefined>(new Date());
+  
   // Receipt/Payment form states
   const [receiptCode, setReceiptCode] = useState('PT000051');
   const [receiptDate, setReceiptDate] = useState<Date>(new Date());
@@ -209,15 +228,24 @@ export function Finance() {
   const [documentTypePayment, setDocumentTypePayment] = useState(false);
   const [presetTimeRange, setPresetTimeRange] = useState('this-month');
 
-  // Mock data
-  const allCreators = [
-    { id: 'admin', name: 'Admin' },
-    { id: 'nguyen-van-a', name: 'Nguyễn Văn A' },
-    { id: 'tran-thi-b', name: 'Trần Thị B' },
-    { id: 'le-van-c', name: 'Lê Văn C' },
-  ];
+  const [allCreators, setAllCreators] = useState<Array<{ id: string; name: string }>>([]);
 
   const [allCategories, setAllCategories] = useState<Array<{ id: string; name: string; type?: 'receipt' | 'payment' }>>([]);
+
+  // Helper for Amount Formatting
+  const formatCurrencyInput = (value: string) => {
+    const number = parseInt(value.replace(/[^0-9]/g, ''));
+    if (isNaN(number)) return '';
+    return number.toLocaleString('vi-VN');
+  };
+
+  const handleReceiptAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setReceiptAmount(formatCurrencyInput(e.target.value));
+  };
+
+  const handlePaymentAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setPaymentAmount(formatCurrencyInput(e.target.value));
+  };
 
   const allCustomers = [
     { id: '1', name: 'Anh Giang - Kim Mã', phone: '0987654321' },
@@ -231,15 +259,12 @@ export function Finance() {
     { id: '3', name: 'Lê Văn C', phone: '0903456789' },
   ];
 
-  const allSuppliers = [
-    { id: '1', name: 'Đại lý Hồng Phúc', phone: '0904567890' },
-    { id: '2', name: 'Cửa hàng Đại Việt', phone: '0905678901' },
-  ];
+  const [allSuppliers, setAllSuppliers] = useState<Array<{ id: string; name: string }>>([]);
+  
+  // Options for Person Select in Modal
+  const [receiptPersonOptions, setReceiptPersonOptions] = useState<Array<{ id: string | number, name: string, phone?: string }>>([]);
+  const [paymentPersonOptions, setPaymentPersonOptions] = useState<Array<{ id: string | number, name: string, phone?: string }>>([]);
 
-  const allOtherPersons = [
-    { id: '1', name: 'Người khác 1', phone: '0906789012' },
-    { id: '2', name: 'Người khác 2', phone: '0907890123' },
-  ];
 
   const [allBankAccounts, setAllBankAccounts] = useState<Array<{ id: string; name?: string; accountNumber: string; bank?: string; bankFull?: string; owner?: string }>>([]);
 
@@ -285,26 +310,191 @@ export function Finance() {
     );
   };
 
-  const cashbookStats = {
-    openingBalance: 7887500,
-    totalIncome: 6417000,
-    totalExpense: -5764500,
-    closingBalance: 8540000,
-  };
+  // Debounce hook
+  function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+    useEffect(() => {
+      const handler = setTimeout(() => {
+        setDebouncedValue(value);
+      }, delay);
+      return () => {
+        clearTimeout(handler);
+      };
+    }, [value, delay]);
+    return debouncedValue;
+  }
 
-  const [allTransactions, setAllTransactions] = useState<Array<{ id: string; time: string; type: 'thu' | 'chi'; category: string; person: string; amount: number; status: string; note: string; method: 'cash' | 'transfer' }>>([]);
+  // Debounced filter values
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+  const debouncedSearchCode = useDebounce(searchCode, 500);
+  const debouncedSearchNote = useDebounce(searchNote, 500);
+  const debouncedPersonName = useDebounce(personName, 500);
+  const debouncedPersonPhone = useDebounce(personPhone, 500);
+  const debouncedReceiptPersonName = useDebounce(receiptPersonName, 500);
+  const debouncedPaymentPersonName = useDebounce(paymentPersonName, 500);
+  
+  const [receiptPersonSearchOpen, setReceiptPersonSearchOpen] = useState(false);
+  const [paymentPersonSearchOpen, setPaymentPersonSearchOpen] = useState(false);
+  
+  const [creatorSearch, setCreatorSearch] = useState('');
+  const debouncedCreatorSearch = useDebounce(creatorSearch, 500);
+
+  const [stats, setStats] = useState({
+    openingBalance: 0,
+    totalIncome: 0,
+    totalExpense: 0,
+    closingBalance: 0,
+  });
+
+  const [transactions, setTransactions] = useState<Array<{ id: string; time: string; type: 'thu' | 'chi'; category: string; person: string; amount: number; status: string; note: string; method: 'cash' | 'transfer' }>>([]);
+  const [loading, setLoading] = useState(false);
 
   // Fetch finance data from backend
-  useEffect(() => {
-    const loadData = async () => {
+  const fetchTransactions = async () => {
+      setLoading(true);
+      try {
+        const params: any = {};
+        
+        // Generic search
+        if (debouncedSearchTerm) params.search = debouncedSearchTerm;
+        
+        // Specific filters
+        if (debouncedSearchCode) params.code = debouncedSearchCode;
+        if (debouncedSearchNote) params.notes = debouncedSearchNote;
+        if (debouncedPersonName) params.personName = debouncedPersonName;
+        if (debouncedPersonPhone) params.personPhone = debouncedPersonPhone;
+        
+        // Date range
+        if (dateFrom) params.dateFrom = format(dateFrom, 'yyyy-MM-dd');
+        if (dateTo) params.dateTo = format(dateTo, 'yyyy-MM-dd');
+
+        // Status filter
+        if (statusCompleted && !statusCancelled) params.status = 'completed';
+        if (statusCancelled && !statusCompleted) params.status = 'cancelled';
+        
+        // Creator filter
+        if (selectedCreators.length > 0) {
+             const ids = selectedCreators.map(id => Number(id)).filter(n => !isNaN(n));
+             if (ids.length > 0) params.creatorIds = ids;
+        }
+
+        // Category filter
+        if (selectedCategories.length > 0) {
+            const catIds = allCategories
+                .filter(c => selectedCategories.includes(c.name))
+                .map(c => Number(c.id))
+                .filter(n => !isNaN(n));
+            
+            if (catIds.length > 0) params.categoryIds = catIds;
+        }
+
+        // Type filter (1=Thu, 2=Chi)
+        // Only apply if ONE is selected. If both or neither, fetch all.
+        if (selectedTypes.includes('income') && !selectedTypes.includes('expense')) {
+            params.typeId = 1;
+        } else if (selectedTypes.includes('expense') && !selectedTypes.includes('income')) {
+            params.typeId = 2;
+        }
+
+        // Method filter
+        if (selectedMethods.length === 1) {
+            params.paymentMethod = selectedMethods[0];
+        }
+
+        // Category filter
+        // Note: Simple ID mapping needed if we want to filter by exact category ID
+        // For now backend supports categoryIds array
+        
+        // Sort
+        if (sortField) {
+            // Map frontend sort fields to backend
+            const sortMap: Record<string, string> = {
+                'id': 'code',
+                'time': 'transactionDate',
+                'amount': 'amount'
+            };
+            if (sortMap[sortField]) {
+                params.sort = `${sortMap[sortField]}:${sortOrder === 'asc' ? 'asc' : 'desc'}`;
+            }
+        }
+
+        const tranRes = await getFinanceTransactions(params);
+
+        // Process Stats
+        // Extract stats from transaction response
+        if (tranRes?.data?.metaData?.stats) {
+             setStats(tranRes.data.metaData.stats);
+        }
+
+        // Process Transactions
+        // Process Transactions
+        console.log("Finance Response:", tranRes.data);
+        
+        let rawItems = 
+            tranRes?.data?.metaData?.transactions ?? 
+            tranRes?.data?.metaData?.items ?? 
+            tranRes?.data?.transactions ?? 
+            tranRes?.data ?? 
+            [];
+
+        if (!Array.isArray(rawItems)) {
+            console.warn("Transactions data is not an array, falling back to empty array. Received:", rawItems);
+            rawItems = [];
+        }
+        const tranItems = rawItems as any[];
+        const mappedTrans = tranItems.map((t: any) => {
+          const code = String(t.code ?? t.id ?? t.transactionId ?? '');
+          const dateStr = t.transactionDate ?? t.createdAt ?? new Date().toISOString();
+          const dt = new Date(dateStr);
+          const time = `${dt.toLocaleDateString('vi-VN')} ${dt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
+          // Detect type from category type or explicit type
+          // Backend: Category Type 1=Thu, 2=Chi
+          const typeId = t.category?.type?.id ?? t.category?.typeId;
+          const isReceipt = typeId === 1;
+          const isPayment = typeId === 2;
+          
+          const amountNum = Number(t.amount ?? 0);
+          const type: 'thu' | 'chi' = isReceipt ? 'thu' : 'chi';
+          // Frontend expects negative for expense for visual consistency, or just 'chi' type
+          const normalizedAmount = type === 'chi' ? -Math.abs(amountNum) : Math.abs(amountNum);
+          
+          return {
+            id: code,
+            time,
+            type,
+            category: t.category?.name ?? t.categoryName ?? '',
+            person: t.personName ?? t.person?.name ?? '',
+            amount: normalizedAmount,
+            status: t.status ?? 'completed',
+            note: t.notes ?? t.note ?? '', // Backend uses 'notes'
+            method: ((t.paymentMethod ?? 'cash') === 'transfer' ? 'transfer' : 'cash') as 'cash' | 'transfer',
+          };
+        });
+        setTransactions(mappedTrans);
+
+      } catch (err: any) {
+        console.error(err);
+        toast.error('Lỗi tải dữ liệu', { description: err?.message });
+      } finally {
+        setLoading(false);
+      }
+  };
+
+
+
+  // ... (debouncing hooks matching previous step if not already there, ensure no duplication)
+
+  // ... (useEffect for transactions)
+
+  const fetchMasterData = async () => {
       try {
         // Categories
         const catRes = await getFinanceCategories();
         const catItems = (catRes?.data?.metaData?.items ?? catRes?.data?.metaData ?? catRes?.data ?? []) as any[];
         const mappedCats = catItems.map((c: any) => {
-          const typeRaw = (c.type ?? c.typeId ?? '').toString().toLowerCase();
-          const type: 'receipt' | 'payment' | undefined = typeRaw.includes('receipt') || typeRaw === '1' ? 'receipt' : (typeRaw.includes('payment') || typeRaw === '2' ? 'payment' : undefined);
-          return { id: String(c.id ?? c.code ?? c.name), name: c.name ?? 'Danh mục', type };
+          const typeId = c.type?.id ?? c.typeId;
+          const type: 'receipt' | 'payment' | undefined = typeId === 1 ? 'receipt' : (typeId === 2 ? 'payment' : undefined);
+          return { id: String(c.id), name: c.name, type };
         });
         setAllCategories(mappedCats);
 
@@ -312,51 +502,141 @@ export function Finance() {
         const bankRes = await getBankAccounts();
         const bankItems = (bankRes?.data?.metaData?.items ?? bankRes?.data?.metaData ?? bankRes?.data ?? []) as any[];
         const mappedBanks = bankItems.map((ba: any) => ({
-          id: String(ba.id ?? ba.accountId ?? ba.accountNumber ?? Math.random()),
+          id: String(ba.id),
           name: ba.name ?? `${ba.bankName ?? 'Ngân hàng'} - ${ba.ownerName ?? ba.owner ?? ''}`,
-          accountNumber: String(ba.accountNumber ?? ba.number ?? ''),
-          bank: ba.bankCode ?? ba.bank ?? undefined,
-          bankFull: ba.bankFullName ?? ba.bankName ?? undefined,
-          owner: ba.ownerName ?? ba.owner ?? undefined,
+          accountNumber: String(ba.accountNumber),
+          bank: ba.bankCode ?? ba.bankName,
+          bankFull: ba.bankFullName ?? ba.bankName,
+          owner: ba.ownerName ?? ba.owner,
         }));
         setAllBankAccounts(mappedBanks);
+        
+        // Fetch Staff (Creators)
+        const staffRes = await staffApi.getAll({ limit: 100 });
+        const staffList = (staffRes?.data?.metaData?.staffs ?? staffRes?.data?.data ?? []) as any[];
+        console.log("Fetch Creators Debug:", staffRes); // DEBUG
+        const mappedStaff = staffList.map((s: any) => ({
+            id: String(s.id),
+            name: s.fullName,
+            phone: s.phone
+        }));
+        setAllCreators(mappedStaff);
 
-        // Transactions
-        const tranRes = await getFinanceTransactions({});
-        const tranItems = (tranRes?.data?.metaData?.items ?? tranRes?.data?.metaData ?? tranRes?.data ?? []) as any[];
-        const mappedTrans = tranItems.map((t: any) => {
-          const code = String(t.code ?? t.id ?? t.transactionId ?? '');
-          const dateStr = t.transactionDate ?? t.createdAt ?? new Date().toISOString();
-          const dt = new Date(dateStr);
-          const time = `${dt.toLocaleDateString('vi-VN')} ${dt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
-          const typeRaw = (t.type ?? t.transactionType ?? '').toString().toLowerCase();
-          const isReceipt = typeRaw.includes('thu') || typeRaw.includes('income');
-          const isPayment = typeRaw.includes('chi') || typeRaw.includes('expense');
-          const amountNum = Number(t.amount ?? 0);
-          const type: 'thu' | 'chi' = isReceipt ? 'thu' : (isPayment ? 'chi' : (amountNum >= 0 ? 'thu' : 'chi'));
-          const normalizedAmount = type === 'chi' ? -Math.abs(amountNum) : Math.abs(amountNum);
-          return {
-            id: code,
-            time,
-            type,
-            category: t.category?.name ?? t.categoryName ?? '',
-            person: t.person?.name ?? t.personName ?? '',
-            amount: normalizedAmount,
-            status: t.status ?? 'completed',
-            note: t.note ?? '',
-            method: (t.paymentMethod ?? 'cash') === 'transfer' ? 'transfer' : 'cash',
-          };
-        });
-        setAllTransactions(mappedTrans);
-
-        // Persons (optional wiring, kept for future use)
-        await getFinancePersons().catch(() => void 0);
-      } catch (err: any) {
-        toast.error('Không tải được dữ liệu tài chính', { description: err?.message || 'Lỗi kết nối API' });
+      } catch (err) {
+          console.error(err);
       }
-    };
-    loadData();
+  };
+
+  // Fetch creators with search
+  useEffect(() => {
+      const fetchCreators = async () => {
+          try {
+            const staffRes = await staffApi.getAll({ limit: 20, search: debouncedCreatorSearch });
+            const staffList = (staffRes?.data?.metaData?.staffs ?? staffRes?.data?.data ?? []) as any[];
+            const mappedStaff = staffList.map((s: any) => ({
+                id: String(s.id),
+                name: s.fullName,
+                phone: s.phone
+            }));
+            setAllCreators(mappedStaff);
+          } catch (e) {
+              console.error(e);
+          }
+      };
+      fetchCreators();
+  }, [debouncedCreatorSearch]);
+
+  // Handle Person Group Change (Receipt) - Fetch with Search
+  useEffect(() => {
+      const fetchOptions = async () => {
+          const search = debouncedReceiptPersonName; // Use debounced input value
+          
+          if (receiptPersonGroup === 'staff') {
+              try {
+                  const res = await staffApi.getAll({ search, limit: 20 });
+                  const items = (res?.data?.metaData?.staffs ?? res?.data?.data ?? []) as any[];
+                  setReceiptPersonOptions(items.map((s: any) => ({ id: s.id, name: s.fullName, phone: s.phone })));
+              } catch(e) { console.error(e); }
+          } else if (receiptPersonGroup === 'supplier') {
+               try {
+                  const res = await supplierApi.getAll({ search, limit: 20 });
+                  const items = (res?.data?.metaData?.suppliers ?? res?.data?.data ?? []) as any[];
+                  setReceiptPersonOptions(items.map((s: any) => ({ id: s.id, name: s.name, phone: s.phone })));
+               } catch(e) { console.error(e); }
+          } else if (receiptPersonGroup === 'other') {
+              try {
+                  const res = await getFinancePersons({ search, limit: 20 });
+                  const items = (res?.data?.metaData?.data ?? res?.data?.data ?? []) as any[];
+                  setReceiptPersonOptions(items.map((i: any) => ({ id: i.id, name: i.name, phone: i.phone })));
+              } catch (e) {
+                  console.error(e);
+                  setReceiptPersonOptions([]);
+              }
+          } else {
+              setReceiptPersonOptions([]);
+          }
+      };
+      
+      fetchOptions();
+  }, [receiptPersonGroup, debouncedReceiptPersonName]);
+
+  // Handle Person Group Change (Payment) - Fetch with Search
+  useEffect(() => {
+      const fetchOptions = async () => {
+          const search = debouncedPaymentPersonName;
+          
+          if (paymentPersonGroup === 'staff') {
+              try {
+                  const res = await staffApi.getAll({ search, limit: 20 });
+                  const items = (res?.data?.metaData?.staffs ?? res?.data?.data ?? []) as any[];
+                  setPaymentPersonOptions(items.map((s: any) => ({ id: s.id, name: s.fullName, phone: s.phone })));
+              } catch(e) { console.error(e); }
+          } else if (paymentPersonGroup === 'supplier') {
+               try {
+                  const res = await supplierApi.getAll({ search, limit: 20 });
+                  const items = (res?.data?.metaData?.suppliers ?? res?.data?.data ?? []) as any[];
+                  setPaymentPersonOptions(items.map((s: any) => ({ id: s.id, name: s.name, phone: s.phone })));
+               } catch(e) { console.error(e); }
+          } else if (paymentPersonGroup === 'other') {
+              try {
+                  const res = await getFinancePersons({ search, limit: 20 });
+                   const items = (res?.data?.metaData?.data ?? res?.data?.data ?? []) as any[];
+                  setPaymentPersonOptions(items.map((i: any) => ({ id: i.id, name: i.name, phone: i.phone })));
+              } catch (e) {
+                  console.error(e);
+                  setPaymentPersonOptions([]);
+              }
+          } else {
+              setPaymentPersonOptions([]);
+          }
+      };
+      fetchOptions();
+  }, [paymentPersonGroup, debouncedPaymentPersonName]);
+
+
+  useEffect(() => {
+    fetchMasterData();
   }, []);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [
+    dateFrom, 
+    dateTo, 
+    debouncedSearchTerm, 
+    debouncedSearchCode, 
+    debouncedSearchNote,
+    debouncedPersonName,
+    debouncedPersonPhone,
+    selectedTypes, 
+    selectedMethods, 
+    sortField, 
+    sortOrder,
+    statusCompleted,
+    statusCancelled,
+    selectedCreators,
+    selectedCategories
+  ]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -406,133 +686,12 @@ export function Finance() {
   // Filtering logic
   const [activeTab, setActiveTab] = useState<'cash' | 'bank' | 'total'>('cash'); // Kept for Dialog compatibility
 
-  // Enhanced filtering logic with all new filters
-  let filteredTransactions = allTransactions.filter(transaction => {
-    // Filter by Search Code
-    if (searchCode) {
-      const lowerCode = searchCode.toLowerCase();
-      if (!transaction.id.toLowerCase().includes(lowerCode)) return false;
-    }
-
-    // Filter by Search Note
-    if (searchNote) {
-      const lowerNote = searchNote.toLowerCase();
-      if (!transaction.note.toLowerCase().includes(lowerNote)) return false;
-    }
-
-    // Filter by Search Term (legacy - for general search)
-    if (searchTerm) {
-      const lowerTerm = searchTerm.toLowerCase();
-      const matchesCode = transaction.id.toLowerCase().includes(lowerTerm);
-      const matchesNote = transaction.note.toLowerCase().includes(lowerTerm);
-      const matchesPerson = transaction.person.toLowerCase().includes(lowerTerm);
-      if (!matchesCode && !matchesNote && !matchesPerson) return false;
-    }
-
-    // Filter by Date
-    if (dateFrom || dateTo) {
-      const [datePart] = transaction.time.split(' ');
-      const [day, month, year] = datePart.split('/');
-      const transDate = new Date(Number(year), Number(month) - 1, Number(day));
-      
-      if (dateFrom) {
-        const from = new Date(dateFrom);
-        from.setHours(0, 0, 0, 0);
-        if (transDate < from) return false;
-      }
-      
-      if (dateTo) {
-        const to = new Date(dateTo);
-        to.setHours(0, 0, 0, 0);
-        if (transDate > to) return false;
-      }
-    }
-
-    // Filter by Type (Thu/Chi)
-    if (selectedTypes.length > 0) {
-      const isIncome = transaction.type === 'thu';
-      const isExpense = transaction.type === 'chi';
-      if (isIncome && !selectedTypes.includes('income')) return false;
-      if (isExpense && !selectedTypes.includes('expense')) return false;
-    }
-
-    // Filter by Method (Tien mat/Chuyen khoan)
-    if (selectedMethods.length > 0) {
-      const method = transaction.method === 'cash' ? 'cash' : 'transfer';
-      if (!selectedMethods.includes(method)) return false;
-    }
-
-    // Filter by Status
-    // Note: Mock data doesn't have status field, so this is placeholder logic
-    // In real implementation, check transaction.status
-    if (statusCompleted || statusCancelled) {
-      // Placeholder: assume all transactions are completed for now
-      // In real app: if (statusCompleted && transaction.status !== 'completed') return false;
-      // In real app: if (statusCancelled && transaction.status !== 'cancelled') return false;
-    }
-
-    // Filter by Creator
-    if (selectedCreators.length > 0) {
-      // Placeholder: Mock data doesn't have creator field
-      // In real app: if (!selectedCreators.includes(transaction.creatorId)) return false;
-    }
-
-    // Filter by Person Name
-    if (personName) {
-      const lowerName = personName.toLowerCase();
-      if (!transaction.person.toLowerCase().includes(lowerName)) return false;
-    }
-
-    // Filter by Person Phone
-    if (personPhone) {
-      // Placeholder: Mock data doesn't have phone field
-      // In real app: if (!transaction.personPhone.includes(personPhone)) return false;
-    }
-
-    // Filter by Category
-    if (selectedCategories.length > 0) {
-      // Placeholder: Mock data doesn't have category field
-      // In real app: if (!selectedCategories.includes(transaction.category)) return false;
-    }
-
-    return true;
-  });
+  // No client-side filtering needed anymore, use transactions state
+  const filteredTransactions = transactions;
 
 
 
-  // Apply sorting
-  if (sortField && sortOrder !== "none") {
-    filteredTransactions = [...filteredTransactions].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
 
-      if (sortField === "id") {
-        aValue = a.id;
-        bValue = b.id;
-      } else if (sortField === "time") {
-        aValue = new Date(a.time.split(' ').reverse().join('-').replace(/\//g, '-')).getTime();
-        bValue = new Date(b.time.split(' ').reverse().join('-').replace(/\//g, '-')).getTime();
-      } else if (sortField === "category") {
-        aValue = a.category;
-        bValue = b.category;
-      } else if (sortField === "person") {
-        aValue = a.person;
-        bValue = b.person;
-      } else if (sortField === "amount") {
-        aValue = a.amount;
-        bValue = b.amount;
-      }
-
-      if (typeof aValue === "string" && typeof bValue === "string") {
-        const comparison = aValue.localeCompare(bValue, "vi");
-        return sortOrder === "asc" ? comparison : -comparison;
-      }
-
-      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
-      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
-  }
 
 
 
@@ -564,10 +723,32 @@ export function Finance() {
     setPaymentDialogOpen(true);
   };
 
-  const handleSaveReceipt = () => {
-    // Save receipt logic
-    console.log('Saving receipt...');
-    setReceiptDialogOpen(false);
+  const handleSaveReceipt = async () => {
+    try {
+        if (!receiptCategory) {
+            toast.error("Vui lòng chọn loại phiếu thu");
+            return;
+        }
+
+        const payload = {
+            categoryId: Number(receiptCategory),
+            amount: Number(receiptAmount.replace(/,/g, '')),
+            notes: receiptNote,
+            paymentMethod: receiptPaymentType === 'bank' ? 'bank' : 'cash',
+            transactionDate: receiptDate.toISOString(),
+            personName: receiptPersonName,
+            bankAccountId: receiptBankAccount ? Number(receiptBankAccount) : undefined,
+            personType: receiptPersonGroup,
+            // personId: ... logic to find person ID if selecting from list
+        };
+
+        await createFinanceTransaction(payload);
+        toast.success("Đã tạo phiếu thu");
+        setReceiptDialogOpen(false);
+        fetchTransactions();
+    } catch (err: any) {
+        toast.error("Lỗi tạo phiếu thu", { description: err.message });
+    }
   };
 
   const handleSaveAndPrintReceipt = () => {
@@ -576,10 +757,31 @@ export function Finance() {
     setReceiptDialogOpen(false);
   };
 
-  const handleSavePayment = () => {
-    // Save payment logic
-    console.log('Saving payment...');
-    setPaymentDialogOpen(false);
+  const handleSavePayment = async () => {
+     try {
+        if (!paymentCategory) {
+            toast.error("Vui lòng chọn loại phiếu chi");
+            return;
+        }
+
+        const payload = {
+            categoryId: Number(paymentCategory),
+            amount: Number(paymentAmount.replace(/,/g, '')),
+            notes: paymentNote,
+            paymentMethod: paymentPaymentType === 'bank' ? 'bank' : 'cash',
+            transactionDate: paymentDate.toISOString(),
+            personName: paymentPersonName,
+            bankAccountId: paymentBankAccount ? Number(paymentBankAccount) : undefined,
+            personType: paymentPersonGroup
+        };
+
+        await createFinanceTransaction(payload);
+        toast.success("Đã tạo phiếu chi");
+        setPaymentDialogOpen(false);
+        fetchTransactions();
+    } catch (err: any) {
+        toast.error("Lỗi tạo phiếu chi", { description: err.message });
+    }
   };
 
   const handleSaveAndPrintPayment = () => {
@@ -588,20 +790,37 @@ export function Finance() {
     setPaymentDialogOpen(false);
   };
 
-  const handleAddPerson = () => {
-    // Add person logic
-    console.log('Adding person:', {
-      name: newPersonName,
-      phone: newPersonPhone,
-      address: newPersonAddress,
-      note: newPersonNote,
-    });
-    setAddPersonDialogOpen(false);
-    // Reset form
-    setNewPersonName('');
-    setNewPersonPhone('');
-    setNewPersonAddress('');
-    setNewPersonNote('');
+  const handleAddPerson = async () => {
+    try {
+      await createFinancePerson({
+          name: newPersonName,
+          phone: newPersonPhone,
+          address: newPersonAddress,
+          type: 'other' // Default type
+      });
+      toast.success("Đã thêm người mới");
+      setAddPersonDialogOpen(false);
+      setNewPersonName('');
+      setNewPersonPhone('');
+      setNewPersonAddress('');
+      setNewPersonNote('');
+      // Refresh options if currently selecting 'other'
+      if (receiptPersonGroup === 'other' || paymentPersonGroup === 'other') {
+          // Trigger useEffect dependency update?
+          // fetchMasterData does not fetch 'other' persons generally, usually handled by useEffect on group change
+          // We can toggle group to refresh or manually fetch?
+          // Simplest is to force refresh by temporary state or just let user re-select?
+          // Actually, useEffect[receiptPersonGroup] handles fetching.
+          // We can call getFinancePersons again here if we want immediate update.
+          const res = await getFinancePersons({ limit: 100 });
+          const items = (res?.data?.metaData?.items ?? res?.data?.data ?? []) as any[];
+          const opts = items.map((i: any) => ({ id: i.id, name: i.name, phone: i.phone }));
+          if (receiptPersonGroup === 'other') setReceiptPersonOptions(opts);
+          if (paymentPersonGroup === 'other') setPaymentPersonOptions(opts);
+      }
+    } catch (err: any) {
+      toast.error("Lỗi thêm người mới", { description: err.message });
+    }
   };
 
   const handleOpenAddReceiptCategory = () => {
@@ -627,16 +846,20 @@ export function Finance() {
     setAddBankAccountDialogOpen(true);
   };
 
-  const handleSaveBankAccount = () => {
-    // Save bank account logic
-    console.log('Saving bank account:', {
-      name: bankAccountName,
-      accountNumber: bankAccountNumber,
-      bank: bankAccountBank,
-      owner: bankAccountOwner,
-      note: bankAccountNote,
-    });
-    setAddBankAccountDialogOpen(false);
+  const handleSaveBankAccount = async () => {
+      try {
+        await createBankAccount({
+            bankName: bankAccountBank,
+            accountNumber: bankAccountNumber,
+            ownerName: bankAccountOwner,
+            notes: bankAccountNote
+        });
+        toast.success("Đã thêm tài khoản");
+        setAddBankAccountDialogOpen(false);
+        fetchMasterData();
+      } catch (err: any) {
+        toast.error("Lỗi thêm tài khoản", { description: err.message });
+      }
   };
 
   const handleOpenEditCategory = (type: 'receipt' | 'payment') => {
@@ -652,30 +875,99 @@ export function Finance() {
     }
   };
 
-  const handleSaveCategory = () => {
-    console.log('Saving category:', categoryName, categoryDescription);
-    setAddReceiptCategoryDialogOpen(false);
-    setAddPaymentCategoryDialogOpen(false);
-    setEditCategoryDialogOpen(false);
+  const handleSaveCategory = async () => {
+      try {
+          const typeId = editingCategoryType === 'receipt' ? 1 : 2;
+          await createFinanceCategory({
+              name: categoryName,
+              typeId: typeId
+          });
+          toast.success("Đã thêm danh mục");
+          setAddReceiptCategoryDialogOpen(false);
+          setAddPaymentCategoryDialogOpen(false);
+          fetchMasterData();
+      } catch (err: any) {
+          toast.error("Lỗi thêm danh mục", { description: err.message });
+      }
   };
 
-  const handleDeleteCategory = () => {
-    console.log('Deleting category');
-    setEditCategoryDialogOpen(false);
-  };
+  const handleDeleteCategory = async () => {
+    try {
+        const typeId = editingCategoryType === 'receipt' ? 1 : 2;
+        const selectedId = editingCategoryType === 'receipt' ? receiptCategory : paymentCategory;
+        if (!selectedId) return;
 
-  const getPersonList = (personGroup: string) => {
-    switch (personGroup) {
-      case 'customer':
-        return allCustomers;
-      case 'staff':
-        return allStaff;
-      case 'supplier':
-        return allSuppliers;
-      default:
-        return allOtherPersons;
+        await deleteFinanceCategory(selectedId);
+        toast.success("Đã xóa danh mục");
+        
+        // Clear selection
+        if (editingCategoryType === 'receipt') setReceiptCategory('');
+        else setPaymentCategory('');
+
+        setEditCategoryDialogOpen(false);
+        fetchMasterData();
+    } catch (err: any) {
+        toast.error("Lỗi xóa danh mục", { description: err.message });
     }
   };
+
+  const handleExportClick = () => {
+       setExportDateFrom(dateFrom || startOfMonth(new Date()));
+       setExportDateTo(dateTo || endOfMonth(new Date()));
+       setExportDialogOpen(true);
+  };
+
+  const processExport = async () => {
+    try {
+        const params: any = {};
+        // Add current filters to params (except date, which comes from modal)
+        if (debouncedSearchTerm) params.search = debouncedSearchTerm;
+        if (debouncedSearchCode) params.code = debouncedSearchCode;
+        if (debouncedSearchNote) params.notes = debouncedSearchNote;
+        if (debouncedPersonName) params.personName = debouncedPersonName;
+        if (debouncedPersonPhone) params.personPhone = debouncedPersonPhone;
+        
+        // Use dates from Export Modal
+        if (exportDateFrom) params.dateFrom = format(exportDateFrom, 'yyyy-MM-dd');
+        else if (dateFrom) params.dateFrom = format(dateFrom, 'yyyy-MM-dd');
+
+        if (exportDateTo) params.dateTo = format(exportDateTo, 'yyyy-MM-dd');
+        else if (dateTo) params.dateTo = format(dateTo, 'yyyy-MM-dd');
+
+        if (statusCompleted && !statusCancelled) params.status = 'completed';
+        if (statusCancelled && !statusCompleted) params.status = 'cancelled';
+        if (selectedCreators.length > 0) {
+              const ids = selectedCreators.map(id => Number(id)).filter(n => !isNaN(n));
+              if (ids.length > 0) params.creatorIds = ids;
+        }
+        if (selectedCategories.length > 0) {
+             const catIds = allCategories
+                 .filter(c => selectedCategories.includes(c.name))
+                 .map(c => Number(c.id))
+                 .filter(n => !isNaN(n));
+             if (catIds.length > 0) params.categoryIds = catIds;
+        }
+        if (selectedTypes.includes('income') && !selectedTypes.includes('expense')) params.typeId = 1;
+        else if (selectedTypes.includes('expense') && !selectedTypes.includes('income')) params.typeId = 2;
+        if (selectedMethods.length === 1) params.paymentMethod = selectedMethods[0];
+        
+        const response = await exportFinanceTransactions(params);
+        // Create blob and download - use response.data as it contains the binary
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Transaction_Export_${format(new Date(), 'ddMMyyyy')}.xlsx`); 
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        
+        setExportDialogOpen(false); // Close dialog
+    } catch (err: any) {
+        toast.error("Lỗi xuất file", { description: err.message });
+    }
+  };
+
+
 
   const [showFilters, setShowFilters] = useState(false);
   return (
@@ -705,7 +997,7 @@ export function Finance() {
               </Button>
             </>
           )}
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={handleExportClick}>
             <Download className="w-4 h-4 mr-2" />
             Xuất file
           </Button>
@@ -718,7 +1010,7 @@ export function Finance() {
           <CardContent className="p-4">
             <div className="text-sm text-slate-600 mb-2">Quỹ đầu kỳ</div>
             <div className="text-xl text-slate-900">
-              {cashbookStats.openingBalance.toLocaleString('vi-VN')}
+              {stats.openingBalance.toLocaleString('vi-VN')}
             </div>
           </CardContent>
         </Card>
@@ -726,7 +1018,7 @@ export function Finance() {
           <CardContent className="p-4">
              <div className="text-sm text-slate-600 mb-2">Tổng thu</div>
             <div className="text-xl text-emerald-600">
-              {cashbookStats.totalIncome.toLocaleString('vi-VN')}
+              {stats.totalIncome.toLocaleString('vi-VN')}
             </div>
           </CardContent>
         </Card>
@@ -734,7 +1026,7 @@ export function Finance() {
           <CardContent className="p-4">
              <div className="text-sm text-slate-600 mb-2">Tổng chi</div>
             <div className="text-xl text-red-600">
-              {cashbookStats.totalExpense.toLocaleString('vi-VN')}
+              {stats.totalExpense.toLocaleString('vi-VN')}
             </div>
           </CardContent>
         </Card>
@@ -742,7 +1034,7 @@ export function Finance() {
           <CardContent className="p-4">
              <div className="text-sm text-slate-600 mb-2">Tồn quỹ</div>
             <div className="text-xl text-blue-600">
-              {cashbookStats.closingBalance.toLocaleString('vi-VN')}
+              {stats.closingBalance.toLocaleString('vi-VN')}
             </div>
           </CardContent>
         </Card>
@@ -905,69 +1197,68 @@ export function Finance() {
                     )}
                    </div>
 
-                   {/* Người tạo */}
-                   <div className="space-y-2">
-                    <Label className="text-xs text-slate-600">Người tạo</Label>
-                    <Popover open={creatorSearchOpen} onOpenChange={setCreatorSearchOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className="w-full justify-between h-9 text-sm bg-white border-slate-300"
-                        >
-                          <span className="text-slate-500 text-xs">
-                            {selectedCreators.length === 0
-                              ? 'Tất cả'
-                              : `Đã chọn ${selectedCreators.length}`}
-                          </span>
-                          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[240px] p-0">
-                        <Command>
-                          <CommandInput placeholder="Tìm người tạo..." />
-                          <CommandList>
-                            <CommandEmpty>Không tìm thấy.</CommandEmpty>
-                            <CommandGroup className="max-h-64 overflow-auto">
-                              {allCreators.map((creator) => (
-                                <CommandItem
-                                  key={creator.id}
-                                  onSelect={() => toggleCreator(creator.id)}
+                    {/* Người tạo */}
+                    <div className="space-y-2">
+                        <Label className="text-xs text-slate-600">Người tạo</Label>
+                        <Popover open={creatorSearchOpen} onOpenChange={setCreatorSearchOpen}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    className="w-full justify-between h-9 text-sm bg-white border-slate-300"
                                 >
-                                  <Checkbox
-                                    checked={selectedCreators.includes(creator.id)}
-                                    className="mr-2"
-                                  />
-                                  {creator.name}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                    {selectedCreators.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {selectedCreators.map((creatorId) => {
-                          const creator = allCreators.find(c => c.id === creatorId);
-                          return (
-                            <div
-                              key={creatorId}
-                              className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs"
-                            >
-                              {creator?.name}
-                              <button
-                                onClick={() => toggleCreator(creatorId)}
-                                className="hover:bg-blue-200 rounded"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                   </div>
+                                     <span className="text-slate-500 text-xs">
+                                        {selectedCreators.length === 0
+                                            ? 'Người tạo'
+                                            : `Đã chọn ${selectedCreators.length}`}
+                                    </span>
+                                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[240px] p-0">
+                                <Command shouldFilter={false}>
+                                    <CommandInput 
+                                        placeholder="Tìm người tạo..." 
+                                        value={creatorSearch}
+                                        onValueChange={setCreatorSearch}
+                                    />
+                                    <CommandList>
+                                        <CommandEmpty>Không tìm thấy.</CommandEmpty>
+                                        <CommandGroup className="max-h-64 overflow-auto">
+                                            {allCreators.map((creator) => (
+                                                <CommandItem
+                                                    key={creator.id}
+                                                    onSelect={() => toggleCreator(creator.id)}
+                                                >
+                                                    <Checkbox
+                                                        checked={selectedCreators.includes(creator.id)}
+                                                        className="mr-2"
+                                                    />
+                                                    {creator.name}
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
+                        {selectedCreators.length > 0 && (
+                             <div className="flex flex-wrap gap-1 mt-2">
+                                {selectedCreators.map((id) => {
+                                    const c = allCreators.find(x => x.id === id);
+                                    return (
+                                        <div key={id} className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">
+                                            {c?.name ?? id}
+                                            <button onClick={() => toggleCreator(id)} className="hover:bg-blue-200 rounded">
+                                                <X className="h-3 w-3" />
+                                            </button>
+                                        </div>
+                                    )
+                                })}
+                             </div>
+                        )}
+                    </div>
+
 
                    {/* Loại giao dịch */}
                    <div className="space-y-2">
@@ -1051,9 +1342,9 @@ export function Finance() {
           Tiền mặt
         </Button>
          <Button 
-          variant={selectedMethods.includes('transfer') && selectedMethods.length === 1 ? 'default' : 'outline'}
-          onClick={() => setSelectedMethods(['transfer'])}
-          className={selectedMethods.includes('transfer') && selectedMethods.length === 1 ? 'bg-blue-600 hover:bg-blue-700' : 'bg-white border-slate-300'}
+          variant={selectedMethods.includes('bank') && selectedMethods.length === 1 ? 'default' : 'outline'}
+          onClick={() => setSelectedMethods(['bank'])}
+          className={selectedMethods.includes('bank') && selectedMethods.length === 1 ? 'bg-blue-600 hover:bg-blue-700' : 'bg-white border-slate-300'}
           size="sm"
         >
           Ngân hàng
@@ -1103,6 +1394,9 @@ export function Finance() {
                           {getSortIcon("person")}
                         </div>
                       </TableHead>
+                      <TableHead className="text-sm">
+                          Ghi chú
+                      </TableHead>
                       <TableHead
                         className="text-sm text-right cursor-pointer hover:bg-blue-100 transition-colors"
                         onClick={() => handleSort("amount")}
@@ -1124,6 +1418,9 @@ export function Finance() {
                             {transaction.type === 'thu' ? 'Thu' : 'Chi'} {transaction.category}
                           </TableCell>
                           <TableCell className="text-sm text-slate-700">{transaction.person}</TableCell>
+                          <TableCell className="text-sm text-slate-500 max-w-[200px] truncate" title={transaction.note}>
+                            {transaction.note}
+                          </TableCell>
                           <TableCell className="text-sm text-right">
                             <span className={transaction.amount > 0 ? 'text-emerald-600' : 'text-red-600'}>
                               {transaction.amount.toLocaleString('vi-VN')}
@@ -1153,7 +1450,22 @@ export function Finance() {
 
 
       {/* Receipt Dialog */}
-      <Dialog open={receiptDialogOpen} onOpenChange={setReceiptDialogOpen}>
+      <Dialog open={receiptDialogOpen} onOpenChange={(open: boolean) => {
+        setReceiptDialogOpen(open);
+        if (!open) {
+            // Reset Receipt Form
+            setReceiptPaymentType('cash');
+            setReceiptCode('');
+            setReceiptDate(new Date());
+            setReceiptCategory('');
+            setReceiptAmount('');
+            setReceiptNote('');
+            setReceiptPersonGroup('other');
+            setReceiptPersonName('');
+            setReceiptPaymentMethod('');
+            setReceiptBankAccount('');
+        }
+      }}>
         <DialogContent className="sm:max-w-[900px]">
           <DialogHeader>
             <DialogTitle>Lập phiếu thu</DialogTitle>
@@ -1207,7 +1519,7 @@ export function Finance() {
                     <Calendar
                       mode="single"
                       selected={receiptDate}
-                      onSelect={(date) => date && setReceiptDate(date)}
+                      onSelect={(date: Date | undefined) => date && setReceiptDate(date)}
                       initialFocus
                     />
                   </PopoverContent>
@@ -1257,9 +1569,9 @@ export function Finance() {
                 <div className="relative">
                   <Input
                     id="receipt-amount"
-                    type="number"
+                    type="text"
                     value={receiptAmount}
-                    onChange={(e) => setReceiptAmount(e.target.value)}
+                    onChange={handleReceiptAmountChange}
                     placeholder="0"
                     className="pr-8 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   />
@@ -1297,65 +1609,60 @@ export function Finance() {
 
               <div className="space-y-2">
                 <Label htmlFor="receipt-person-name">Tên người nộp</Label>
-                {!receiptPersonName ? (
-                  <>
-                    <div className="flex gap-2">
+                <div className="flex gap-2">
+                   <Popover open={receiptPersonSearchOpen} onOpenChange={setReceiptPersonSearchOpen}>
+                    <PopoverTrigger asChild>
                       <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                         <Input
                           id="receipt-person-name"
                           value={receiptPersonName}
-                          onChange={(e) => setReceiptPersonName(e.target.value)}
-                          placeholder="Tìm kiếm"
+                          onChange={(e) => {
+                            setReceiptPersonName(e.target.value);
+                            setReceiptPersonSearchOpen(true);
+                          }}
+                          onFocus={() => {
+                              setReceiptPersonSearchOpen(true);
+                          }}
+                          autoComplete="off"
+                          placeholder="Tìm kiếm hoặc nhập tên"
                           className="pl-9 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                         />
                       </div>
-                      {(receiptPersonGroup === 'other' || !receiptPersonGroup) && (
+                    </PopoverTrigger>
+                    {/* Always render Content if open to show CommandEmpty/Loading */}
+                    <PopoverContent className="w-[300px] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+                        <Command shouldFilter={false}>
+                            <CommandList>
+                            <CommandEmpty>Không tìm thấy.</CommandEmpty>
+                            <CommandGroup heading="Gợi ý">
+                                {receiptPersonOptions.map((option) => (
+                                <CommandItem
+                                    key={option.id}
+                                    value={option.name}
+                                    onSelect={() => {
+                                    setReceiptPersonName(option.name);
+                                    setReceiptPersonSearchOpen(false);
+                                    }}
+                                >
+                                    {option.name} {option.phone ? ` - ${option.phone}` : ''}
+                                </CommandItem>
+                                ))}
+                            </CommandGroup>
+                            </CommandList>
+                        </Command>
+                        </PopoverContent>
+                   </Popover>
+
+                    {(receiptPersonGroup === 'other' || !receiptPersonGroup) && (
                         <Button
                           variant="outline"
                           size="icon"
                           onClick={() => setAddPersonDialogOpen(true)}
                           title="Thêm người nộp mới"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    
-                    {/* Show person suggestions based on group */}
-                    {receiptPersonGroup && receiptPersonGroup !== 'other' && (
-                      <div className="mt-2 border border-slate-200 rounded-md max-h-40 overflow-y-auto">
-                        {getPersonList(receiptPersonGroup).map((person) => (
-                          <button
-                            key={person.id}
-                            onClick={() => setReceiptPersonName(person.name)}
-                            className="w-full text-left px-3 py-2 hover:bg-slate-50 text-sm"
-                          >
-                            <div className="text-slate-900">{person.name}</div>
-                            <div className="text-xs text-slate-500">{person.phone}</div>
-                          </button>
-                        ))}
-                      </div>
+                        > <Plus className="h-4 w-4" /> </Button>
                     )}
-                  </>
-                ) : (
-                  <div className="flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded text-sm">
-                    <div className="flex-1">
-                      <div className="text-slate-900">{receiptPersonName}</div>
-                      {receiptPersonGroup !== 'other' && getPersonList(receiptPersonGroup).find(p => p.name === receiptPersonName) && (
-                        <div className="text-xs text-slate-500">
-                          {getPersonList(receiptPersonGroup).find(p => p.name === receiptPersonName)?.phone}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => setReceiptPersonName('')}
-                      className="text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
                   </div>
-                )}
               </div>
 
               {/* Bank fields - only show when receiptPaymentType is 'bank' */}
@@ -1420,18 +1727,27 @@ export function Finance() {
             >
               Lưu
             </Button>
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-              onClick={handleSaveAndPrintReceipt}
-            >
-              Lưu & In
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Payment Dialog */}
-      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+      <Dialog open={paymentDialogOpen} onOpenChange={(open: boolean) => {
+        setPaymentDialogOpen(open);
+        if (!open) {
+             // Reset Payment Form
+             setPaymentPaymentType('cash');
+             setPaymentCode('');
+             setPaymentDate(new Date());
+             setPaymentCategory('');
+             setPaymentAmount('');
+             setPaymentNote('');
+             setPaymentPersonGroup('other');
+             setPaymentPersonName('');
+             setPaymentPaymentMethod('');
+             setPaymentBankAccount('');
+        }
+      }}>
         <DialogContent className="sm:max-w-[900px]">
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold">Lập phiếu chi</DialogTitle>
@@ -1485,7 +1801,7 @@ export function Finance() {
                     <Calendar
                       mode="single"
                       selected={paymentDate}
-                      onSelect={(date) => date && setPaymentDate(date)}
+                      onSelect={(date: Date | undefined) => date && setPaymentDate(date)}
                       initialFocus
                     />
                   </PopoverContent>
@@ -1575,65 +1891,60 @@ export function Finance() {
 
               <div className="space-y-2">
                 <Label htmlFor="payment-person-name">Tên người nhận</Label>
-                {!paymentPersonName ? (
-                  <>
-                    <div className="flex gap-2">
+                <div className="flex gap-2">
+                  <Popover open={paymentPersonSearchOpen} onOpenChange={setPaymentPersonSearchOpen}>
+                    <PopoverTrigger asChild>
                       <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                         <Input
                           id="payment-person-name"
                           value={paymentPersonName}
-                          onChange={(e) => setPaymentPersonName(e.target.value)}
-                          placeholder="Tìm kiếm"
+                          onChange={(e) => {
+                            setPaymentPersonName(e.target.value);
+                            setPaymentPersonSearchOpen(true);
+                          }}
+                          onFocus={() => {
+                              setPaymentPersonSearchOpen(true);
+                          }}
+                          autoComplete="off"
+                          placeholder="Tìm kiếm hoặc nhập tên"
                           className="pl-9 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                         />
                       </div>
-                      {(paymentPersonGroup === 'other' || !paymentPersonGroup) && (
+                    </PopoverTrigger>
+                    {/* Always render Content if open */}
+                        <PopoverContent className="w-[300px] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+                        <Command shouldFilter={false}>
+                            <CommandList>
+                            <CommandEmpty>Không tìm thấy.</CommandEmpty>
+                            <CommandGroup heading="Gợi ý">
+                                {paymentPersonOptions.map((option) => (
+                                <CommandItem
+                                    key={option.id}
+                                    value={option.name}
+                                    onSelect={() => {
+                                    setPaymentPersonName(option.name);
+                                    setPaymentPersonSearchOpen(false);
+                                    }}
+                                >
+                                    {option.name} {option.phone ? ` - ${option.phone}` : ''}
+                                </CommandItem>
+                                ))}
+                            </CommandGroup>
+                            </CommandList>
+                        </Command>
+                        </PopoverContent>
+                   </Popover>
+
+                    {(paymentPersonGroup === 'other' || !paymentPersonGroup) && (
                         <Button
                           variant="outline"
                           size="icon"
                           onClick={() => setAddPersonDialogOpen(true)}
                           title="Thêm người nhận mới"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    
-                    {/* Show person suggestions based on group */}
-                    {paymentPersonGroup && paymentPersonGroup !== 'other' && (
-                      <div className="mt-2 border border-slate-200 rounded-md max-h-40 overflow-y-auto">
-                        {getPersonList(paymentPersonGroup).map((person) => (
-                          <button
-                            key={person.id}
-                            onClick={() => setPaymentPersonName(person.name)}
-                            className="w-full text-left px-3 py-2 hover:bg-slate-50 text-sm"
-                          >
-                            <div className="text-slate-900">{person.name}</div>
-                            <div className="text-xs text-slate-500">{person.phone}</div>
-                          </button>
-                        ))}
-                      </div>
+                        > <Plus className="h-4 w-4" /> </Button>
                     )}
-                  </>
-                ) : (
-                  <div className="flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded text-sm">
-                    <div className="flex-1">
-                      <div className="text-slate-900">{paymentPersonName}</div>
-                      {paymentPersonGroup !== 'other' && getPersonList(paymentPersonGroup).find(p => p.name === paymentPersonName) && (
-                        <div className="text-xs text-slate-500">
-                          {getPersonList(paymentPersonGroup).find(p => p.name === paymentPersonName)?.phone}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => setPaymentPersonName('')}
-                      className="text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
                   </div>
-                )}
               </div>
 
               {/* Bank fields - only show when paymentPaymentType is 'bank' */}
@@ -1697,12 +2008,6 @@ export function Finance() {
               onClick={handleSavePayment}
             >
               Lưu
-            </Button>
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-              onClick={handleSaveAndPrintPayment}
-            >
-              Lưu & In
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2025,6 +2330,75 @@ export function Finance() {
             >
               Thêm
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Export Dialog */}
+      <Dialog open={exportDialogOpen} onOpenChange={(open: boolean) => setExportDialogOpen(open)}>
+        <DialogContent className="sm:max-w-[100px]" style={{ width: "30vw" }}>
+          <DialogHeader>
+            <DialogTitle>Xuất file Excel</DialogTitle>
+            <DialogDescription>
+              Chọn khoảng thời gian cần xuất dữ liệu
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+             <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col space-y-2">
+                    <Label>Từ ngày</Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant={"outline"}
+                                className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !exportDateFrom && "text-muted-foreground"
+                                )}
+                            >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {exportDateFrom ? format(exportDateFrom, "dd/MM/yyyy") : <span>Chọn ngày</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                mode="single"
+                                selected={exportDateFrom}
+                                onSelect={setExportDateFrom}
+                                initialFocus
+                            />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+                <div className="flex flex-col space-y-2">
+                    <Label>Đến ngày</Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant={"outline"}
+                                className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !exportDateTo && "text-muted-foreground"
+                                )}
+                            >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {exportDateTo ? format(exportDateTo, "dd/MM/yyyy") : <span>Chọn ngày</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                mode="single"
+                                selected={exportDateTo}
+                                onSelect={setExportDateTo}
+                                initialFocus
+                            />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialogOpen(false)}>Hủy</Button>
+            <Button className="bg-blue-600 hover:bg-blue-700" onClick={processExport}>Xuất file</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

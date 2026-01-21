@@ -3,13 +3,10 @@ export type Permission =
   | 'system_users:view' | 'system_users:create' | 'system_users:update' | 'system_users:delete'
   // Tổng quan
   | 'dashboard:view'
-  // Hàng hóa
+// Hàng hóa
   | 'goods_inventory:view' | 'goods_inventory:create' | 'goods_inventory:update' | 'goods_inventory:delete'
-  | 'goods_pricing:view' | 'goods_pricing:update'
-  | 'goods_stock_check:view' | 'goods_stock_check:create'
-  | 'goods_new_items:view' | 'goods_new_items:update'
-  | 'goods_import_export:view' | 'goods_import_export:create'
-  | 'goods_recipe:view' | 'goods_recipe:update'
+  | 'goods_stock_check:view' | 'goods_stock_check:create' | 'goods_stock_check:update' | 'goods_stock_check:delete'
+  | 'combos:view' | 'combos:create' | 'combos:update' | 'combos:delete'
   // Phòng bàn
   | 'tables:view' | 'tables:create' | 'tables:update' | 'tables:delete'
   // Đối tác
@@ -22,23 +19,19 @@ export type Permission =
   | 'staff:view' | 'staff:create' | 'staff:update' | 'staff:delete'
   | 'staff_scheduling:view' | 'staff_scheduling:update'
   | 'staff_timekeeping:view' | 'staff_timekeeping:update'
-  | 'staff_payroll:view' | 'staff_payroll:create' | 'staff_payroll:update' | 'staff_payroll:delete' | 'staff_payroll:payment'
-  | 'staff_settings:view' | 'staff_settings:update'
+  | 'staff_payroll:view' | 'staff_payroll:create' | 'staff_payroll:update' | 'staff_payroll:delete'
   // Giao dịch
-  | 'invoices:view' | 'invoices:create' | 'invoices:update' | 'invoices:delete'
-  | 'returns:view' | 'returns:create'
   | 'purchase_orders:view' | 'purchase_orders:create' | 'purchase_orders:update'
-  | 'purchase_returns:view' | 'purchase_returns:create'
-  | 'write_offs:view' | 'write_offs:create'
+  | 'write_offs:view' | 'write_offs:create' | 'write_offs:update'
   // Tài chính
   | 'finance:view' | 'finance:create' | 'finance:update' | 'finance:delete'
   // Báo cáo
   | 'reports:view'
   // Đặc biệt
-  | 'pos:access' | 'kitchen:access';
+  | 'pos:access' | 'kitchen:access' | 'kitchen:complete' | 'kitchen:deliver';
 
 export interface Role {
-  id: string;
+  id: number;
   name: string;
   description?: string;
   permissions: Permission[];
@@ -51,7 +44,7 @@ export interface Account {
   id: string;
   username: string;
   fullName: string;
-  roleId: string;
+  roleId: number;
   status: 'active' | 'inactive';
   customPermissions?: Permission[]; // Override role permissions if set
   createdAt: string;

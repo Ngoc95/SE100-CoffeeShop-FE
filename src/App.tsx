@@ -29,6 +29,7 @@ import { WriteOffs } from "./components/pages/WriteOffs";
 import { Accounts } from "./components/pages/Accounts";
 import { POSOrderPanelRestockedDemo } from "./components/POSOrderPanelRestockedDemo";
 import { Toaster } from "./components/ui/sonner";
+import { Combos } from "./components/pages/Combos";
 
 export type PageType =
   | "dashboard"
@@ -36,6 +37,7 @@ export type PageType =
   | "kitchen"
   | "inventory"
   | "product-pricing"
+  | "combos"
   | "stock-check"
   | "import-export"
   | "menu"
@@ -110,6 +112,7 @@ function AppContent() {
       'kitchen': 'kitchen:access',
       'inventory': 'goods_inventory:view',
       'product-pricing': 'goods_pricing:view',
+      'combos': 'combos:view',
       'stock-check': 'goods_stock_check:view',
       'import-export': 'goods_import_export:view',
       'menu': 'goods_recipe:view',
@@ -195,6 +198,8 @@ function AppContent() {
         return <Inventory />;
       case "product-pricing":
         return <ProductPricing />;
+      case "combos":
+        return <Combos />;
       case "stock-check":
         return <StockCheck />;
       case "import-export":

@@ -3,13 +3,13 @@ import { X, Check, Plus, Minus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
-import { Dialog, DialogContent } from "./ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { Separator } from "./ui/separator";
 
 export interface ItemCustomization {
   sugarLevel: string;
   iceLevel: string;
-  toppings: { name: string; price: number; quantity: number }[];
+  toppings: { id: string; name: string; price: number; quantity: number }[];
   note: string;
 }
 
@@ -19,6 +19,8 @@ interface Topping {
   price: number;
 }
 
+// ... imports
+
 interface ItemCustomizationModalProps {
   open: boolean;
   onClose: () => void;
@@ -27,6 +29,7 @@ interface ItemCustomizationModalProps {
   onUpdate: (customization: ItemCustomization) => void;
   initialCustomization?: ItemCustomization;
   availableToppings?: Topping[];
+  isComposite?: boolean; // New prop
 }
 
 export function ItemCustomizationModal({
@@ -37,6 +40,7 @@ export function ItemCustomizationModal({
   onUpdate,
   initialCustomization,
   availableToppings: propToppings,
+  isComposite = true, // Default to true if not specified, or false? Better default false if we want safety, but let's check caller.
 }: ItemCustomizationModalProps) {
   const [sugarLevel, setSugarLevel] = useState(
     initialCustomization?.sugarLevel || "100%"
@@ -45,7 +49,7 @@ export function ItemCustomizationModal({
     initialCustomization?.iceLevel || "100%"
   );
   const [selectedToppings, setSelectedToppings] = useState<
-    { name: string; price: number; quantity: number }[]
+    { id: string; name: string; price: number; quantity: number }[]
   >(initialCustomization?.toppings || []);
   const [note, setNote] = useState(initialCustomization?.note || "");
 
@@ -64,7 +68,7 @@ export function ItemCustomizationModal({
     } else {
       setSelectedToppings([
         ...selectedToppings,
-        { name: topping.name, price: topping.price, quantity: 1 },
+        { id: topping.id, name: topping.name, price: topping.price, quantity: 1 },
       ]);
     }
   };
@@ -96,8 +100,8 @@ export function ItemCustomizationModal({
 
   const handleUpdate = () => {
     onUpdate({
-      sugarLevel,
-      iceLevel,
+      sugarLevel: isComposite ? sugarLevel : "", // Clear sugar if not composite
+      iceLevel: isComposite ? iceLevel : "", // Clear ice if not composite
       toppings: selectedToppings,
       note,
     });
@@ -115,65 +119,65 @@ export function ItemCustomizationModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[460px] p-0 gap-0 overflow-hidden rounded-xl">
+      <DialogContent className="sm:max-w-[460px] p-0 gap-0 overflow-hidden rounded-xl" aria-describedby={undefined}>
         {/* Header */}
-        <div className="px-6 pt-6 pb-4">
-          <div className="flex items-start justify-between mb-2">
-            <div className="flex-1">
-              <h2 className="text-blue-900 text-lg">{itemName}</h2>
-              <p className="text-blue-700 mt-1">
-                {calculateTotalPrice().toLocaleString()}₫
-              </p>
+        <div className="relative p-6 text-black">
+          <div className="pr-8">
+            <DialogTitle className="text-xl font-bold mb-1">{itemName}</DialogTitle>
+            <div className="flex items-center gap-2 text-black text-sm">
+                <Badge variant="secondary" className="bg-white/20 border-0 text-black hover:bg-white/30">{calculateTotalPrice().toLocaleString('vi-VN')} đ</Badge>
+                {initialCustomization?.note && <span className="flex items-center gap-1"><span className="w-1 h-1 bg-white rounded-full"></span>Note: {initialCustomization.note}</span>}
             </div>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Tùy chỉnh món theo yêu cầu khách
-          </p>
         </div>
-
-        <Separator />
-
+        
         {/* Content */}
         <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
-          {/* Sugar Level */}
-          <div className="mb-5">
-            <label className="text-sm text-slate-700 mb-2 block">Đường</label>
-            <div className="flex gap-2 flex-wrap">
-              {sugarOptions.map((option) => (
-                <button
-                  key={option}
-                  onClick={() => setSugarLevel(option)}
-                  className={`px-4 py-2 rounded-full text-sm transition-all border-2 ${
-                    sugarLevel === option
-                      ? "bg-blue-600 border-blue-600 text-white shadow-md"
-                      : "bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50"
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
+          {/* Sugar Level - Only for Composite */}
+          {isComposite && (
+            <div className="mb-5">
+              <label className="text-sm text-slate-700 mb-2 block">Đường</label>
+              <div className="flex gap-2 flex-wrap">
+                {sugarOptions.map((option) => (
+                  <button
+                    key={option}
+                    onClick={() => setSugarLevel(option)}
+                    className={`px-4 py-2 rounded-full text-sm transition-all border-2 ${
+                      sugarLevel === option
+                        ? "bg-blue-600 border-blue-600 text-white shadow-md"
+                        : "bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50"
+                    }`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Ice Level */}
-          <div className="mb-5">
-            <label className="text-sm text-slate-700 mb-2 block">Đá</label>
-            <div className="flex gap-2 flex-wrap">
-              {iceOptions.map((option) => (
-                <button
-                  key={option}
-                  onClick={() => setIceLevel(option)}
-                  className={`px-4 py-2 rounded-full text-sm transition-all border-2 ${
-                    iceLevel === option
-                      ? "bg-blue-600 border-blue-600 text-white shadow-md"
-                      : "bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50"
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
+          {/* Ice Level - Only for Composite */}
+          {isComposite && (
+            <div className="mb-5">
+              <label className="text-sm text-slate-700 mb-2 block">Đá</label>
+              <div className="flex gap-2 flex-wrap">
+                {iceOptions.map((option) => (
+                  <button
+                    key={option}
+                    onClick={() => setIceLevel(option)}
+                    className={`px-4 py-2 rounded-full text-sm transition-all border-2 ${
+                      iceLevel === option
+                        ? "bg-blue-600 border-blue-600 text-white shadow-md"
+                        : "bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50"
+                    }`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Toppings ... */}
 
           {/* Toppings */}
           <div className="mb-5">

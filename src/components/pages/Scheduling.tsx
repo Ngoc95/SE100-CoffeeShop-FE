@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { Settings, Calendar, Clock, Calculator } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
@@ -6,17 +6,10 @@ import { ShiftManagement } from "../scheduling/ShiftManagement";
 import { ScheduleCalendar } from "../scheduling/ScheduleCalendar";
 import { TimekeepingBoard } from "../scheduling/TimekeepingBoard";
 import { PayrollBoard } from "../scheduling/PayrollBoard";
-import { initialSchedule } from "../../data/staffData";
-
-interface Shift {
-  id: string;
-  name: string;
-  startTime: string;
-  endTime: string;
-  checkInTime?: string;
-  checkOutTime?: string;
-  active?: boolean;
-}
+import shiftApi from "../../api/shiftApi";
+import staffApi from "../../api/staffApi";
+import { Shift } from "../../types/hr";
+import { toast } from "sonner"; // Assuming toast usage
 
 export function Scheduling() {
   const { hasPermission } = useAuth();
@@ -30,40 +23,57 @@ export function Scheduling() {
     if (canViewPayroll) return "payroll";
     return "shifts";
   });
-  const [schedule, setSchedule] =
-    useState<Record<string, Record<string, string[]>>>(initialSchedule);
-  const [timekeepingData, setTimekeepingData] = useState<
-    Record<string, Record<string, Record<string, any>>>
-  >({});
-  const [shifts, setShifts] = useState<Shift[]>([
-    {
-      id: "1",
-      name: "Ca sáng",
-      startTime: "07:00",
-      endTime: "11:00",
-      checkInTime: "06:00",
-      checkOutTime: "12:00",
-      active: true,
-    },
-    {
-      id: "2",
-      name: "Ca chiều",
-      startTime: "14:00",
-      endTime: "18:00",
-      checkInTime: "13:00",
-      checkOutTime: "19:00",
-      active: true,
-    },
-    {
-      id: "3",
-      name: "Ca tối",
-      startTime: "18:00",
-      endTime: "22:00",
-      checkInTime: "17:00",
-      checkOutTime: "23:00",
-      active: true,
-    },
-  ]);
+
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch shifts & staff
+  const fetchShifts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await shiftApi.getAll(); // Fetch all shifts
+      const responseData = res.data as any;
+      const data = Array.isArray(responseData) ? responseData : (responseData.data || responseData.metaData || []);
+      setShifts(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to fetch shifts", error);
+      toast.error("Không thể tải danh sách ca làm việc");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const [staffList, setStaffList] = useState<any[]>([]); // Use 'any' temporarily or import Staff type
+
+  const fetchStaff = useCallback(async () => {
+    try {
+      const res = await staffApi.getAll({ limit: 100, status: 'active' });
+      const responseData = res.data as any;
+      const staffArray = responseData.staffs || responseData.metaData?.staffs || responseData.data?.staffs || [];
+      setStaffList(Array.isArray(staffArray) ? staffArray : []);
+    } catch (error) {
+      console.error("Failed to fetch staff", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (canViewScheduling || canViewTimekeeping) {
+        fetchShifts();
+        fetchStaff();
+    }
+  }, [canViewScheduling, canViewTimekeeping, fetchShifts, fetchStaff]);
+
+  useEffect(() => {
+    if (canViewScheduling || canViewTimekeeping) {
+        fetchShifts();
+    }
+  }, [canViewScheduling, canViewTimekeeping, fetchShifts]);
+
+  // Pass fetchShifts to ShiftManagement so it can refresh list after changes
+  const handleRefreshShifts = () => {
+      fetchShifts();
+  };
+
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
@@ -106,38 +116,26 @@ export function Scheduling() {
 
         {canViewScheduling && (
         <TabsContent value="shifts" className="mt-6">
-          <ShiftManagement shifts={shifts} setShifts={setShifts} />
+          <ShiftManagement shifts={shifts} onRefresh={handleRefreshShifts} />
         </TabsContent>
         )}
 
+        {/* Placeholder for other tabs - they will need updates too */}
         {canViewScheduling && (
         <TabsContent value="schedule" className="mt-6">
-          <ScheduleCalendar
-            shifts={shifts}
-            schedule={schedule}
-            setSchedule={setSchedule}
-          />
+          <ScheduleCalendar shifts={shifts} staffList={staffList} />
         </TabsContent>
         )}
 
         {canViewTimekeeping && (
         <TabsContent value="timekeeping" className="mt-6">
-          <TimekeepingBoard
-            shifts={shifts}
-            schedule={schedule}
-            setSchedule={setSchedule}
-            value={timekeepingData}
-            onChange={setTimekeepingData}
-          />
+           <TimekeepingBoard shifts={shifts} staffList={staffList} />
         </TabsContent>
         )}
 
         {canViewPayroll && (
         <TabsContent value="payroll" className="mt-6">
-          <PayrollBoard
-            shifts={shifts}
-            timekeepingData={timekeepingData}
-          />
+           <PayrollBoard shifts={shifts} staffList={staffList} />
         </TabsContent>
         )}
       </Tabs>

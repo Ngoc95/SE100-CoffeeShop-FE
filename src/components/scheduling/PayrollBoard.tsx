@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { Calculator, ChevronDown, ChevronUp, Plus, X, FileSpreadsheet, RefreshCw } from "lucide-react";
+import React, { useMemo, useState, useEffect } from "react";
+import { Calculator, ChevronDown, ChevronUp, Plus, X, FileSpreadsheet, RefreshCw, Download } from "lucide-react";
 import { PayrollDetailModal } from "./PayrollDetailModal";
 import { SalaryBreakdownModal } from "./SalaryBreakdownModal";
 import { calculateStaffOvertime } from "./payrollHelpers";
@@ -41,44 +41,26 @@ import {
 } from "../ui/select";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-import { staffMembers, initialSchedule, StaffMember } from "../../data/staffData";
 import { useAuth } from "../../contexts/AuthContext";
 import type { TimekeepingEntry } from "./TimekeepingBoard";
+import payrollApi from "../../api/payrollApi";
+import timekeepingApi from "../../api/timekeepingApi";
+import { Payroll, Payslip, CreatePayrollDto, PayrollPayment } from "../../types/payroll";
+import { toast } from 'sonner';
+import { Shift } from "../../types/hr";
 
-interface PayrollDetail {
-  staffId: string;
-  staffName: string;
-  totalAmount: number; // Lương cơ bản (theo ca hoặc cố định)
-  overtimeAmount: number; // Tiền làm thêm
-  bonus: number; // Thưởng
-  penalty: number; // Phạt
-  finalAmount: number; // Tổng lương = totalAmount + overtimeAmount + bonus - penalty
-  paidAmount: number; // Đã trả
-  remainingAmount: number; // Còn lại = finalAmount - paidAmount
-}
-
-interface PayrollPayment {
-  id: string;
-  date: string;
-  staffName: string;
-  amount: number;
-  note?: string;
-  method: "cash" | "transfer";
-  bankAccount?: string;
-  bankName?: string;
-}
-
-interface PayrollItem {
-  id: string;
-  name: string;
-  periodType: "monthly" | "custom";
+// Helper types for UI
+interface PayrollUI extends Payroll {
   workRange: string;
-  totalAmount: number;
-  paidAmount: number;
-  status: "draft" | "closed";
-  createdAt: string;
-  details: PayrollDetail[];
-  payments?: PayrollPayment[];
+  payslips: PayslipUI[];
+  payments: PayrollPayment[];
+}
+
+interface PayslipUI extends Payslip {
+  overtimeAmount: number;
+  staffName: string;
+  finalAmount: number;
+  remainingAmount: number;
 }
 
 interface MonthlyOption {
@@ -102,6 +84,11 @@ const formatDateDMY = (date: Date) => {
 };
 
 const formatDateStringDMY = (value: string) => {
+  if (!value) return "";
+  if (value.includes("T")) {
+    const date = new Date(value);
+    return formatDateDMY(date);
+  }
   const [year, month, day] = value.split("-");
   if (!year || !month || !day) return value;
   return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`;
@@ -177,7 +164,7 @@ const getDayTypeFromDate = (date: Date): DayType => {
 const calculateEntryAmount = (
   entry: TimekeepingEntry,
   staff: StaffMember,
-  shifts: { id: string; startTime: string; endTime: string }[]
+  shifts: Shift[]
 ) => {
   if (entry.status === "missing" || entry.status === "not-checked") {
     return 0;
@@ -192,7 +179,7 @@ const calculateEntryAmount = (
   // Lương theo ca (shift-based)
   if (salarySettings.salaryType === "shift") {
     const shiftSetting =
-      salarySettings.shifts.find((sh) => sh.id === entry.shiftId) ||
+      salarySettings.shifts.find((sh: any) => sh.id.toString() === entry.shiftId.toString()) ||
       salarySettings.shifts[0];
 
     const basePerShift = parseCurrency(shiftSetting?.salaryPerShift);
@@ -235,7 +222,7 @@ const calculateEntryAmount = (
 const calculateStaffPayroll = (
   staff: StaffMember,
   timekeepingData: TimekeepingData | undefined,
-  shifts: { id: string; startTime: string; endTime: string }[],
+  shifts: Shift[],
   periodStart: Date,
   periodEnd: Date
 ) => {
@@ -278,37 +265,166 @@ const calculateStaffPayroll = (
 
 interface PayrollBoardProps {
   timekeepingData?: TimekeepingData;
-  shifts: { id: string; startTime: string; endTime: string }[];
+  shifts: Shift[];
+  staffList?: any[];
 }
 
-export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
-  const [payrolls, setPayrolls] = useState<PayrollItem[]>(() => {
-    if (typeof window === "undefined") return [];
+export function PayrollBoard({ timekeepingData, shifts, staffList }: PayrollBoardProps) {
+  const [payrolls, setPayrolls] = useState<PayrollUI[]>([]);
+  
+  // State for creation ONLY
+  const monthlyOptions = useMemo(buildMonthlyOptions, []);
+  const [createMonth, setCreateMonth] = useState(
+    monthlyOptions[Math.max(monthlyOptions.length - 3, 0)]?.value || monthlyOptions[0]?.value
+  );
+
+  const [fetchedTimekeeping, setFetchedTimekeeping] = useState<TimekeepingData | undefined>(undefined);
+
+  const fetchTimekeepingForBreakdown = async (startDate: string, endDate: string) => {
     try {
-      const stored = window.localStorage.getItem("payrollBoard.payrolls");
-      if (!stored) return [];
-      const parsed = JSON.parse(stored) as PayrollItem[];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
+        console.log("Fetching timekeeping for breakdown:", startDate, endDate);
+        // Ensure dates are ISO format for API
+        const sDate = new Date(startDate).toISOString();
+        const eDate = new Date(endDate).toISOString();
+
+        const res = await timekeepingApi.getAll({
+            from: sDate,
+            to: eDate
+        });
+        const entries = (res.data as any).metaData || res.data;
+        if (Array.isArray(entries)) {
+             // Convert to TimekeepingData structure
+             const newData: TimekeepingData = {};
+             entries.forEach((entry: any) => {
+                 // API might return date string, ensure we key it correctly matching SalaryBreakdownModal expectation
+                 // SalaryBreakdownModal expects keys to be ISO strings usually, or whatever is in the loop. 
+                 // It matches `dateStr < fromStr` ... using `date.split("T")[0]`
+                 
+                 const dateKey = entry.date; // Should be ISO string from backend
+                 const shiftId = entry.shiftId.toString();
+                 const staffId = entry.staffId.toString();
+                 
+                 if (!newData[dateKey]) newData[dateKey] = {};
+                 if (!newData[dateKey][shiftId]) newData[dateKey][shiftId] = {};
+                 
+                 newData[dateKey][shiftId][staffId] = {
+                     id: entry.id,
+                     staffId: staffId,
+                     shiftId: shiftId,
+                     date: entry.date,
+                     checkIn: entry.checkIn,
+                     checkOut: entry.checkOut,
+                     status: entry.status,
+                     note: entry.note
+                 } as any;
+             });
+             console.log("Fetched Timekeeping Data:", newData);
+             setFetchedTimekeeping(newData);
+        } else {
+            console.warn("API response is not an array:", entries);
+        }
+    } catch (err) {
+        console.error("Error fetching timekeeping for breakdown", err);
+        toast.error("Không thể tải dữ liệu chấm công chi tiết");
     }
-  });
-  const [expandedPayrollId, setExpandedPayrollId] = useState<string | null>(
-    null
-  );
+  };
+
+  const staffArray = useMemo(() => {
+    return (staffList || [])
+      .filter((s: any) => s.position !== "manager")
+      .map((s: any) => {
+          // Adapt backend salarySetting to frontend salarySettings
+          const backendSetting = s.salarySetting;
+          let salarySettings = undefined;
+          
+          if (backendSetting) {
+              const isFixed = backendSetting.salaryType === 'monthly';
+              salarySettings = {
+                  salaryType: isFixed ? 'fixed' : 'shift',
+                  salaryAmount: backendSetting.baseRate?.toString() || '0',
+                  shifts: shifts.map(shift => ({
+                      id: shift.id,
+                      name: shift.name,
+                      salaryPerShift: backendSetting.baseRate?.toString() || '0',
+                      saturdayCoeff: '1',
+                      sundayCoeff: '1',
+                      dayOffCoeff: '1',
+                      holidayCoeff: '1'
+                  }))
+              };
+          }
+
+          return {
+            id: s.id.toString(),
+            fullName: s.fullName,
+            salarySettings: salarySettings,
+            position: s.position,
+            staffCode: s.staffCode
+          };
+      });
+  }, [staffList, shifts]);
+  
+  // Fetch Payrolls on mount (all)
+  useEffect(() => {
+    fetchPayrolls();
+  }, []);
+
+  const fetchPayrolls = async () => {
+    try {
+      const res = await payrollApi.getAll({});
+      const mapped: PayrollUI[] = (res.data as any).metaData.map((p: any) => {
+        const payslips: PayslipUI[] = (p.payslips || []).map((ps: Payslip) => ({
+            ...ps,
+            staffName: ps.staff?.fullName || `Staff ${ps.staffId}`,
+            finalAmount: Number(ps.totalSalary),
+            paidAmount: Number(ps.paidAmount || 0),
+            remainingAmount: Number(ps.totalSalary) - Number(ps.paidAmount)
+        }));
+
+        return {
+            id: p.id,
+            code: p.code || `BL${p.id}`,
+            name: p.name || `Bảng lương ${p.month}/${p.year}`,
+            periodType: 'monthly',
+            periodStart: p.periodStart || new Date().toISOString(),
+            periodEnd: p.periodEnd || new Date().toISOString(),
+            workRange: p.periodStart ? `${formatDateStringDMY(p.periodStart)} - ${formatDateStringDMY(p.periodEnd)}` : '',
+            totalAmount: Number(p.totalAmount),
+            paidAmount: Number(p.paidAmount || 0),
+            status: (p.status === 'finalized' || p.status === 'closed' || p.status === 'CLOSED') ? 'finalized' : 'draft',
+            createdAt: p.createdAt,
+            payslips,
+            payments: payslips.flatMap(ps => (ps.payments || []).map((pm: any) => ({
+                ...pm,
+                staffName: ps.staffName, // Mapped in payslips
+                amount: Number(pm.amount),
+                payslipId: ps.id,
+                financeTransaction: pm.financeTransaction
+            }))).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        };
+      });
+
+      setPayrolls(mapped);
+    } catch (error) {
+       console.error("Fetch payrolls error", error);
+       toast.error("Không thể tải bảng lương");
+    }
+  };
+
+
+
+  const [expandedPayrollId, setExpandedPayrollId] = useState<number | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [paymentPayrollId, setPaymentPayrollId] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer">(
-    "cash"
-  );
+  const [paymentPayrollId, setPaymentPayrollId] = useState<number | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer">("cash");
   const [paymentNote, setPaymentNote] = useState("");
   const [paymentDate, setPaymentDate] = useState(
-    new Date().toISOString().slice(0, 16)
+    new Date().toISOString().slice(0, 10)
   );
   const [paymentBankAccount, setPaymentBankAccount] = useState("");
   const [paymentBankName, setPaymentBankName] = useState("");
   const [selectedPaymentStaffIds, setSelectedPaymentStaffIds] = useState<
-    string[]
+    number[]
   >([]);
 
   const { hasPermission } = useAuth();
@@ -316,32 +432,70 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
   const canCreate = hasPermission('staff_payroll:create');
   const canUpdate = hasPermission('staff_payroll:update');
   const canDelete = hasPermission('staff_payroll:delete');
-  const canPayment = hasPermission('staff_payroll:payment');
+  const canPayment = hasPermission('staff_payroll:update'); 
 
-  if (!canView) return null; // Or render "Access Denied"
+  if (!canView) return null; 
 
-  // Use string to support formatted input (comma separated)
-  const [paymentAmounts, setPaymentAmounts] = useState<Record<string, string>>({});
+  const [paymentAmounts, setPaymentAmounts] = useState<Record<number, string>>({});
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [periodType, setPeriodType] = useState<"monthly" | "custom">("monthly");
-  const monthlyOptions = useMemo(buildMonthlyOptions, []);
-  const [selectedMonth, setSelectedMonth] = useState(
-    monthlyOptions[Math.max(monthlyOptions.length - 3, 0)]?.value ||
-      monthlyOptions[0]?.value
-  );
+
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   
-  // New states for detail modal
   const [detailModalOpen, setDetailModalOpen] = useState(false);
-  const [selectedPayrollId, setSelectedPayrollId] = useState<string | null>(null);
-  const [deleteData, setDeleteData] = useState<{ id: string } | null>(null);
+  const [selectedPayrollId, setSelectedPayrollId] = useState<number | null>(null);
+  const [deleteData, setDeleteData] = useState<{ id: number } | null>(null);
 
   // New states for salary breakdown modal
   const [breakdownStaffId, setBreakdownStaffId] = useState<string | null>(null);
   const [breakdownModalOpen, setBreakdownModalOpen] = useState(false);
 
-  const persistPayrolls = (items: PayrollItem[]) => {
+  /* State definitions end */
+
+  /* Helper functions using state */
+  const fetchPayrollDetails = async (id: number) => {
+    try {
+        const res = await payrollApi.getPayslips(id);
+        const payslipsData = (res.data as any).metaData || [];
+        const payslips: PayslipUI[] = payslipsData.map((ps: Payslip) => ({
+            ...ps,
+            staffName: ps.staff?.fullName || `Staff ${ps.staffId}`,
+            finalAmount: Number(ps.totalSalary),
+            remainingAmount: Number(ps.totalSalary) - Number(ps.paidAmount)
+        }));
+        
+        setPayrolls(prev => prev.map(item => {
+            if (item.id === id) {
+                 const payments = payslips.flatMap(ps => (ps.payments || []).map((pm: any) => ({
+                    ...pm,
+                    staffName: ps.staffName,
+                    amount: Number(pm.amount),
+                    payslipId: ps.id,
+                    financeTransaction: pm.financeTransaction
+                 }))).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+                 return { ...item, payslips, payments };
+            }
+            return item;
+        }));
+    } catch (err) {
+        console.log(err);
+        toast.error("Lỗi tải chi tiết");
+    }
+  };
+
+  // Restore details if expandedPayrollId exists but details are missing (e.g. after reload)
+  useEffect(() => {
+    if (expandedPayrollId) {
+        const p = payrolls.find(item => item.id === expandedPayrollId);
+        if (p && p.payslips.length === 0) {
+            fetchPayrollDetails(expandedPayrollId);
+        }
+    }
+  }, [expandedPayrollId, payrolls]);
+
+  const persistPayrolls = (items: PayrollUI[]) => {
     setPayrolls(items);
     if (typeof window !== "undefined") {
       try {
@@ -355,7 +509,7 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
 
   const getWorkRange = () => {
     if (periodType === "monthly") {
-      const found = monthlyOptions.find((m) => m.value === selectedMonth);
+      const found = monthlyOptions.find((m) => m.value === createMonth);
       return found?.range || "";
     }
     if (customFrom && customTo) {
@@ -366,189 +520,92 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
     return "";
   };
 
-  const handleCreatePayroll = () => {
-    const workRange = getWorkRange();
-    if (!workRange) return;
-
-    const now = new Date();
-
-    let periodStart: Date;
-    let periodEnd: Date;
-
-    if (periodType === "monthly") {
-      const found = monthlyOptions.find((m) => m.value === selectedMonth);
-      if (!found) return;
-      periodStart = new Date(found.startDate);
-      periodEnd = new Date(found.endDate);
-    } else {
-      if (!customFrom || !customTo) return;
-      periodStart = new Date(customFrom);
-      periodEnd = new Date(customTo);
+  const handleCreatePayroll = async () => {
+    // Only supports monthly for now as per API DTO
+    if (periodType !== 'monthly') {
+        toast.error("Hiện tại chỉ hỗ trợ bảng lương theo tháng");
+        return;
     }
+    
+    const [year, month] = createMonth.split('-').map(Number); // value is "2023-10"
 
-    const details: PayrollDetail[] = staffMembers
-      .filter((s) => s.position !== "manager")
-      .slice(0, 4)
-      .map((s) => {
-        const totalAmount = Math.round(
-          calculateStaffPayroll(
-            s,
-            timekeepingData,
-            shifts,
-            periodStart,
-            periodEnd
-          )
-        );
-        
-        const overtimeAmount = Math.round(
-          calculateStaffOvertime(s, timekeepingData, shifts, periodStart, periodEnd)
-        );
-
-        const bonus = 0;
-        const penalty = 0;
-        const finalAmount = totalAmount + overtimeAmount + bonus - penalty;
-        const paidAmount = 0;
-        const remainingAmount = finalAmount - paidAmount;
-        
-        return {
-          staffId: s.id,
-          staffName: s.fullName,
-          totalAmount,
-          overtimeAmount,
-          bonus,
-          penalty,
-          finalAmount,
-          paidAmount,
-          remainingAmount,
-        };
-      });
-
-    const totalAmount = details.reduce((sum, d) => sum + d.finalAmount, 0);
-
-    const id = `BL${(payrolls.length + 1).toString().padStart(6, "0")}`;
-
-    const name =
-      periodType === "monthly"
-        ? (() => {
-            const found = monthlyOptions.find((m) => m.value === selectedMonth);
-            return found ? `Bảng lương ${found.label.toLowerCase()}` : id;
-          })()
-        : "Bảng lương tùy chọn";
-
-    const payload: PayrollItem = {
-      id,
-      name,
-      periodType,
-      workRange,
-      totalAmount,
-      paidAmount: 0,
-      status: "draft",
-      createdAt: now.toLocaleString(),
-      details,
-    };
-
-    persistPayrolls([...payrolls, payload]);
-    setCreateDialogOpen(false);
+    try {
+        await payrollApi.create({ month, year });
+        toast.success("Đã tạo bảng lương thành công");
+        setCreateDialogOpen(false);
+        fetchPayrolls();
+    } catch (error: any) {
+        const msg = error.response?.data?.message || error.message || "Lỗi không xác định";
+        toast.error("Lỗi khi tạo bảng lương: " + msg);
+        console.error(error);
+    }
   };
 
   const workRangeText = getWorkRange();
 
-  const handleReloadPayroll = (payrollId: string) => {
-    const payroll = payrolls.find((p) => p.id === payrollId);
-    if (!payroll) return;
-
-    const parts = payroll.workRange.split(" - ");
-    if (parts.length !== 2) return;
-
-    const start = parseDMYToDate(parts[0]);
-    const end = parseDMYToDate(parts[1]);
-
-    if (!start || !end) return;
-
-    const existingDetailsMap = new Map(payroll.details.map((d) => [d.staffId, d]));
-
-    const newDetails: PayrollDetail[] = staffMembers
-      .filter((s) => s.position !== "manager")
-      .slice(0, 4)
-      .map((s) => {
-        const totalAmount = Math.round(
-          calculateStaffPayroll(s, timekeepingData, shifts, start, end)
-        );
-        const overtimeAmount = Math.round(
-          calculateStaffOvertime(s, timekeepingData, shifts, start, end)
-        );
-
-        const existing = existingDetailsMap.get(s.id);
-        const bonus = existing ? existing.bonus : 0;
-        const penalty = existing ? existing.penalty : 0;
-        const paidAmount = existing ? existing.paidAmount : 0;
-
-        const finalAmount = totalAmount + overtimeAmount + bonus - penalty;
-        const remainingAmount = finalAmount - paidAmount;
-
-        return {
-          staffId: s.id,
-          staffName: s.fullName,
-          totalAmount,
-          overtimeAmount,
-          bonus,
-          penalty,
-          finalAmount,
-          paidAmount,
-          remainingAmount,
-        };
-      });
-
-    const newTotalAmount = newDetails.reduce((sum, d) => sum + d.finalAmount, 0);
-
-    const updatedPayrolls = payrolls.map((p) => {
-      if (p.id === payrollId) {
-        return { ...p, details: newDetails, totalAmount: newTotalAmount };
-      }
-      return p;
-    });
-
-    persistPayrolls(updatedPayrolls);
-  };
-
-  const handleUpdateDetails = (payrollId: string, updatedDetails: PayrollDetail[]) => {
-    const newTotalAmount = updatedDetails.reduce((sum, d) => sum + d.finalAmount, 0);
-    
-    const updatedPayrolls = payrolls.map(p => {
-      if (p.id === payrollId) {
-        return {
-          ...p,
-          details: updatedDetails,
-          totalAmount: newTotalAmount
-        };
-      }
-      return p;
-    });
-    
-    persistPayrolls(updatedPayrolls);
-  };
-
-  const handleFinalizePayroll = (payrollId: string) => {
-     const updatedPayrolls = payrolls.map(p => {
-      if (p.id === payrollId) {
-        return {
-          ...p,
-          status: "closed" as const
-        };
-      }
-      return p;
-    });
-    persistPayrolls(updatedPayrolls);
-  };
-
-  const handleDeletePayroll = () => {
-    if (!deleteData) return;
-    const next = payrolls.filter((item) => item.id !== deleteData.id);
-    persistPayrolls(next);
-    if (expandedPayrollId === deleteData.id) {
-      setExpandedPayrollId(null);
+  const handleReloadPayroll = async (payrollId: number) => {
+    try {
+        await payrollApi.reload(payrollId);
+        toast.success("Đã tải lại bảng lương");
+        fetchPayrolls();
+    } catch (err: any) {
+        toast.error(err.response?.data?.message || "Lỗi tải lại");
     }
-    setDeleteData(null);
+  };
+
+  const handleDeletePayroll = async () => {
+    if (!deleteData) return;
+    try {
+        await payrollApi.delete(deleteData.id);
+        toast.success("Đã xóa bảng lương");
+        setDeleteData(null);
+        fetchPayrolls();
+    } catch (err: any) {
+        toast.error(err.response?.data?.message || "Lỗi xóa bảng lương");
+    }
+  };
+
+  const handleExport = async (payrollId: number) => {
+      try {
+          const response = await payrollApi.export(payrollId);
+          const date = new Date();
+          const url = window.URL.createObjectURL(new Blob([response.data]));
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', `Bang_luong_${payrollId}_${date.getTime()}.xlsx`);
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          toast.success("Xuất file thành công");
+      } catch (error) {
+          toast.error("Lỗi xuất file");
+      }
+  };
+
+  const handleUpdateDetails = async (payrollId: number, updatedDetails: { staffId: string; bonus: number; penalty: number }[]) => {
+      try {
+          const promises = updatedDetails.map(d => 
+              payrollApi.updatePayslip(payrollId, Number(d.staffId), {
+                  bonus: d.bonus,
+                  penalty: d.penalty
+              })
+          );
+          await Promise.all(promises);
+          toast.success("Đã cập nhật chi tiết");
+          fetchPayrolls();
+      } catch (err) {
+          toast.error("Lỗi cập nhật");
+      }
+  };
+
+  const handleFinalizePayroll = async (payrollId: number) => {
+     try {
+         await payrollApi.finalize(payrollId);
+         toast.success("Đã chốt bảng lương");
+         fetchPayrolls();
+     } catch (err) {
+         toast.error("Lỗi khi chốt bảng lương");
+     }
   };
 
   const selectedPayroll = payrolls.find(p => p.id === selectedPayrollId);
@@ -560,15 +617,18 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
           <Calculator className="w-4 h-4" />
           Danh sách bảng lương
         </CardTitle>
-        {canCreate && (
-          <Button
-            className="bg-blue-600 hover:bg-blue-700"
-            onClick={() => setCreateDialogOpen(true)}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Bảng tính lương
-          </Button>
-        )}
+        <div className="flex items-center gap-4">
+
+          {canCreate && (
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => setCreateDialogOpen(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Bảng tính lương
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
@@ -604,10 +664,18 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
                   <React.Fragment key={p.id}>
                     <TableRow
                       className="cursor-pointer hover:bg-blue-50/60"
-                      onClick={() =>
-                        setExpandedPayrollId(
-                          expandedPayrollId === p.id ? null : p.id
-                        )
+                      onClick={async () => {
+                         if (expandedPayrollId === p.id) {
+                            setExpandedPayrollId(null);
+                         } else {
+                            // Optimistically expand, effect will load data if missing
+                            setExpandedPayrollId(p.id);
+                         // Also trigger load immediately if we know it's missing (optimization)
+                            if (p.payslips.length === 0) {
+                                await fetchPayrollDetails(p.id);
+                            }
+                         }
+                      }
                       }
                     >
                       <TableCell className="text-sm font-medium text-slate-900">
@@ -628,7 +696,7 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
                               <ChevronDown className="w-4 h-4" />
                             )}
                           </button>
-                          {p.id}
+                          {p.code}
                         </div>
                       </TableCell>
                       <TableCell className="text-sm text-slate-900">
@@ -675,7 +743,7 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
                                     Mã bảng lương
                                   </div>
                                   <div className="font-medium text-slate-900">
-                                    {p.id}
+                                    {p.code}
                                   </div>
                                 </div>
                                 <div className="space-y-1">
@@ -722,56 +790,15 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
                                 </div>
                               </div>
                               <div className="mt-4 flex justify-end gap-2">
+                                
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   className="border-slate-300 text-slate-700 hover:bg-slate-50 ml-auto"
-                                  onClick={() => {
-                                    const header = [
-                                      "Mã nhân viên",
-                                      "Tên nhân viên",
-                                      "Tổng lương",
-                                      "Đã thanh toán",
-                                      "Còn lại",
-                                    ];
-                                    const rows = p.details.map((d) => {
-                                      const remaining = (d.finalAmount || d.totalAmount || 0) - (d.paidAmount || 0);
-                                      return [
-                                        d.staffId,
-                                        d.staffName,
-                                        d.finalAmount || d.totalAmount || 0,
-                                        d.paidAmount || 0,
-                                        remaining,
-                                      ];
-                                    });
-                                    const csv = [header, ...rows]
-                                      .map((row) =>
-                                        row
-                                          .map((value) =>
-                                            `"${String(value).replace(
-                                              /"/g,
-                                              '""'
-                                            )}"`
-                                          )
-                                          .join(",")
-                                      )
-                                      .join("\n");
-                                    const blob = new Blob([csv], {
-                                      type: "text/csv;charset=utf-8;",
-                                    });
-                                    const url = URL.createObjectURL(blob);
-                                    const link =
-                                      document.createElement("a");
-                                    link.href = url;
-                                    link.download = `${p.id}.csv`;
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                    URL.revokeObjectURL(url);
-                                  }}
+                                  onClick={() => handleExport(p.id)}
                                 >
-                                  <FileSpreadsheet className="w-4 h-4 mr-1" />
-                                  Xuất file
+                                  <Download className="w-4 h-4 mr-2" />
+                                  Xuất Excel
                                 </Button>
                                 {canDelete && (
                                   <Button
@@ -820,17 +847,16 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
                                       disabled={!canPayment}
                                       onClick={() => {
                                         setPaymentPayrollId(p.id);
-                                        setSelectedPaymentStaffIds(
-                                          p.details
-                                            .filter(
-                                              (d) =>
-                                                (d.finalAmount || d.totalAmount || 0) > (d.paidAmount || 0)
-                                            )
-                                            .map((d) => d.staffId)
+                                        const eligiblePayslips = p.payslips.filter(
+                                            (d) => (d.finalAmount || d.totalAmount || 0) > (d.paidAmount || 0)
                                         );
+                                        setSelectedPaymentStaffIds(
+                                          eligiblePayslips.map((d) => d.staffId) // d.staffId is number now
+                                        );
+                                         // ... logic update needed for setPaymentAmounts keys if number ...
                                         setPaymentDialogOpen(true);
                                         const initialAmounts: Record<string, string> = {};
-                                        p.details.forEach(d => {
+                                        p.payslips.forEach(d => {
                                            const final = d.finalAmount || d.totalAmount || 0;
                                            const paid = d.paidAmount || 0;
                                            const remaining = Math.max(0, final - paid);
@@ -867,14 +893,14 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                      {p.details.map((d) => {
+                                      {p.payslips.map((d) => {
                                         const final = d.finalAmount || d.totalAmount || 0;
                                         const paid = d.paidAmount || 0;
                                         const remaining = final - paid;
                                         return (
                                           <tr key={d.staffId}>
                                             <td className="px-4 py-3 text-sm text-slate-500">
-                                              {p.id}-{d.staffId}
+                                              {d.code}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-slate-900">
                                               <div className="font-medium">{d.staffName}</div>
@@ -903,6 +929,9 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
                                     <thead className="bg-slate-100">
                                       <tr>
                                         <th className="px-4 py-2 text-left text-xs text-slate-600">
+                                          Mã phiếu
+                                        </th>
+                                        <th className="px-4 py-2 text-left text-xs text-slate-600">
                                           Ngày
                                         </th>
                                         <th className="px-4 py-2 text-left text-xs text-slate-600">
@@ -922,24 +951,27 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
                                     <tbody className="divide-y divide-slate-100">
                                       {p.payments.map((pm) => (
                                         <tr key={pm.id}>
+                                          <td className="px-4 py-2 text-sm font-medium text-blue-600">
+                                            {pm.financeTransaction?.code || "---"}
+                                          </td>
                                           <td className="px-4 py-2 text-sm text-slate-900">
                                             {formatDateStringDMY(
-                                              pm.date.split("T")[0]
+                                              pm.createdAt.split("T")[0]
                                             )}
                                           </td>
                                           <td className="px-4 py-2 text-sm text-slate-900">
-                                            {pm.staffName}
+                                            {(pm as any).staffName}
                                           </td>
                                           <td className="px-4 py-2 text-sm text-slate-700">
                                             {pm.method === "cash"
                                               ? "Tiền mặt"
                                               : "Chuyển khoản"}
                                           </td>
-                                          <td className="px-4 py-2 text-sm text-right text-slate-900 font-medium">
+                                          <td className="px-4 py-2 text-sm text-right font-medium text-slate-900">
                                             {pm.amount.toLocaleString()}₫
                                           </td>
                                           <td className="px-4 py-2 text-sm text-slate-500 pl-4">
-                                            {pm.note || "-"}
+                                            {pm.note}
                                           </td>
                                         </tr>
                                       ))}
@@ -971,58 +1003,20 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Loại kỳ lương</Label>
-              <RadioGroup
-                value={periodType}
-                onValueChange={(v: string) => setPeriodType(v as "monthly" | "custom")}
-                className="flex gap-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="monthly" id="monthly" />
-                  <Label htmlFor="monthly">Theo tháng</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="custom" id="custom" />
-                  <Label htmlFor="custom">Tùy chọn</Label>
-                </div>
-              </RadioGroup>
+              <Label>Chọn tháng</Label>
+              <Select value={createMonth} onValueChange={setCreateMonth}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthlyOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label} ({opt.range})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            {periodType === "monthly" ? (
-              <div className="space-y-2">
-                <Label>Chọn tháng</Label>
-                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {monthlyOptions.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label} ({opt.range})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Từ ngày</Label>
-                  <Input
-                    type="date"
-                    value={customFrom}
-                    onChange={(e) => setCustomFrom(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Đến ngày</Label>
-                  <Input
-                    type="date"
-                    value={customTo}
-                    onChange={(e) => setCustomTo(e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
             <div className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">
               <span className="font-medium">Kỳ làm việc: </span>
               {workRangeText}
@@ -1055,7 +1049,7 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
             <div className="space-y-2">
               <Label>Ngày thanh toán</Label>
               <Input
-                type="datetime-local"
+                type="date"
                 value={paymentDate}
                 onChange={(e) => setPaymentDate(e.target.value)}
               />
@@ -1123,7 +1117,7 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
                         const currentPayroll = payrolls.find(p => p.id === paymentPayrollId);
                         if (!currentPayroll) return null;
                         
-                        return currentPayroll.details
+                        return currentPayroll.payslips
                           .filter(d => (d.finalAmount || d.totalAmount || 0) - (d.paidAmount || 0) > 0)
                           .map(d => {
                             const final = d.finalAmount || d.totalAmount || 0;
@@ -1190,64 +1184,37 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
             </Button>
             <Button
               className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
+              onClick={async () => {
                 if (!paymentPayrollId) return;
 
-                const currentPayroll = payrolls.find(p => p.id === paymentPayrollId);
-                if (!currentPayroll) return;
+                try {
+                    for (const staffId of selectedPaymentStaffIds) {
+                        const amountStr = paymentAmounts[staffId] || "0";
+                        const amount = Number(amountStr.replace(/,/g, ''));
+                        // Skip zero amounts if desired, or let backend handle
+                        if (amount <= 0) continue;
 
-                const newPayments: PayrollPayment[] = selectedPaymentStaffIds.map(
-                  (staffId) => {
-                      const detail = currentPayroll.details.find(d => d.staffId === staffId);
-                      const amountStr = paymentAmounts[staffId] || "0";
-                      const amount = Number(amountStr.replace(/,/g, ''));
-  
-                      return {
-                        id: `PAY${Date.now()}${staffId}`,
-                        date: paymentDate,
-                        staffName: detail?.staffName || "",
-                        amount,
-                        note: paymentNote,
-                        method: paymentMethod,
-                        bankAccount: paymentBankAccount,
-                        bankName: paymentBankName,
-                      };
+                        await payrollApi.addPayment(paymentPayrollId, {
+                            staffId,
+                            amount,
+                            method: paymentMethod,
+                            note: paymentNote,
+                            bankAccount: paymentBankAccount,
+                            bankName: paymentBankName
+                        });
                     }
-                  );
-  
-                  const updatedDetails = currentPayroll.details.map((d) => {
-                    if (selectedPaymentStaffIds.includes(d.staffId)) {
-                      const amountStr = paymentAmounts[d.staffId] || "0";
-                      const amount = Number(amountStr.replace(/,/g, ''));
-                      
-                      const paid = d.paidAmount || 0;
-                      const final = d.finalAmount || d.totalAmount || 0;
-                      
-                      const newPaid = paid + amount;
-                      const newRemaining = final - newPaid;
 
-                      return {
-                        ...d,
-                        paidAmount: newPaid,
-                        remainingAmount: newRemaining
-                      };
-                    }
-                    return d;
-                  });
-
-                const updatedPayroll: PayrollItem = {
-                  ...currentPayroll,
-                  details: updatedDetails,
-                  paidAmount: updatedDetails.reduce((sum, d) => sum + d.paidAmount, 0),
-                  payments: [...(currentPayroll.payments || []), ...newPayments],
-                };
-
-                const nextPayrolls = payrolls.map((p) =>
-                  p.id === paymentPayrollId ? updatedPayroll : p
-                );
-                
-                persistPayrolls(nextPayrolls);
-                setPaymentDialogOpen(false);
+                    toast.success("Thanh toán thành công");
+                    
+                    setPaymentDialogOpen(false);
+                    // Refresh data from server to ensure accuracy
+                    await fetchPayrolls();
+                    await fetchPayrollDetails(paymentPayrollId);
+                    
+                } catch (err: any) {
+                    console.error(err);
+                    toast.error(err.response?.data?.message || "Lỗi thanh toán");
+                }
               }}
             >
               Xác nhận thanh toán
@@ -1262,15 +1229,18 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
             open={detailModalOpen}
             onOpenChange={setDetailModalOpen}
             payrollName={selectedPayroll.name}
-            workRange={selectedPayroll.workRange}
-            details={selectedPayroll.details.map(d => ({
+            workRange={`${formatDateStringDMY(formatISODate(new Date(selectedPayroll.periodStart)))} - ${formatDateStringDMY(formatISODate(new Date(selectedPayroll.periodEnd)))}`}
+            details={selectedPayroll.payslips.map(d => ({
               ...d,
+              staffId: d.staffId.toString(),
+              baseSalary: Number(d.baseSalary || 0),
+              totalAmount: Number(d.totalSalary || 0),
               overtimeAmount: d.overtimeAmount || 0,
               bonus: d.bonus || 0,
               penalty: d.penalty || 0,
-              finalAmount: d.finalAmount || d.totalAmount || 0,
+              finalAmount: d.finalAmount || Number(d.totalSalary) || 0,
               paidAmount: d.paidAmount || 0,
-              remainingAmount: d.remainingAmount || ((d.finalAmount || d.totalAmount || 0) - (d.paidAmount || 0))
+              remainingAmount: d.remainingAmount || ((d.finalAmount || Number(d.totalSalary) || 0) - (d.paidAmount || 0))
             }))}
             status={selectedPayroll.status}
             onSave={(updatedDetails) => handleUpdateDetails(selectedPayroll.id, updatedDetails)}
@@ -1279,28 +1249,22 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
                setBreakdownStaffId(staffId);
                setBreakdownModalOpen(true);
             }}
-            readOnly={!canUpdate}
+            readOnly={!canUpdate || selectedPayroll.status === 'finalized'}
           />
 
           <SalaryBreakdownModal
             open={breakdownModalOpen}
             onOpenChange={setBreakdownModalOpen}
-            staff={staffMembers.find(s => s.id === breakdownStaffId) || null}
-            timekeepingData={timekeepingData}
+            staff={staffArray.find(s => s.id === breakdownStaffId) || null}
+            timekeepingData={fetchedTimekeeping || timekeepingData}
             shifts={shifts}
-            periodStart={(() => {
-              const parts = selectedPayroll.workRange.split(" - ");
-              return parseDMYToDate(parts[0]) || new Date();
-            })()}
-            periodEnd={(() => {
-               const parts = selectedPayroll.workRange.split(" - ");
-               return parseDMYToDate(parts[1]) || new Date();
-            })()}
+            periodStart={new Date(selectedPayroll.periodStart)}
+            periodEnd={new Date(selectedPayroll.periodEnd)}
           />
         </>
       )}
 
-      <AlertDialog open={!!deleteData} onOpenChange={(open) => !open && setDeleteData(null)}>
+      <AlertDialog open={!!deleteData} onOpenChange={(open: boolean) => !open && setDeleteData(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Xác nhận xóa bảng lương</AlertDialogTitle>
@@ -1312,7 +1276,7 @@ export function PayrollBoard({ timekeepingData, shifts }: PayrollBoardProps) {
             <AlertDialogCancel>Hủy</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
-              onClick={handleDeletePayroll}
+
             >
               Xóa
             </AlertDialogAction>

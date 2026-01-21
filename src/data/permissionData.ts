@@ -44,14 +44,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
           { id: 'goods_inventory:delete', name: 'Xóa' },
         ],
       },
-      {
-        id: 'goods_pricing',
-        name: 'Thiết lập giá',
-        permissions: [
-          { id: 'goods_pricing:view', name: 'Xem' },
-          { id: 'goods_pricing:update', name: 'Cập nhật' },
-        ],
-      },
+
       {
         id: 'goods_stock_check',
         name: 'Kiểm kho',
@@ -60,28 +53,17 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
           { id: 'goods_stock_check:create', name: 'Tạo phiếu' },
         ],
       },
+
+
+
       {
-        id: 'goods_new_items',
-        name: 'Yêu cầu món mới',
+        id: 'combos',
+        name: 'Combo',
         permissions: [
-          { id: 'goods_new_items:view', name: 'Xem' },
-          { id: 'goods_new_items:update', name: 'Duyệt' },
-        ],
-      },
-      {
-        id: 'goods_import_export',
-        name: 'Nhập/Xuất',
-        permissions: [
-          { id: 'goods_import_export:view', name: 'Xem' },
-          { id: 'goods_import_export:create', name: 'Tạo phiếu' },
-        ],
-      },
-      {
-        id: 'goods_recipe',
-        name: 'Công thức',
-        permissions: [
-          { id: 'goods_recipe:view', name: 'Xem' },
-          { id: 'goods_recipe:update', name: 'Cập nhật' },
+          { id: 'combos:view', name: 'Xem danh sách' },
+          { id: 'combos:create', name: 'Thêm mới' },
+          { id: 'combos:update', name: 'Cập nhật' },
+          { id: 'combos:delete', name: 'Xóa' },
         ],
       },
     ],
@@ -186,41 +168,17 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
           { id: 'staff_payroll:create', name: 'Tạo bảng lương' },
           { id: 'staff_payroll:update', name: 'Cập nhật' },
           { id: 'staff_payroll:delete', name: 'Xóa' },
-          { id: 'staff_payroll:payment', name: 'Thanh toán' },
         ],
       },
-      {
-        id: 'staff_settings',
-        name: 'Thiết lập',
-        permissions: [
-          { id: 'staff_settings:view', name: 'Xem' },
-          { id: 'staff_settings:update', name: 'Cập nhật' },
-        ],
-      },
+
     ],
   },
   {
     id: 'transactions',
     name: 'Giao dịch',
     modules: [
-      {
-        id: 'invoices',
-        name: 'Hóa đơn',
-        permissions: [
-          { id: 'invoices:view', name: 'Xem' },
-          { id: 'invoices:create', name: 'Tạo' },
-          { id: 'invoices:update', name: 'Cập nhật' },
-          { id: 'invoices:delete', name: 'Xóa' },
-        ],
-      },
-      {
-        id: 'returns',
-        name: 'Trả hàng',
-        permissions: [
-          { id: 'returns:view', name: 'Xem' },
-          { id: 'returns:create', name: 'Tạo' },
-        ],
-      },
+
+
       {
         id: 'purchase_orders',
         name: 'Nhập hàng',
@@ -230,14 +188,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
           { id: 'purchase_orders:update', name: 'Cập nhật' },
         ],
       },
-      {
-        id: 'purchase_returns',
-        name: 'Trả hàng nhập',
-        permissions: [
-          { id: 'purchase_returns:view', name: 'Xem' },
-          { id: 'purchase_returns:create', name: 'Tạo' },
-        ],
-      },
+
       {
         id: 'write_offs',
         name: 'Xuất hủy',
@@ -293,6 +244,8 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         name: 'Pha chế',
         permissions: [
           { id: 'kitchen:access', name: 'Truy cập' },
+          { id: 'kitchen:complete', name: 'Đánh dấu đã chế biến' },
+          { id: 'kitchen:deliver', name: 'Đánh dấu đã giao' },
         ],
       },
     ],

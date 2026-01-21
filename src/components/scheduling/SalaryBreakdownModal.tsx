@@ -9,7 +9,23 @@ import {
 } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { StaffMember } from "../../data/staffData";
+interface StaffMember {
+  id: string | number;
+  fullName: string;
+  salarySettings?: {
+    salaryType: "shift" | "fixed";
+    salaryAmount: string;
+    shifts: Array<{
+      id: string | number;
+      name: string;
+      salaryPerShift: string;
+      saturdayCoeff: string;
+      sundayCoeff: string;
+      dayOffCoeff: string;
+      holidayCoeff: string;
+    }>;
+  };
+}
 import type { TimekeepingEntry } from "./TimekeepingBoard";
 
 interface SalaryBreakdownModalProps {
@@ -17,7 +33,7 @@ interface SalaryBreakdownModalProps {
   onOpenChange: (open: boolean) => void;
   staff: StaffMember | null;
   timekeepingData: Record<string, Record<string, Record<string, TimekeepingEntry>>> | undefined;
-  shifts: { id: string; startTime: string; endTime: string }[];
+  shifts: { id: string | number; startTime: string; endTime: string }[];
   periodStart: Date;
   periodEnd: Date;
 }
@@ -83,6 +99,7 @@ export function SalaryBreakdownModal({
 
       Object.entries(shiftMap || {}).forEach(([shiftId, staffMap]) => {
         const entry = (staffMap as any)?.[staff.id];
+        // console.log("Checking entry", { date, shiftId, staffId: staff.id, entry });
         if (!entry || typeof entry !== "object") return;
         
         const typedEntry = entry as TimekeepingEntry;
@@ -91,7 +108,7 @@ export function SalaryBreakdownModal({
         const dateObj = new Date(date);
         const dayType = getDayTypeFromDate(dateObj);
         
-        const shiftSetting = staff.salarySettings?.shifts.find(s => s.id === shiftId);
+        const shiftSetting = (staff as any).salarySettings?.shifts.find((s: any) => s.id.toString() === shiftId.toString());
         if (!shiftSetting) return;
 
         const basePerShift = parseCurrency(shiftSetting.salaryPerShift);
@@ -101,13 +118,8 @@ export function SalaryBreakdownModal({
         let label = "Ngày thường";
 
         if (typedEntry.status === "day-off") {
-          if (typedEntry.leaveType === "approved-leave") {
              coeff = parseCoefficient(shiftSetting.dayOffCoeff, 0);
-             label = "Ngày nghỉ (có phép)";
-          } else {
-             coeff = 0;
-             label = "Ngày nghỉ (không phép)";
-          }
+             label = "Ngày nghỉ";
         } else if (dayType === "saturday") {
           coeff = parseCoefficient(shiftSetting.saturdayCoeff, 1);
           label = "Ngày thứ 7";
@@ -136,6 +148,38 @@ export function SalaryBreakdownModal({
 
     return Object.values(grouped);
   }, [staff, timekeepingData, periodStart, periodEnd]);
+  
+  const fixedStats = useMemo(() => {
+    if (!staff || staff.salarySettings?.salaryType !== "fixed" || !timekeepingData) return null;
+    
+    let workingDays = 0;
+    const fromStr = formatISODate(periodStart);
+    const toStr = formatISODate(periodEnd);
+
+    // Calculate total days in period for "Standard Days" roughly (or just use calendar days)
+    const diffTime = Math.abs(periodEnd.getTime() - periodStart.getTime());
+    const standardDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; 
+
+    Object.entries(timekeepingData).forEach(([date, shiftMap]) => {
+      const dateStr = date.split("T")[0];
+      if (dateStr < fromStr || dateStr > toStr) return;
+
+      // Check if ANY shift was worked on this date
+      let workedOnDate = false;
+      Object.values(shiftMap || {}).forEach((staffMap: any) => {
+         const entry = staffMap?.[staff.id];
+         if (entry && typeof entry === 'object') {
+             const e = entry as TimekeepingEntry;
+             if (e.status === 'on-time' || e.status === 'late-early' || e.status === 'day-off') {
+                 workedOnDate = true;
+             }
+         }
+      });
+      if (workedOnDate) workingDays++;
+    });
+
+    return { workingDays, standardDays };
+  }, [staff, timekeepingData, periodStart, periodEnd]);
 
   if (!staff) return null;
 
@@ -158,20 +202,36 @@ export function SalaryBreakdownModal({
             <table className="w-full">
               <thead className="bg-slate-100">
                 <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Ca</th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">Lương mỗi ca</th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">Số ca chấm công</th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">Số ca tính lương</th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">Thành tiền</th>
+                  {staff.salarySettings?.salaryType === "fixed" ? (
+                      <>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Khoản lương</th>
+                        <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">Ngày chuẩn</th>
+                        <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">Ngày làm</th>
+                        <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">Tỷ lệ</th>
+                        <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">Thành tiền</th>
+                      </>
+                  ) : (
+                      <>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Ca</th>
+                        <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">Lương mỗi ca</th>
+                        <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">Số ca chấm công</th>
+                        <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">Số ca tính lương</th>
+                        <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">Thành tiền</th>
+                      </>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {staff.salarySettings?.salaryType === "fixed" ? (
+              {staff.salarySettings?.salaryType === "fixed" ? (
                    <tr>
                      <td className="px-4 py-3 text-sm font-medium">Lương tháng cố định</td>
-                     <td className="px-4 py-3 text-right text-sm text-slate-500">-</td>
-                     <td className="px-4 py-3 text-right text-sm text-slate-500">-</td>
-                     <td className="px-4 py-3 text-right text-sm text-slate-500">-</td>
+                     <td className="px-4 py-3 text-right text-sm text-slate-500">
+                        {fixedStats?.standardDays || '-'} ngày
+                     </td>
+                     <td className="px-4 py-3 text-right text-sm font-medium text-slate-900">
+                        {fixedStats?.workingDays || 0} ngày
+                     </td>
+                     <td className="px-4 py-3 text-right text-sm text-slate-500">100%</td>
                      <td className="px-4 py-3 text-right text-sm font-semibold">
                        {parseCurrency(staff.salarySettings.salaryAmount).toLocaleString()}₫
                      </td>

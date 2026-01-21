@@ -3,8 +3,9 @@ export interface StaffMember {
   staffCode: string;
   fullName: string;
   phone: string;
+  email?: string;
   idCard: string;
-  gender: "male" | "female";
+  gender: string;
   birthDate: string;
   position: string;
   positionLabel: string;
@@ -41,6 +42,7 @@ export interface StaffMember {
   accountId?: string; // Link to Account ID
   account?: {
     username: string;
+    roleId?: number;
   };
 }
 

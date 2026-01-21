@@ -24,7 +24,15 @@ export interface ApplyPromotionPayload {
 }
 
 export function getPromotions(params?: PromotionsQuery) {
-  return axiosClient.get("/promotions", { params });
+  const cacheBuster = Date.now();
+  return axiosClient.get("/promotions", {
+    params: { ...(params || {}), _: cacheBuster },
+    headers: {
+      "Cache-Control": "no-cache",
+      "Pragma": "no-cache",
+      "If-Modified-Since": "0",
+    },
+  });
 }
 
 export function getPromotionById(id: string | number) {

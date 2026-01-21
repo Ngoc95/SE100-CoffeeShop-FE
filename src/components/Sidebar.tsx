@@ -27,6 +27,8 @@ import {
   Utensils,
   Moon,
   Home,
+  PackageCheck,
+  PiggyBankIcon
 } from 'lucide-react';
 import { PageType } from '../App';
 import { Button } from './ui/button';
@@ -69,6 +71,8 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
     logout();
   };
 
+  
+
   // Check permission for a specific page
   const hasAccess = (page: PageType) => {
     if (!user) return false;
@@ -82,6 +86,7 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
       'stock-check': 'goods_stock_check:view',
       'import-export': 'goods_import_export:view',
       'menu': 'goods_recipe:view',
+      'combos': 'combos:view',
       'tables': 'tables:view',
       'scheduling': ['staff_scheduling:view', 'staff_timekeeping:view', 'staff_payroll:view'],
       'staff': 'staff:view',
@@ -136,6 +141,7 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
       items: [
         { id: 'inventory', label: 'Danh mục', icon: Package },
         { id: 'product-pricing', label: 'Thiết lập giá', icon: DollarSign },
+        { id: 'combos', label: 'Combo', icon: PiggyBankIcon },
         { id: 'stock-check', label: 'Kiểm kho', icon: FileText },
         { id: 'new-item-requests', label: 'Yêu cầu món mới', icon: FileQuestion },
       ],
@@ -328,6 +334,8 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
                   Tài khoản
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                
+                <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
                   <LogOut className="w-4 h-4 mr-2" />
                   Đăng xuất
@@ -433,6 +441,8 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
                 <User className="w-4 h-4 mr-2" />
                 Tài khoản
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
                 <LogOut className="w-4 h-4 mr-2" />

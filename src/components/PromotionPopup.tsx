@@ -1,4 +1,4 @@
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "../contexts/AuthContext";
 import { useState, useEffect } from "react";
 import {
   Percent,
@@ -65,13 +65,22 @@ interface ComboCondition {
 }
 
 interface Promotion {
+  id?: number | string;
   code: string;
   name: string;
   description: string;
-  type: "percentage" | "fixed" | "item" | "combo";
+  type: "percentage" | "fixed" | "fixed_price" | "gift" | "item" | "combo";
   value: number;
   minOrderValue?: number;
+  maxDiscount?: number;
+  // Product scope flags
+  applyToAllItems?: boolean;
+  applyToAllCategories?: boolean;
+  applyToAllCombos?: boolean;
+  applicableItemIds?: (string | number)[];
   applicableCategories?: string[];
+  applicableCategoryIds?: (string | number)[];
+  applicableComboIds?: (string | number)[];
   maxUsage?: number;
   currentUsage?: number;
   expiryDate?: Date;
@@ -82,9 +91,20 @@ interface Promotion {
   applicableCustomerIds?: string[];
   applicableMembershipTiers?: string[];
   requiresCustomer?: boolean;
+  // Walk-in and groups
+  applyToAllCustomers?: boolean;
+  applyToAllCustomerGroups?: boolean;
+  applyToWalkIn?: boolean;
+  applicableCustomerGroupIds?: string[];
+  maxTotalUsage?: number;
+  maxUsagePerCustomer?: number | null;
   // NEW: Combo-specific fields
   isCombo?: boolean;
   comboCondition?: ComboCondition;
+  // Gift fields
+  buyQuantity?: number;
+  getQuantity?: number;
+  requireSameItem?: boolean;
 }
 
 interface PromotionPopupProps {
@@ -192,55 +212,134 @@ export function PromotionPopup({
       if (!open || notAuthorized) return;
       setIsLoadingPromos(true);
       try {
+        // Flexible extractor to handle various API response shapes
+        const extractItems = (res: any): any[] => {
+          const data = res?.data ?? res;
+          const candidates = [
+            data?.metaData?.promotions,
+            data?.metaData?.items,
+            data?.metaData?.data?.items,
+            data?.metaData?.data,
+            data?.data?.items,
+            data?.data?.records,
+            data?.data?.list,
+            data?.items,
+            data?.records,
+            data?.list,
+            data?.metaData,
+            Array.isArray(data) ? data : undefined,
+          ];
+          for (const c of candidates) {
+            if (Array.isArray(c)) return c;
+          }
+          // As a last resort, scan enumerable properties and return the first array
+          if (data && typeof data === "object") {
+            for (const key of Object.keys(data)) {
+              if (Array.isArray((data as any)[key])) return (data as any)[key];
+            }
+          }
+          return [];
+        };
+
         let list: any[] = [];
         if (orderId) {
           const res = await getAvailablePromotions({
             orderId,
             customerId: selectedCustomer?.id,
           });
-          const data = (res as any)?.data ?? res;
-          const items =
-            data?.metaData?.promotions ??
-            data?.metaData?.items ??
-            data?.metaData?.data?.items ??
-            data?.data?.items ??
-            data?.items ??
-            data?.metaData ??
-            (Array.isArray(data) ? data : []);
-          list = Array.isArray(items) ? items : [];
+          list = extractItems(res);
         } else {
           const res = await fetchPromotions({ isActive: true, limit: 50 });
-          const data = (res as any)?.data ?? res;
-          const items =
-            data?.metaData?.items ??
-            data?.metaData?.data?.items ??
-            data?.data?.items ??
-            data?.items ??
-            data?.metaData ??
-            (Array.isArray(data) ? data : []);
-          list = Array.isArray(items) ? items : [];
+          list = extractItems(res);
         }
-        const mapped: Promotion[] = list.map((p: any) => ({
+        const mapTypeId = (typeId: any): Promotion["type"] => {
+          const id = Number(typeId);
+          switch (id) {
+            case 1:
+              return "percentage";
+            case 2:
+              return "fixed";
+            case 3:
+              return "fixed_price";
+            case 4:
+              return "gift";
+            default: {
+              const t = (typeof typeId === "string" ? typeId : "percentage").toLowerCase();
+              return (t === "percentage" || t === "fixed" || t === "fixed_price" || t === "gift" || t === "item" || t === "combo") ? (t as Promotion["type"]) : "percentage";
+            }
+          }
+        };
+
+        let mapped: Promotion[] = list.map((p: any) => ({
           id: Number(p.id ?? p.promotionId ?? 0),
           code: String(p.code ?? p.promotionCode ?? p.id ?? ""),
           name: String(p.name ?? p.title ?? "Khuyến mãi"),
           description: String(p.description ?? ""),
-          type: (p.type ?? p.typeId ?? "percentage").toString().toLowerCase(),
-          value: Number(p.value ?? p.promotionValue ?? 0),
+          type: mapTypeId(p.typeId ?? p.type),
+          value: Number(p.discountValue ?? p.value ?? p.promotionValue ?? 0),
           minOrderValue: p.minOrderValue != null ? Number(p.minOrderValue) : undefined,
+          maxDiscount: p.maxDiscount != null ? Number(p.maxDiscount) : undefined,
+          applyToAllItems: Boolean(p.applyToAllItems),
+          applyToAllCategories: Boolean(p.applyToAllCategories),
+          applyToAllCombos: Boolean(p.applyToAllCombos),
+          applicableItemIds: Array.isArray(p.applicableItemIds) ? p.applicableItemIds : undefined,
           applicableCategories: Array.isArray(p.applicableCategories) ? p.applicableCategories : undefined,
+          applicableCategoryIds: Array.isArray(p.applicableCategoryIds) ? p.applicableCategoryIds : undefined,
+          applicableComboIds: Array.isArray(p.applicableComboIds) ? p.applicableComboIds : undefined,
           maxUsage: p.maxUsage != null ? Number(p.maxUsage) : undefined,
           currentUsage: p.currentUsage != null ? Number(p.currentUsage) : undefined,
           expiryDate: p.expiryDate ? new Date(p.expiryDate) : undefined,
-          isActive: Boolean(p.isActive ?? true),
+          isActive: p.isActive != null ? Boolean(p.isActive) : true,
           conflictsWith: Array.isArray(p.conflictsWith) ? p.conflictsWith : undefined,
           customerSpecific: Boolean(p.customerSpecific ?? false),
           applicableCustomerIds: Array.isArray(p.applicableCustomerIds) ? p.applicableCustomerIds : undefined,
           applicableMembershipTiers: Array.isArray(p.applicableMembershipTiers) ? p.applicableMembershipTiers : undefined,
           requiresCustomer: Boolean(p.requiresCustomer ?? false),
-          isCombo: Boolean(p.isCombo ?? false),
+          isCombo: Boolean(p.isCombo),
           comboCondition: p.comboCondition ?? undefined,
+          buyQuantity: p.buyQuantity != null ? Number(p.buyQuantity) : undefined,
+          getQuantity: p.getQuantity != null ? Number(p.getQuantity) : undefined,
+          requireSameItem: Boolean(p.requireSameItem),
         }));
+
+        // Fallback: if filtered listing returned empty, try unfiltered list
+        if (!orderId && mapped.length === 0) {
+          try {
+            const res2 = await fetchPromotions();
+            const list2: any[] = extractItems(res2);
+            mapped = list2.map((p: any) => ({
+              id: Number(p.id ?? p.promotionId ?? 0),
+              code: String(p.code ?? p.promotionCode ?? p.id ?? ""),
+              name: String(p.name ?? p.title ?? "Khuyến mãi"),
+              description: String(p.description ?? ""),
+              type: mapTypeId(p.typeId ?? p.type),
+              value: Number(p.discountValue ?? p.value ?? p.promotionValue ?? 0),
+              minOrderValue: p.minOrderValue != null ? Number(p.minOrderValue) : undefined,
+              maxDiscount: p.maxDiscount != null ? Number(p.maxDiscount) : undefined,
+              applyToAllItems: Boolean(p.applyToAllItems),
+              applyToAllCategories: Boolean(p.applyToAllCategories),
+              applyToAllCombos: Boolean(p.applyToAllCombos),
+              applicableItemIds: Array.isArray(p.applicableItemIds) ? p.applicableItemIds : undefined,
+              applicableCategories: Array.isArray(p.applicableCategories) ? p.applicableCategories : undefined,
+              applicableCategoryIds: Array.isArray(p.applicableCategoryIds) ? p.applicableCategoryIds : undefined,
+              applicableComboIds: Array.isArray(p.applicableComboIds) ? p.applicableComboIds : undefined,
+              maxUsage: p.maxUsage != null ? Number(p.maxUsage) : undefined,
+              currentUsage: p.currentUsage != null ? Number(p.currentUsage) : undefined,
+              expiryDate: p.expiryDate ? new Date(p.expiryDate) : undefined,
+              isActive: p.isActive != null ? Boolean(p.isActive) : true,
+              conflictsWith: Array.isArray(p.conflictsWith) ? p.conflictsWith : undefined,
+              customerSpecific: Boolean(p.customerSpecific ?? false),
+              applicableCustomerIds: Array.isArray(p.applicableCustomerIds) ? p.applicableCustomerIds : undefined,
+              applicableMembershipTiers: Array.isArray(p.applicableMembershipTiers) ? p.applicableMembershipTiers : undefined,
+              requiresCustomer: Boolean(p.requiresCustomer ?? false),
+              isCombo: Boolean(p.isCombo),
+              comboCondition: p.comboCondition ?? undefined,
+              buyQuantity: p.buyQuantity != null ? Number(p.buyQuantity) : undefined,
+              getQuantity: p.getQuantity != null ? Number(p.getQuantity) : undefined,
+              requireSameItem: Boolean(p.requireSameItem),
+            }));
+          } catch {}
+        }
         setAvailablePromotions(mapped);
       } catch (err: any) {
         const status = err?.response?.status;
@@ -322,10 +421,45 @@ export function PromotionPopup({
     let orderDiscount = 0;
     const itemDiscounts: { itemName: string; discount: number }[] = [];
 
+    const totalQty = orderItems.reduce((sum, i) => sum + i.quantity, 0);
+
     if (promo.type === "percentage") {
       orderDiscount = (orderTotal * promo.value) / 100;
+      if (promo.maxDiscount != null) {
+        orderDiscount = Math.min(orderDiscount, Number(promo.maxDiscount));
+      }
+      orderDiscount = Math.min(orderDiscount, orderTotal);
     } else if (promo.type === "fixed") {
-      orderDiscount = promo.value;
+      orderDiscount = Math.min(promo.value, orderTotal);
+    } else if (promo.type === "fixed_price") {
+      const finalPrice = Number(promo.value) * totalQty;
+      orderDiscount = Math.max(0, orderTotal - finalPrice);
+    } else if (promo.type === "gift") {
+      const buyQ = Number(promo.buyQuantity) || 0;
+      const getQ = Number(promo.getQuantity) || 0;
+      const requireSame = Boolean(promo.requireSameItem);
+
+      let giftCount = 0;
+      if (buyQ > 0 && getQ > 0) {
+        if (requireSame) {
+          giftCount = orderItems.reduce((sum, i) => sum + Math.floor(i.quantity / buyQ) * getQ, 0);
+        } else {
+          giftCount = Math.floor(totalQty / buyQ) * getQ;
+        }
+      } else if (getQ > 0) {
+        giftCount = getQ;
+      }
+      if (giftCount > 0) {
+        const unitPrices: number[] = [];
+        orderItems.forEach((i) => {
+          const unitPrice = i.price;
+          for (let q = 0; q < i.quantity; q++) unitPrices.push(unitPrice);
+        });
+        unitPrices.sort((a, b) => a - b);
+        const take = Math.min(giftCount, unitPrices.length);
+        orderDiscount = unitPrices.slice(0, take).reduce((s, p) => s + p, 0);
+      }
+      orderDiscount = Math.min(orderDiscount, orderTotal);
     } else if (promo.type === "item" && promo.applicableCategories) {
       orderItems.forEach((item) => {
         if (
@@ -362,6 +496,10 @@ export function PromotionPopup({
         return "% Hóa đơn";
       case "fixed":
         return "Giảm tiền";
+      case "fixed_price":
+        return "Đồng giá";
+      case "gift":
+        return "Tặng món";
       case "item":
         return "Theo món";
       case "combo":
@@ -375,6 +513,10 @@ export function PromotionPopup({
         return "bg-blue-100 text-blue-700 border-blue-300";
       case "fixed":
         return "bg-green-100 text-green-700 border-green-300";
+      case "fixed_price":
+        return "bg-indigo-100 text-indigo-700 border-indigo-300";
+      case "gift":
+        return "bg-amber-100 text-amber-700 border-amber-300";
       case "item":
         return "bg-purple-100 text-purple-700 border-purple-300";
       case "combo":
@@ -619,7 +761,7 @@ export function PromotionPopup({
           orderId,
           promotionId: selectedPromo.id,
           customerId: selectedCustomer?.id,
-          points: pointsToUse,
+          pointsToUse: pointsToUse,
         } as any);
       } catch (err: any) {
         toast.error("Áp dụng khuyến mãi backend thất bại", {
@@ -882,8 +1024,8 @@ export function PromotionPopup({
           <div className="space-y-3">
             <Label>Mã khuyến mãi gợi ý</Label>
             <div className="flex flex-wrap gap-3 max-h-80 overflow-y-auto pr-1">
-              {availablePromotions
-                .filter((p) => p.isActive && !p.isCombo)
+                {availablePromotions
+                  .filter((p) => p.isActive)
                 .map((promo) => {
                   const { applicable, reason } = isPromoApplicable(promo);
                   const isSelected = selectedPromo?.code === promo.code;
@@ -1012,6 +1154,12 @@ export function PromotionPopup({
                     </Card>
                   );
                 })}
+              {availablePromotions.filter((p) => p.isActive).length === 0 && !isLoadingPromos && (
+                <Card className="p-4 border-slate-200 bg-slate-50 w-full">
+                  <p className="text-sm text-slate-700">Không có khuyến mãi khả dụng.</p>
+                  <p className="text-xs text-slate-500 mt-1">Thử làm mới hoặc kiểm tra quyền truy cập.</p>
+                </Card>
+              )}
             </div>
           </div>
 

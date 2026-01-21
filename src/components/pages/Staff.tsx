@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import * as React from "react";
 import {
   Plus,
@@ -62,6 +62,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { StaffMember, staffMembers as initialStaffMembers } from "../../data/staffData";
 import { initialAccounts } from "../../data/accountData";
 import { initialRoles } from "../../data/roleData";
+import roleApi from "../../api/roleApi";
+import { Role } from "../../types/account";
+import staffApi from "../../api/staffApi"; // Import API
+import { CreateStaffDto, UpdateStaffDto } from "../../types/staff"; // Import DTOs
+import { useDebounce } from "../../hooks/useDebounce";
 
 type SortField = "staffCode" | "fullName" | "joinDate" | "position" | null;
 type SortOrder = "asc" | "desc" | "none";
@@ -113,8 +118,11 @@ export function Staff({
   setStaffList: setPropsStaffList
 }: StaffProps = {}) {
   const { canCreate, canUpdate, canDelete } = useAuth();
+
+
   const [activeTab, setActiveTab] = useState("staff-list");
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [viewDetailDialogOpen, setViewDetailDialogOpen] = useState(false);
@@ -140,6 +148,7 @@ export function Staff({
   const [formData, setFormData] = useState({
     fullName: "",
     phone: "",
+    email: "", // Added email field
     idCard: "",
     position: "",
     joinDate: "",
@@ -147,7 +156,7 @@ export function Staff({
     city: "",
     ward: "",
     addressDetail: "",
-    gender: "male",
+    gender: "Nam",
     birthDate: "",
   });
 
@@ -184,16 +193,138 @@ export function Staff({
 
   const [accountForm, setAccountForm] = useState({ username: "", password: "" });
 
-  const [localStaffMembers, setLocalStaffMembers] = useState<StaffMember[]>(initialStaffMembers);
+  const [localStaffMembers, setLocalStaffMembers] = useState<StaffMember[]>([]);
   const staffMembers = propsStaffList || localStaffMembers;
   const setStaffMembers = setPropsStaffList || setLocalStaffMembers;
 
+  const [roles, setRoles] = useState<Role[]>([]);
+
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        const res = await roleApi.getAll();
+        const rolesData = res.data.metaData?.roles || [];
+        setRoles(Array.isArray(rolesData) ? rolesData : []);
+      } catch (error) {
+        console.error("Error fetching roles:", error);
+      }
+    };
+    fetchRoles();
+  }, []);
+
   const positions = [
-    { value: "manager", label: "Quản lý" },
-    { value: "barista", label: "Pha chế" },
-    { value: "cashier", label: "Thu ngân" },
-    { value: "server", label: "Phục vụ" },
+    { value: "Quản lý", label: "Quản lý" },
+    { value: "Pha chế", label: "Pha chế" },
+    { value: "Thu ngân", label: "Thu ngân" },
+    { value: "Phục vụ", label: "Phục vụ" },
   ];
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  // FETCH DATA FROM API
+  const fetchStaffs = React.useCallback(async () => {
+    try {
+      const params: any = {
+        limit: pageSize.toString(),
+        page: currentPage.toString(),
+      };
+
+      if (debouncedSearchQuery) {
+        params.search = debouncedSearchQuery;
+      }
+      if (filterPosition !== "all") {
+        params.position = filterPosition;
+      }
+      if (filterStatus !== "all") {
+        params.status = filterStatus;
+      }
+      if (sortField && sortOrder !== "none") {
+        const sortKey = sortField === "staffCode" ? "code" : sortField === "joinDate" ? "hireDate" : sortField;
+        params.sort = JSON.stringify({ [sortKey]: sortOrder.toUpperCase() });
+      }
+
+      const res = await staffApi.getAll(params);
+      // Helper to extract data handling potential wrappers
+      const responseData = res.data as any;
+      const staffList = responseData.staffs || responseData.metaData?.staffs || responseData.data?.staffs || [];
+      const meta = responseData.metaData;
+      if (meta) {
+        setTotalPages(meta.totalPages);
+      }
+      
+      if (!Array.isArray(staffList)) {
+          console.warn("Unexpected staff response structure:", res.data);
+          setStaffMembers([]);
+          return;
+      }
+
+      // Map Backend Data to UI Structure
+      const mappedStaff: StaffMember[] = staffList.map((s: any) => ({
+          id: s.id.toString(),
+          staffCode: s.code,
+          fullName: s.fullName,
+          phone: s.phone || '',
+          idCard: s.idCard || '',
+          gender: s.gender || "Nam",
+          birthDate: s.birthday ? new Date(s.birthday).toISOString().split('T')[0] : '',
+          joinDate: s.hireDate ? new Date(s.hireDate).toISOString().split('T')[0] : '',
+          position: s.position || '',
+          positionLabel: positions.find(p => p.value === s.position)?.label || s.position || '',
+          status: s.status as "active" | "quit", // Cast to match UI type
+          salary: Number(s.salarySetting?.baseRate) || 0,
+          address: {
+              city: s.city || '',
+              ward: s.address ? s.address.split(', ')[1] || '' : '', 
+              detail: s.address ? s.address.split(', ')[0] || '' : ''
+          },
+          account: s.user ? {
+              username: s.user.username,
+              password: '',
+              roleId: s.user.role.id.toString(), // Helper mapping needed if roles differ
+              roleName: s.user.role.name
+          } : undefined,
+          accountId: s.user?.id.toString(),
+          
+          // Map simple backend salary to complex frontend structure
+          salarySettings: {
+              salaryType: s.salarySetting?.salaryType === 'monthly' ? 'fixed' : 'shift',
+              salaryAmount: s.salarySetting?.baseRate.toString() || '0',
+              advancedSetup: false,
+              overtimeEnabled: false,
+              shifts: [
+                  {
+                      id: "default",
+                      name: "Mặc định",
+                      salaryPerShift: s.salarySetting?.baseRate.toString() || '0',
+                      saturdayCoeff: "100%",
+                      sundayCoeff: "100%",
+                      dayOffCoeff: "100%",
+                      holidayCoeff: "100%",
+                  }
+              ],
+              overtimeCoeffs: {
+                  weekday: "100%",
+                  saturday: "100%",
+                  sunday: "100%",
+                  dayOff: "100%",
+                  holiday: "100%",
+              }
+          }
+      }));
+      setStaffMembers(mappedStaff);
+    } catch (error) {
+      console.error("Error fetching staff:", error);
+      toast.error("Không thể tải danh sách nhân viên");
+    }
+  }, [currentPage, pageSize, debouncedSearchQuery, filterPosition, filterStatus, sortField, sortOrder]);
+
+  useEffect(() => {
+    fetchStaffs();
+  }, [fetchStaffs]);
+
+
 
   // Danh sách ca làm việc
   const shiftTypes = [
@@ -441,25 +572,9 @@ export function Staff({
     }
   );
 
-  // Apply filters
-  let filteredStaff = staffMembers.filter((staff) => {
-    const matchesSearch =
-      staff.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      staff.staffCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      staff.phone.includes(searchQuery) ||
-      staff.idCard.includes(searchQuery);
-
-    const matchesPosition =
-      filterPosition === "all" || staff.position === filterPosition;
-    const matchesStatus =
-      filterStatus === "all" || staff.status === filterStatus;
-
-    return matchesSearch && matchesPosition && matchesStatus;
-  });
-
+  // Sorting helpers
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      // Cycle through: asc -> desc -> none -> asc
       if (sortOrder === "asc") {
         setSortOrder("desc");
       } else if (sortOrder === "desc") {
@@ -485,73 +600,52 @@ export function Staff({
     return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
   };
 
-  // Apply sorting
-  if (sortField && sortOrder !== "none") {
-    filteredStaff = [...filteredStaff].sort((a, b) => {
-      let aValue: any = a[sortField];
-      let bValue: any = b[sortField];
+  // Client-side filtering and sorting removed in favor of Server-side
+  const filteredStaff = staffMembers;
 
-      if (sortField === "joinDate") {
-        aValue = new Date(a.joinDate).getTime();
-        bValue = new Date(b.joinDate).getTime();
-      } else if (sortField === "position") {
-        aValue = a.positionLabel;
-        bValue = b.positionLabel;
-      }
 
-      if (typeof aValue === "string" && typeof bValue === "string") {
-        const comparison = aValue.localeCompare(bValue, "vi");
-        return sortOrder === "asc" ? comparison : -comparison;
-      }
-
-      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
-      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
-  }
 
   const resetForm = () => {
     setFormData({
       fullName: "",
       phone: "",
+      email: "",
       idCard: "",
+      gender: "",
+      birthDate: "",
       position: "",
-      joinDate: "",
+      joinDate: new Date().toISOString().split('T')[0],
       salary: "",
       city: "",
       ward: "",
       addressDetail: "",
-      gender: "male",
+      gender: "Nam",
       birthDate: "",
     });
-    setSelectedRoleId("");
     setSalarySettings({
       salaryType: "shift",
       salaryAmount: "",
       advancedSetup: false,
       overtimeEnabled: false,
-      shifts: [
-        {
-          id: "default",
-          name: "Mặc định",
-          salaryPerShift: "0",
-          saturdayCoeff: "100%",
-          sundayCoeff: "100%",
-          dayOffCoeff: "100%",
-          holidayCoeff: "100%",
-        },
-      ],
+      shifts: [],
       overtimeCoeffs: {
-        weekday: "50%",
+        weekday: "100%",
         saturday: "100%",
         sunday: "100%",
         dayOff: "100%",
         holiday: "100%",
-      },
+      }
     });
+    setAccountForm({ username: "", password: "" });
+    setSelectedRoleId("");
   };
 
-  const handleSubmit = () => {
+  const handleAddNew = () => {
+    resetForm();
+    setAddDialogOpen(true);
+  };
+
+  const handleSubmit = async () => {
     // Validate employee info
     if (
       !formData.fullName ||
@@ -576,68 +670,65 @@ export function Staff({
     }
 
     // Validate account info
-    if (!selectedRoleId) {
-      toast.error("Vui lòng chọn loại tài khoản");
-      return;
+    if (selectedRoleId && !accountForm.username) {
+       // Only if role is select but username is empty
+       // Note: logic in UI allows selecting role without username? 
+       // Just ensuring if they want account, need username/pass
+       toast.error("Vui lòng nhập tên đăng nhập nếu chọn vai trò");
+       return;
     }
 
-    // Calculate salary from settings
-    let calculatedSalary = 0;
-    const salaryAmountNum =
-      Number(parseVNCurrency(salarySettings.salaryAmount)) || 0;
-    if (salarySettings.salaryType === "fixed") {
-      calculatedSalary = salaryAmountNum;
-    } else {
-      // For shift-based, use the default shift salary or the main salary amount
-      const defaultShift = salarySettings.shifts.find(
-        (s) => s.id === "default"
-      );
-      const shiftSalary = defaultShift
-        ? Number(parseVNCurrency(defaultShift.salaryPerShift)) || 0
-        : 0;
-      calculatedSalary = shiftSalary || salaryAmountNum;
+    try {
+        const createDto: CreateStaffDto = {
+            fullName: formData.fullName,
+            phone: formData.phone,
+            idCard: formData.idCard,
+            gender: formData.gender,
+            birthday: formData.birthDate,
+            position: formData.position,
+            department: 'Store', // Default
+            hireDate: formData.joinDate,
+            city: formData.city,
+            address: `${formData.addressDetail}, ${formData.ward}`,
+            
+            // Salary
+            salaryType: salarySettings.salaryType === 'fixed' ? 'monthly' : 'hourly',
+            baseRate: Number(parseVNCurrency(salarySettings.salaryAmount)),
+
+            // Account
+            username: accountForm.username || undefined,
+            password: accountForm.password || undefined,
+            roleId: selectedRoleId ? Number(selectedRoleId) : undefined,
+            // Salary
+            salaryType: salarySettings.salaryType === 'fixed' ? 'monthly' : 'hourly',
+            baseRate: Number(parseVNCurrency(salarySettings.salaryAmount)),
+
+            // Account
+            username: accountForm.username || undefined,
+            password: accountForm.password || undefined,
+            roleId: selectedRoleId ? Number(selectedRoleId) : undefined
+        };
+
+        // Remove optional empty fields to check
+        if (!createDto.email) delete createDto.email;
+        if (!createDto.username) {
+             delete createDto.username;
+             delete createDto.password;
+             delete createDto.roleId;
+        }
+
+        await staffApi.create(createDto);
+        toast.success("Thêm nhân viên thành công");
+        setAddDialogOpen(false);
+        resetForm();
+        
+        // Refresh list
+        // Refresh list
+        fetchStaffs(); 
+
+    } catch (error: any) {
+        toast.error(error.response?.data?.message || "Lỗi khi tạo nhân viên");
     }
-
-    const newStaff: StaffMember = {
-      id: Date.now().toString(),
-      staffCode: `NV${String(staffMembers.length + 1).padStart(3, "0")}`,
-      fullName: formData.fullName,
-      phone: formData.phone,
-      idCard: formData.idCard,
-      gender: formData.gender as "male" | "female",
-      birthDate: formData.birthDate,
-      position: formData.position,
-      positionLabel:
-        positions.find((p) => p.value === formData.position)?.label || "",
-      joinDate: formData.joinDate,
-      salary: calculatedSalary,
-      status: "active",
-      address: {
-        city: formData.city,
-        ward: formData.ward,
-        detail: formData.addressDetail,
-      },
-      salarySettings: {
-        ...salarySettings,
-        salaryType: salarySettings.salaryType as "shift" | "fixed",
-      },
-      accountId: `acc_${Date.now()}`,
-      account: {
-        username: formData.username,
-        password: formData.password,
-        roleId: selectedRoleId
-      },
-    };
-
-    setStaffMembers([...staffMembers, newStaff]);
-
-    const roleName = initialRoles.find(r => r.id === selectedRoleId)?.name;
-    toast.success(
-      `Đã thêm nhân viên mới và tạo tài khoản "${formData.username}" (${roleName}) thành công`
-    );
-
-    setAddDialogOpen(false);
-    resetForm();
   };
 
   const handleEdit = (staff: StaffMember) => {
@@ -645,6 +736,7 @@ export function Staff({
     setFormData({
       fullName: staff.fullName,
       phone: staff.phone,
+      email: staff.email || "",
       idCard: staff.idCard,
       position: staff.position,
       joinDate: staff.joinDate,
@@ -654,8 +746,6 @@ export function Staff({
       addressDetail: staff.address.detail,
       gender: staff.gender,
       birthDate: staff.birthDate,
-      username: staff.account?.username || "", // Populate username for editing
-      password: "", // Password is not editable directly, leave blank
     });
     // Load salary settings if available, otherwise use defaults
     if (staff.salarySettings) {
@@ -664,14 +754,14 @@ export function Staff({
       // Set default salary settings based on current salary
       setSalarySettings({
         salaryType: "shift",
-        salaryAmount: formatVNCurrency(staff.salary),
+        salaryAmount: staff.salary ? staff.salary.toString() : "",
         advancedSetup: false,
         overtimeEnabled: false,
         shifts: [
           {
             id: "default",
             name: "Mặc định",
-            salaryPerShift: formatVNCurrency(staff.salary),
+            salaryPerShift: staff.salary ? staff.salary.toString() : "",
             saturdayCoeff: "100%",
             sundayCoeff: "100%",
             dayOffCoeff: "100%",
@@ -679,7 +769,7 @@ export function Staff({
           },
         ],
         overtimeCoeffs: {
-          weekday: "50%",
+          weekday: "100%",
           saturday: "100%",
           sunday: "100%",
           dayOff: "100%",
@@ -689,8 +779,8 @@ export function Staff({
     }
     // Reset account data when editing
     if (staff.accountId || staff.account) {
-      const acc = staff.account; // Use staff.account directly if available
-      setSelectedRoleId(acc?.roleId || "staff"); // Default to "staff" if roleId is missing
+      const acc = staff.account; 
+      setSelectedRoleId(acc?.roleId?.toString() || "");
       setAccountForm({
         username: acc?.username || "",
         password: ""
@@ -702,87 +792,125 @@ export function Staff({
     setEditDialogOpen(true);
   };
 
-  const handleUpdate = () => {
-    if (!editingStaff) return;
+  const handleUpdate = async () => {
+    // Validate
     if (
       !formData.fullName ||
       !formData.phone ||
       !formData.idCard ||
       !formData.position ||
-      !formData.joinDate
+      !formData.joinDate ||
+      !formData.birthDate ||
+      !formData.gender ||
+      !formData.city ||
+      !formData.ward ||
+      !formData.addressDetail
     ) {
-      toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
+      toast.error("Vui lòng điền đầy đủ thông tin nhân viên bắt buộc");
       return;
     }
 
-    // Account validation
-    if (!selectedRoleId) {
-      toast.error("Vui lòng chọn loại tài khoản");
-      return;
-    }
+    if (!editingStaff) return;
 
-    const updatedStaff = staffMembers.map((staff) => {
-      if (staff.id === editingStaff.id) {
-        return {
-          ...staff,
-          fullName: formData.fullName,
-          phone: formData.phone,
-          idCard: formData.idCard,
-          gender: formData.gender as "male" | "female",
-          birthDate: formData.birthDate,
-          position: formData.position,
-          positionLabel:
-            positions.find((p) => p.value === formData.position)?.label || "",
-          joinDate: formData.joinDate,
-          salary: Number(formData.salary) || 0, // Keep existing logic for now
-          address: {
-            city: formData.city,
-            ward: formData.ward,
-            detail: formData.addressDetail,
-          },
-          // details
-          salarySettings: salarySettings, // Ensure we save the complex settings
-          // Update account info
-          account: {
-            ...staff.account,
-            username: accountForm.username || staff.account?.username || "",
-            roleId: selectedRoleId
-          },
-        };
+    try {
+      // 1. Construct UpdateStaffDto
+      const updateData: UpdateStaffDto = {
+        fullName: formData.fullName,
+        gender: formData.gender,
+        birthday: formData.birthDate, // Map back if needed
+        phone: formData.phone,
+        email: formData.email,
+        address: formData.addressDetail,
+        city: formData.city, // simplified Addr
+        idCard: formData.idCard,
+        position: formData.position,
+        department: "TBD", // hidden field
+        hireDate: formData.joinDate,
+        status: editingStaff.status, // keep existing status or use specific field
+        
+        // Account 
+        username: accountForm.username,
+        password: accountForm.password, // Only if changed
+        roleId: selectedRoleId ? Number(selectedRoleId) : undefined,
+
+        // Salary
+        salaryType: salarySettings.salaryType === 'fixed' ? 'monthly' : 'hourly',
+        baseRate: Number(salarySettings.salaryAmount) || 0
+      };
+
+      // Sanitize optional fields
+      if (!updateData.email) delete updateData.email;
+      if (!updateData.username) {
+        delete updateData.username;
+        delete updateData.password;
+        delete updateData.roleId;
+      } else if (!updateData.password) {
+        delete updateData.password; // Don't send empty password if not changing
       }
-      return staff;
-    });
 
-    setStaffMembers(updatedStaff);
-    toast.success("Đã cập nhật thông tin nhân viên");
-    setEditDialogOpen(false);
-    setEditingStaff(null);
-    resetForm();
-  };
+      // 2. Call API
+      await staffApi.update(Number(editingStaff.id), updateData);
 
-  const handleDelete = (staff: StaffMember) => {
-    if (confirm(`Bạn có chắc muốn xóa nhân viên ${staff.fullName}?`)) {
-      setStaffMembers(staffMembers.filter((s) => s.id !== staff.id));
-      toast.success("Đã xóa nhân viên");
+      // 3. Success
+      toast.success("Cập nhật thông tin nhân viên thành công");
+      
+      // 4. Refresh List
+      await fetchStaffs(); // Await to ensure refresh completes
+      setEditDialogOpen(false);
+      
+    } catch (error) {
+      console.error(error);
+      toast.error("Lỗi khi cập nhật nhân viên");
     }
   };
 
-  const handleToggleStatus = (id: string) => {
-    setStaffMembers(
-      staffMembers.map((staff) =>
-        staff.id === id
-          ? {
-            ...staff,
-            status: staff.status === "active" ? "inactive" : "active",
-          }
-          : staff
-      )
-    );
-    toast.success(
-      staffMembers.find((s) => s.id === id)?.status === "active"
-        ? "Đã vô hiệu hóa nhân viên"
-        : "Đã kích hoạt nhân viên"
-    );
+  const handleDelete = async (staff: StaffMember) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa nhân viên "${staff.fullName}"?`)) {
+      return;
+    }
+
+    try {
+      await staffApi.delete(Number(staff.id));
+      
+      // Refresh List
+      fetchStaffs();
+      
+      toast.success("Đã xóa nhân viên");
+    } catch (error) {
+      console.error(error);
+      toast.error("Lỗi khi xóa nhân viên");
+    }
+  };
+
+  const handleToggleStatus = async (id: string) => {
+    try {
+      const staffRef = staffMembers.find((s) => s.id === id);
+      if (!staffRef) return;
+
+      const newStatus = staffRef.status === "active" ? "inactive" : "active";
+      
+      // Optimistic update
+      setStaffMembers(
+        staffMembers.map((staff) =>
+          staff.id === id ? { ...staff, status: newStatus as "active" | "inactive" } : staff
+        )
+      );
+
+      // Call API
+      await staffApi.update(Number(id), { 
+        status: newStatus 
+      } as any);
+
+      toast.success(
+        newStatus === "inactive"
+          ? "Đã vô hiệu hóa nhân viên"
+          : "Đã kích hoạt nhân viên"
+      );
+    } catch (error) {
+       console.error(error);
+       toast.error("Lỗi khi cập nhật trạng thái");
+       fetchStaffs(); // Revert on error
+    }
   };
 
   return (
@@ -803,7 +931,10 @@ export function Staff({
             {canCreate('staff') && (
               <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button className="bg-blue-600 hover:bg-blue-700">
+                  <Button 
+                    className="bg-blue-600 hover:bg-blue-700"
+                    onClick={handleAddNew}
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Thêm nhân viên
                   </Button>
@@ -897,8 +1028,9 @@ export function Staff({
                                   <SelectValue placeholder="Chọn giới tính" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="male">Nam</SelectItem>
-                                  <SelectItem value="female">Nữ</SelectItem>
+                                  <SelectItem value="Nam">Nam</SelectItem>
+                                  <SelectItem value="Nữ">Nữ</SelectItem>
+                                  <SelectItem value="Khác">Khác</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -977,7 +1109,7 @@ export function Staff({
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <Label>
-                                Thành phố <span className="text-red-500">*</span>
+                                Thành phố
                               </Label>
                               <div className="mt-1.5">
                                 <SimpleSearchSelect
@@ -996,7 +1128,7 @@ export function Staff({
                             </div>
                             <div>
                               <Label>
-                                Phường/Xã <span className="text-red-500">*</span>
+                                Phường/Xã
                               </Label>
                               <div className="mt-1.5">
                                 <SimpleSearchSelect
@@ -1017,7 +1149,6 @@ export function Staff({
                             <div className="col-span-2">
                               <Label>
                                 Địa chỉ cụ thể{" "}
-                                <span className="text-red-500">*</span>
                               </Label>
                               <Input
                                 placeholder="VD: Số nhà, tên đường..."
@@ -1081,508 +1212,31 @@ export function Staff({
                               </div>
                             </div>
 
-                            {/* Mức lương và Thiết lập nâng cao */}
-                            <div className="flex items-center justify-between px-4 py-3 border-b">
-                              {/* Div 1: Mức lương */}
-                              <div className="flex items-center">
-                                <Label className="text-sm font-normal">
-                                  Mức lương{" "}
-                                  <span className="text-red-500">*</span>
+                            {/* Mức lương */}
+                            <div className="flex items-center px-4 py-3 border-b">
+                                <Label className="text-sm font-normal w-32">
+                                  Mức lương <span className="text-red-500">*</span>
                                 </Label>
-                                {salarySettings.salaryType === "fixed" ||
-                                  (salarySettings.salaryType === "shift" &&
-                                    !salarySettings.advancedSetup) ? (
-                                  <div className="ml-5 flex items-center gap-2 px-4">
+                                <div className="flex items-center gap-2">
                                     <Input
                                       type="text"
                                       placeholder="0"
-                                      value={formatVNCurrency(
-                                        salarySettings.salaryAmount
-                                      )}
+                                      value={formatVNCurrency(salarySettings.salaryAmount)}
                                       onChange={(e) => {
-                                        const rawValue = parseVNCurrency(
-                                          e.target.value
-                                        );
-                                        if (
-                                          rawValue === "" ||
-                                          /^\d+$/.test(rawValue)
-                                        ) {
-                                          setSalarySettings({
-                                            ...salarySettings,
-                                            salaryAmount: rawValue,
-                                          });
+                                        const rawValue = parseVNCurrency(e.target.value);
+                                        if (rawValue === "" || /^\d+$/.test(rawValue)) {
+                                          setSalarySettings({ ...salarySettings, salaryAmount: rawValue });
                                         }
                                       }}
                                       className="w-48 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                                     />
                                     <span className="text-sm text-slate-600 whitespace-nowrap">
-                                      {salarySettings.salaryType === "shift"
-                                        ? "/ ca"
-                                        : "/ kỳ lương"}
+                                      {salarySettings.salaryType === "shift" ? "/ ca" : "/ kỳ lương"}
                                     </span>
-                                  </div>
-                                ) : null}
-                              </div>
-
-                              {/* Div 2: Thiết lập nâng cao */}
-                              {salarySettings.salaryType === "shift" && (
-                                <div className="flex items-center gap-3">
-                                  <Label className="text-sm font-normal">
-                                    Thiết lập nâng cao
-                                  </Label>
-                                  <Switch
-                                    checked={salarySettings.advancedSetup}
-                                    onCheckedChange={(checked) => {
-                                      // Sync giá trị từ mức lương vào cell lương/ca khi mở thiết lập nâng cao
-                                      if (
-                                        checked &&
-                                        salarySettings.salaryAmount
-                                      ) {
-                                        const defaultShift =
-                                          salarySettings.shifts.find(
-                                            (s) => s.id === "default"
-                                          );
-                                        if (defaultShift) {
-                                          const updatedShifts =
-                                            salarySettings.shifts.map((s) =>
-                                              s.id === "default"
-                                                ? {
-                                                  ...s,
-                                                  salaryPerShift:
-                                                    salarySettings.salaryAmount,
-                                                }
-                                                : s
-                                            );
-                                          setSalarySettings({
-                                            ...salarySettings,
-                                            advancedSetup: checked,
-                                            shifts: updatedShifts,
-                                          });
-                                        } else {
-                                          setSalarySettings({
-                                            ...salarySettings,
-                                            advancedSetup: checked,
-                                          });
-                                        }
-                                      } else {
-                                        setSalarySettings({
-                                          ...salarySettings,
-                                          advancedSetup: checked,
-                                        });
-                                      }
-                                    }}
-                                  />
                                 </div>
-                              )}
                             </div>
-
-                            {salarySettings.salaryType === "shift" &&
-                              salarySettings.advancedSetup && (
-                                <div className="border-b rounded-b-lg overflow-hidden">
-                                  <div className="overflow-x-auto">
-                                    <Table>
-                                      <TableHeader>
-                                        <TableRow>
-                                          <TableHead className="w-40">
-                                            Ca
-                                          </TableHead>
-                                          <TableHead className="w-40">
-                                            Lương/ca
-                                          </TableHead>
-                                          <TableHead className="w-32">
-                                            Thứ 7
-                                          </TableHead>
-                                          <TableHead className="w-32">
-                                            Chủ nhật
-                                          </TableHead>
-                                          <TableHead className="w-32">
-                                            Ngày nghỉ
-                                          </TableHead>
-                                          <TableHead className="w-32">
-                                            Ngày lễ tết
-                                          </TableHead>
-                                          <TableHead className="w-16"></TableHead>
-                                        </TableRow>
-                                      </TableHeader>
-                                      <TableBody>
-                                        {salarySettings.shifts.map((shift) => (
-                                          <TableRow key={shift.id}>
-                                            <TableCell className="font-medium">
-                                              {shift.id === "default" ? (
-                                                shift.name
-                                              ) : (
-                                                <Select
-                                                  value={shift.name}
-                                                  onValueChange={(value) => {
-                                                    const updatedShifts =
-                                                      salarySettings.shifts.map(
-                                                        (s) =>
-                                                          s.id === shift.id
-                                                            ? {
-                                                              ...s,
-                                                              name: value,
-                                                            }
-                                                            : s
-                                                      );
-                                                    setSalarySettings({
-                                                      ...salarySettings,
-                                                      shifts: updatedShifts,
-                                                    });
-                                                  }}
-                                                >
-                                                  <SelectTrigger className="h-8 bg-white border-slate-300 shadow-none">
-                                                    <SelectValue />
-                                                  </SelectTrigger>
-                                                  <SelectContent>
-                                                    {shiftTypes.map((st) => (
-                                                      <SelectItem
-                                                        key={st.value}
-                                                        value={st.value}
-                                                      >
-                                                        {st.label}
-                                                      </SelectItem>
-                                                    ))}
-                                                  </SelectContent>
-                                                </Select>
-                                              )}
-                                            </TableCell>
-                                            <TableCell>
-                                              <Input
-                                                type="text"
-                                                value={formatVNCurrency(
-                                                  shift.salaryPerShift
-                                                )}
-                                                onChange={(e) => {
-                                                  const rawValue =
-                                                    parseVNCurrency(
-                                                      e.target.value
-                                                    );
-                                                  if (
-                                                    rawValue === "" ||
-                                                    /^\d+$/.test(rawValue)
-                                                  ) {
-                                                    const updatedShifts =
-                                                      salarySettings.shifts.map(
-                                                        (s) =>
-                                                          s.id === shift.id
-                                                            ? {
-                                                              ...s,
-                                                              salaryPerShift:
-                                                                rawValue,
-                                                            }
-                                                            : s
-                                                      );
-                                                    setSalarySettings({
-                                                      ...salarySettings,
-                                                      shifts: updatedShifts,
-                                                    });
-                                                  }
-                                                }}
-                                                className="h-8 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                                              />
-                                            </TableCell>
-                                            <TableCell>
-                                              <CoefficientInput
-                                                value={shift.saturdayCoeff}
-                                                onChange={(value) => {
-                                                  const updatedShifts =
-                                                    salarySettings.shifts.map(
-                                                      (s) =>
-                                                        s.id === shift.id
-                                                          ? {
-                                                            ...s,
-                                                            saturdayCoeff:
-                                                              value,
-                                                          }
-                                                          : s
-                                                    );
-                                                  setSalarySettings({
-                                                    ...salarySettings,
-                                                    shifts: updatedShifts,
-                                                  });
-                                                }}
-                                                placeholder="100%"
-                                              />
-                                            </TableCell>
-                                            <TableCell>
-                                              <CoefficientInput
-                                                value={shift.sundayCoeff}
-                                                onChange={(value) => {
-                                                  const updatedShifts =
-                                                    salarySettings.shifts.map(
-                                                      (s) =>
-                                                        s.id === shift.id
-                                                          ? {
-                                                            ...s,
-                                                            sundayCoeff: value,
-                                                          }
-                                                          : s
-                                                    );
-                                                  setSalarySettings({
-                                                    ...salarySettings,
-                                                    shifts: updatedShifts,
-                                                  });
-                                                }}
-                                                placeholder="100%"
-                                              />
-                                            </TableCell>
-                                            <TableCell>
-                                              <CoefficientInput
-                                                value={shift.dayOffCoeff}
-                                                onChange={(value) => {
-                                                  const updatedShifts =
-                                                    salarySettings.shifts.map(
-                                                      (s) =>
-                                                        s.id === shift.id
-                                                          ? {
-                                                            ...s,
-                                                            dayOffCoeff: value,
-                                                          }
-                                                          : s
-                                                    );
-                                                  setSalarySettings({
-                                                    ...salarySettings,
-                                                    shifts: updatedShifts,
-                                                  });
-                                                }}
-                                                placeholder="100%"
-                                              />
-                                            </TableCell>
-                                            <TableCell>
-                                              <CoefficientInput
-                                                value={shift.holidayCoeff}
-                                                onChange={(value) => {
-                                                  const updatedShifts =
-                                                    salarySettings.shifts.map(
-                                                      (s) =>
-                                                        s.id === shift.id
-                                                          ? {
-                                                            ...s,
-                                                            holidayCoeff: value,
-                                                          }
-                                                          : s
-                                                    );
-                                                  setSalarySettings({
-                                                    ...salarySettings,
-                                                    shifts: updatedShifts,
-                                                  });
-                                                }}
-                                                placeholder="100%"
-                                              />
-                                            </TableCell>
-                                            <TableCell>
-                                              {shift.id !== "default" && (
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                                                  onClick={() => {
-                                                    const updatedShifts =
-                                                      salarySettings.shifts.filter(
-                                                        (s) => s.id !== shift.id
-                                                      );
-                                                    setSalarySettings({
-                                                      ...salarySettings,
-                                                      shifts: updatedShifts,
-                                                    });
-                                                  }}
-                                                >
-                                                  <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                              )}
-                                            </TableCell>
-                                          </TableRow>
-                                        ))}
-                                      </TableBody>
-                                    </Table>
-                                  </div>
-                                  <div className="p-3 border-t">
-                                    <Button
-                                      variant="link"
-                                      className="text-blue-600 p-0 h-auto"
-                                      onClick={() => {
-                                        // Tìm ca chưa được sử dụng
-                                        const usedShifts = salarySettings.shifts
-                                          .filter((s) => s.id !== "default")
-                                          .map((s) => s.name);
-                                        const availableShift = shiftTypes.find(
-                                          (st) => !usedShifts.includes(st.value)
-                                        );
-
-                                        const newShift = {
-                                          id: `shift-${Date.now()}`,
-                                          name:
-                                            availableShift?.value || "Ca sáng",
-                                          salaryPerShift: "0",
-                                          saturdayCoeff: "100%",
-                                          sundayCoeff: "100%",
-                                          dayOffCoeff: "100%",
-                                          holidayCoeff: "100%",
-                                        };
-                                        setSalarySettings({
-                                          ...salarySettings,
-                                          shifts: [
-                                            ...salarySettings.shifts,
-                                            newShift,
-                                          ],
-                                        });
-                                      }}
-                                    >
-                                      + Thêm điều kiện
-                                    </Button>
-                                  </div>
-                                </div>
-                              )}
-                          </div>
+                            </div>
                         </div>
-
-                        {/* Overtime Salary Section */}
-                        {salarySettings.salaryType === "shift" && (
-                          <div>
-                            <div className="space-y-0 border-t border-l border-r rounded-lg">
-                              <div className="flex items-center justify-between px-4 py-3 border-b">
-                                <Label className="text-sm font-normal">
-                                  Lương làm thêm giờ
-                                </Label>
-                                <Switch
-                                  checked={salarySettings.overtimeEnabled}
-                                  onCheckedChange={(checked) =>
-                                    setSalarySettings({
-                                      ...salarySettings,
-                                      overtimeEnabled: checked,
-                                    })
-                                  }
-                                />
-                              </div>
-
-                              {salarySettings.overtimeEnabled && (
-                                <div className="border-b rounded-b-lg overflow-hidden">
-                                  <div className="overflow-x-auto">
-                                    <Table>
-                                      <TableHeader>
-                                        <TableRow>
-                                          <TableHead className="w-32"></TableHead>
-                                          <TableHead className="w-32">
-                                            Ngày thường
-                                          </TableHead>
-                                          <TableHead className="w-32">
-                                            Thứ 7
-                                          </TableHead>
-                                          <TableHead className="w-32">
-                                            Chủ nhật
-                                          </TableHead>
-                                          <TableHead className="w-32">
-                                            Ngày nghỉ
-                                          </TableHead>
-                                          <TableHead className="w-32">
-                                            Ngày lễ tết
-                                          </TableHead>
-                                        </TableRow>
-                                      </TableHeader>
-                                      <TableBody>
-                                        <TableRow>
-                                          <TableCell className="font-medium">
-                                            Hệ số lương trên giờ
-                                          </TableCell>
-                                          <TableCell>
-                                            <CoefficientInput
-                                              value={
-                                                salarySettings.overtimeCoeffs
-                                                  .weekday
-                                              }
-                                              onChange={(value) => {
-                                                setSalarySettings({
-                                                  ...salarySettings,
-                                                  overtimeCoeffs: {
-                                                    ...salarySettings.overtimeCoeffs,
-                                                    weekday: value,
-                                                  },
-                                                });
-                                              }}
-                                              placeholder="50%"
-                                            />
-                                          </TableCell>
-                                          <TableCell>
-                                            <CoefficientInput
-                                              value={
-                                                salarySettings.overtimeCoeffs
-                                                  .saturday
-                                              }
-                                              onChange={(value) => {
-                                                setSalarySettings({
-                                                  ...salarySettings,
-                                                  overtimeCoeffs: {
-                                                    ...salarySettings.overtimeCoeffs,
-                                                    saturday: value,
-                                                  },
-                                                });
-                                              }}
-                                              placeholder="100%"
-                                            />
-                                          </TableCell>
-                                          <TableCell>
-                                            <CoefficientInput
-                                              value={
-                                                salarySettings.overtimeCoeffs
-                                                  .sunday
-                                              }
-                                              onChange={(value) => {
-                                                setSalarySettings({
-                                                  ...salarySettings,
-                                                  overtimeCoeffs: {
-                                                    ...salarySettings.overtimeCoeffs,
-                                                    sunday: value,
-                                                  },
-                                                });
-                                              }}
-                                              placeholder="100%"
-                                            />
-                                          </TableCell>
-                                          <TableCell>
-                                            <CoefficientInput
-                                              value={
-                                                salarySettings.overtimeCoeffs
-                                                  .dayOff
-                                              }
-                                              onChange={(value) => {
-                                                setSalarySettings({
-                                                  ...salarySettings,
-                                                  overtimeCoeffs: {
-                                                    ...salarySettings.overtimeCoeffs,
-                                                    dayOff: value,
-                                                  },
-                                                });
-                                              }}
-                                              placeholder="100%"
-                                            />
-                                          </TableCell>
-                                          <TableCell>
-                                            <CoefficientInput
-                                              value={
-                                                salarySettings.overtimeCoeffs
-                                                  .holiday
-                                              }
-                                              onChange={(value) => {
-                                                setSalarySettings({
-                                                  ...salarySettings,
-                                                  overtimeCoeffs: {
-                                                    ...salarySettings.overtimeCoeffs,
-                                                    holiday: value,
-                                                  },
-                                                });
-                                              }}
-                                              placeholder="100%"
-                                            />
-                                          </TableCell>
-                                        </TableRow>
-                                      </TableBody>
-                                    </Table>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </TabsContent>
 
@@ -1593,32 +1247,19 @@ export function Staff({
                           <Label>Tên đăng nhập <span className="text-red-500">*</span></Label>
                           <Input
                             placeholder="Tên đăng nhập"
-                            value={formData.username || ''}
-                            onChange={e => setFormData({ ...formData, username: e.target.value })}
+                            value={accountForm.username || ''}
+                            onChange={e => setAccountForm({ ...accountForm, username: e.target.value })}
                             className="mt-1.5 bg-white border-slate-300 shadow-none"
                           />
                         </div>
                         {/* Password */}
                         <div>
                           <Label>Mật khẩu <span className="text-red-500">*</span></Label>
-                          <div className="relative">
-                            <Input
-                              type={formData.showPassword ? 'text' : 'password'}
-                              placeholder="Mật khẩu"
-                              value={formData.password || ''}
-                              onChange={e => setFormData({ ...formData, password: e.target.value })}
-                              className="mt-1.5 bg-white border-slate-300 shadow-none pr-10"
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-slate-500 hover:text-slate-700"
-                              onClick={() => setFormData({ ...formData, showPassword: !formData.showPassword })}
-                            >
-                              {formData.showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </Button>
-                          </div>
+                          <PasswordInput 
+                                value={accountForm.password || ''}
+                                onChange={e => setAccountForm({ ...accountForm, password: e.target.value })}
+                                placeholder="Mật khẩu"
+                          />
                         </div>
                         {/* Existing account select (optional) */}
                         <div className="space-y-4">
@@ -1628,8 +1269,8 @@ export function Staff({
                               <SelectValue placeholder="Chọn loại tài khoản..." />
                             </SelectTrigger>
                             <SelectContent>
-                              {initialRoles.map(role => (
-                                <SelectItem key={role.id} value={role.id}>
+                              {roles.map(role => (
+                                <SelectItem key={role.id} value={role.id.toString()}>
                                   {role.name}
                                 </SelectItem>
                               ))}
@@ -1642,8 +1283,12 @@ export function Staff({
                       </div>
                     </TabsContent>
                   </Tabs>
-
-                  <DialogFooter>
+                    <div className="mt-4 bg-slate-50 p-3 rounded-lg">
+                      <p className="text-xs text-slate-600">
+                        <span className="text-red-500">*</span> Trường bắt buộc
+                      </p>
+                    </div>
+                    <DialogFooter>
                     <Button
                       variant="outline"
                       onClick={() => setAddDialogOpen(false)}
@@ -1848,7 +1493,7 @@ export function Staff({
                           <TableCell className="text-sm text-slate-700">{staff.phone}</TableCell>
                           <TableCell className="text-sm text-slate-700">{staff.idCard}</TableCell>
                           <TableCell className="text-sm text-slate-700">
-                            {new Date(staff.joinDate).toLocaleDateString("vi-VN")}
+                            {staff.joinDate ? new Date(staff.joinDate).toLocaleDateString("vi-VN") : "Chưa cập nhật"}
                           </TableCell>
                           <TableCell className="text-sm">
                             <Badge
@@ -1875,38 +1520,44 @@ export function Staff({
                           </TableCell>
                           <TableCell className="text-sm">
                             <div className="flex gap-1 justify-center">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                onClick={() => handleEdit(staff)}
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                                onClick={() => handleDelete(staff)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleToggleStatus(staff.id)}
-                                className={
-                                  staff.status === "active"
-                                    ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                                }
-                              >
-                                {staff.status === "active" ? (
-                                  <PowerOff className="w-4 h-4" />
-                                ) : (
-                                  <Power className="w-4 h-4" />
-                                )}
-                              </Button>
+                              {canUpdate('staff') && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => handleEdit(staff)}
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {canDelete('staff') && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                  onClick={() => handleDelete(staff)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {canUpdate('staff') && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleToggleStatus(staff.id)}
+                                  className={
+                                    staff.status === "active"
+                                      ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                  }
+                                >
+                                  {staff.status === "active" ? (
+                                    <PowerOff className="w-4 h-4" />
+                                  ) : (
+                                    <Power className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -1998,8 +1649,9 @@ export function Staff({
                           <SelectValue placeholder="Chọn giới tính" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="male">Nam</SelectItem>
-                          <SelectItem value="female">Nữ</SelectItem>
+                          <SelectItem value="Nam">Nam</SelectItem>
+                          <SelectItem value="Nữ">Nữ</SelectItem>
+                          <SelectItem value="Khác">Khác</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -2063,23 +1715,8 @@ export function Staff({
                         className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                       />
                     </div>
-                    <div className="col-span-2">
-                      <Label>
-                        Lương cơ bản (VNĐ){" "}
-                        <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        value={formData.salary}
-                        onChange={(e) =>
-                          setFormData({ ...formData, salary: e.target.value })
-                        }
-                        className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                      />
-                    </div>
-                  </div>
                 </div>
+              </div>
 
                 {/* Address Information */}
                 <div className="border-t pt-6">
@@ -2087,7 +1724,7 @@ export function Staff({
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>
-                        Thành phố <span className="text-red-500">*</span>
+                        Thành phố
                       </Label>
                       <div className="mt-1.5">
                         <SimpleSearchSelect
@@ -2102,7 +1739,7 @@ export function Staff({
                     </div>
                     <div>
                       <Label>
-                        Phường/Xã <span className="text-red-500">*</span>
+                        Phường/Xã
                       </Label>
                       <div className="mt-1.5">
                         <SimpleSearchSelect
@@ -2120,7 +1757,7 @@ export function Staff({
                     </div>
                     <div className="col-span-2">
                       <Label>
-                        Địa chỉ cụ thể <span className="text-red-500">*</span>
+                        Địa chỉ
                       </Label>
                       <Input
                         placeholder="VD: Số nhà, tên đường..."
@@ -2189,459 +1826,31 @@ export function Staff({
                       </div>
                     </div>
 
-                    {/* Mức lương và Thiết lập nâng cao */}
-                    <div className="flex items-center justify-between px-4 py-3 border-b">
-                      {/* Div 1: Mức lương */}
-                      <div className="flex items-center">
-                        <Label className="text-sm font-normal">
+                    {/* Mức lương */}
+                    <div className="flex items-center px-4 py-3 border-b">
+                        <Label className="text-sm font-normal w-32">
                           Mức lương <span className="text-red-500">*</span>
                         </Label>
-                        {salarySettings.salaryType === "fixed" ||
-                          (salarySettings.salaryType === "shift" &&
-                            !salarySettings.advancedSetup) ? (
-                          <div className="ml-5 flex items-center gap-2 px-4">
+                        <div className="flex items-center gap-2">
                             <Input
                               type="text"
                               placeholder="0"
-                              value={formatVNCurrency(
-                                salarySettings.salaryAmount
-                              )}
+                              value={formatVNCurrency(salarySettings.salaryAmount)}
                               onChange={(e) => {
-                                const rawValue = parseVNCurrency(
-                                  e.target.value
-                                );
+                                const rawValue = parseVNCurrency(e.target.value);
                                 if (rawValue === "" || /^\d+$/.test(rawValue)) {
-                                  setSalarySettings({
-                                    ...salarySettings,
-                                    salaryAmount: rawValue,
-                                  });
+                                  setSalarySettings({ ...salarySettings, salaryAmount: rawValue });
                                 }
                               }}
                               className="w-48 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                             />
                             <span className="text-sm text-slate-600 whitespace-nowrap">
-                              {salarySettings.salaryType === "shift"
-                                ? "/ ca"
-                                : "/ kỳ lương"}
+                              {salarySettings.salaryType === "shift" ? "/ ca" : "/ kỳ lương"}
                             </span>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      {/* Div 2: Thiết lập nâng cao */}
-                      {salarySettings.salaryType === "shift" && (
-                        <div className="flex items-center gap-3">
-                          <Label className="text-sm font-normal">
-                            Thiết lập nâng cao
-                          </Label>
-                          <Switch
-                            checked={salarySettings.advancedSetup}
-                            onCheckedChange={(checked) => {
-                              if (checked && salarySettings.salaryAmount) {
-                                const defaultShift = salarySettings.shifts.find(
-                                  (s) => s.id === "default"
-                                );
-                                if (defaultShift) {
-                                  const updatedShifts =
-                                    salarySettings.shifts.map((s) =>
-                                      s.id === "default"
-                                        ? {
-                                          ...s,
-                                          salaryPerShift:
-                                            salarySettings.salaryAmount,
-                                        }
-                                        : s
-                                    );
-                                  setSalarySettings({
-                                    ...salarySettings,
-                                    advancedSetup: checked,
-                                    shifts: updatedShifts,
-                                  });
-                                } else {
-                                  setSalarySettings({
-                                    ...salarySettings,
-                                    advancedSetup: checked,
-                                  });
-                                }
-                              } else {
-                                setSalarySettings({
-                                  ...salarySettings,
-                                  advancedSetup: checked,
-                                });
-                              }
-                            }}
-                          />
                         </div>
-                      )}
                     </div>
-
-                    {salarySettings.salaryType === "shift" &&
-                      salarySettings.advancedSetup && (
-                        <div className="border-b rounded-b-lg overflow-hidden">
-                          <div className="overflow-x-auto">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead className="w-40">Ca</TableHead>
-                                  <TableHead className="w-40">
-                                    Lương/ca
-                                  </TableHead>
-                                  <TableHead className="w-32">Thứ 7</TableHead>
-                                  <TableHead className="w-32">
-                                    Chủ nhật
-                                  </TableHead>
-                                  <TableHead className="w-32">
-                                    Ngày nghỉ
-                                  </TableHead>
-                                  <TableHead className="w-32">
-                                    Ngày lễ tết
-                                  </TableHead>
-                                  <TableHead className="w-16"></TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {salarySettings.shifts.map((shift) => (
-                                  <TableRow key={shift.id}>
-                                    <TableCell className="font-medium">
-                                      {shift.id === "default" ? (
-                                        shift.name
-                                      ) : (
-                                        <Select
-                                          value={shift.name}
-                                          onValueChange={(value) => {
-                                            const updatedShifts =
-                                              salarySettings.shifts.map((s) =>
-                                                s.id === shift.id
-                                                  ? { ...s, name: value }
-                                                  : s
-                                              );
-                                            setSalarySettings({
-                                              ...salarySettings,
-                                              shifts: updatedShifts,
-                                            });
-                                          }}
-                                        >
-                                          <SelectTrigger className="h-8 bg-white border-slate-300 shadow-none">
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            {shiftTypes.map((st) => (
-                                              <SelectItem
-                                                key={st.value}
-                                                value={st.value}
-                                              >
-                                                {st.label}
-                                              </SelectItem>
-                                            ))}
-                                          </SelectContent>
-                                        </Select>
-                                      )}
-                                    </TableCell>
-                                    <TableCell>
-                                      <Input
-                                        type="text"
-                                        value={formatVNCurrency(
-                                          shift.salaryPerShift
-                                        )}
-                                        onChange={(e) => {
-                                          const rawValue = parseVNCurrency(
-                                            e.target.value
-                                          );
-                                          if (
-                                            rawValue === "" ||
-                                            /^\d+$/.test(rawValue)
-                                          ) {
-                                            const updatedShifts =
-                                              salarySettings.shifts.map((s) =>
-                                                s.id === shift.id
-                                                  ? {
-                                                    ...s,
-                                                    salaryPerShift: rawValue,
-                                                  }
-                                                  : s
-                                              );
-                                            setSalarySettings({
-                                              ...salarySettings,
-                                              shifts: updatedShifts,
-                                            });
-                                          }
-                                        }}
-                                        className="h-8 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                                      />
-                                    </TableCell>
-                                    <TableCell>
-                                      <CoefficientInput
-                                        value={shift.saturdayCoeff}
-                                        onChange={(value) => {
-                                          const updatedShifts =
-                                            salarySettings.shifts.map((s) =>
-                                              s.id === shift.id
-                                                ? { ...s, saturdayCoeff: value }
-                                                : s
-                                            );
-                                          setSalarySettings({
-                                            ...salarySettings,
-                                            shifts: updatedShifts,
-                                          });
-                                        }}
-                                        placeholder="100%"
-                                      />
-                                    </TableCell>
-                                    <TableCell>
-                                      <CoefficientInput
-                                        value={shift.sundayCoeff}
-                                        onChange={(value) => {
-                                          const updatedShifts =
-                                            salarySettings.shifts.map((s) =>
-                                              s.id === shift.id
-                                                ? { ...s, sundayCoeff: value }
-                                                : s
-                                            );
-                                          setSalarySettings({
-                                            ...salarySettings,
-                                            shifts: updatedShifts,
-                                          });
-                                        }}
-                                        placeholder="100%"
-                                      />
-                                    </TableCell>
-                                    <TableCell>
-                                      <CoefficientInput
-                                        value={shift.dayOffCoeff}
-                                        onChange={(value) => {
-                                          const updatedShifts =
-                                            salarySettings.shifts.map((s) =>
-                                              s.id === shift.id
-                                                ? { ...s, dayOffCoeff: value }
-                                                : s
-                                            );
-                                          setSalarySettings({
-                                            ...salarySettings,
-                                            shifts: updatedShifts,
-                                          });
-                                        }}
-                                        placeholder="100%"
-                                      />
-                                    </TableCell>
-                                    <TableCell>
-                                      <CoefficientInput
-                                        value={shift.holidayCoeff}
-                                        onChange={(value) => {
-                                          const updatedShifts =
-                                            salarySettings.shifts.map((s) =>
-                                              s.id === shift.id
-                                                ? { ...s, holidayCoeff: value }
-                                                : s
-                                            );
-                                          setSalarySettings({
-                                            ...salarySettings,
-                                            shifts: updatedShifts,
-                                          });
-                                        }}
-                                        placeholder="100%"
-                                      />
-                                    </TableCell>
-                                    <TableCell>
-                                      {shift.id !== "default" && (
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                                          onClick={() => {
-                                            const updatedShifts =
-                                              salarySettings.shifts.filter(
-                                                (s) => s.id !== shift.id
-                                              );
-                                            setSalarySettings({
-                                              ...salarySettings,
-                                              shifts: updatedShifts,
-                                            });
-                                          }}
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </Button>
-                                      )}
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                          <div className="p-3 border-t">
-                            <Button
-                              variant="link"
-                              className="text-blue-600 p-0 h-auto"
-                              onClick={() => {
-                                const usedShifts = salarySettings.shifts
-                                  .filter((s) => s.id !== "default")
-                                  .map((s) => s.name);
-                                const availableShift = shiftTypes.find(
-                                  (st) => !usedShifts.includes(st.value)
-                                );
-
-                                const newShift = {
-                                  id: `shift-${Date.now()}`,
-                                  name: availableShift?.value || "Ca sáng",
-                                  salaryPerShift: "0",
-                                  saturdayCoeff: "100%",
-                                  sundayCoeff: "100%",
-                                  dayOffCoeff: "100%",
-                                  holidayCoeff: "100%",
-                                };
-                                setSalarySettings({
-                                  ...salarySettings,
-                                  shifts: [...salarySettings.shifts, newShift],
-                                });
-                              }}
-                            >
-                              + Thêm điều kiện
-                            </Button>
-                          </div>
-                        </div>
-                      )}
                   </div>
                 </div>
-
-                {/* Overtime Salary Section */}
-                {salarySettings.salaryType === "shift" && (
-                  <div>
-                    <div className="space-y-0 border-t border-l border-r rounded-lg">
-                      <div className="flex items-center justify-between px-4 py-3 border-b">
-                        <Label className="text-sm font-normal">
-                          Lương làm thêm giờ
-                        </Label>
-                        <Switch
-                          checked={salarySettings.overtimeEnabled}
-                          onCheckedChange={(checked) =>
-                            setSalarySettings({
-                              ...salarySettings,
-                              overtimeEnabled: checked,
-                            })
-                          }
-                        />
-                      </div>
-
-                      {salarySettings.overtimeEnabled && (
-                        <div className="border-b rounded-b-lg overflow-hidden">
-                          <div className="overflow-x-auto">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead className="w-32"></TableHead>
-                                  <TableHead className="w-32">
-                                    Ngày thường
-                                  </TableHead>
-                                  <TableHead className="w-32">Thứ 7</TableHead>
-                                  <TableHead className="w-32">
-                                    Chủ nhật
-                                  </TableHead>
-                                  <TableHead className="w-32">
-                                    Ngày nghỉ
-                                  </TableHead>
-                                  <TableHead className="w-32">
-                                    Ngày lễ tết
-                                  </TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                <TableRow>
-                                  <TableCell className="font-medium">
-                                    Hệ số lương trên giờ
-                                  </TableCell>
-                                  <TableCell>
-                                    <CoefficientInput
-                                      value={
-                                        salarySettings.overtimeCoeffs.weekday
-                                      }
-                                      onChange={(value) => {
-                                        setSalarySettings({
-                                          ...salarySettings,
-                                          overtimeCoeffs: {
-                                            ...salarySettings.overtimeCoeffs,
-                                            weekday: value,
-                                          },
-                                        });
-                                      }}
-                                      placeholder="50%"
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    <CoefficientInput
-                                      value={
-                                        salarySettings.overtimeCoeffs.saturday
-                                      }
-                                      onChange={(value) => {
-                                        setSalarySettings({
-                                          ...salarySettings,
-                                          overtimeCoeffs: {
-                                            ...salarySettings.overtimeCoeffs,
-                                            saturday: value,
-                                          },
-                                        });
-                                      }}
-                                      placeholder="100%"
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    <CoefficientInput
-                                      value={
-                                        salarySettings.overtimeCoeffs.sunday
-                                      }
-                                      onChange={(value) => {
-                                        setSalarySettings({
-                                          ...salarySettings,
-                                          overtimeCoeffs: {
-                                            ...salarySettings.overtimeCoeffs,
-                                            sunday: value,
-                                          },
-                                        });
-                                      }}
-                                      placeholder="100%"
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    <CoefficientInput
-                                      value={
-                                        salarySettings.overtimeCoeffs.dayOff
-                                      }
-                                      onChange={(value) => {
-                                        setSalarySettings({
-                                          ...salarySettings,
-                                          overtimeCoeffs: {
-                                            ...salarySettings.overtimeCoeffs,
-                                            dayOff: value,
-                                          },
-                                        });
-                                      }}
-                                      placeholder="100%"
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    <CoefficientInput
-                                      value={
-                                        salarySettings.overtimeCoeffs.holiday
-                                      }
-                                      onChange={(value) => {
-                                        setSalarySettings({
-                                          ...salarySettings,
-                                          overtimeCoeffs: {
-                                            ...salarySettings.overtimeCoeffs,
-                                            holiday: value,
-                                          },
-                                        });
-                                      }}
-                                      placeholder="100%"
-                                    />
-                                  </TableCell>
-                                </TableRow>
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             </TabsContent>
 
@@ -2678,8 +1887,8 @@ export function Staff({
                       <SelectValue placeholder="Chọn loại tài khoản..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {initialRoles.map(role => (
-                        <SelectItem key={role.id} value={role.id}>
+                      {roles.map(role => (
+                        <SelectItem key={role.id} value={role.id.toString()}>
                           {role.name}
                         </SelectItem>
                       ))}

@@ -1,6 +1,8 @@
-import { SetStateAction, useEffect, useState } from "react";
-import { getInventoryItems, getToppingItems } from "../../api/inventoryItem";
+import React, { SetStateAction, useEffect, useState } from "react";
+import { getInventoryItems, getToppingItems, getItemById } from "../../api/inventoryItem";
 import { getTables } from "../../api/table";
+import axiosClient from "../../api/axiosClient";
+
 import {
   Search,
   Plus,
@@ -100,11 +102,10 @@ import { getActiveCombos } from "../../api/combo";
 import { AccountProfileModal } from "../AccountProfileModal";
 import { useAuth } from "../../contexts/AuthContext";
 import { getCategories } from "../../api/category";
-import { getOrderByTable, getOrders, sendOrderToKitchen, checkoutOrder, mapOrderToCartItems, mapOrdersToReadyItems } from "../../api/order";
+import { getOrderByTable, getOrders, getKitchenItems, getTakeawayOrder, sendOrderToKitchen, checkoutOrder, mapOrderToCartItems, mapOrdersToReadyItems, createOrder, addOrderItem, updateOrderItem, deleteOrderItem, removeOrderItem, transferTable, mergeOrders, splitOrder, updateOrder, updateItemStatus } from "../../api/order";
 import { getAreas } from "../../api/area";
 import { getBankAccounts as fetchBankAccounts, createBankAccount as createBankAccountApi } from "../../api/finance";
 import { getCustomers } from "../../api/customer";
-import { create } from "domain";
 // Helper to safely extract array items from various API response shapes
 const extractItems = (res: any): any[] => {
   const data = res?.data ?? res;
@@ -134,9 +135,13 @@ interface Customer {
 
 interface CartItem {
   id: string;
+  orderItemId?: number; // ID from backend OrderItem (for items already in order)
+  inventoryItemId?: number | string;
   name: string;
   price: number;
   quantity: number;
+  sentQty?: number; // Quantity already sent to kitchen (default 0)
+  localQty?: number; // Quantity in local cart - if not set, equals quantity
   notes?: string;
   status?:
     | "pending"
@@ -155,14 +160,33 @@ interface CartItem {
   customization?: ItemCustomization;
   // Combo fields
   isCombo?: boolean;
-  comboId?: string;
+  comboId?: string | number;
+  comboInstanceId?: string; // Unique instance ID for distinguishing multiple identical combos
+  comboName?: string;
+  comboPrice?: number;
   comboItems?: CartItem[];
   comboExpanded?: boolean;
+  extraPrice?: number; // Extra price for combo items (upgrade fee)
   // Topping fields
   isTopping?: boolean;
   parentItemId?: string; // If this is an attached topping, store parent item ID
   attachedToppings?: CartItem[]; // If this is a main item, store its attached toppings
   basePrice?: number; // Original price before customization
+  // Gift field
+  isGift?: boolean;
+  // Status breakdown for grouped items
+  statusBreakdown?: {
+    pending: number;
+    preparing: number;
+    completed: number;
+    served: number;
+  };
+  orderItemIdsByStatus?: {
+    pending: number[];
+    preparing: number[];
+    completed: number[];
+    served: number[];
+  };
 }
 
 interface Table {
@@ -312,9 +336,10 @@ export function POSOrdering({ userRole = "waiter" }: POSOrderingProps) {
   id: t.id,
   // Normalize to remove leading "Bàn" to avoid duplicate label "Bàn Bàn 01"
   name: (t.tableName ?? String(t.id)).replace(/^Bàn\s*/i, ''),
-  number: Number(t.tableName.replace(/\D/g, '')),
+  // Guard: some BE rows may not have tableName → avoid calling replace on undefined
+  number: Number(String(t.tableName ?? t.id).replace(/\D/g, '')),
   capacity: t.capacity,
-  status: (t.currentStatus === 'OCCUPIED' ? 'occupied' : 'available') as Table['status'],
+  status: (t.currentStatus === 'occupied' ? 'occupied' : 'available') as Table['status'],
   area: (t.area?.id ?? (t as any).areaId) as number,
   createdAt: t.createdAt ? new Date(t.createdAt).getTime() : undefined,
   updatedAt: t.updatedAt ? new Date(t.updatedAt).getTime() : undefined,
@@ -357,6 +382,7 @@ useEffect(() => {
         const res = await fetchBankAccounts();
         const items = extractItems(res);
         const mapped = (items as any[]).map((ba: any) => ({
+          id: ba.id,
           bank: ba.bankFullName ?? ba.bankName ?? ba.bank ?? "Ngân hàng",
           owner: ba.owner ?? ba.ownerName ?? ba.accountOwner ?? "",
           account: ba.accountNumber ?? ba.number ?? ba.account ?? "",
@@ -380,15 +406,31 @@ useEffect(() => {
   const [noteText, setNoteText] = useState("");
   const [moveTableOpen, setMoveTableOpen] = useState(false);
   const [targetTable, setTargetTable] = useState<Table | null>(null);
-  const [orderHistoryOpen, setOrderHistoryOpen] = useState(false);
-  const [orderHistory, setOrderHistory] = useState<OrderHistoryEntry[]>([
-    { time: "12:31", action: "Tạo đơn ORD-001 tại Bàn 2", staff: "NV Minh" },
-    {
-      time: "12:35",
-      action: "Cập nhật trạng thái: Đang chế biến",
-      staff: "NV Lan",
-    },
-  ]);
+  // Cancel/Reduce Item states
+  const [cancelItemModalOpen, setCancelItemModalOpen] = useState(false);
+  const [itemToCancel, setItemToCancel] = useState<CartItem | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [otherReason, setOtherReason] = useState("");
+  const [cancelQuantity, setCancelQuantity] = useState(1);
+  
+  // Cancel Topping states
+  const [cancelToppingModalOpen, setCancelToppingModalOpen] = useState(false);
+  const [toppingToCancel, setToppingToCancel] = useState<{parentItemId: string, topping: CartItem} | null>(null);
+  const [cancelToppingReason, setCancelToppingReason] = useState("");
+  const [otherToppingReason, setOtherToppingReason] = useState("");
+  const [cancelToppingQuantity, setCancelToppingQuantity] = useState(1);
+  
+  const cancelReasons = [
+    "Khác",
+    "Khách đợi lâu",
+    "Khách không hài lòng",
+    "Khách đổi món",
+    "Khách hủy món",
+    "Nhân viên ghi sai đơn",
+  ];
+  // Topping copy dialog states (for adding quantity to sent items with toppings)
+  const [toppingCopyDialogOpen, setToppingCopyDialogOpen] = useState(false);
+  const [pendingQuantityChange, setPendingQuantityChange] = useState<{item: CartItem, quantityToAdd: number} | null>(null);
   const [mergeTableOpen, setMergeTableOpen] = useState(false);
   const [mergeTargetTable, setMergeTargetTable] = useState<Table | null>(null);
   const [splitOrderOpen, setSplitOrderOpen] = useState(false);
@@ -401,10 +443,13 @@ useEffect(() => {
   const [outOfStockItem, setOutOfStockItem] = useState<CartItem | null>(null);
   const [outOfStockIngredient, setOutOfStockIngredient] = useState<string>("");
   const [replaceItemModalOpen, setReplaceItemModalOpen] = useState(false);
-  const [globalOutOfStock, setGlobalOutOfStock] = useState<string[]>([
-    "Sữa tươi",
-    "Trân châu",
-  ]); // Mock data // itemId -> quantity to split
+  // IMPORTANT: inventoryOutageIngredients represents store-level outages coming from inventory,
+  // not kitchen per-order incidents. Keep kitchen outages scoped to the affected order item only.
+  const [inventoryOutageIngredients, setInventoryOutageIngredients] = useState<string[]>([]);
+  // UI-only kitchen outage flags (per item). These gray out product cards and ask for confirmation.
+  const [kitchenOutageItemIds, setKitchenOutageItemIds] = useState<string[]>([]);
+  const [outageConfirmOpen, setOutageConfirmOpen] = useState(false);
+  const [pendingOutageProduct, setPendingOutageProduct] = useState<(typeof products)[0] | null>(null);
   const [splitDestinationTable, setSplitDestinationTable] =
     useState<Table | null>(null);
 
@@ -424,6 +469,10 @@ useEffect(() => {
   const [selectedPromotion, setSelectedPromotion] = useState<any>(null);
   const [usedPoints, setUsedPoints] = useState(0);
 
+// Backend totals (subtotal and totalAmount)
+const [orderSubtotal, setOrderSubtotal] = useState<number>(0);
+const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
+
   // Kitchen update needed state - track when to enable send to kitchen button
   const [isKitchenUpdateNeeded, setIsKitchenUpdateNeeded] = useState(false);
 
@@ -431,8 +480,17 @@ useEffect(() => {
   const [printReceiptOpen, setPrintReceiptOpen] = useState(false);
   // Checkout modal state
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [receiptData, setReceiptData] = useState<{
+    items: any[];
+    totalAmount: number;
+    orderNumber: string;
+    customerName: string;
+    tableNumber?: string;
+  } | null>(null);
   // Track last payment method for receipt
   const [lastPaymentMethod, setLastPaymentMethod] = useState<string>("Tiền mặt");
+  // Track current order payment status to control cart adjustment behavior
+  const [orderPaymentStatus, setOrderPaymentStatus] = useState<'unpaid' | 'partial' | 'paid'>('unpaid');
 
   // Restock notification states
   const [restockedItems, setRestockedItems] = useState<string[]>([]);
@@ -461,48 +519,144 @@ useEffect(() => {
 
   // Ready items from backend (completed items across orders)
   const [readyItems, setReadyItems] = useState<ReadyItem[]>([]);
+  
+  // Combo summary map: comboId => { comboName, comboPrice }
+  const [comboSummaryMap, setComboSummaryMap] = useState<Map<number, { comboName: string; comboPrice: number }>>(new Map());
+  
+  const fetchReadyItems = async () => {
+    try {
+      // Call kitchen items API with status=completed to get items waiting to be served
+      const res = await getKitchenItems({ status: 'completed' });
+      const data = res?.data?.metaData ?? res?.data ?? [];
+      const kitchenItems: any[] = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+      
+      // Map kitchen items to ReadyItem format
+      const ready: ReadyItem[] = kitchenItems.map((item: any) => ({
+        id: String(item?.id ?? Date.now()),
+        itemName: item?.itemName ?? item?.item?.name ?? item?.name ?? 'Món',
+        totalQuantity: Number(item?.quantity ?? 1),
+        completedQuantity: Number(item?.quantity ?? 1),
+        servedQuantity: 0,
+        table: item?.table?.tableName ?? item?.tableName ?? 'Mang đi',
+        timestamp: new Date(item?.updatedAt ?? item?.createdAt ?? Date.now()),
+        notes: item?.notes ?? undefined,
+      }));
+      
+      setReadyItems(ready);
+    } catch (err: any) {
+      // Silently ignore if endpoint/shape not available, but surface toast for visibility
+      toast.error("Không tải được danh sách món chờ cung ứng", {
+        description: err?.message || "Lỗi kết nối API",
+      });
+    }
+  };
+
+  const advanceReadyItemOneUnit = async (itemId: string) => {
+    try {
+       await updateItemStatus(itemId, { status: 'served', all: false });
+       toast.success("Đã phục vụ 1 món");
+       fetchReadyItems();
+    } catch (err: any) {
+      toast.error("Lỗi cập nhật trạng thái", {
+        description: err?.message || ""
+      });
+    }
+  };
+
+  const advanceReadyItemAllUnits = async (itemId: string) => {
+    try {
+       await updateItemStatus(itemId, { status: 'served', all: true });
+       toast.success("Đã phục vụ tất cả");
+       fetchReadyItems();
+    } catch (err: any) {
+      toast.error("Lỗi cập nhật trạng thái", {
+        description: err?.message || ""
+      });
+    }
+  };
+
   useEffect(() => {
-    const fetchReady = async () => {
-      try {
-        const res = await getOrders();
-        const data = extractItems(res);
-        const d: any = data;
-        const ordersArray: any[] = Array.isArray(d)
-          ? d
-          : (Array.isArray(d?.items) ? d.items : []);
-        const ready = mapOrdersToReadyItems(ordersArray);
-        setReadyItems(ready);
-      } catch (err: any) {
-        // Silently ignore if endpoint/shape not available, but surface toast for visibility
-        toast.error("Không tải được danh sách món đã hoàn thành", {
-          description: err?.message || "Lỗi kết nối API",
-        });
-      }
-    };
-    fetchReady();
+    fetchReadyItems();
   }, []);
 
   // Lưu đơn hàng cho từng bàn
   const [tableOrders, setTableOrders] = useState<TableOrders>({});
   const [takeawayOrders, setTakeawayOrders] = useState<CartItem[]>([]);
+  const [takeawayOrderId, setTakeawayOrderId] = useState<number | null>(null);
+  const [takeawayOrderCode, setTakeawayOrderCode] = useState<string | null>(null);
+
+
+  // Restore takeaway order from local storage
+  useEffect(() => {
+    const savedId = localStorage.getItem("pos_takeaway_order_id");
+    if (savedId) {
+      setTakeawayOrderId(Number(savedId));
+      // Fetch order details
+      const fetchTakeawayOrder = async () => {
+        try {
+          const res = await axiosClient.get(`/orders/${savedId}`);
+          const orderData = res?.data?.metaData ?? res?.data;
+          
+          if (orderData && orderData.status !== 'completed' && orderData.status !== 'canceled') {
+             const newItems = mapOrderToCartItems(orderData);
+             setTakeawayOrders(newItems);
+             setTakeawayOrderCode(orderData.orderCode); // Set code from backend
+             // Restore customer if needed
+             if (orderData.customer) {
+                // Only if looking at takeaway tab? Or globally?
+                // Maybe don't auto-set global customer to avoid confusion if user is on table tab
+             }
+          } else {
+             // Order invalid or completed, clear local
+             localStorage.removeItem("pos_takeaway_order_id");
+             setTakeawayOrderId(null);
+             setTakeawayOrderCode(null);
+          }
+        } catch (e) {
+          console.error("Failed to restore takeaway order", e);
+          // If 404, clear it
+          localStorage.removeItem("pos_takeaway_order_id");
+          setTakeawayOrderId(null);
+          setTakeawayOrderCode(null);
+        }
+      };
+      fetchTakeawayOrder();
+    }
+  }, []);
+
+  // Persist takeaway order ID
+  useEffect(() => {
+    if (takeawayOrderId) {
+      localStorage.setItem("pos_takeaway_order_id", String(takeawayOrderId));
+    } else {
+      // If explicit null set (e.g. cleared), remove it. 
+      // But be careful not to remove on initial null before restore?
+      // actually initial is null. 
+      // We should only remove if we explicitly want to clear, which usually happens in handlers.
+      // But sync is good. Let's rely on handlers removing it for 'clear' events.
+      // Actually, if we set it to null, we expect it to be gone.
+      // But initial render is null. We don't want to wipe existing storage on first render.
+      // So checking inside the 'Restore' effect is key.
+    }
+  }, [takeawayOrderId]);
 
   const [tables, setTables] = useState<Table[]>([])
+  
+  // Reusable function to refresh tables list
+  const refreshTables = async () => {
+    // Gate by permission to avoid 403 for roles without table access
+    if (!hasPermission("tables:view" as any)) return;
+    try {
+      const res = await getTables();
+      const items = extractItems(res);
+      setTables(items.map(mapTableFromBE));
+    } catch (err: any) {
+      console.error("Failed to refresh tables:", err);
+    }
+  };
+  
   useEffect(() => {
-    const fetchTables = async () => {
-      // Gate by permission to avoid 403 for roles without table access
-      if (!hasPermission("tables:view" as any)) return;
-      try {
-        const res = await getTables();
-        const items = extractItems(res);
-        setTables(items.map(mapTableFromBE));
-      } catch (err: any) {
-        toast.error("Không tải được danh sách bàn", {
-          description: err?.message || "Lỗi kết nối API",
-        });
-      }
-    };
-
-    fetchTables();
+    refreshTables();
   }, [])
 
 
@@ -577,7 +731,7 @@ useEffect(() => {
             category: String(item?.category?.id ?? item.category),
             // Ensure sellingPrice is numeric to avoid string concatenation issues
             price: Number(item.sellingPrice),
-            image: '☕'
+            image: item.imageUrl ?? '☕'
           }))
         );
       } catch (err: any) {
@@ -590,6 +744,8 @@ useEffect(() => {
     fetchProducts();
   }, [])
 
+
+
   // Fetch active combos for POS and map to UI shape
   useEffect(() => {
     const fetchCombos = async () => {
@@ -597,14 +753,18 @@ useEffect(() => {
         const res = await getActiveCombos();
         const items = extractItems(res);
         const mapped: PosCombo[] = (items as any[]).map((c: any) => {
-          const groups: PosComboGroup[] = (c.groups || []).map((g: any, idx: number) => {
-            const groupItems: PosComboItem[] = (g.items || []).map((gi: any) => {
-              const itemId = String(gi.itemId ?? gi.inventoryItemId ?? gi.id ?? gi.item?.id);
+          // BE returns comboGroups (not groups)
+          const groups: PosComboGroup[] = (c.comboGroups || c.groups || []).map((g: any, idx: number) => {
+            // BE returns comboItems (not items)
+            const groupItems: PosComboItem[] = (g.comboItems || g.items || []).map((gi: any) => {
+              // BE returns gi.item with the actual item details
+              const itemData = gi.item ?? gi;
+              const itemId = String(itemData.id ?? gi.itemId ?? gi.inventoryItemId);
               const product = products.find(p => String(p.id) === itemId);
               return {
                 id: itemId,
-                name: gi.itemName ?? gi.name ?? product?.name ?? 'Món',
-                price: Number(product?.price ?? gi.price ?? 0),
+                name: itemData.name ?? gi.itemName ?? product?.name ?? 'Món',
+                price: Number(itemData.sellingPrice ?? product?.price ?? gi.price ?? 0),
                 extraPrice: gi.extraPrice != null ? Number(gi.extraPrice) : undefined,
                 category: product?.category,
                 stock: Number(gi.stock ?? 999),
@@ -613,9 +773,10 @@ useEffect(() => {
             return {
               id: String(g.id ?? g.groupId ?? `${c.id}-g${idx}`),
               name: g.name ?? g.groupName ?? `Nhóm ${idx + 1}`,
-              required: Boolean(g.required ?? (g.minSelect ?? 0) > 0),
-              minSelect: Number(g.minSelect ?? (g.required ? 1 : 0)),
-              maxSelect: Number(g.maxSelect ?? (groupItems.length || 1)),
+              // BE uses isRequired (not required)
+              required: Boolean(g.isRequired ?? g.required ?? (g.minChoices ?? 0) > 0),
+              minSelect: Number(g.minChoices ?? g.minSelect ?? (g.isRequired ? 1 : 0)),
+              maxSelect: Number(g.maxChoices ?? g.maxSelect ?? (groupItems.length || 1)),
               items: groupItems,
             };
           });
@@ -625,7 +786,7 @@ useEffect(() => {
             description: c.description ?? '',
             price: Number(c.comboPrice ?? c.price ?? 0),
             groups,
-            image: c.image ?? undefined,
+            image: c.imageUrl ?? c.image ?? undefined,
             discount: typeof c.discount === 'number' ? c.discount : undefined,
           };
         });
@@ -667,6 +828,98 @@ useEffect(() => {
     fetchToppings();
   }, []);
 
+  // Backend-linked: keep kitchen outage flags in sync with items marked OUT_OF_STOCK
+  useEffect(() => {
+    let timer: any;
+    let active = true;
+    const refreshKitchenOutages = async () => {
+      try {
+        const res = await getKitchenItems({ status: 'all' } as any);
+        const items = extractItems(res);
+        // Prefer inventoryItemId (or equivalent id fields) when backend provides it; fallback to name matching
+        const flaggedIds = (items as any[])
+          .filter((it: any) => {
+            const s = String(it.status || '').toUpperCase();
+            return s === 'OUT_OF_STOCK' || s === 'OUT-OF-STOCK';
+          })
+          .map((it: any) => {
+            const idCandidates = [
+              it.inventoryItemId,
+              it.inventoryItemID,
+              it.inventory_item_id,
+              it.itemId,
+              it.itemID,
+              it.item_id,
+              it?.item?.id,
+              it?.inventoryItem?.id,
+              it?.inventoryItem?.inventoryItemId,
+            ].filter((v: any) => v !== undefined && v !== null && String(v).length > 0);
+
+            if (idCandidates.length > 0) {
+              return String(idCandidates[0]);
+            }
+
+            // Fallback to name-based matching if no id available
+            const name = String(it.itemName || it.name || '');
+            if (!name) return null;
+            const p = products.find(
+              (x) => String(x.name).toLowerCase() === name.toLowerCase()
+            );
+            return p ? String(p.id) : null;
+          })
+          .filter((id: any): id is string => Boolean(id));
+
+        // Stable, deduped list for consistent equality checks
+        const unique = Array.from(new Set(flaggedIds)).sort();
+        // Deduplicate state updates to avoid render loops
+        if (active) {
+          setKitchenOutageItemIds((prev) => {
+            if (prev.length === unique.length && prev.every((v, i) => v === unique[i])) {
+              return prev;
+            }
+            return unique;
+          });
+        }
+      } catch (_) {
+        // Silent; POS can operate without kitchen feed
+      }
+    };
+    const start = () => {
+      refreshKitchenOutages();
+      timer = setInterval(refreshKitchenOutages, 10000);
+    };
+    const stop = () => {
+      if (timer) clearInterval(timer);
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') start();
+      else stop();
+    };
+    // Start only when visible
+    handleVisibility();
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      active = false;
+      stop();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [products]);
+
+  // Fallback: if cannot fetch global kitchen items (e.g., lack permission),
+  // still grey items that are OUT_OF_STOCK in the currently selected table's cart.
+  useEffect(() => {
+    const cart = getCurrentCart();
+    const localOutageIds = cart
+      .filter((it) => (it.status || '').toLowerCase() === 'out-of-stock')
+      .map((it) => String(it.id).split('-')[0]);
+    if (localOutageIds.length > 0) {
+      setKitchenOutageItemIds((prev) => {
+        const set = new Set([...prev, ...localOutageIds]);
+        return Array.from(set);
+      });
+    }
+  }, [selectedTable, tableOrders]);
+
   const filteredProducts = products.filter((p) => {
     const matchesCategory =
       selectedCategory === "all" || p.category === selectedCategory;
@@ -707,64 +960,56 @@ useEffect(() => {
     }
   };
 
+
+  // Refresh order helper
+  // Refresh order helper
+  const fetchTableOrder = async (table: Table) => {
+    try {
+      // Reset totals before fetching
+      setOrderSubtotal(0);
+      setOrderTotalAmount(0);
+
+      const res = await getOrderByTable(table.id);
+      const orderData = res?.data?.metaData ?? res?.data;
+      
+      if (orderData && orderData.status !== 'cancelled') {
+         // Update state with fetched order ID
+         setSelectedTable(prev => prev?.id === table.id ? ({ ...prev, order_id: orderData.id, currentOrder: orderData.orderCode }) : prev);
+        // Set backend totals
+        setOrderSubtotal(Number(orderData.subtotal ?? 0));
+        setOrderTotalAmount(Number(orderData.totalAmount ?? 0));
+
+        const newItems = mapOrderToCartItems(orderData);
+        setTableOrders(prev => ({ ...prev, [table.id]: newItems }));
+
+        // Restore customer if exists
+        if (orderData.customer) {
+            setSelectedCustomer(orderData.customer);
+            setCustomerSearchCode(orderData.customer.name);
+        } else {
+            setSelectedCustomer(null);
+            setCustomerSearchCode("");
+        }
+
+      } else {
+         // If no order found or CANCELLED, clear local
+         if (selectedTable?.id === table.id) {
+             setSelectedTable(prev => prev ? ({ ...prev, order_id: undefined as any, currentOrder: undefined }) : null);
+         }
+         
+         setTableOrders(prev => ({ ...prev, [table.id]: [] }));
+         // Clear customer as well since no order
+         setSelectedCustomer(null);
+         setCustomerSearchCode("");
+      }
+    } catch (e) {
+       console.error("Failed to fetch order", e);
+    }
+  };
+
   // Combo helper functions
   const detectComboSuggestions = () => {
-    const cart = getCurrentCart();
-    const suggestions: any[] = [];
-
-    // Get non-combo items for detection
-    const nonComboItems = cart.filter((item) => !item.isCombo);
-
-    autoComboPromotions.forEach((promo) => {
-      let eligible = true;
-      const missingItems: string[] = [];
-      let applicableCount = Infinity;
-
-      // Check each required item category/id
-      promo.requiredItems.forEach((required) => {
-        let availableCount = 0;
-
-        if (required.category) {
-          // Count items in this category
-          nonComboItems.forEach((cartItem) => {
-            const product = products.find((p) => p.id === cartItem.id);
-            if (product?.category === required.category) {
-              availableCount += cartItem.quantity;
-            }
-          });
-
-          if (availableCount < required.minQuantity) {
-            eligible = false;
-            missingItems.push(
-              `${required.minQuantity - availableCount} món ${getCategoryName(
-                required.category
-              )}`
-            );
-          } else {
-            // Calculate how many times this combo can be applied
-            applicableCount = Math.min(
-              applicableCount,
-              Math.floor(availableCount / required.minQuantity)
-            );
-          }
-        }
-      });
-
-      // Don't show if dismissed
-      if (!dismissedComboSuggestions.includes(promo.id)) {
-        suggestions.push({
-          id: promo.id,
-          name: promo.name,
-          description: promo.description,
-          discount: promo.discount.value,
-          eligible,
-          missingItems,
-          applicableCount: eligible ? applicableCount : undefined,
-        });
-      }
-    });
-
-    return suggestions;
+    return [];
   };
 
   const getCategoryName = (categoryId: string) => {
@@ -792,68 +1037,156 @@ useEffect(() => {
   };
 
   const handleComboClick = (combo: PosCombo) => {
-    if (selectedTable && selectedTable.status === "occupied") {
-      toast.error("Bàn này đang có khách, không thể thêm món mới");
-      return;
-    }
-
+    // Modified: Allow adding items/combos even if table is occupied (to add to existing order)
+    
     setSelectedCombo(combo);
     setComboSelectionOpen(true);
   };
 
-  const handleConfirmCombo = (
+  const handleConfirmCombo = async (
     selectedItems: { [groupId: string]: string[] },
-    combo: any
+    combo: PosCombo
   ) => {
-    const comboData = combo as PosCombo;
-    const cart = getCurrentCart();
+    // 1. Construct the combo payload
+    const comboInstanceId = `${combo.id}-${Date.now()}`;
+    const comboSubItems: CartItem[] = [];
+    
+    let isFirstItem = true;
 
-    // Create combo cart item with nested items
-    const comboCartItem: CartItem = {
-      id: `combo-${comboData.id}-${Date.now()}`,
-      name: comboData.name,
-      price: comboData.price,
-      quantity: 1,
-      status: "pending",
-      isCombo: true,
-      comboId: comboData.id,
-      comboExpanded: false,
-      comboItems: [],
-    };
+    combo.groups.forEach(group => {
+        const selectedIds = selectedItems[group.id] || [];
+        selectedIds.forEach(itemId => {
+             const groupItem = group.items.find(i => i.id === itemId);
+             if (groupItem) {
+                 // Calculate local price: Base combo price (for 1st item) + Extra Price
+                 let itemPrice = Number(groupItem.extraPrice || 0);
+                 if (isFirstItem) {
+                     itemPrice += Number(combo.price);
+                     isFirstItem = false;
+                 }
 
-    // Add selected items as nested items
-    comboData.groups.forEach((group) => {
-      const selections = selectedItems[group.id] || [];
-      selections.forEach((itemId) => {
-        const groupItem = group.items.find((i) => i.id === itemId);
-        if (groupItem) {
-          comboCartItem.comboItems!.push({
-            id: groupItem.id,
-            name: groupItem.name,
-            price: groupItem.price,
-            quantity: 1,
-            status: "pending",
-          });
-        }
-      });
+                 comboSubItems.push({
+                     id: `${combo.id}-${group.id}-${itemId}-${Date.now()}`,
+                     name: groupItem.name,
+                     price: itemPrice, 
+                     quantity: 1,
+                     status: 'pending',
+                     inventoryItemId: groupItem.id, 
+                     extraPrice: Number(groupItem.extraPrice || 0),
+                     // Combo Linking
+                     comboId: combo.id,
+                     comboName: combo.name,
+                     comboPrice: combo.price,
+                     comboInstanceId: comboInstanceId
+                 });
+             }
+        });
     });
 
-    // Calculate final price (base + extras)
-    let finalPrice = comboData.price;
-    comboData.groups.forEach((group) => {
-      const selections = selectedItems[group.id] || [];
-      selections.forEach((itemId) => {
-        const item = group.items.find((i) => i.id === itemId);
-        if (item?.extraPrice) {
-          finalPrice += item.extraPrice;
+    // 2. Add to Cart (Local or API)
+    let currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
+    
+    // Nếu có bàn nhưng chưa có order → tạo order mới trước
+    if (!isTakeaway && selectedTable && !selectedTable.order_id) {
+        try {
+            const newOrderRes = await createOrder({ tableId: selectedTable.id, items: [] });
+            const newOrderData = newOrderRes?.data?.metaData ?? newOrderRes?.data;
+            const newOrderId = newOrderData?.id;
+            
+            if (newOrderId) {
+                currentOrderId = newOrderId;
+                // Cập nhật selectedTable với order_id mới
+                setSelectedTable({
+                    ...selectedTable,
+                    order_id: newOrderId as any,
+                    status: 'occupied'
+                });
+                // Refresh tables to show occupied status
+                await refreshTables();
+                toast.success(`Đã tạo đơn hàng mới cho ${selectedTable.name}`);
+            } else {
+                toast.error("Không thể tạo đơn hàng mới");
+                return;
+            }
+        } catch (e: any) {
+            toast.error(`Lỗi tạo đơn hàng: ${e?.message}`);
+            return;
         }
-      });
-    });
-    comboCartItem.price = finalPrice;
+    }
+    
+    // Nếu là takeaway mà chưa có order → tạo takeaway order
+    if (isTakeaway && !takeawayOrderId) {
+        try {
+            const newOrderRes = await createOrder({ tableId: null as any, items: [] } as any);
+            const newOrderData = newOrderRes?.data?.metaData ?? newOrderRes?.data;
+            const newOrderId = newOrderData?.id;
+            const newOrderCode = newOrderData?.orderCode || String(newOrderId);
+            
+            if (newOrderId) {
+                currentOrderId = newOrderId;
+                setTakeawayOrderId(newOrderId);
+                setTakeawayOrderCode(newOrderCode);
+                localStorage.setItem("pos_takeaway_order_id", String(newOrderId));
+                toast.success(`Đã tạo đơn mang đi: ${newOrderCode}`);
+            } else {
+                toast.error("Không thể tạo đơn mang đi");
+                return;
+            }
+        } catch (e: any) {
+            toast.error(`Lỗi tạo đơn mang đi: ${e?.message}`);
+            return;
+        }
+    }
+    
+    if (currentOrderId) {
+        try {
+             // Loop through sub-items and add them to the order via API
+             // We need to match the backend 'addItem' expectation for Combos.
+             // Backend 'addItem' expects standard item addition but with `comboId` set.
+             // So we iterate over the selected items and add them one by one.
+             
+             // Send combo items SEQUENTIALLY to avoid race condition in pro-rate calculation
+             // Each request needs to see previous items to calculate correct pro-rate
+             for (const subItem of comboSubItems) {
+                 if (!subItem.inventoryItemId) continue;
 
-    updateCurrentCart([...cart, comboCartItem]);
-    toast.success("Đã thêm combo vào đơn hàng");
+                 await addOrderItem(currentOrderId, {
+                     itemId: Number(subItem.inventoryItemId),
+                     quantity: 1, // Combo items usually qty 1
+                     comboId: Number(combo.id),
+                     notes: subItem.notes,
+                     // If we had customization (ice, sugar) we would pass it here
+                     // For now passing basic info
+                 });
+             }
+             
+             toast.success("Đã thêm combo vào đơn");
+
+             // Refresh
+             if (isTakeaway) {
+                const res = await axiosClient.get(`/orders/${currentOrderId}`);
+                const orderData = res?.data?.metaData ?? res?.data;
+                if (orderData) {
+                    setTakeawayOrders(mapOrderToCartItems(orderData));
+                }
+             } else if (selectedTable) {
+                fetchTableOrder(selectedTable);
+             }
+
+        } catch (e: any) {
+             console.error(e);
+             toast.error(`Lỗi thêm combo: ${e?.message || 'Không rõ'}`);
+        }
+    } else {
+        // Fallback: Local Only - Flatten items for rendering consistency
+        const cart = getCurrentCart();
+        updateCurrentCart([...cart, ...comboSubItems]);
+        setComboSelectionOpen(false);
+        toast.success("Đã thêm combo (Local)");
+    }
   };
+
+  // Combo item addition with API sync completed above
 
   const toggleComboExpansion = (comboItemId: string) => {
     const cart = getCurrentCart();
@@ -867,84 +1200,7 @@ useEffect(() => {
   };
 
   const handleApplyDetectedCombo = () => {
-    if (!detectedComboData || !pendingItemToAdd) return;
-
-    const cart = getCurrentCart();
-
-    // Add the pending item first
-    const existing = cart.find(
-      (item) => item.id === pendingItemToAdd.id && !item.isCombo
-    );
-    let newCart = [...cart];
-
-    if (existing) {
-      newCart = cart.map((item) =>
-        item.id === pendingItemToAdd.id && !item.isCombo
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
-      );
-    } else {
-      newCart = [
-        ...cart,
-        { ...pendingItemToAdd, quantity: 1, status: "pending" },
-      ];
-    }
-
-    // Now convert matching items into a combo
-    const comboItems: CartItem[] = [];
-    const itemsToRemove: string[] = [];
-
-    detectedComboData.matchingItems.forEach((matchItem: any) => {
-      const cartItem = newCart.find(
-        (item) => item.id === matchItem.id && !item.isCombo
-      );
-      if (cartItem) {
-        // Add to combo items
-        for (let i = 0; i < matchItem.quantity; i++) {
-          comboItems.push({
-            id: cartItem.id,
-            name: cartItem.name,
-            price: cartItem.price,
-            quantity: 1,
-            status: "pending",
-            customization: cartItem.customization,
-          });
-        }
-
-        // Reduce quantity or mark for removal
-        if (cartItem.quantity <= matchItem.quantity) {
-          itemsToRemove.push(cartItem.id);
-        } else {
-          cartItem.quantity -= matchItem.quantity;
-        }
-      }
-    });
-
-    // Remove items that were fully consumed by combo
-    newCart = newCart.filter(
-      (item) => !itemsToRemove.includes(item.id) || item.isCombo
-    );
-
-    // Create combo cart item
-    const comboCartItem: CartItem = {
-      id: `combo-auto-${detectedComboData.id}-${Date.now()}`,
-      name: detectedComboData.name,
-      price: detectedComboData.finalPrice,
-      quantity: 1,
-      status: "pending",
-      isCombo: true,
-      comboId: detectedComboData.id,
-      comboExpanded: false,
-      comboItems,
-    };
-
-    newCart.push(comboCartItem);
-    updateCurrentCart(newCart);
-
-    toast.success(`Đã áp dụng ${detectedComboData.name}`);
-    setComboDetectionOpen(false);
-    setPendingItemToAdd(null);
-    setDetectedComboData(null);
+      // Empty
   };
 
   const handleContinueIndividual = () => {
@@ -995,55 +1251,7 @@ useEffect(() => {
   const handleUpdateComboItemCustomization = (
     customization: ItemCustomization
   ) => {
-    const item = selectedItemForCustomization as any;
-    if (!item || !item.__comboId) return;
-
-    const cart = getCurrentCart();
-    const comboId = item.__comboId;
-    const itemIndex = item.__itemIndex;
-
-    updateCurrentCart(
-      cart.map((cartItem) => {
-        if (
-          cartItem.id === comboId &&
-          cartItem.isCombo &&
-          cartItem.comboItems
-        ) {
-          const updatedComboItems = [...cartItem.comboItems];
-          if (updatedComboItems[itemIndex]) {
-            updatedComboItems[itemIndex] = {
-              ...updatedComboItems[itemIndex],
-              customization,
-            };
-
-            // Calculate extra charge from toppings
-            const extraCharge = customization.toppings.reduce(
-              (sum, t) => sum + t.price,
-              0
-            );
-
-            // Update combo price
-            const baseComboPrice =
-              detectedComboData?.finalPrice || cartItem.price;
-            const totalExtra = cartItem.comboItems.reduce((sum, item) => {
-              const itemExtra =
-                item.customization?.toppings?.reduce(
-                  (s, t) => s + t.price,
-                  0
-                ) || 0;
-              return sum + itemExtra;
-            }, extraCharge);
-
-            return {
-              ...cartItem,
-              comboItems: updatedComboItems,
-              price: baseComboPrice + totalExtra,
-            };
-          }
-        }
-        return cartItem;
-      })
-    );
+      // Empty
   };
 
   const isProductOutOfStock = (product: (typeof products)[0]) => {
@@ -1055,241 +1263,583 @@ useEffect(() => {
     };
 
     const ingredients = productIngredients[product.id] || [];
-    return ingredients.some((ing) => globalOutOfStock.includes(ing));
+    // Gate menu items only by inventory-level outages, not by kitchen per-order events
+    return ingredients.some((ing) => inventoryOutageIngredients.includes(ing));
   };
 
   const checkComboDetection = (
     cart: CartItem[],
     newProduct: (typeof products)[0]
   ) => {
-    // Create hypothetical cart with the new item
-    const hypotheticalCart = [...cart];
-    const existing = hypotheticalCart.find(
-      (item) => item.id === newProduct.id && !item.isCombo
-    );
-
-    if (existing) {
-      existing.quantity += 1;
-    } else {
-      hypotheticalCart.push({ ...newProduct, quantity: 1, status: "pending" });
-    }
-
-    // Get non-combo items only
-    const nonComboItems = hypotheticalCart.filter((item) => !item.isCombo);
-
-    // Check each auto combo promotion
-    for (const promo of autoComboPromotions) {
-      const matchingItems: { id: string; name: string; quantity: number }[] =
-        [];
-      let allRequirementsMet = true;
-      let minApplicableCount = Infinity;
-
-      // Check if all required items are in cart
-      for (const required of promo.requiredItems) {
-        let availableCount = 0;
-
-        if (required.category) {
-          // Count items in this category
-          nonComboItems.forEach((cartItem) => {
-            const prod = products.find((p) => p.id === cartItem.id);
-            if (prod?.category === required.category) {
-              availableCount += cartItem.quantity;
-              matchingItems.push({
-                id: cartItem.id,
-                name: cartItem.name,
-                quantity: Math.min(cartItem.quantity, required.minQuantity),
-              });
-            }
-          });
-        } else if (required.itemId) {
-          // Specific item
-          const cartItem = nonComboItems.find(
-            (item) => item.id === required.itemId
-          );
-          if (cartItem) {
-            availableCount = cartItem.quantity;
-            matchingItems.push({
-              id: cartItem.id,
-              name: cartItem.name,
-              quantity: Math.min(cartItem.quantity, required.minQuantity),
-            });
-          }
-        }
-
-        if (availableCount < required.minQuantity) {
-          allRequirementsMet = false;
-          break;
-        }
-
-        minApplicableCount = Math.min(
-          minApplicableCount,
-          Math.floor(availableCount / required.minQuantity)
-        );
-      }
-
-      // If combo requirements met, return detection data
-      if (allRequirementsMet && matchingItems.length > 0) {
-        // Calculate prices
-        const originalPrice = matchingItems.reduce((sum, item) => {
-          const prod = products.find((p) => p.id === item.id);
-          return sum + (prod?.price || 0) * item.quantity;
-        }, 0);
-
-        let finalPrice = originalPrice;
-        if (promo.discount.type === "percentage") {
-          finalPrice = originalPrice * (1 - promo.discount.value / 100);
-        } else {
-          finalPrice = originalPrice - promo.discount.value;
-        }
-
-        return {
-          id: promo.id,
-          name: promo.name,
-          description: promo.description,
-          discount: promo.discount,
-          matchingItems,
-          originalPrice,
-          finalPrice,
-          applicableCount: minApplicableCount,
-        };
-      }
-    }
-
     return null;
   };
 
-  const addToCart = (product: (typeof products)[0]) => {
-    // Check if product is out of stock
-    if (isProductOutOfStock(product)) {
-      toast.error("Món này tạm thời không thể phục vụ do hết nguyên liệu");
-      return;
-    }
 
+
+
+
+  const updateQuantity = async (id: string, newQty: number, reason?: string) => {
     const cart = getCurrentCart();
+    const item = cart.find(i => i.id === id);
+    if (!item) return;
 
-    // Check for combo detection
-    const detectedCombo = checkComboDetection(cart, product);
+    // Check if newQty is valid relative to item
+    const delta = newQty - item.quantity;
+    if (delta === 0) return;
 
-    if (detectedCombo) {
-      // Show combo detection popup
-      setPendingItemToAdd(product);
-      setDetectedComboData(detectedCombo);
-      setComboDetectionOpen(true);
-      return;
+    // Case 1: Item is Pending (not sent to kitchen)
+    if (!item.orderItemId) {
+         if (newQty <= 0) {
+             // Remove local item
+             updateCurrentCart(cart.filter(i => i.id !== id));
+         } else {
+             // Update local quantity
+             updateCurrentCart(cart.map(i => i.id === id ? { ...i, quantity: newQty } : i));
+         }
+         return;
     }
 
-    // Always create a new item with unique ID for customization
-    const newItem = {
-      ...product,
-      id: `${product.id}-${Date.now()}`, // Unique ID for each instance
-      quantity: 1,
-      status: "pending" as const,
-    };
-    updateCurrentCart([...cart, newItem]);
-    setIsKitchenUpdateNeeded(true); // Enable send to kitchen button
+    // Case 2: Item is Sent (Has orderItemId)
+    const currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
 
-    // Open customization modal only for non-pastry items
-    if (product.category !== "pastry") {
-      setSelectedItemForCustomization(newItem);
-      setCustomizationModalOpen(true);
-    } else {
-      toast.success(`Đã thêm ${product.name} vào đơn hàng`);
-    }
-  };
+    if (currentOrderId && item.orderItemId) {
+        try {
+            if (newQty > item.quantity) {
+                 const quantityToAdd = newQty - item.quantity;
+                 const isPending = !item.status || item.status === 'pending';
+                 
+                 if (isPending && item.orderItemId) {
+                     // Item is PENDING: Update the existing orderItem quantity
+                     await updateOrderItem(currentOrderId, item.orderItemId, {
+                         quantity: newQty
+                     });
+                     
+                     // Also update attached toppings quantities proportionally
+                     if (item.attachedToppings && item.attachedToppings.length > 0) {
+                       for (const topping of item.attachedToppings) {
+                         if (topping.orderItemId) {
+                           const newToppingQty = Math.round((topping.quantity / item.quantity) * newQty);
+                           await updateOrderItem(currentOrderId, topping.orderItemId, {
+                             quantity: newToppingQty
+                           });
+                         }
+                       }
+                     }
+                     
+                     toast.success(`Đã cập nhật số lượng ${item.name} thành ${newQty}`);
+                 } else {
+                     // Item is already sent to kitchen: ADD NEW ITEM
+                     if (!item.inventoryItemId) {
+                         toast.error("Không tìm thấy ID sản phẩm gốc để thêm mới");
+                         return;
+                     }
+                     
+                     // Check if item has attached toppings - show dialog to ask if user wants to copy them
+                     if (item.attachedToppings && item.attachedToppings.length > 0) {
+                       setPendingQuantityChange({ item, quantityToAdd });
+                       setToppingCopyDialogOpen(true);
+                       return; // Wait for user choice in dialog
+                     }
+                     
+                     // No toppings - add directly
+                     await addOrderItem(currentOrderId, {
+                         itemId: Number(item.inventoryItemId),
+                         quantity: quantityToAdd,
+                         notes: item.notes,
+                         // Copy customization if available
+                        customization: stripToppingsFromCustomization(item.customization),
+                     });
+                     toast.success(`Đã gọi thêm ${quantityToAdd} ${item.name}`);
+                 }
 
-  const updateQuantity = (id: string, change: number) => {
-    const cart = getCurrentCart();
-    updateCurrentCart(
-      cart
-        .map((item) => {
-          if (item.id === id) {
-            const newQuantity = item.quantity + change;
-            return newQuantity > 0 ? { ...item, quantity: newQuantity } : item;
-          }
-          return item;
-        })
-        .filter((item) => item.quantity > 0)
-    );
-    // Only enable send to kitchen button if quantity increased (change > 0)
-    if (change > 0) {
-      setIsKitchenUpdateNeeded(true);
-    }
-  };
-
-  const removeFromCart = (id: string) => {
-    const cart = getCurrentCart();
-    // When removing an item, also remove all its attached toppings
-    const updatedCart = cart
-      .filter((item) => {
-        // Don't remove items that are attached to the deleted item
-        if (item.parentItemId === id) return false;
-        // Remove the main item
-        if (item.id === id) return false;
-        return true;
-      })
-      .map((item) => {
-        // If item has attached toppings, keep the item but filter out the deleted one
-        if (item.attachedToppings) {
-          return {
-            ...item,
-            attachedToppings: item.attachedToppings.filter((t) => t.id !== id),
-          };
+            } else {
+                 // DECREASE QUANTITY (Must keep this logic as it removes from the EXISTING item)
+                 if (newQty <= 0) {
+                     // Full cancel
+                     await deleteOrderItem(currentOrderId, item.orderItemId, { 
+                         reason: reason || 'Khách yêu cầu hủy' 
+                     });
+                     toast.success(`Đã hủy món: ${item.name}`);
+                 } else {
+                     // Partial decrease
+                     const quantityToRemove = item.quantity - newQty;
+                     await deleteOrderItem(currentOrderId, item.orderItemId, { 
+                         quantity: quantityToRemove,
+                         reason: reason || 'Giảm số lượng'
+                     });
+                     toast.success(`Đã giảm số lượng ${item.name}`);
+                 }
+            }
+            // Always refresh from server
+            if (isTakeaway) {
+                 // Refresh takeaway logic
+                const res = await axiosClient.get(`/orders/${currentOrderId}`);
+                const orderData = res?.data?.metaData ?? res?.data;
+                if (orderData) {
+                    if (orderData.status === 'cancelled') {
+                        // Clear takeaway state if cancelled
+                        setTakeawayOrders([]);
+                        setTakeawayOrderId(null);
+                        setTakeawayOrderCode(null);
+                        localStorage.removeItem("pos_takeaway_order_id");
+                        toast.info("Đơn hàng đã bị hủy do hết món");
+                    } else {
+                        setTakeawayOrders(mapOrderToCartItems(orderData));
+                    }
+                }
+            } else {
+                if (selectedTable) {
+                    fetchTableOrder(selectedTable);
+                }
+            }
+        } catch (err: any) {
+            toast.error(`Cập nhật số lượng thất bại: ${err?.message}`);
         }
-        return item;
-      });
-    updateCurrentCart(updatedCart);
+    }
   };
-  const handleSelectArea = (areaId: number | null) => {
-  setSelectedAreaId(areaId)
 
-  if (!hasPermission("tables:view" as any)) {
-    toast.error("Bạn không có quyền xem phòng bàn");
-    return;
-  }
+  const handleRemoveCombo = async (comboInstanceId: string, comboItems?: CartItem[]) => {
+     const cart = getCurrentCart();
+     // Use provided comboItems if available (from rendering), otherwise find by comboInstanceId or comboId
+     let items = comboItems;
+     if (!items || items.length === 0) {
+       // Fallback: find items by comboInstanceId
+       items = cart.filter(i => i.comboInstanceId === comboInstanceId || String(i.comboId) === comboInstanceId);
+     }
+     console.log(`Deleting combo instance ${comboInstanceId}, found ${items.length} items`, items);
+     
+     if (items.length === 0) return;
 
-  getTables({
-    areaId: areaId ?? undefined,
-    isActive: true
-  }).then(res => {
-    const items = extractItems(res);
-    setTables(items.map(mapTableFromBE))
-  }).catch((err: any) => {
-    toast.error("Không tải được danh sách bàn", {
-      description: err?.message || "Lỗi kết nối API",
-    });
-  })
-}
+     const isAnySent = items.some(i => i.status && i.status !== 'pending');
+     const currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
+     
+     // Get orderItemIds for this specific combo instance
+     const orderItemIds = items.map(i => i.orderItemId).filter(Boolean);
+     
+     if (isAnySent) {
+         // Open Cancel Modal for the entire combo
+         // We pass a "virtual" item representing the combo
+         const comboName = items[0].comboName || "Combo";
+         setItemToCancel({ 
+             id: comboInstanceId, 
+             name: comboName, 
+             quantity: 1, 
+             price: 0, 
+             status: 'served', // Treat as served so logic knows it's sent
+             comboInstanceId: comboInstanceId,
+             // Custom properties
+             ...({ isCombo: true, items: items } as any)
+         } as CartItem);
+         setCancelQuantity(1);
+         setCancelReason("");
+         setCancelItemModalOpen(true);
+     } else {
+         // All pending -> Delete all immediately
+         if (!currentOrderId) {
+             // Local cart removal - filter by orderItemIds for specific instance
+             const idsToRemove = new Set(orderItemIds);
+             updateCurrentCart(cart.filter(i => !idsToRemove.has(i.orderItemId)));
+             toast.success("Đã xóa combo");
+         } else {
+             // API removal - only remove items from this specific instance
+             try {
+                 await Promise.all(items.map(item => {
+                     if (item.orderItemId) {
+                        return removeOrderItem(currentOrderId, item.orderItemId);
+                     }
+                     return Promise.resolve();
+                 }));
+                 toast.success("Đã xóa combo khỏi đơn");
+                 
+                 // Refresh data
+                 if (isTakeaway && takeawayOrderId) {
+                    const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
+                    const orderData = res?.data?.metaData ?? res?.data;
+                    if (orderData) setTakeawayOrders(mapOrderToCartItems(orderData));
+                } else if (selectedTable) {
+                    fetchTableOrder(selectedTable);
+                }
+
+                // Check for allItemsCanceled flag
+                // Note: removeOrderItem might not return it, but deleteOrderItem (below) does.
+                // If removing pending items leads to empty order, we might need to check manually?
+                // But typically pending items removal is fine.
+                // The user specifically asked for "huỷ hết orderitem trong order... bên BE có flag allItemsCanceled".
+                // This flag comes from deleteOrderItem/updateItemStatus logic in backend.
+             } catch (err: any) {
+                 toast.error(`Xóa combo thất bại: ${err?.message}`);
+             }
+         }
+     }
+  };
+
+  // Handle removal of individual combo items (same logic as regular items)
+  const handleRemoveComboItem = async (item: CartItem) => {
+    // If no orderItemId (local only), remove from cart
+    if (!item.orderItemId) {
+      const cart = getCurrentCart();
+      updateCurrentCart(cart.filter(i => i.id !== item.id));
+      toast.success("Đã xóa món khỏi giỏ hàng");
+      return;
+    }
+    
+    const currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
+    if (!currentOrderId) return;
+    
+    const isPending = !item.status || item.status === 'pending';
+    
+    if (isPending) {
+      // Pending: remove directly
+      try {
+        await removeOrderItem(currentOrderId, item.orderItemId);
+        toast.success("Đã xóa món khỏi đơn hàng");
+        
+        // Refresh data
+        if (isTakeaway && takeawayOrderId) {
+          const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
+          const orderData = res?.data?.metaData ?? res?.data;
+          if (orderData) {
+            setTakeawayOrders(mapOrderToCartItems(orderData));
+          }
+        } else if (selectedTable) {
+          fetchTableOrder(selectedTable);
+        }
+      } catch (err: any) {
+        toast.error(`Xóa món thất bại: ${err?.message}`);
+      }
+    } else {
+      // Sent to kitchen: show cancel modal
+      setItemToCancel(item);
+      setCancelQuantity(item.quantity);
+      setCancelReason("");
+      setOtherReason("");
+      setCancelItemModalOpen(true);
+    }
+  };
+
+  const removeFromCart = async (id: string, reason?: string) => {
+    // Determine item
+    const cart = getCurrentCart();
+    const item = cart.find(i => i.id === id);
+    if (!item) return;
+    
+    // Nếu chưa có orderItemId (chưa lưu vào CSDL) → xóa local
+    if (!item.orderItemId) {
+        updateCurrentCart(cart.filter(i => i.id !== id));
+        toast.success("Đã xóa món khỏi giỏ hàng");
+        return;
+    }
+    
+    // Xác định orderId
+    const currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
+    if (!currentOrderId) return;
+    
+    // Kiểm tra status:
+    // - pending = chưa báo bếp → xóa vĩnh viễn khỏi CSDL
+    // - khác pending = đã báo bếp → mark canceled để track lỗ
+    const isPending = !item.status || item.status === 'pending';
+    
+    if (isPending) {
+        // CHƯA BÁO BẾP → Xóa vĩnh viễn khỏi CSDL
+        try {
+            await removeOrderItem(currentOrderId, item.orderItemId);
+            toast.success("Đã xóa món khỏi đơn hàng");
+            
+            // Refresh data
+            if (isTakeaway && takeawayOrderId) {
+                const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
+                const orderData = res?.data?.metaData ?? res?.data;
+                if (orderData) {
+                    setTakeawayOrders(mapOrderToCartItems(orderData));
+                }
+            } else if (selectedTable) {
+                fetchTableOrder(selectedTable);
+            }
+        } catch (err: any) {
+            toast.error(`Xóa món thất bại: ${err?.message}`);
+        }
+    } else {
+        // ĐÃ BÁO BẾP → Mark canceled (cần reason)
+        if (reason) {
+            // Có reason từ dialog CartItemDisplay
+            try {
+                await deleteOrderItem(currentOrderId, item.orderItemId, {
+                    quantity: item.quantity,
+                    reason: reason
+                });
+                toast.success("Đã hủy món (lưu vào thống kê)");
+                
+                if (isTakeaway && takeawayOrderId) {
+                    const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
+                    const orderData = res?.data?.metaData ?? res?.data;
+                    if (orderData) {
+                        setTakeawayOrders(mapOrderToCartItems(orderData));
+                    }
+                } else if (selectedTable) {
+                    fetchTableOrder(selectedTable);
+                }
+            } catch (err: any) {
+                toast.error(`Hủy món thất bại: ${err?.message}`);
+            }
+        } else {
+            // Chưa có reason → mở modal để nhập reason
+            setItemToCancel(item);
+            setCancelQuantity(item.quantity); 
+            setCancelReason("");
+            setOtherReason("");
+            setCancelItemModalOpen(true);
+        }
+    }
+  };
+  
+  const handleConfirmCancel = async () => {
+    if (!cancelReason || (cancelReason === "Khác" && !otherReason.trim())) {
+      return;
+    }
+    
+    const currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
+    if (!itemToCancel || !currentOrderId) return;
+    
+    const finalReason = cancelReason === "Khác" ? otherReason : cancelReason;
+      
+    try {
+        // Check if it's a combo cancellation
+        if ((itemToCancel as any).isCombo && (itemToCancel as any).items) {
+            const comboItems = (itemToCancel as any).items as CartItem[];
+            const responses = await Promise.all(comboItems.map(item => 
+                 deleteOrderItem(currentOrderId, item.orderItemId || item.id, {
+                    quantity: item.quantity,
+                    reason: finalReason || "Hủy combo"
+                 })
+            ));
+            toast.success("Đã hủy combo thành công");
+            
+            // Check if any response indicates all items canceled
+            const anyCanceled = responses.some(res => {
+                const meta = res.data?.metaData ?? res.data;
+                return meta?.allItemsCanceled;
+            });
+
+            if (anyCanceled) {
+                 alert("Bạn đã hủy hết món trong đơn hàng. Đơn hàng sẽ chuyển sang trạng thái Đã Hủy.");
+                 // Refresh tables to update status
+                 await refreshTables();
+                 if (selectedTable) {
+                    fetchTableOrder(selectedTable);
+                    // Clear selected table since order is canceled
+                    setSelectedTable(null);
+                 } else if (isTakeaway) {
+                    setTakeawayOrders([]);
+                    setTakeawayOrderId(null);
+                    setTakeawayOrderCode(null);
+                    localStorage.removeItem("pos_takeaway_order_id");
+                 }
+                 setCancelItemModalOpen(false);
+                 setItemToCancel(null);
+                 return;
+            }
+
+        } else {
+            // Single item cancellation
+            const res = await deleteOrderItem(currentOrderId, itemToCancel.orderItemId || itemToCancel.id, {
+                   quantity: cancelQuantity,
+                   reason: finalReason || "Khách hủy"
+            });
+            toast.success("Đã hủy món thành công");
+            
+            const metaData = res.data?.metaData ?? res.data; // Check response structure
+            if (metaData?.allItemsCanceled) {
+                 alert("Bạn đã hủy hết món trong đơn hàng. Đơn hàng sẽ chuyển sang trạng thái Đã Hủy.");
+                 // Refresh tables to update status
+                 await refreshTables();
+                 // Refresh entirely to clear state
+                 if (selectedTable) {
+                    // Clear selected table since order is canceled
+                    setSelectedTable(null);
+                 } else if (isTakeaway) {
+                    setTakeawayOrders([]);
+                    setTakeawayOrderId(null);
+                    setTakeawayOrderCode(null);
+                    localStorage.removeItem("pos_takeaway_order_id");
+                 }
+                 setCancelItemModalOpen(false);
+                 setItemToCancel(null);
+                 return;
+            }
+        }
+
+        // Refresh data
+        if (isTakeaway && takeawayOrderId) {
+            const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
+            const orderData = res?.data?.metaData ?? res?.data;
+            if (orderData) setTakeawayOrders(mapOrderToCartItems(orderData));
+        } else if (selectedTable) {
+            fetchTableOrder(selectedTable);
+        }
+
+    } catch (err: any) {
+        toast.error(`Hủy món thất bại: ${err?.message}`);
+    } finally {
+        setCancelItemModalOpen(false);
+        setItemToCancel(null);
+    }
+  };
+
+  // Handle topping copy dialog - add item with toppings
+  const handleAddItemWithToppings = async () => {
+    if (!pendingQuantityChange) return;
+    
+    const { item, quantityToAdd } = pendingQuantityChange;
+    const currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
+    
+    if (!currentOrderId || !item.inventoryItemId) {
+      toast.error("Không tìm thấy thông tin đơn hàng");
+      setToppingCopyDialogOpen(false);
+      setPendingQuantityChange(null);
+      return;
+    }
+    
+    try {
+      // Build attachedToppings payload from existing toppings
+      const attachedToppings = item.attachedToppings?.map(t => ({
+        itemId: Number(t.inventoryItemId),
+        quantity: t.quantity
+      })) || [];
+      
+      await addOrderItem(currentOrderId, {
+        itemId: Number(item.inventoryItemId),
+        quantity: quantityToAdd,
+        notes: item.notes,
+        customization: stripToppingsFromCustomization(item.customization),
+        attachedToppings: attachedToppings
+      });
+      
+      toast.success(`Đã gọi thêm ${quantityToAdd} ${item.name} (kèm topping)`);
+      
+      // Refresh data
+      if (isTakeaway && takeawayOrderId) {
+        const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
+        const orderData = res?.data?.metaData ?? res?.data;
+        if (orderData) setTakeawayOrders(mapOrderToCartItems(orderData));
+      } else if (selectedTable) {
+        fetchTableOrder(selectedTable);
+      }
+    } catch (err: any) {
+      toast.error(`Thêm món thất bại: ${err?.message}`);
+    } finally {
+      setToppingCopyDialogOpen(false);
+      setPendingQuantityChange(null);
+    }
+  };
+  
+  // Handle topping copy dialog - add item without toppings
+  const handleAddItemWithoutToppings = async () => {
+    if (!pendingQuantityChange) return;
+    
+    const { item, quantityToAdd } = pendingQuantityChange;
+    const currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
+    
+    if (!currentOrderId || !item.inventoryItemId) {
+      toast.error("Không tìm thấy thông tin đơn hàng");
+      setToppingCopyDialogOpen(false);
+      setPendingQuantityChange(null);
+      return;
+    }
+    
+    try {
+      await addOrderItem(currentOrderId, {
+        itemId: Number(item.inventoryItemId),
+        quantity: quantityToAdd,
+        notes: item.notes,
+        customization: stripToppingsFromCustomization(item.customization),
+        // No toppings
+      });
+      
+      toast.success(`Đã gọi thêm ${quantityToAdd} ${item.name} (không có topping)`);
+      
+      // Refresh data
+      if (isTakeaway && takeawayOrderId) {
+        const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
+        const orderData = res?.data?.metaData ?? res?.data;
+        if (orderData) setTakeawayOrders(mapOrderToCartItems(orderData));
+      } else if (selectedTable) {
+        fetchTableOrder(selectedTable);
+      }
+    } catch (err: any) {
+      toast.error(`Thêm món thất bại: ${err?.message}`);
+    } finally {
+      setToppingCopyDialogOpen(false);
+      setPendingQuantityChange(null);
+    }
+  };
+  
+  // Handle topping copy dialog - cancel
+  const handleCancelToppingCopy = () => {
+    setToppingCopyDialogOpen(false);
+    setPendingQuantityChange(null);
+  };
+
   const handleSelectTable = (table: Table) => {
-    // Cho phép xem tất cả các bàn, kể cả bàn có khách
     setSelectedTable(table);
     setIsTakeaway(false);
-    // Fetch current order items from backend
-    getOrderByTable(table.id)
-      .then((res: any) => {
-        const payload = res?.data?.metaData?.order ?? res?.data?.metaData ?? res?.data?.order ?? res?.data;
-        const items = mapOrderToCartItems(payload ?? {});
-        setTableOrders((prev) => ({ ...prev, [table.id]: items }));
-      })
-      .catch((err: any) => {
-        toast.error("Không tải được đơn hàng của bàn", {
-          description: err?.message || "Lỗi kết nối API",
-        });
-        // Ensure key exists even if empty so UI renders predictably
-        setTableOrders((prev) => ({ ...prev, [table.id]: [] }));
-      });
+    setOrderType("dine-in");
+    
+    // Reset customer state when switching tables
+    setSelectedCustomer(null);
+    setCustomerSearchCode("");
+
+    // Fetch order if occupied
+    if (table.status === 'occupied') {
+       fetchTableOrder(table);
+    }
   };
 
-  const handleSelectTakeaway = () => {
+  const handleSelectTakeaway = async () => {
     setSelectedTable(null);
     setIsTakeaway(true);
     setOrderType("takeaway");
+    setSelectedCustomer(null);
+    setCustomerSearchCode("");
+    
+    // Try to find existing takeaway order
+    try {
+      const res = await getTakeawayOrder();
+      const order = res?.data?.metaData ?? res?.data;
+      if (order && order.id) {
+        // Restore existing takeaway order
+        setTakeawayOrderId(order.id);
+        setTakeawayOrderCode(order.orderCode);
+        const cartItems = mapOrderToCartItems(order);
+        setTakeawayOrders(cartItems);
+        console.log("Existing takeaway order found:", order);
+        // Set customer if exists
+        if (order.customer) {
+          setSelectedCustomer(order.customer);
+          setCustomerSearchCode(order.customer.name);
+        }
+      }
+    } catch (err: any) {
+      // No existing takeaway order found or API error - that's fine
+      console.log("No existing takeaway order found");
+    }
   };
 
   const handleOrderTypeChange = (type: "dine-in" | "takeaway" | "delivery") => {
     setOrderType(type);
+
     if (type === "takeaway") {
       setSelectedTable(null);
       setIsTakeaway(true);
+      // Reset customer
+      setSelectedCustomer(null);
+      setCustomerSearchCode("");
+      setTakeawayOrderId(null); // Reset takeaway order ID for new session if needed (customer clears? no, maybe we keep it until pay?)
+      // Actually, if we switch mode, we might want to keep it? 
+      // User flow: "Mang về" -> Create Order -> Pay -> Done.
+      // If user switches away and back, we might lose it if we reset here blindly?
+      // Better to reset only if explicitly starting NEW. For now, let's keep it safe. 
+      // But typically switching tabs implies new context or viewing.
+      // Let's assume switching to Takeaway is just viewing the takeaway tab.
     } else if (type === "delivery") {
       setSelectedTable(null);
       setIsTakeaway(true);
@@ -1304,8 +1854,9 @@ useEffect(() => {
     setNoteDialogOpen(true);
   };
 
-  const handleSaveNote = () => {
+  const handleSaveNote = async () => {
     if (selectedItemForNote) {
+      // 1. Update local state
       const cart = getCurrentCart();
       updateCurrentCart(
         cart.map((item) =>
@@ -1314,62 +1865,111 @@ useEffect(() => {
             : item
         )
       );
+
+      // 2. If item is already sent (has orderItemId), call API immediately
+      if (selectedItemForNote.orderItemId && selectedTable?.order_id) {
+          try {
+              await updateOrderItem(selectedTable.order_id, selectedItemForNote.orderItemId, { notes: noteText });
+              toast.success("Đã lưu ghi chú");
+              // Refresh order to ensure sync
+              fetchTableOrder(selectedTable);
+          } catch (err: any) {
+              toast.error(`Lưu ghi chú thất bại: ${err?.message}`);
+          }
+      }
     }
     setNoteDialogOpen(false);
     setSelectedItemForNote(null);
     setNoteText("");
   };
-
-  const handleSendToKitchen = () => {
-    const cart = getCurrentCart();
-    // Include items with any status except "served" (items that need to be sent to kitchen)
-    const itemsToSend = cart.filter(
-      (item) => item.status !== "served" && item.status !== "canceled"
-    );
-
-    if (itemsToSend.length === 0) {
-      toast.error("Không có món nào cần gửi bếp");
-      return;
+  
+  // Refactored: Open Customization Modal FIRST, do NOT add to cart/API yet
+  const addToCart = (product: (typeof products)[0]) => {
+    if (isProductOutOfStock(product)) {
+        // Find the out of stock ingredient (simplistic logic)
+        const ingredients: Record<string, string> = {
+          "1": "Cà phê", 
+          "2": "Sữa đặc", 
+          "6": "Trân châu"
+        };
+        const ingredient = ingredients[String(product.id)] || "Nguyên liệu";
+        
+        setOutOfStockItem(product);
+        setOutOfStockIngredient(ingredient); 
+        setOutOfStockWarningOpen(true);
+        return;
     }
 
-    // Update status of items to preparing
-    updateCurrentCart(
-      cart.map((item) =>
-        item.status !== "served" && item.status !== "canceled"
-          ? { ...item, status: "preparing" }
-          : item
-      )
-    );
+    // Check for combo detection
+    const suggestion = checkComboDetection(getCurrentCart(), product);
+    if (suggestion) {
+        setPendingItemToAdd(product);
+        setDetectedComboData(suggestion);
+        setComboDetectionOpen(true);
+        return;
+    }
 
-    const orderInfo = isTakeaway
-      ? "Đơn mang về"
-      : `Bàn ${selectedTable?.id}`;
-
-    // Add to order history
-    const historyEntry = {
-      time: new Date().toLocaleTimeString("vi-VN", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      action: `Gửi ${itemsToSend.length} món đến quầy pha chế - ${orderInfo}`,
-      staff: "Thu ngân Lan",
+    // Prepare draft item and open customization
+    const newItem: CartItem & { isComposite?: boolean } = {
+        id: `${product.id}-${Date.now()}`,
+        name: product.name,
+        price: product.price,
+        quantity: 1,
+        status: 'pending',
+        customization: { sugarLevel: '100%', iceLevel: '100%', toppings: [], note: '' },
+        isComposite: product.itemType?.id === 2 || product.itemTypeId === 2 // Check provided type ID
     };
-    setOrderHistory((prev) => [historyEntry, ...prev]);
+    
+    handleOpenCustomizationModal(newItem);
+  };
 
-    // Attempt backend send-to-kitchen if we have current order id
-    const orderId = selectedTable?.order_id;
+  const handleSendToKitchen = async () => {
+    // Determine items to send (pending status)
+    const cart = getCurrentCart();
+    const itemsToSend = cart.filter(i => !i.status || i.status === 'pending');
+    
+    // UI feedback context
+    const orderInfo = selectedTable ? `Bàn ${selectedTable.name}` : 'Mang về';
+
+    const orderId = isTakeaway ? (takeawayOrderId || undefined) : selectedTable?.order_id;
     if (orderId) {
-      sendOrderToKitchen(Number(orderId)).catch((err: any) => {
-        toast.error("Gửi bếp thất bại", { description: err?.message || "API lỗi" });
-      });
+       toast.promise(
+           sendOrderToKitchen(Number(orderId)).then(async () => {
+              // Update status of items to preparing locally or just rely on refresh
+              updateCurrentCart(
+                cart.map((item) =>
+                  item.status !== "served" && item.status !== "canceled"
+                    ? { ...item, status: "preparing" }
+                    : item
+                )
+              );
+               // Refresh from BE to ensure sync
+              if (!isTakeaway && selectedTable) {
+                 await fetchTableOrder(selectedTable);
+              } else if (isTakeaway && takeawayOrderId) {
+                 // Refresh takeaway order
+                 try {
+                     const resOrder = await axiosClient.get(`/orders/${takeawayOrderId}`);
+                     const orderData = resOrder?.data?.metaData ?? resOrder?.data;
+                     if (orderData) {
+                         const newItems = mapOrderToCartItems(orderData);
+                         setTakeawayOrders(newItems);
+                     }
+                 } catch (e) {
+                     console.error("Failed to refresh takeaway order", e);
+                 }
+              }
+           }),
+           {
+               loading: 'Đang gửi bếp...',
+               success: `Đã gửi ${itemsToSend.length} món đến quầy pha chế`,
+               error: (err) => `Gửi bếp thất bại: ${err?.message || 'Lỗi hệ thống'}`
+           }
+       );
+       // Removed Order History Log
+    } else {
+        toast.error("Chưa có đơn hàng để gửi bếp (Lỗi: Missing Order ID)");
     }
-
-    // Reset kitchen update flag after sending
-    setIsKitchenUpdateNeeded(false);
-
-    toast.success(`Đã gửi ${itemsToSend.length} món đến quầy pha chế`, {
-      description: orderInfo,
-    });
   };
 
   // Promotion handlers
@@ -1439,27 +2039,120 @@ useEffect(() => {
 
     if (promotion) {
       const cart = getCurrentCart();
-      const subtotal = cart.reduce(
+      const orderTotal = cart.reduce(
         (sum, item) => sum + getItemPrice(item) * item.quantity,
         0
       );
 
+      // Helper: determine if a cart item is applicable under promotion scopes
+      const isItemApplicable = (item: CartItem) => {
+        const product = products.find((p) => String(p.id) === String(item.id));
+        const categoryId = product?.category;
+
+        const applyToAllItems = Boolean(promotion.applyToAllItems);
+        const applyToAllCategories = Boolean(promotion.applyToAllCategories);
+        const applyToAllCombos = Boolean(promotion.applyToAllCombos);
+        const applicableItemIds: string[] = (promotion.applicableItemIds || []).map((x: any) => String(x));
+        const applicableCategoryIds: string[] = (promotion.applicableCategoryIds || []).map((x: any) => String(x));
+        const applicableComboIds: string[] = (promotion.applicableComboIds || []).map((x: any) => String(x));
+
+        // Combos are separate entity: only include when explicitly allowed
+        if (item.isCombo) {
+          if (applyToAllCombos) return true;
+          if (applicableComboIds.length > 0 && item.comboId) {
+            return applicableComboIds.includes(String(item.comboId));
+          }
+          // If neither flag nor ids provided, combos are not applicable
+          return false;
+        }
+
+        // Items scope
+        if (applyToAllItems || applyToAllCategories) return true;
+        if (applicableItemIds.length === 0 && applicableCategoryIds.length === 0) {
+          // No explicit scope provided → treat as not applicable (backend should enforce at least one)
+          return false;
+        }
+        if (applicableItemIds.includes(String(item.id))) return true;
+        if (categoryId && applicableCategoryIds.includes(String(categoryId))) return true;
+        return false;
+      };
+
+      // Build applicable items list (exclude attached toppings which already merge into parent price)
+      const applicableItems = cart.filter((i) => !i.parentItemId && isItemApplicable(i));
+      const applicableSubtotal = applicableItems.reduce(
+        (sum, i) => sum + getItemPrice(i) * i.quantity,
+        0
+      );
+      const totalApplicableQty = applicableItems.reduce((sum, i) => sum + i.quantity, 0);
+
+      // Respect minOrderValue on total order
+      if (promotion.minOrderValue && orderTotal < Number(promotion.minOrderValue)) {
+        setAppliedPromoCode(promotion.code);
+        setDiscountAmount((pointsToUse || 0) * 10);
+        return;
+      }
+
       let calculatedDiscount = 0;
 
+      // Percentage (typeId=1)
       if (promotion.type === "percentage") {
-        calculatedDiscount = (subtotal * promotion.value) / 100;
-      } else if (promotion.type === "fixed") {
-        calculatedDiscount = promotion.value;
-      } else if (promotion.type === "item" && promotion.applicableCategories) {
-        cart.forEach((item) => {
-          const product = products.find((p) => p.id === item.id);
-          if (
-            product &&
-            product.category &&
-            promotion.applicableCategories.includes(product.category)
-          ) {
+        calculatedDiscount = (applicableSubtotal * Number(promotion.value)) / 100;
+        if (promotion.maxDiscount != null) {
+          calculatedDiscount = Math.min(calculatedDiscount, Number(promotion.maxDiscount));
+        }
+        calculatedDiscount = Math.min(calculatedDiscount, applicableSubtotal);
+      }
+      // Fixed amount (typeId=2)
+      else if (promotion.type === "fixed") {
+        calculatedDiscount = Math.min(Number(promotion.value), applicableSubtotal);
+      }
+      // Fixed price (typeId=3)
+      else if (promotion.type === "fixed_price") {
+        const finalPrice = Number(promotion.value) * totalApplicableQty;
+        calculatedDiscount = Math.max(0, applicableSubtotal - finalPrice);
+      }
+      // Gift (typeId=4)
+      else if (promotion.type === "gift") {
+        const buyQ = Number(promotion.buyQuantity) || 0;
+        const getQ = Number(promotion.getQuantity) || 0;
+        const requireSame = Boolean(promotion.requireSameItem);
+
+        let giftCount = 0;
+
+        if (buyQ > 0 && getQ > 0) {
+          if (requireSame) {
+            // Sum gifts per item
+            giftCount = applicableItems.reduce((sum, i) => sum + Math.floor(i.quantity / buyQ) * getQ, 0);
+          } else {
+            const totalQty = totalApplicableQty;
+            giftCount = Math.floor(totalQty / buyQ) * getQ;
+          }
+        } else if (getQ > 0) {
+          // Mode A: only minOrderValue + getQuantity
+          giftCount = getQ;
+        }
+
+        if (giftCount > 0) {
+          // Build unit price list of applicable items (repeat by quantity), sort ascending
+          const unitPrices: number[] = [];
+          applicableItems.forEach((i) => {
+            const unitPrice = getItemPrice(i); // price per unit includes customization
+            for (let q = 0; q < i.quantity; q++) unitPrices.push(unitPrice);
+          });
+          unitPrices.sort((a, b) => a - b);
+          const take = Math.min(giftCount, unitPrices.length);
+          calculatedDiscount = unitPrices.slice(0, take).reduce((s, p) => s + p, 0);
+        }
+        calculatedDiscount = Math.min(calculatedDiscount, applicableSubtotal);
+      }
+      // Backward compatibility: category-based item discount
+      else if (promotion.type === "item" && Array.isArray(promotion.applicableCategories)) {
+        applicableItems.forEach((item) => {
+          const product = products.find((p) => String(p.id) === String(item.id));
+          const categoryId = product?.category;
+          if (categoryId && promotion.applicableCategories.includes(categoryId)) {
             calculatedDiscount += Math.min(
-              promotion.value * item.quantity,
+              Number(promotion.value) * item.quantity,
               getItemPrice(item) * item.quantity
             );
           }
@@ -1493,15 +2186,7 @@ useEffect(() => {
     );
 
     // Add to order history
-    const historyEntry = {
-      time: new Date().toLocaleTimeString("vi-VN", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      action: `Hủy món ${outOfStockItem.name} do hết nguyên liệu ${outOfStockIngredient}`,
-      staff: "Thu ngân Lan",
-    };
-    setOrderHistory((prev) => [historyEntry, ...prev]);
+
 
     toast.error(`Đã hủy món ${outOfStockItem.name}`);
     setOutOfStockWarningOpen(false);
@@ -1523,16 +2208,7 @@ useEffect(() => {
       )
     );
 
-    // Add to order history
-    const historyEntry = {
-      time: new Date().toLocaleTimeString("vi-VN", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      action: `Đợi nguyên liệu ${outOfStockIngredient} cho món ${outOfStockItem.name}`,
-      staff: "Thu ngân Lan",
-    };
-    setOrderHistory((prev) => [historyEntry, ...prev]);
+
 
     toast.info(`Món ${outOfStockItem.name} đang đợi nguyên liệu`);
     setOutOfStockWarningOpen(false);
@@ -1545,16 +2221,7 @@ useEffect(() => {
       description: `Món ${outOfStockItem.name} hết nguyên liệu ${outOfStockIngredient}`,
     });
 
-    // Add to order history
-    const historyEntry = {
-      time: new Date().toLocaleTimeString("vi-VN", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      action: `Thông báo phục vụ: món ${outOfStockItem.name} hết nguyên liệu`,
-      staff: "Thu ngân Lan",
-    };
-    setOrderHistory((prev) => [historyEntry, ...prev]);
+
   };
 
   const handleOpenReplaceModal = () => {
@@ -1579,16 +2246,7 @@ useEffect(() => {
       )
     );
 
-    // Add to order history
-    const historyEntry = {
-      time: new Date().toLocaleTimeString("vi-VN", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      action: `Thu ngân đổi món ${outOfStockItem.name} → ${newProduct.name}`,
-      staff: "Thu ngân Lan",
-    };
-    setOrderHistory((prev) => [historyEntry, ...prev]);
+
 
     toast.success(
       `Đã thay thế món ${outOfStockItem.name} bằng ${newProduct.name}`
@@ -1599,12 +2257,60 @@ useEffect(() => {
 
   // Removed: handler for submitting new item requests
 
-  const handleOpenCustomizationModal = (item: CartItem) => {
-    setSelectedItemForCustomization(item);
+  // State for available toppings for the selected item
+  const [currentAvailableToppings, setCurrentAvailableToppings] = useState<any[]>(toppings);
+
+  const handleOpenCustomizationModal = async (item: CartItem) => {
+    // Determine if we should fetch specific toppings
+    // itemId might be "productID-timestamp"
+    const productId = item.id.split('-')[0];
+    
+    // Try to fetch item details for toppings
+    try {
+        const res = await getItemById(productId);
+        const itemData = res?.data?.metaData ?? res?.data;
+        if (itemData?.availableToppings && itemData.availableToppings.length > 0) {
+            // Map to Topping interface
+            const specificToppings = itemData.availableToppings.map((t: any) => ({
+                id: String(t.topping.id),
+                name: t.topping.name,
+                price: Number(t.topping.sellingPrice || 0)
+            }));
+            setCurrentAvailableToppings(specificToppings);
+        } else {
+            // Fallback to global toppings if none specific (or maybe empty?)
+            // User requested: "response nó có availableToppings á, thì dùng các toppings đó thôi"
+            // So default to empty if specific provided but empty? Or fallback to all?
+            // Let's fallback to global if fetching failed or empty, OR just empty?
+            // Based on user request "thì dùng các toppings đó thôi", implies STRICT subset.
+            // If itemData exists but no toppings, then NO toppings.
+            if (itemData) {
+                 setCurrentAvailableToppings([]);
+            } else {
+                 setCurrentAvailableToppings(toppings);
+            }
+        }
+        
+        // Determine isComposite from itemData
+        // itemTypeId: 1=ready_made, 2=composite, 3=ingredient
+        const isComposite = itemData?.itemTypeId === 2 || itemData?.itemType?.id === 2;
+        
+        // Update item with isComposite flag before setting state
+        // We need to cast or ensure CartItem has this prop. 
+        // We will extend the object locally.
+        const itemWithFlag = { ...item, isComposite };
+        setSelectedItemForCustomization(itemWithFlag);
+
+    } catch (err) {
+        console.error("Failed to fetch item details", err);
+        setCurrentAvailableToppings(toppings); // Fallback on error
+        setSelectedItemForCustomization(item);
+    }
+
     setCustomizationModalOpen(true);
   };
 
-  const handleUpdateCustomization = (customization: ItemCustomization) => {
+  const handleUpdateCustomization = async (customization: ItemCustomization) => {
     if (!selectedItemForCustomization) return;
 
     const cart = getCurrentCart();
@@ -1631,182 +2337,190 @@ useEffect(() => {
       );
     };
 
-    // Check if customization has changed
+    // Calculate if changed
     const hasCustomizationChanged = !isCustomizationEqual(
       selectedItemForCustomization.customization,
       customization
     );
 
-    // Check if there's an existing item with the same product and customization
-    const existingItemWithSameCustomization = cart.find(
-      (item) =>
-        item.id.split("-")[0] ===
-          selectedItemForCustomization.id.split("-")[0] && // Same product
-        item.id !== selectedItemForCustomization.id && // Different item instance
-        isCustomizationEqual(item.customization, customization)
+    // Prepare the final item
+    const finalItem: CartItem = {
+      ...selectedItemForCustomization,
+      customization,
+      notes: customization.note || selectedItemForCustomization.notes,
+    };
+
+    // --- API INTEGRATION ---
+    // --- API INTEGRATION ---
+    // Handle Dine-in (Table)
+    if (!isTakeaway && selectedTable) {
+         let currentOrderId = selectedTable.order_id;
+
+         try {
+             // If no existing order, create one first
+             if (!currentOrderId) {
+                 const res = await createOrder({ tableId: selectedTable.id, items: [] });
+                 const newOrder = res?.data?.metaData ?? res?.data;
+                 currentOrderId = newOrder.id;
+                 
+                 // Ideally update selectedTable state immediately so next item knows
+                 setSelectedTable(prev => prev ? { ...prev, order_id: currentOrderId, currentOrder: newOrder.orderCode, status: 'occupied' } : null);
+                 // Refresh tables to show occupied status
+                 await refreshTables();
+             }
+
+             if (currentOrderId) {
+                 const notes = finalItem.notes || '';
+                 const attachedToppings = finalItem.customization?.toppings?.map((t) => ({
+                     itemId: Number(t.id),
+                     quantity: t.quantity
+                 })) || [];
+                 
+                 if (finalItem.orderItemId) {
+                     // CASE 1: EDITING EXISTING SENT ITEM -> UPDATE
+                     await updateOrderItem(currentOrderId, finalItem.orderItemId, {
+                         notes: notes,
+                        customization: stripToppingsFromCustomization(finalItem.customization),
+                         attachedToppings: attachedToppings
+                     });
+                     toast.success("Đã cập nhật món");
+                 } else {
+                     // CASE 2: ADDING NEW ITEM -> ADD
+                     await addOrderItem(currentOrderId, {
+                        itemId: Number(finalItem.id.split('-')[0]),
+                        quantity: finalItem.quantity,
+                        notes: notes,
+                        customization: stripToppingsFromCustomization(finalItem.customization),
+                        attachedToppings: attachedToppings
+                     });
+                     toast.success("Đã thêm món vào đơn");
+                 }
+                 // Refresh Order
+                 await fetchTableOrder({ ...selectedTable, id: selectedTable.id }); // Pass ID to ensure sync
+             }
+         } catch (err: any) {
+             toast.error(`Lỗi tạo/cập nhật đơn: ${err?.message}`);
+         }
+         
+         // Close modal
+         setCustomizationModalOpen(false);
+         setSelectedItemForCustomization(null);
+         return; 
+    }
+
+
+    // --- LOCAL FALLBACK (Takeaway or No Order ID) ---
+    // User Requirement: "rồi nếu chọn mang về, lúc thêm món lần đầu thì cũng gọi api create order để cho nó có order"
+    
+    // Check if Takeaway and NO OrderID yet -> Create Order First
+    if (isTakeaway) {
+        let currentOrderId = takeawayOrderId;
+
+        try {
+            if (!currentOrderId) {
+                // Must create order first
+                // Use a default tableId=null or similar for takeaway (backend expects tableId? DTO says tableId number...)
+                // If backend requires tableId, we might need a dummy "Takeaway Table" or null if allowed.
+                // Re-reading user request: "tableId là null thôi" -> OK.
+                const res = await createOrder({ tableId: null as any, items: [] });
+                const newOrder = res?.data?.metaData ?? res?.data;
+                currentOrderId = newOrder.id;
+                setTakeawayOrderId(currentOrderId);
+                setTakeawayOrderCode(newOrder.orderCode);
+            }
+
+            if (currentOrderId) {
+                 // Now we have an ID, call addOrderItem/updateOrderItem like Dine-in
+                 // Logic here is identical to Dine-In block above.
+                 const notes = finalItem.notes || '';
+                 const attachedToppings = finalItem.customization?.toppings?.map((t) => ({
+                     itemId: Number(t.id),
+                     quantity: t.quantity
+                 })) || [];
+
+                 if (finalItem.orderItemId) {
+                     // UPDATE
+                     await updateOrderItem(currentOrderId, finalItem.orderItemId, {
+                         notes: notes,
+                        customization: stripToppingsFromCustomization(finalItem.customization),
+                         attachedToppings: attachedToppings
+                     });
+                     toast.success("Đã cập nhật món (Mang về)");
+                 } else {
+                     // ADD
+                     await addOrderItem(currentOrderId, {
+                        itemId: Number(finalItem.id.split('-')[0]),
+                        quantity: finalItem.quantity,
+                        notes: notes,
+                        customization: stripToppingsFromCustomization(finalItem.customization),
+                        attachedToppings: attachedToppings
+                     });
+                     toast.success("Đã thêm món (Mang về)");
+                 }
+                 
+                 // Fetch updated order from backend to sync
+                 const resOrder = await axiosClient.get(`/orders/${currentOrderId}`); // Manual fetch helper since fetchTableOrder uses table
+                 const orderData = resOrder?.data?.metaData ?? resOrder?.data;
+                 if (orderData) {
+                     const newItems = mapOrderToCartItems(orderData);
+                     setTakeawayOrders(newItems);
+                     // Also update generic order info if needed (code)
+                 }
+
+                 setCustomizationModalOpen(false);
+                 setSelectedItemForCustomization(null);
+                 return;
+            }
+
+        } catch (err: any) {
+            console.error(err);
+             toast.error(`Lỗi tạo đơn mang về: ${err?.message}`);
+             // If failed, maybe fall through to local? Or stop? 
+             // Stop to avoid inconsistency.
+             return;
+        }
+    }
+
+    // Legacy Local Only (Should not be reached for Takeaway anymore if API succeeds) or other undefined states
+    // ... (Keep existing local logic for fallback or Delivery) but only if NOT Takeaway
+    
+    // Check if we can merge with an existing PENDING item
+    let updatedCart = [...cart];
+    // We only merge with 'pending' (local) items. Sent items cannot be merged into locally.
+    const existingItemIndex = cart.findIndex(item => 
+        item.status === 'pending' &&
+        item.id !== finalItem.id && // Don't match self
+        item.id.split('-')[0] === finalItem.id.split('-')[0] && // Same product (base ID)
+        isCustomizationEqual(item.customization, customization) // Same customization
     );
 
-    if (existingItemWithSameCustomization) {
-      // Merge: increase quantity of existing item and remove current item
-      updateCurrentCart(
-        cart
-          .map((item) =>
-            item.id === existingItemWithSameCustomization.id
-              ? {
-                  ...item,
-                  quantity:
-                    item.quantity + selectedItemForCustomization.quantity,
-                }
-              : item.id === selectedItemForCustomization.id
-              ? { ...item, quantity: 0 } // Mark for removal
-              : item
-          )
-          .filter((item) => item.quantity > 0)
-      );
-      toast.success("Đã gộp với món cùng tùy chỉnh");
+    if (existingItemIndex !== -1) {
+         // MERGE
+         updatedCart[existingItemIndex] = {
+             ...updatedCart[existingItemIndex],
+             quantity: updatedCart[existingItemIndex].quantity + finalItem.quantity
+         };
+         if (cart.some(i => i.id === finalItem.id)) {
+             updatedCart = updatedCart.filter(i => i.id !== finalItem.id);
+         }
+         toast.success("Đã gộp vào món đang chờ (x" + finalItem.quantity + ")");
     } else {
-      // No matching item, just update customization
-      updateCurrentCart(
-        cart.map((item) =>
-          item.id === selectedItemForCustomization.id
-            ? {
-                ...item,
-                customization,
-                notes: customization.note || item.notes,
-              }
-            : item
-        )
-      );
-      toast.success("Đã cập nhật tùy chỉnh món");
+         // NO MERGE
+         if (cart.some(i => i.id === finalItem.id)) {
+             updatedCart = updatedCart.map(item => item.id === finalItem.id ? finalItem : item);
+         } else {
+             updatedCart.push(finalItem);
+         }
     }
 
-    // Enable send to kitchen button if customization changed
-    if (hasCustomizationChanged) {
-      setIsKitchenUpdateNeeded(true);
-    }
-
+    updateCurrentCart(updatedCart);
     setCustomizationModalOpen(false);
     setSelectedItemForCustomization(null);
   };
 
-  // Simulate KDS sending out-of-stock notification (Demo only)
-  const simulateOutOfStockNotification = () => {
-    const cart = getCurrentCart();
-    const preparingItems = cart.filter((item) => item.status === "preparing");
 
-    if (preparingItems.length > 0) {
-      const randomItem =
-        preparingItems[Math.floor(Math.random() * preparingItems.length)];
-      const ingredients = ["Sữa tươi", "Sữa đặc", "Trân châu", "Cà phê", "Trà"];
-      const randomIngredient =
-        ingredients[Math.floor(Math.random() * ingredients.length)];
 
-      // Update item status to out-of-stock
-      updateCurrentCart(
-        cart.map((item) =>
-          item.id === randomItem.id
-            ? {
-                ...item,
-                status: "out-of-stock" as const,
-                outOfStockReason: randomIngredient,
-                outOfStockIngredients: [randomIngredient],
-              }
-            : item
-        )
-      );
 
-      // Show warning modal
-      setOutOfStockItem(randomItem);
-      setOutOfStockIngredient(randomIngredient);
-      setOutOfStockWarningOpen(true);
-
-      // Add to order history
-      const historyEntry = {
-        time: new Date().toLocaleTimeString("vi-VN", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        action: `Bếp báo hết nguyên liệu ${randomIngredient} cho món ${randomItem.name}`,
-        staff: "Bếp - Trần Minh",
-      };
-      setOrderHistory((prev) => [historyEntry, ...prev]);
-    }
-  };
-
-  // Simulate KDS sending ingredient restocked notification (Demo only)
-  const simulateRestockNotification = () => {
-    const cart = getCurrentCart();
-    const waitingItems = cart.filter(
-      (item) =>
-        item.status === "waiting-ingredient" || item.status === "out-of-stock"
-    );
-
-    if (waitingItems.length > 0) {
-      const itemToRestock = waitingItems[0];
-      const ingredient = itemToRestock.outOfStockReason || "Nguyên liệu";
-
-      // Show toast notification with green background
-      toast.success(
-        <div className="flex items-start gap-3">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm text-slate-900 mb-1">
-              ✓ Nguyên liệu đã bổ sung
-            </p>
-            <p className="text-xs text-slate-600">
-              {ingredient} đã có lại trong kho. Món {itemToRestock.name} có thể
-              pha chế.
-            </p>
-          </div>
-        </div>,
-        {
-          duration: 4000,
-          style: {
-            background: "#E8F8ED",
-            border: "1px solid #86EFAC",
-          },
-        }
-      );
-
-      // Update item status back to preparing
-      updateCurrentCart(
-        cart.map((item) =>
-          item.id === itemToRestock.id
-            ? {
-                ...item,
-                status: "preparing" as const,
-                outOfStockReason: undefined,
-                outOfStockIngredients: undefined,
-              }
-            : item
-        )
-      );
-
-      // Add to restocked and glowing lists for visual effects
-      setRestockedItems([itemToRestock.id]);
-      setGlowingItems([itemToRestock.id]);
-
-      // Auto-remove from lists after delay
-      setTimeout(() => {
-        setRestockedItems([]);
-      }, 3000);
-
-      setTimeout(() => {
-        setGlowingItems([]);
-      }, 2000);
-
-      // Add to order history
-      const historyEntry = {
-        time: new Date().toLocaleTimeString("vi-VN", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        action: `Bếp báo đã bổ sung ${ingredient} cho món ${itemToRestock.name}`,
-        staff: "Bếp - Trần Minh",
-      };
-      setOrderHistory((prev) => [historyEntry, ...prev]);
-    }
-  };
 
   // Helper function to get compatible items from cart for topping attachment
   const getCompatibleItemsForTopping = (
@@ -1864,26 +2578,124 @@ useEffect(() => {
   // Helper function to remove attached topping
   const removeAttachedTopping = (parentItemId: string, toppingId: string) => {
     const cart = getCurrentCart();
-    const updatedCart = cart.map((item) => {
-      if (item.id === parentItemId && item.attachedToppings) {
-        return {
-          ...item,
-          attachedToppings: item.attachedToppings.filter(
-            (t) => t.id !== toppingId
-          ),
-        };
+    const parentItem = cart.find(i => i.id === parentItemId);
+    const topping = parentItem?.attachedToppings?.find(t => t.id === toppingId);
+    
+    if (!parentItem || !topping) {
+      toast.error("Không tìm thấy topping");
+      return;
+    }
+    
+    const currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
+    
+    // If topping has orderItemId (saved to DB), need to call API
+    if (topping.orderItemId && currentOrderId) {
+      const isPending = !topping.status || topping.status === 'pending';
+      
+      if (isPending) {
+        // Pending: remove permanently
+        (async () => {
+          try {
+            if (!topping.orderItemId) return;
+            await removeOrderItem(currentOrderId, topping.orderItemId as number);
+            toast.success("Đã xóa topping");
+            
+            // Refresh order data
+            if (isTakeaway && takeawayOrderId) {
+              const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
+              const orderData = res?.data?.metaData ?? res?.data;
+              if (orderData) {
+                setTakeawayOrders(mapOrderToCartItems(orderData));
+              }
+            } else if (selectedTable) {
+              fetchTableOrder(selectedTable);
+            }
+          } catch (err: any) {
+            toast.error(`Xóa topping thất bại: ${err?.message}`);
+          }
+        })();
+      } else {
+        // Sent: show cancel modal
+        setToppingToCancel({ parentItemId, topping });
+        setCancelToppingQuantity(topping.quantity);
+        setCancelToppingReason("");
+        setOtherToppingReason("");
+        setCancelToppingModalOpen(true);
       }
-      return item;
-    });
-    updateCurrentCart(updatedCart);
+    } else {
+      // Local only: just update cart
+      const updatedCart = cart.map((item) => {
+        if (item.id === parentItemId && item.attachedToppings) {
+          return {
+            ...item,
+            attachedToppings: item.attachedToppings.filter(
+              (t) => t.id !== toppingId
+            ),
+          };
+        }
+        return item;
+      });
+      updateCurrentCart(updatedCart);
+      toast.success("Đã xóa topping");
+    }
+  };
+  
+  // Handle confirm cancel topping
+  const handleConfirmCancelTopping = async () => {
+    if (!toppingToCancel || !cancelToppingReason || (cancelToppingReason === "Khác" && !otherToppingReason.trim())) {
+      return;
+    }
+    
+    const currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
+    if (!currentOrderId || !toppingToCancel.topping.orderItemId) return;
+    
+    try {
+      const finalReason = cancelToppingReason === "Khác" ? otherToppingReason : cancelToppingReason;
+      
+      await deleteOrderItem(currentOrderId, toppingToCancel.topping.orderItemId, {
+        quantity: cancelToppingQuantity,
+        reason: finalReason
+      });
+      
+      toast.success("Đã hủy topping");
+      
+      // Refresh order data
+      if (isTakeaway && takeawayOrderId) {
+        const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
+        const orderData = res?.data?.metaData ?? res?.data;
+        if (orderData) {
+          setTakeawayOrders(mapOrderToCartItems(orderData));
+        }
+      } else if (selectedTable) {
+        fetchTableOrder(selectedTable);
+      }
+      
+      // Reset modal
+      setCancelToppingModalOpen(false);
+      setToppingToCancel(null);
+      setCancelToppingQuantity(1);
+      setCancelToppingReason("");
+      setOtherToppingReason("");
+    } catch (err: any) {
+      toast.error(`Hủy topping thất bại: ${err?.message}`);
+    }
+  };
+
+  // Helper to strip toppings from customization (toppings are sent via attachedToppings)
+  const stripToppingsFromCustomization = (customization: any) => {
+    if (!customization) return undefined;
+    const { toppings, ...rest } = customization;
+    return Object.keys(rest).length > 0 ? rest : undefined;
   };
 
   // Helper function to calculate item price with customization and attached toppings
   const getItemPrice = (item: CartItem): number => {
     // Coerce base price to number to prevent string concatenation (e.g., "42000" + 8000)
     const basePrice = Number(item.price) || 0;
+    // Extra price for combo items (upgrade fee) - already included in backend unitPrice but adding for safety
+    const extraPrice = Number(item.extraPrice) || 0;
     const customizationToppingsPrice =
-      item.customization?.toppings.reduce(
+      item.customization?.toppings?.reduce(
         (sum, t) => sum + (Number(t.price) || 0) * (t.quantity ?? 1),
         0
       ) || 0;
@@ -1892,11 +2704,11 @@ useEffect(() => {
         (sum, t) => sum + (Number(t.price) || 0) * t.quantity,
         0
       ) || 0;
-    return basePrice + customizationToppingsPrice + attachedToppingsPrice;
+    return basePrice + extraPrice + customizationToppingsPrice + attachedToppingsPrice;
   };
 
   const cart = getCurrentCart();
-  const totalAmount = cart.reduce((sum, item) => {
+  const localTotalAmount = cart.reduce((sum, item) => {
     // Skip attached toppings - they're included in parent price
     if (item.parentItemId) return sum;
     return sum + getItemPrice(item) * item.quantity;
@@ -1906,6 +2718,10 @@ useEffect(() => {
     if (item.parentItemId) return sum;
     return sum + item.quantity;
   }, 0);
+
+  // Decide display totals: prefer backend values when available
+  const displaySubtotal = orderSubtotal > 0 ? orderSubtotal : localTotalAmount;
+  const displayTotalAmount = orderTotalAmount > 0 ? orderTotalAmount : localTotalAmount;
 
   const getTableStatusColor = (status: Table["status"]) => {
     switch (status) {
@@ -2010,33 +2826,7 @@ useEffect(() => {
 
   // Ready items advance functions (for waiter tab)
   // servedQuantity decreases when serving (completedQuantity stays fixed for display)
-  const advanceReadyItemOneUnit = (itemId: string) => {
-    setReadyItems((prev) =>
-      prev.map((item) => {
-        if (item.id === itemId && item.servedQuantity > 0) {
-          return {
-            ...item,
-            servedQuantity: item.servedQuantity - 1,
-          };
-        }
-        return item;
-      })
-    );
-  };
 
-  const advanceReadyItemAllUnits = (itemId: string) => {
-    setReadyItems((prev) =>
-      prev.map((item) => {
-        if (item.id === itemId && item.servedQuantity > 0) {
-          return {
-            ...item,
-            servedQuantity: 0,
-          };
-        }
-        return item;
-      })
-    );
-  };
 
   // Refactored Cart Panel Content
   const renderCartPanel = (isMobile = false) => {
@@ -2050,10 +2840,10 @@ useEffect(() => {
         className={
           isMobile
             ? "bg-white border-l shadow-lg flex flex-col h-full fixed inset-0 z-50 transition-transform duration-300 lg:hidden translate-y-0"
-            : "bg-white border-l shadow-lg flex flex-col h-full hidden lg:flex lg:flex-none lg:w-[400px] xl:w-[450px]"
+            : "bg-white border-l shadow-lg flex flex-col h-full hidden lg:flex lg:flex-none lg:w-[500px] xl:w-[600px]"
         }
       >
-      <div className="p-3 border-b bg-gradient-to-r from-blue-50 to-blue-100">
+      <div className="p-3 border-b bg-gradient-to-r from-blue-50 to-blue-100 ">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             {isMobile && (
@@ -2067,12 +2857,12 @@ useEffect(() => {
               </Button>
             )}
             <h2 className="text-blue-900 text-base">Đơn hàng</h2>
-            {selectedTable?.currentOrder && (
+            {(selectedTable?.currentOrder || (isTakeaway && takeawayOrderCode)) && (
               <Badge
                 variant="secondary"
                 className="bg-blue-600 text-white text-xs"
               >
-                {selectedTable.currentOrder}
+                {selectedTable?.currentOrder || takeawayOrderCode}
               </Badge>
             )}
           </div>
@@ -2097,48 +2887,48 @@ useEffect(() => {
                 Bàn {selectedTable.name} – {selectedTable.capacity} chỗ
               </span>
             </div>
+          </div>
+        ) : (
+             !isTakeaway && <p className="text-xs text-slate-500">Chưa chọn bàn</p>
+        )}
 
-            {/* Order Actions & Customer Autocomplete - Same Row */}
-            <div className="flex gap-2 items-end">
-              {/* Order Actions */}
-              <div className="flex gap-1 pt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 px-1.5 p-0"
-                  title="Chuyển bàn"
-                  onClick={() => setMoveTableOpen(true)}
-                >
-                  <ArrowLeftRight className="w-3 h-3" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 px-1.5 p-0"
-                  title="Gộp bàn"
-                  onClick={() => setMergeTableOpen(true)}
-                >
-                  <GitMerge className="w-3 h-3" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 px-1.5 p-0"
-                  title="Tách đơn"
-                  onClick={() => setSplitOrderOpen(true)}
-                >
-                  <FileText className="w-3 h-3" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 px-1.5 p-0"
-                  title="Lịch sử"
-                  onClick={() => setOrderHistoryOpen(true)}
-                >
-                  <History className="w-3 h-3" />
-                </Button>
-              </div>
+        {(selectedTable || isTakeaway) && (
+            /* Order Actions & Customer Autocomplete - Same Row */
+            <div className="flex gap-2 items-end mt-1">
+              {/* Order Actions - Only for Tables usually, but maybe for Takeaway too? 
+                  Move/Merge/Split unlikely for Takeaway. So keep conditional if needed.
+              */}
+              {selectedTable && (
+                  <div className="flex gap-1 pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-1.5 p-0"
+                      title="Chuyển bàn"
+                      onClick={() => setMoveTableOpen(true)}
+                    >
+                      <ArrowLeftRight className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-1.5 p-0"
+                      title="Gộp bàn"
+                      onClick={() => setMergeTableOpen(true)}
+                    >
+                      <GitMerge className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-1.5 p-0"
+                      title="Tách đơn"
+                      onClick={() => setSplitOrderOpen(true)}
+                    >
+                      <FileText className="w-3 h-3" />
+                    </Button>
+                  </div>
+              )}
 
               {/* Customer Autocomplete */}
               <div className="flex-1">
@@ -2146,21 +2936,41 @@ useEffect(() => {
                   customers={customers}
                   value={customerSearchCode}
                   onChange={(code, customer) => {
-                    setCustomerSearchCode(code);
+                    // If customer is selected, show Name. Else show Code (typing)
+                    if (customer) {
+                        setCustomerSearchCode(customer.name);
+                    } else {
+                        setCustomerSearchCode(code);
+                    }
+                    
                     if (customer) {
                       setSelectedCustomer(customer);
+                      
+                      const orderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
+                      if (orderId) {
+                         // Attach customer to order in backend
+                         updateOrder(orderId, { customerId: customer.id })
+                           .then(() => toast.success(`Đã gắn khách: ${customer.name}`))
+                           .catch((err: any) => toast.error("Lỗi gắn khách hàng", { description: err.message }));
+                      }
+                    } else if (code === "" && selectedTable?.order_id) {
+                         // Handle clear customer?
                     }
                   }}
                   onAddNew={(newCustomer) => {
                     setSelectedCustomer(newCustomer);
                     setCustomerSearchCode(newCustomer.code);
+                    
+                    const orderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
+                    if (orderId) {
+                       updateOrder(orderId, { customerId: newCustomer.id })
+                           .then(() => toast.success(`Đã gắn khách mới: ${newCustomer.name}`))
+                           .catch((err: any) => toast.error("Lỗi gắn khách hàng", { description: err.message }));
+                    }
                   }}
                 />
               </div>
             </div>
-          </div>
-        ) : (
-          <p className="text-xs text-slate-500">Chưa chọn bàn</p>
         )}
       </div>
 
@@ -2179,68 +2989,281 @@ useEffect(() => {
           <div className="space-y-2">
             {/* Combo Suggestion Banner - will add later */}
 
-            {cart.map((item) => {
-              // Skip attached toppings in main loop - they'll be rendered under parent
-              if (item.parentItemId) return null;
+            {(() => {
+              // Group items: combo items grouped by comboInstanceId (or comboId fallback), non-combo items separate
+              const comboGroups = new Map<string, typeof cart>();
+              const nonComboItems: typeof cart = [];
+              
+              cart.forEach(item => {
+                if (item.parentItemId) return; // Skip toppings
+                
+                if (item.comboId || item.comboInstanceId) {
+                  // Use comboInstanceId if available, otherwise fallback to comboId
+                  const key = item.comboInstanceId || `combo-${item.comboId}-fallback`;
+                  const existing = comboGroups.get(key) || [];
+                  existing.push(item);
+                  comboGroups.set(key, existing);
+                } else {
+                  nonComboItems.push(item);
+                }
+              });
+
+              // Count combo types for displaying "2x Combo..." 
+              // Group instances by comboId to count identical combos
+              const comboIdToInstances = new Map<string | number, string[]>();
+              comboGroups.forEach((items, instanceId) => {
+                const comboId = items[0]?.comboId;
+                if (comboId) {
+                  const existing = comboIdToInstances.get(comboId) || [];
+                  existing.push(instanceId);
+                  comboIdToInstances.set(comboId, existing);
+                }
+              });
 
               return (
-                <div key={item.id}>
-                  {/* Main Item */}
-                  <CartItemDisplay
-                    item={item}
-                    onUpdateQuantity={updateQuantity}
-                    onRemove={removeFromCart}
-                    onCustomize={handleOpenCustomizationModal}
-                    onAddNote={handleOpenNoteDialog}
-                    onToggleComboExpansion={toggleComboExpansion}
-                    onCustomizeComboItem={handleCustomizeComboItem}
-                    getItemStatusBadge={getItemStatusBadge}
-                    restockedItems={restockedItems}
-                    glowingItems={glowingItems}
-                    appliedPromoCode={appliedPromoCode}
-                  />
-
-                  {/* Attached Toppings - Indented */}
-                  {item.attachedToppings &&
-                    item.attachedToppings.length > 0 && (
-                      <div className="ml-6 mt-1 space-y-1 border-l-2 border-amber-200 pl-3">
-                        {item.attachedToppings.map((topping) => (
-                          <div
-                            key={topping.id}
-                            className="bg-amber-50 rounded border border-amber-200 p-2 flex items-center justify-between gap-2"
-                          >
-                            <div className="flex-1">
-                              <p className="text-xs font-medium text-slate-900">
-                                + {topping.name}
-                              </p>
-                              <p className="text-xs text-amber-700">
-                                {topping.quantity} x{" "}
-                                {topping.price.toLocaleString("vi-VN")}đ ={" "}
-                                {(
-                                  topping.quantity * topping.price
-                                ).toLocaleString("vi-VN")}
-                                đ
-                              </p>
+                <>
+                  {/* Render Combo Groups - Aggregate identical combos */}
+                  {Array.from(comboIdToInstances.entries()).map(([comboId, instanceIds]) => {
+                    // Get all items from all instances of this comboId
+                    const allComboItems: typeof cart = [];
+                    instanceIds.forEach(instanceId => {
+                      const items = comboGroups.get(instanceId) || [];
+                      allComboItems.push(...items);
+                    });
+                    
+                    if (allComboItems.length === 0) return null;
+                    
+                    // Get combo info from first item
+                    const firstItem = allComboItems[0];
+                    const baseComboName = firstItem?.comboName || `Combo #${comboId}`;
+                    // Count instances of this combo type
+                    const instanceCount = instanceIds.length;
+                    // Display with count prefix if multiple instances
+                    const comboName = instanceCount > 1 ? `${instanceCount}x ${baseComboName}` : baseComboName;
+                    
+                    // Calculate combo price: base price per instance + total extra prices from all items
+                    const baseComboPrice = firstItem?.comboPrice ?? 0;
+                    const totalExtraPrice = allComboItems.reduce((sum, i) => sum + (Number(i.extraPrice) || 0), 0);
+                    // Total price = (base price * instance count) + total extra prices
+                    const comboPrice = (baseComboPrice * instanceCount) + totalExtraPrice;
+                    
+                    // Group items by instance for rendering (to allow individual instance deletion)
+                    const itemsByInstance = new Map<string, typeof cart>();
+                    instanceIds.forEach(instanceId => {
+                      const items = comboGroups.get(instanceId) || [];
+                      itemsByInstance.set(instanceId, items);
+                    });
+                    
+                    return (
+                      <Card key={`combo-aggregated-${comboId}`} className="border-green-300 bg-green-50/50">
+                        <CardContent className="p-3">
+                          {/* Combo Header */}
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Package className="w-4 h-4 text-green-600" />
+                              <span className="font-medium text-green-800">
+                                {comboName}
+                              </span>
+                              <Badge className="bg-green-500 text-xs">
+                                {allComboItems.length} món
+                              </Badge>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-6 w-6 p-0 text-slate-400 hover:text-red-600"
-                                onClick={() =>
-                                  removeAttachedTopping(item.id, topping.id)
-                                }
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-green-700">
+                                {comboPrice.toLocaleString()}đ
+                              </span>
+                              {/* Show delete button for entire combo if single instance, or if user wants to delete all */}
+                              {instanceCount === 1 && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 ml-2 text-red-500 hover:bg-red-50 hover:text-red-700"
+                                  onClick={() => handleRemoveCombo(instanceIds[0], itemsByInstance.get(instanceIds[0]))}
+                                  title="Xóa combo"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                </div>
+                          
+                          {/* Render each instance's items */}
+                          {Array.from(itemsByInstance.entries()).map(([comboInstanceId, comboItems]) => {
+                            // Calculate price for this specific instance
+                            const instanceBasePrice = comboItems[0]?.comboPrice ?? 0;
+                            const instanceExtraPrice = comboItems.reduce((sum, i) => sum + (Number(i.extraPrice) || 0), 0);
+                            const instancePrice = instanceBasePrice + instanceExtraPrice;
+                            
+                            return (
+                              <div key={`combo-instance-${comboInstanceId}`} className="mb-3 last:mb-0">
+                                {/* Instance header with delete button (only show if multiple instances) */}
+                                {instanceCount > 1 && (
+                                  <div className="flex items-center justify-between mb-2 pb-2 border-b border-green-200">
+                                    <span className="text-xs text-green-600 font-medium">
+                                      Combo #{instanceIds.indexOf(comboInstanceId) + 1}
+                                    </span>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 text-red-500 hover:bg-red-50 hover:text-red-700"
+                                      onClick={() => handleRemoveCombo(comboInstanceId, comboItems)}
+                                      title="Xóa combo này"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                )}
+                                
+                                {/* Combo Items for this instance */}
+                                <div className="space-y-2 ml-4 border-l-2 border-green-300 pl-3">
+                            {comboItems.map(item => {
+                              // Determine status display
+                              const isPending = !item.status || item.status === 'pending';
+                              const statusColor = item.status === 'completed' ? 'bg-green-100 text-green-700' 
+                                : item.status === 'preparing' ? 'bg-yellow-100 text-yellow-700'
+                                : item.status === 'served' ? 'bg-blue-100 text-blue-700'
+                                : 'bg-slate-100 text-slate-600';
+                              const statusLabel = item.status === 'completed' ? 'Xong' 
+                                : item.status === 'preparing' ? 'Đang làm'
+                                : item.status === 'served' ? 'Đã phục vụ'
+                                : 'Chờ báo';
+                              
+                              return (
+                                <div key={item.id} className="py-1">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1 flex items-center gap-2 flex-wrap">
+                                      <span className="text-sm text-slate-700">
+                                        {item.quantity}x {item.name}
+                                      </span>
+                                      {/* Extra Price Badge for combo items */}
+                                      {(item.extraPrice ?? 0) > 0 && (
+                                        <Badge variant="outline" className="text-xs text-amber-600 border-amber-200 bg-amber-50">
+                                          +{item.extraPrice?.toLocaleString()}đ
+                                        </Badge>
+                                      )}
+                                      {/* Status Badge */}
+                                      <span className={`text-xs px-1.5 py-0.5 rounded ${statusColor}`}>
+                                        {statusLabel}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      {/* Settings button - disabled if not pending or is topping */}
+                                      {!item.isTopping && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 w-6 p-0"
+                                          onClick={() => handleOpenCustomizationModal(item)}
+                                          title={isPending ? "Tùy chỉnh" : "Không thể chỉnh sửa sau khi báo bếp"}
+                                          disabled={!isPending}
+                                        >
+                                          <Settings className={`w-3 h-3 ${!isPending ? 'text-slate-300' : ''}`} />
+                                        </Button>
+                                      )}
+                                      {/* Trash button for individual combo items */}
+                                      {!item.isTopping && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 w-6 p-0 text-red-500 hover:bg-red-50 hover:text-red-700"
+                                          onClick={() => handleRemoveComboItem(item)}
+                                          title={isPending ? "Xóa món" : "Hủy món"}
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {/* Customization info */}
+                                  {item.customization && (
+                                    <div className="text-xs text-slate-500 ml-4">
+                                      Đường: {item.customization.sugarLevel}, Đá: {item.customization.iceLevel}
+                                    </div>
+                                  )}
+                                  {/* Attached Toppings */}
+                                  {item.attachedToppings && item.attachedToppings.length > 0 && (
+                                    <div className="text-xs text-slate-500 ml-4 mt-0.5">
+                                      Topping: {item.attachedToppings.map(t => `${t.name} x${t.quantity || 1}`).join(', ')}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+
+                  {/* Render Non-Combo Items */}
+                  {nonComboItems.map((item) => (
+                    <div key={item.id}>
+                      {/* Main Item */}
+                      <CartItemDisplay
+                        item={item}
+                        onUpdateQuantity={(id, change, reason) => {
+                             const targetItem = cart.find(i => i.id === id);
+                             if (targetItem) {
+                                 updateQuantity(id, targetItem.quantity + change, reason);
+                             }
+                        }}
+                        onRemove={(id, reason) => removeFromCart(id, reason)}
+                        onCustomize={handleOpenCustomizationModal}
+                        onAddNote={handleOpenNoteDialog}
+                        onToggleComboExpansion={toggleComboExpansion}
+                        onCustomizeComboItem={handleCustomizeComboItem}
+                        getItemStatusBadge={getItemStatusBadge}
+                        restockedItems={restockedItems}
+                        glowingItems={glowingItems}
+                        appliedPromoCode={appliedPromoCode}
+                      />
+
+                      {/* Attached Toppings - Indented */}
+                      {item.attachedToppings &&
+                        item.attachedToppings.length > 0 && (
+                          <div className="ml-6 mt-1 space-y-1 border-l-2 border-amber-200 pl-3">
+                            {item.attachedToppings.map((topping) => (
+                              <div
+                                key={topping.id}
+                                className="bg-amber-50 rounded border border-amber-200 p-2 flex items-center justify-between gap-2"
+                              >
+                                <div className="flex-1">
+                                  <p className="text-xs font-medium text-slate-900">
+                                    + {topping.name}
+                                  </p>
+                                  <p className="text-xs text-amber-700">
+                                    {topping.quantity} x{" "}
+                                    {topping.price.toLocaleString("vi-VN")}đ ={" "}
+                                    {(
+                                      topping.quantity * topping.price
+                                    ).toLocaleString("vi-VN")}
+                                    đ
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 w-6 p-0 text-slate-400 hover:text-red-600"
+                                    onClick={() =>
+                                      removeAttachedTopping(item.id, topping.id)
+                                    }
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                    </div>
+                  ))}
+                </>
               );
-            })}
+            })()}
           </div>
         )}
       </div>
@@ -2248,65 +3271,26 @@ useEffect(() => {
       <Separator className="shadow-sm" />
 
       <div className="p-3 space-y-2 bg-gradient-to-r from-blue-50 to-blue-100">
-        {/* Inline Promo Code Input */}
-        {!appliedPromoCode && cart.length > 0 && (
-          <div className="space-y-1"></div>
-        )}
-
+        
         <div className="space-y-1">
           <div className="flex justify-between text-xs">
-            {/* <span className="text-slate-600">Tạm tính</span>
-              <span className="text-slate-900">
-                {totalAmount.toLocaleString()}₫
-              </span> */}
           </div>
-          {discountAmount > 0 && (
-            <div className="flex justify-between text-xs items-center">
-              <span className="text-green-700">Giảm giá</span>
-              <div className="flex items-center gap-2">
-                <span className="text-green-700">
-                  –{discountAmount.toLocaleString()}₫
-                </span>
-                <button
-                  onClick={handleRemovePromo}
-                  className="text-slate-400 hover:text-red-600 transition-colors"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-          )}
           <Separator className="bg-blue-300 my-1" />
           <div className="flex justify-between text-sm">
-            <span className="text-blue-950">Tổng cộng</span>
+            <span className="text-blue-950">Tổng cộng ước tính</span>
             <span className="text-blue-900 text-2xl font-semibold">
-              {(totalAmount - discountAmount).toLocaleString()}₫
+              {displaySubtotal.toLocaleString()}₫
             </span>
           </div>
         </div>
 
-        {/* Demo: Simulate restock notification */}
-        {cart.some(
-          (item) =>
-            item.status === "waiting-ingredient" ||
-            item.status === "out-of-stock"
-        ) && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full text-xs border-emerald-300 text-emerald-600 hover:bg-emerald-50 h-7"
-            onClick={simulateRestockNotification}
-          >
-            <PackageCheck className="w-3 h-3 mr-1" />
-            Demo: Nhận thông báo đã bổ sung NL
-          </Button>
-        )}
+
 
         {/* Send to Kitchen Button - Big Primary */}
         <Button
           className="w-full bg-orange-600 hover:bg-orange-700 h-8 shadow-lg text-base disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={handleSendToKitchen}
-          disabled={cart.length === 0 || !isKitchenUpdateNeeded}
+          disabled={cart.length === 0 || !cart.some(i => i.status === 'pending')}
         >
           <Bell className="w-5 h-5 mr-2" />
           Gửi pha chế
@@ -2314,26 +3298,7 @@ useEffect(() => {
 
         {/* Buttons Row */}
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="border-2 border-blue-500 text-blue-700 hover:bg-blue-50 hover:text-blue-800 h-9 shadow-sm text-xs px-3"
-            onClick={() => {
-              if (!hasPermission("promotions:view" as any)) {
-                toast.error("Bạn không có quyền xem khuyến mãi");
-                return;
-              }
-              setPromotionModalOpen(true);
-            }}
-            disabled={cart.length === 0 || !hasPermission("promotions:view" as any)}
-            title={
-              !hasPermission("promotions:view" as any)
-                ? "Bạn không có quyền khuyến mãi"
-                : undefined
-            }
-          >
-            <Percent className="w-3.5 h-3.5 mr-1" />
-            Khuyến mãi
-          </Button>
+          {/* Removed Promotion Button as requested */}
 
           <Button
             className="flex-1 bg-blue-600 hover:bg-blue-700 h-9 shadow-md text-sm"
@@ -2349,6 +3314,44 @@ useEffect(() => {
     </div>
   );
   };
+
+  // Persist Takeaway Order ID
+  useEffect(() => {
+    const savedId = localStorage.getItem("pos_takeaway_order_id");
+    if (savedId) {
+       const id = parseInt(savedId);
+       setTakeawayOrderId(id);
+       // Fetch the order to restore cart UI
+       axiosClient.get(`/orders/${id}`)
+        .then(res => {
+            const orderData = res?.data?.metaData ?? res?.data;
+            if (orderData && (orderData.status === 'pending' || orderData.status === 'in_progress')) {
+                 const newItems = mapOrderToCartItems(orderData);
+                 setTakeawayOrders(newItems);
+            } else {
+                // If order is completed or invalid, clear logic
+                setTakeawayOrderId(null);
+                localStorage.removeItem("pos_takeaway_order_id");
+            }
+        })
+        .catch(() => {
+            setTakeawayOrderId(null);
+            localStorage.removeItem("pos_takeaway_order_id");
+        });
+    }
+  }, []);
+
+  useEffect(() => {
+     if (takeawayOrderId) {
+         localStorage.setItem("pos_takeaway_order_id", takeawayOrderId.toString());
+     } else {
+         // Do not remove immediately if null to avoid race conditions during init, 
+         // but here we only set null on explicit clear.
+         // Actually we should remove if it becomes null explicitly (like cancel/pay).
+         // However, initial state is null. We should check if we have transitioned?
+         // Simpler: Only setItem if truthy. RemoveItem is handled in specific actions (pay).
+     }
+  }, [takeawayOrderId]);
 
   return (
     <div className="h-full flex flex-col lg:flex-row bg-slate-50">
@@ -2438,6 +3441,10 @@ useEffect(() => {
               // Reset to all when leaving menu/combo tabs
               setSelectedCategory('all');
             }
+            
+            if (value === 'ready') {
+                fetchReadyItems();
+            }
           }}
         >
           <div className="mx-4 lg:mx-6 mt-2 overflow-x-auto lg:overflow-visible no-scrollbar">
@@ -2480,8 +3487,8 @@ useEffect(() => {
             </TabsList>
           </div>
 
-          <TabsContent value="tables" className="flex-1 overflow-auto m-0">
-            <div className="p-4 lg:p-6 pb-24 lg:pb-6">
+          <TabsContent value="tables" className="flex-1 overflow-auto m-0 !pb-40">
+            <div className="p-4 lg:p-6 pb-64 lg:pb-6">
               {/* Order Type Tabs */}
               <div className="mb-4 flex gap-2 bg-slate-100 p-1 rounded-lg">
                 <Button
@@ -2669,8 +3676,8 @@ useEffect(() => {
             </div>
           </TabsContent>
 
-          <TabsContent value="menu" className="flex-1 overflow-auto m-0">
-            <div className="p-4 lg:p-6 space-y-4 pb-24 lg:pb-6">
+          <TabsContent value="menu" className="flex-1 overflow-auto m-0 !pb-40">
+            <div className="p-4 lg:p-6 space-y-4 pb-64 lg:pb-6">
               {/* Header with Categories and Add New Item button */}
               <div className="flex items-center justify-between gap-3">
                 {/* Categories */}
@@ -2699,23 +3706,29 @@ useEffect(() => {
 
               {/* Products Grid */}
               <div
-                className={`grid ${
+                    className={`grid ${
                   viewMode === "grid"
                     ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
                     : "grid-cols-1"
                 } gap-2`}
               >
-                {filteredProducts.map((product) => {
-                  const isOutOfStock = isProductOutOfStock(product);
+                    {filteredProducts.map((product) => {
+                      const isOutOfStock = isProductOutOfStock(product);
+                      const isKitchenOutage = kitchenOutageItemIds.includes(String(product.id));
                   return (
                     <Card
                       key={product.id}
-                      className={`transition-shadow border-blue-200 relative ${
-                        isOutOfStock
-                          ? "opacity-50 cursor-not-allowed bg-gray-50"
-                          : "cursor-pointer hover:shadow-lg hover:border-blue-400"
-                      }`}
-                      onClick={() => !isOutOfStock && addToCart(product)}
+                          className={`transition-shadow border-blue-200 relative ${
+                            isOutOfStock
+                              ? "opacity-50 cursor-not-allowed bg-gray-50"
+                              : isKitchenOutage
+                              ? "opacity-60 bg-slate-50 cursor-pointer hover:shadow-md hover:border-blue-300"
+                              : "cursor-pointer hover:shadow-lg hover:border-blue-400"
+                          }`}
+                          onClick={() => {
+                            if (isOutOfStock) return;
+                            addToCart(product);
+                          }}
                     >
                       <CardContent className="p-2">
                         <div className="text-3xl mb-1 text-center">
@@ -2739,6 +3752,14 @@ useEffect(() => {
                             Tạm ngưng
                           </Badge>
                         )}
+                            {!isOutOfStock && isKitchenOutage && (
+                              <Badge
+                                variant="outline"
+                                className="absolute top-1 right-1 bg-amber-50 text-amber-700 border-amber-300 text-[10px] flex items-center gap-1"
+                              >
+                                <AlertCircle className="w-3 h-3" /> Thiếu NL
+                              </Badge>
+                            )}
                         {!isOutOfStock && (product as any).isNew && (
                           <Badge className="absolute top-1 right-1 bg-green-500 text-white text-[10px]">
                             Mới
@@ -2753,8 +3774,8 @@ useEffect(() => {
           </TabsContent>
 
           {/* Topping Tab */}
-          <TabsContent value="topping" className="flex-1 overflow-auto m-0">
-            <div className="p-4 lg:p-6 pb-24 lg:pb-6">
+          <TabsContent value="topping" className="flex-1 overflow-auto m-0 !pb-40">
+            <div className="p-4 lg:p-6 pb-64 lg:pb-6">
               <div className="mb-4">
                 <h3 className="text-slate-900 font-semibold mb-4">
                   Topping & Phụ gia
@@ -2785,8 +3806,8 @@ useEffect(() => {
             </div>
           </TabsContent>
 
-          <TabsContent value="combo" className="flex-1 overflow-auto m-0">
-            <div className="p-4 lg:p-6 pb-24 lg:pb-6 space-y-4">
+          <TabsContent value="combo" className="flex-1 overflow-auto m-0 !pb-40">
+            <div className="p-4 lg:p-6 pb-64 lg:pb-6 space-y-4">
               {/* Combo Info Header */}
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
                 <div className="flex items-start gap-3">
@@ -2888,12 +3909,11 @@ useEffect(() => {
           </TabsContent>
 
           {userRole === "waiter" && (
-            <TabsContent value="ready" className="flex-1 overflow-auto m-0">
-              <div className="p-4 lg:p-6 pb-24 lg:pb-6">
+            <TabsContent value="ready" className="flex-1 overflow-auto m-0 !pb-40">
+              <div className="p-4 lg:p-6 pb-64 lg:pb-6">
                 <div className="space-y-3">
                   {readyItems.filter(
-                    (item) =>
-                      item.completedQuantity > 0 && item.servedQuantity > 0
+                    (item) => item.completedQuantity > item.servedQuantity
                   ).length === 0 ? (
                     <div className="text-center py-12">
                       <CheckCircle2 className="w-12 h-12 text-green-300 mx-auto mb-3" />
@@ -2908,13 +3928,11 @@ useEffect(() => {
                     <div className="space-y-3">
                       {readyItems
                         .filter(
-                          (item) =>
-                            item.completedQuantity > 0 &&
-                            item.servedQuantity > 0
+                          (item) => item.completedQuantity > item.servedQuantity
                         )
                         .map((item) => {
-                          const totalItems =
-                            item.totalQuantity + item.completedQuantity;
+                          // itemsToServe = số món đã hoàn thành nhưng chưa phục vụ
+                          const itemsToServe = item.completedQuantity - item.servedQuantity;
                           const elapsedMinutes = Math.floor(
                             (Date.now() - item.timestamp.getTime()) / 60000
                           );
@@ -2926,10 +3944,10 @@ useEffect(() => {
                               <div className="pt-2 p-4 space-y-2">
                                 <div className="flex items-center justify-between">
                                   <h2 className="text-slate-900 font-semibold">
-                                    {item.servedQuantity}x {item.itemName}
+                                    {itemsToServe}x {item.itemName}
                                   </h2>
                                   <div className="flex gap-1 flex-shrink-0">
-                                    {item.servedQuantity > 0 && (
+                                    {hasPermission('kitchen:deliver' as any) && itemsToServe > 0 && (
                                       <Button
                                         size="sm"
                                         variant="outline"
@@ -2942,7 +3960,7 @@ useEffect(() => {
                                         <ChevronRight className="w-8 h-8 " />
                                       </Button>
                                     )}
-                                    {item.servedQuantity > 0 && (
+                                    {hasPermission('kitchen:deliver' as any) && itemsToServe > 0 && (
                                       <Button
                                         size="sm"
                                         variant="outline"
@@ -2968,15 +3986,8 @@ useEffect(() => {
                                   </span>
                                 </div>
                                 <Badge className="bg-green-600 text-white text-xs h-5 w-fit">
-                                  Đã làm {item.completedQuantity}/{totalItems}
+                                  Chờ phục vụ {itemsToServe}
                                 </Badge>
-
-                                {item.totalQuantity > 0 && (
-                                  <p className="text-xs text-amber-700">
-                                    Chờ làm thêm {item.totalQuantity}/
-                                    {totalItems}
-                                  </p>
-                                )}
 
                                 {item.notes && (
                                   <p className="text-xs text-slate-600 mt-2">
@@ -3003,17 +4014,12 @@ useEffect(() => {
       <PrintReceiptModal
         open={printReceiptOpen}
         onClose={() => setPrintReceiptOpen(false)}
-        items={cart.map((item) => ({
-          id: item.id,
-          name: item.name,
-          quantity: item.quantity,
-          price: getItemPrice(item),
-        }))}
-        totalAmount={totalAmount}
-        orderNumber={selectedTable?.currentOrder || "TAKEAWAY"}
-        customerName={selectedCustomer?.name || "Khách hàng"}
+        items={receiptData?.items || []}
+        totalAmount={receiptData?.totalAmount || 0}
+        orderNumber={receiptData?.orderNumber || "ORD-000"}
+        customerName={receiptData?.customerName || "Khách hàng"}
         paymentMethod={lastPaymentMethod}
-        tableNumber={selectedTable ? String(selectedTable.id) : undefined}
+        tableNumber={receiptData?.tableNumber}
         waiterName={user?.fullName}
       />
 
@@ -3021,21 +4027,96 @@ useEffect(() => {
       <CheckoutModal
         open={checkoutOpen}
         onClose={() => setCheckoutOpen(false)}
-        items={cart
-          .filter((item) => !item.parentItemId)
-          .map((item) => ({
-            id: item.id,
-            name: item.name,
-            quantity: item.quantity,
-            price: getItemPrice(item),
-            basePrice: item.basePrice ?? item.price,
-          }))}
-        totalAmount={totalAmount}
+        items={(() => {
+          // Group items for checkout display
+          const checkoutItems: any[] = [];
+          const processedComboInstances = new Set<string>();
+          
+          // First, group combo items by instance
+          const comboGroups = new Map<string, CartItem[]>();
+          const nonComboItems: CartItem[] = [];
+          
+          cart.forEach(item => {
+            if (item.parentItemId) return; // Skip toppings here, they'll be added to parents
+            
+            if (item.comboInstanceId || item.comboId) {
+              const key = item.comboInstanceId || `combo-${item.comboId}-fallback`;
+              if (!comboGroups.has(key)) {
+                comboGroups.set(key, []);
+              }
+              comboGroups.get(key)!.push(item);
+            } else {
+              nonComboItems.push(item);
+            }
+          });
+          
+          // Add combo groups as combo headers
+          comboGroups.forEach((comboItems, instanceId) => {
+            if (processedComboInstances.has(instanceId)) return;
+            processedComboInstances.add(instanceId);
+            
+            const firstItem = comboItems[0];
+            const comboName = firstItem?.comboName || `Combo`;
+            const baseComboPrice = firstItem?.comboPrice ?? 0;
+            const totalExtraPrice = comboItems.reduce((sum, i) => sum + (Number(i.extraPrice) || 0), 0);
+            const comboPrice = baseComboPrice + totalExtraPrice;
+            
+            checkoutItems.push({
+              id: `checkout-combo-${instanceId}`,
+              name: comboName,
+              quantity: 1,
+              price: comboPrice,
+              basePrice: baseComboPrice,
+              isComboHeader: true,
+              comboInstanceId: instanceId,
+              comboItems: comboItems.map(ci => ({
+                id: ci.id,
+                name: ci.name,
+                quantity: ci.quantity,
+                price: ci.price,
+                basePrice: ci.price,
+                extraPrice: ci.extraPrice,
+              })),
+            });
+          });
+          
+          // Add non-combo items with their toppings
+          nonComboItems.forEach(item => {
+            checkoutItems.push({
+              id: item.id,
+              name: item.name,
+              quantity: item.quantity,
+              price: getItemPrice(item),
+              basePrice: item.basePrice ?? item.price,
+              notes: item.notes,
+            });
+            
+            // Add attached toppings
+            if (item.attachedToppings && item.attachedToppings.length > 0) {
+              item.attachedToppings.forEach(topping => {
+                checkoutItems.push({
+                  id: topping.id,
+                  name: topping.name,
+                  quantity: topping.quantity,
+                  price: topping.price * topping.quantity,
+                  basePrice: topping.price,
+                  isTopping: true,
+                  parentName: item.name,
+                });
+              });
+            }
+          });
+          
+          return checkoutItems;
+        })()}
+        totalAmount={displayTotalAmount}
         discountAmount={discountAmount}
         tableNumber={selectedTable?.id}
         tableArea={selectedTable ? areas.find((a) => a.id === selectedTable.area)?.name : undefined}
         isTakeaway={isTakeaway}
         orderCode={selectedTable?.currentOrder || "TAKEAWAY"}
+        orderId={isTakeaway ? (takeawayOrderId || undefined) : selectedTable?.order_id}
+        customerId={selectedCustomer?.id}
         bankAccounts={bankAccounts}
         onAddBankAccount={(bank, owner, account) => {
           // Optimistically update, then sync to backend
@@ -3051,25 +4132,158 @@ useEffect(() => {
             });
           });
         }}
-        onConfirmPayment={(paymentMethod, _paymentDetails) => {
+        onConfirmPayment={async (paymentMethod, _paymentDetails, promotionId, selectedGifts) => {
           const methodLabelMap: Record<string, string> = {
             cash: "Tiền mặt",
             transfer: "Chuyển khoản",
             combined: "Kết hợp",
           };
           setLastPaymentMethod(methodLabelMap[paymentMethod] || "Tiền mặt");
-          // Best-effort backend checkout before printing
-          const orderId = selectedTable?.order_id;
+          
+          const orderId = isTakeaway ? (takeawayOrderId || undefined) : selectedTable?.order_id;
           if (orderId) {
-            checkoutOrder(Number(orderId), {
-              paymentMethod,
-              discountAmount,
-              totalAmount,
-            }).catch((err: any) => {
-              toast.error("Thanh toán backend thất bại", { description: err?.message || "API lỗi" });
-            });
+            try {
+              // Call checkout API
+              const res = await checkoutOrder(Number(orderId), {
+                paymentMethod,
+                paidAmount: _paymentDetails.customerPaid || displayTotalAmount,
+                bankAccountId: _paymentDetails.bankAccountId,
+                promotionId,
+                selectedGifts,
+              });
+
+              // Map response items (including gifts) for receipt
+              const data = res.data || res; // Handle axios response
+              // Backend returns metaData as { order: {...}, totalAmount: ... }
+              const orderData = data.metaData ?? data.order ?? data;
+              // Access order items nested in the 'order' property
+              const itemsList = orderData.order?.orderItems || orderData.orderitems || [];
+              const comboSummary = orderData.order?.comboSummary ?? orderData.comboSummary ?? [];
+              
+              // Group items for receipt with combo and topping support
+              const receiptItems: any[] = [];
+              const processedComboItems = new Set<number>();
+              
+              // Process combo summary to create combo headers
+              comboSummary.forEach((cs: any) => {
+                if (!cs?.comboId) return;
+                
+                const comboItems = cs.items || [];
+                const comboItemIds = comboItems.map((i: any) => i.id);
+                
+                // Find actual items for this combo
+                const actualComboItems = itemsList.filter((item: any) => 
+                  comboItemIds.includes(item.id) && item.status !== 'canceled'
+                );
+                
+                if (actualComboItems.length > 0) {
+                  const totalPrice = actualComboItems.reduce((sum: number, i: any) => 
+                    sum + Number(i.totalPrice || 0), 0
+                  );
+                  
+                  receiptItems.push({
+                    id: `combo-${cs.comboId}-${cs.items[0]?.id}`,
+                    name: cs.comboName || `Combo #${cs.comboId}`,
+                    quantity: 1,
+                    price: totalPrice,
+                    isComboHeader: true,
+                    comboItems: actualComboItems.map((item: any) => ({
+                      id: item.id.toString(),
+                      name: item.name,
+                      quantity: item.quantity,
+                      price: Number(item.totalPrice) / Number(item.quantity || 1),
+                      extraPrice: item.extraPrice || 0,
+                    })),
+                  });
+                  
+                  // Mark these items as processed
+                  actualComboItems.forEach((item: any) => processedComboItems.add(item.id));
+                }
+              });
+              
+              // Process remaining items (non-combo)
+              itemsList.forEach((item: any) => {
+                if (processedComboItems.has(item.id)) return; // Skip already processed combo items
+                if (item.status === 'canceled') return; // Skip canceled items
+                
+                // Check if this is a topping
+                if (item.isTopping) {
+                  receiptItems.push({
+                    id: item.id.toString(),
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: Number(item.totalPrice) / Number(item.quantity || 1),
+                    notes: item.notes,
+                    isTopping: true,
+                  });
+                } else {
+                  receiptItems.push({
+                    id: item.id.toString(),
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: Number(item.totalPrice) / Number(item.quantity || 1),
+                    notes: item.notes,
+                  });
+                }
+              });
+              
+              // Filter out any items with cancel notes
+              const activeReceiptItems = receiptItems.filter((i: any) => !i.notes?.includes('Đã hủy'));
+              
+              // Store receipt data BEFORE clearing state
+              setReceiptData({
+                items: activeReceiptItems,
+                totalAmount: Number(orderData.totalAmount ?? displayTotalAmount),
+                orderNumber: orderData.order?.orderCode ?? (isTakeaway ? String(takeawayOrderId) : selectedTable?.currentOrder),
+                customerName: selectedCustomer?.name || orderData.order?.customer?.name || "Khách hàng",
+                tableNumber: isTakeaway ? undefined : (selectedTable ? String(selectedTable.id) : undefined)
+              });
+            
+              // If Takeaway, clear local state
+              if (isTakeaway) {
+                  setTakeawayOrderId(null);
+                  setTakeawayOrders([]);
+                  setTakeawayOrderCode(null);
+                  localStorage.removeItem("pos_takeaway_order_id");
+                  setOrderSubtotal(0);
+                  setOrderTotalAmount(0);
+              } else {
+                  // If Dine-in, refresh tables and clear selection
+                  // Refresh tables
+                  await getTables().then((res: any) => {
+                    const items = extractItems(res);
+                    const mapFn = (t: any) => ({
+                      id: t.id,
+                      name: (t.tableName ?? String(t.id)).replace(/^Bàn\s*/i, ''),
+                      number: Number(t.tableName.replace(/\D/g, '')),
+                      capacity: t.capacity,
+                      status: (t.currentStatus === 'occupied' ? 'occupied' : 'available') as any,
+                      area: (t.area?.id ?? (t as any).areaId) as number,
+                      createdAt: t.createdAt ? new Date(t.createdAt).getTime() : undefined,
+                      updatedAt: t.updatedAt ? new Date(t.updatedAt).getTime() : undefined,
+                      deletedAt: t.deletedAt ? new Date(t.deletedAt).getTime() : undefined,
+                      isActive: t.isActive,
+                      order_id: t.order_id,
+                      currentOrder: t.currentOrder
+                     } as Table);
+                    setTables(items.map(mapFn));
+                  });
+                  
+                  // Clear selection
+                  updateCurrentCart([]);
+                  setSelectedTable(null);
+                  setSelectedCustomer(null);
+                  setOrderSubtotal(0);
+                  setOrderTotalAmount(0);
+              }
+
+              // Open Print Modal
+              setPrintReceiptOpen(true);
+              
+            } catch (err: any) {
+              toast.error("Thanh toán thất bại", { description: err?.message || "API lỗi" });
+            }
           }
-          setPrintReceiptOpen(true);
         }}
       />
 
@@ -3127,6 +4341,54 @@ useEffect(() => {
             >
               <Bell className="w-4 h-4 mr-1" />
               Báo khách
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Kitchen Outage Confirm Dialog */}
+      <Dialog open={outageConfirmOpen} onOpenChange={setOutageConfirmOpen}>
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700">
+              <AlertCircle className="w-5 h-5" />
+              Cảnh báo thiếu nguyên liệu
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg">
+              <p className="text-sm text-amber-800">
+                ⚠️ Món này hiện đang thiếu nguyên liệu. Bạn có muốn tiếp tục bán?
+              </p>
+              {pendingOutageProduct && (
+                <p className="text-xs text-amber-700 mt-1">
+                  {pendingOutageProduct.name} • {pendingOutageProduct.price.toLocaleString("vi-VN")}đ
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setOutageConfirmOpen(false);
+                setPendingOutageProduct(null);
+              }}
+            >
+              Hủy
+            </Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 w-full"
+              onClick={() => {
+                if (pendingOutageProduct) {
+                  addToCart(pendingOutageProduct);
+                }
+                setOutageConfirmOpen(false);
+                setPendingOutageProduct(null);
+              }}
+            >
+              Vẫn bán
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3345,69 +4607,28 @@ useEffect(() => {
             </Button>
             <Button
               className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                if (selectedTable && targetTable) {
-                  const currentOrder = selectedTable.currentOrder;
-                  const currentCart = tableOrders[selectedTable.id] || [];
-
-                  // Move orders from old table to new table
-                  const newTableOrders = {
-                    ...tableOrders,
-                    [selectedTable.id]: [],
-                    [targetTable.id]: [...currentCart],
-                  };
-                  setTableOrders(newTableOrders);
-
-                  // Update table statuses
-                  const updatedTables = tables.map((table) => {
-                    if (table.id === selectedTable.id) {
-                      // Old table becomes available
-                      return {
-                        ...table,
-                        status: "available" as const,
-                        currentOrder: undefined,
-                        startTime: undefined,
-                      };
-                    } else if (table.id === targetTable.id) {
-                      // New table becomes occupied
-                      return {
-                        ...table,
-                        status: "occupied" as const,
-                        currentOrder: currentOrder,
-                        startTime: Date.now(),
-                      };
-                    }
-                    return table;
-                  });
-                  setTables(updatedTables);
-
-                  // Update selected table to the new one
-                  const newSelectedTable = updatedTables.find(
-                    (t) => t.id === targetTable.id
-                  );
-                  setSelectedTable(newSelectedTable || null);
-
-                  // Add to order history
-                  const now = new Date();
-                  const timeString = now.toLocaleTimeString("vi-VN", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  });
-                  setOrderHistory([
-                    ...orderHistory,
-                    {
-                      time: timeString,
-                      action: `Chuyển đơn ${currentOrder} từ Bàn ${selectedTable?.name} sang Bàn ${targetTable.name}`,
-                      staff: "NV Minh",
-                    },
-                  ]);
-
-                  toast.success(
-                    `Đã chuyển đơn ${currentOrder} sang Bàn ${targetTable.name}`,
-                    {
-                      description: `Bàn ${selectedTable.name} đã trống`,
-                    }
-                  );
+              onClick={async () => {
+                if (selectedTable?.order_id && targetTable) {
+                  try {
+                    await transferTable(selectedTable.order_id, { newTableId: Number(targetTable.id) });
+                    
+                    toast.success(
+                      `Đã chuyển đơn sang Bàn ${targetTable.name}`,
+                      {
+                        description: `Bàn ${selectedTable.name} đã trống`,
+                      }
+                    );
+                    
+                    // Refresh tables data
+                    const res = await getTables();
+                    const items = extractItems(res);
+                    setTables(items.map(mapTableFromBE));
+                    setSelectedTable(null);
+                  } catch (err: any) {
+                    toast.error("Chuyển bàn thất bại", {
+                      description: err?.response?.data?.message || err?.message,
+                    });
+                  }
                 }
                 setMoveTableOpen(false);
                 setTargetTable(null);
@@ -3525,65 +4746,32 @@ useEffect(() => {
             </Button>
             <Button
               className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                if (selectedTable && mergeTargetTable) {
-                  const sourceOrder = selectedTable.currentOrder;
-                  const targetOrder = mergeTargetTable.currentOrder;
-                  const sourceCart = tableOrders[selectedTable.id] || [];
-                  const targetCart = tableOrders[mergeTargetTable.id] || [];
-
-                  // Merge orders: combine both carts
-                  const mergedCart = [...targetCart, ...sourceCart];
-
-                  const newTableOrders = {
-                    ...tableOrders,
-                    [selectedTable.id]: [], // Clear source table
-                    [mergeTargetTable.id]: mergedCart, // Combined orders in target
-                  };
-                  setTableOrders(newTableOrders);
-
-                  // Update table statuses
-                  const updatedTables = tables.map((table) => {
-                    if (table.id === selectedTable.id) {
-                      // Source table becomes available
-                      return {
-                        ...table,
-                        status: "available" as const,
-                        currentOrder: undefined,
-                        startTime: undefined,
-                      };
-                    }
-                    return table;
-                  });
-                  setTables(updatedTables);
-
-                  // Update selected table to the target one
-                  const newSelectedTable = updatedTables.find(
-                    (t) => t.id === mergeTargetTable.id
-                  );
-                  setSelectedTable(newSelectedTable || null);
-
-                  // Add to order history
-                  const now = new Date();
-                  const timeString = now.toLocaleTimeString("vi-VN", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  });
-                  setOrderHistory([
-                    ...orderHistory,
-                    {
-                      time: timeString,
-                      action: `Gộp đơn: Bàn ${selectedTable?.name} → Bàn ${mergeTargetTable.name} (${sourceOrder} + ${targetOrder})`,
-                      staff: "NV Minh",
-                    },
-                  ]);
-
-                  toast.success(
-                    `Đã gộp đơn Bàn ${selectedTable?.name} vào Bàn ${mergeTargetTable.name} thành công`,
-                    {
-                      description: `Bàn ${selectedTable?.name} đã trống`,
-                    }
-                  );
+              onClick={async () => {
+                // Merge: source (mergeTargetTable) into target (selectedTable)
+                // Backend: POST /orders/:id/merge { fromOrderId } - merges 'fromOrderId' INTO ':id'
+                if (selectedTable?.order_id && mergeTargetTable?.order_id) {
+                  try {
+                    await mergeOrders(selectedTable.order_id, { fromOrderId: mergeTargetTable.order_id });
+                    
+                    toast.success(
+                      `Đã gộp đơn Bàn ${mergeTargetTable.name} vào Bàn ${selectedTable?.name} thành công`,
+                      {
+                        description: `Bàn ${mergeTargetTable?.name} đã trống`,
+                      }
+                    );
+                    
+                    // Refresh tables data
+                    const res = await getTables();
+                    const items = extractItems(res);
+                    setTables(items.map(mapTableFromBE));
+                    
+                    // Refresh current order
+                    fetchTableOrder(selectedTable);
+                  } catch (err: any) {
+                    toast.error("Gộp bàn thất bại", {
+                      description: err?.response?.data?.message || err?.message,
+                    });
+                  }
                 }
                 setMergeTableOpen(false);
                 setMergeTargetTable(null);
@@ -3596,64 +4784,7 @@ useEffect(() => {
         </DialogContent>
       </Dialog>
 
-      {/* Order History Dialog */}
-      <Dialog open={orderHistoryOpen} onOpenChange={setOrderHistoryOpen}>
-        <DialogContent className="max-w-lg" aria-describedby={undefined}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <History className="w-5 h-5" />
-              Lịch sử đơn hàng
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="flex justify-between mb-4">
-                <span className="text-sm text-slate-600">
-                  Bàn {selectedTable?.name}
-                </span>
-                <Badge className="bg-blue-600 text-white">
-                  {selectedTable?.currentOrder}
-                </Badge>
-              </div>
-
-              {/* Timeline */}
-              <div className="space-y-4 relative pl-6">
-                {/* Vertical line */}
-                <div className="absolute left-2 top-0 bottom-0 w-0.5 bg-blue-200"></div>
-
-                {orderHistory.map((entry, index) => (
-                  <div key={index} className="relative">
-                    {/* Timeline dot */}
-                    <div className="absolute -left-6 mt-1 w-4 h-4 rounded-full bg-blue-500 border-2 border-white"></div>
-
-                    <div className="bg-white p-3 rounded-lg shadow-sm border border-blue-100">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Clock className="w-3 h-3 text-blue-500" />
-                        <span className="text-xs text-blue-600">
-                          {entry.time}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          • {entry.staff}
-                        </span>
-                      </div>
-                      <p className="text-sm text-slate-700">{entry.action}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setOrderHistoryOpen(false)}
-              className="w-full"
-            >
-              Đóng
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Order History Dialog Removed */}
 
       {/* Split Order Dialog */}
       <Dialog
@@ -3923,77 +5054,45 @@ useEffect(() => {
                 !splitDestinationTable ||
                 !Object.keys(splitItems).some((id) => splitItems[id] > 0)
               }
-              onClick={() => {
-                if (!selectedTable || !splitDestinationTable) return;
+              onClick={async () => {
+                if (!selectedTable?.order_id || !splitDestinationTable) return;
 
-                // Generate new order code
-                const newOrderCode = `ORD-${String(
-                  Math.floor(Math.random() * 900) + 100
-                ).padStart(3, "0")}`;
-
-                // Create split items array
-                const splitItemsArray: CartItem[] = cart
+                // Create split items array for API
+                const itemsToSplit = cart
                   .filter((item) => (splitItems[item.id] || 0) > 0)
                   .map((item) => ({
-                    ...item,
+                    itemId: Number(item.orderItemId || item.id.split('-')[0]),
                     quantity: splitItems[item.id],
                   }));
 
-                // Update remaining items in current table
-                const remainingItems = cart
-                  .map((item) => ({
-                    ...item,
-                    quantity: item.quantity - (splitItems[item.id] || 0),
-                  }))
-                  .filter((item) => item.quantity > 0);
+                if (itemsToSplit.length === 0) {
+                  toast.error("Vui lòng chọn món để tách");
+                  return;
+                }
 
-                // Update table orders
-                const newTableOrders = {
-                  ...tableOrders,
-                  [selectedTable.id]: remainingItems,
-                  [splitDestinationTable.id]: splitItemsArray,
-                };
-                setTableOrders(newTableOrders);
+                try {
+                  await splitOrder(selectedTable.order_id, {
+                    newTableId: Number(splitDestinationTable.id),
+                    items: itemsToSplit,
+                  });
 
-                // Update table statuses
-                const updatedTables = tables.map((table) => {
-                  if (table.id === splitDestinationTable.id) {
-                    return {
-                      ...table,
-                      status: "occupied" as const,
-                      currentOrder: newOrderCode,
-                      startTime: Date.now(),
-                    };
-                  }
-                  return table;
-                });
-                setTables(updatedTables);
+                  toast.success(
+                    `Đã tách đơn thành công sang Bàn ${splitDestinationTable?.name}`,
+                    {
+                      description: `${itemsToSplit.length} món đã được tách`,
+                    }
+                  );
 
-                // Add to order history
-                const now = new Date();
-                const timeString = now.toLocaleTimeString("vi-VN", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
-                const itemNames = splitItemsArray
-                  .map((item) => `${item.quantity} ${item.name}`)
-                  .join(", ");
-                setOrderHistory([
-                  ...orderHistory,
-                  {
-                    time: timeString,
-                    action: `Tách đơn: ${itemNames} sang Bàn ${splitDestinationTable?.name} → tạo ${newOrderCode}`,
-                    staff: "NV Minh",
-                  },
-                ]);
-
-                // Show toast
-                toast.success(
-                  `Đã tách đơn thành công: tạo đơn mới ${newOrderCode}`,
-                  {
-                    description: `Bàn ${splitDestinationTable?.name} đã có ${splitItemsArray.length} món`,
-                  }
-                );
+                  // Refresh tables and current order
+                  const res = await getTables();
+                  const items = extractItems(res);
+                  setTables(items.map(mapTableFromBE));
+                  fetchTableOrder(selectedTable);
+                } catch (err: any) {
+                  toast.error("Tách đơn thất bại", {
+                    description: err?.response?.data?.message || err?.message,
+                  });
+                }
 
                 // Clean up and close
                 setSplitOrderOpen(false);
@@ -4020,16 +5119,18 @@ useEffect(() => {
           onClose={() => {
             setCustomizationModalOpen(false);
             setSelectedItemForCustomization(null);
+            setCurrentAvailableToppings([]); // clear temp toppings
           }}
           itemName={selectedItemForCustomization.name}
           basePrice={selectedItemForCustomization.price}
           onUpdate={handleUpdateCustomization}
           initialCustomization={selectedItemForCustomization.customization}
-          availableToppings={toppings.map((t) => ({
+          availableToppings={currentAvailableToppings.length > 0 ? currentAvailableToppings : toppings.map((t) => ({
             id: t.id,
             name: t.name,
             price: t.price,
           }))}
+          isComposite={(selectedItemForCustomization as any).isComposite} // Pass the flag
         />
       )}
 
@@ -4037,7 +5138,7 @@ useEffect(() => {
       <PromotionPopup
         open={promotionModalOpen}
         onClose={() => setPromotionModalOpen(false)}
-        orderTotal={totalAmount}
+        orderTotal={displayTotalAmount}
         orderItems={cart.map((item) => {
           const product = products.find((p) => p.id === item.id);
           return {
@@ -4049,7 +5150,13 @@ useEffect(() => {
           };
         })}
         orderId={selectedTable?.order_id}
-        selectedCustomer={selectedCustomer}
+        selectedCustomer={selectedCustomer ? {
+          id: String(selectedCustomer.id),
+          name: selectedCustomer.name,
+          phone: selectedCustomer.phone ?? "",
+          code: selectedCustomer.code,
+          points: 0,
+        } : null}
         onApply={handleApplyPromotion}
       />
 
@@ -4207,22 +5314,57 @@ useEffect(() => {
               <div className="border-t pt-4">
                 <Button
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                  onClick={() => {
-                    // Add as standalone item
-                    const cart = getCurrentCart();
-                    const newItem: CartItem = {
-                      id: `${selectedTopping.id}-${Date.now()}`,
-                      name: selectedTopping.name,
-                      price: selectedTopping.price,
-                      quantity: toppingQuantity,
-                      status: "pending",
-                      isTopping: true,
-                      basePrice: selectedTopping.price,
-                    };
-                    updateCurrentCart([...cart, newItem]);
-                    toast.success(
-                      `Đã thêm ${toppingQuantity} x ${selectedTopping.name}`
-                    );
+                  onClick={async () => {
+                    // Check if there is an active order (Dine-in or Takeaway)
+                    const currentOrderId = isTakeaway ? takeawayOrderId : selectedTable?.order_id;
+
+                    if (currentOrderId) {
+                        // Call API to add topping as a standalone item
+                        try {
+                             await addOrderItem(currentOrderId, {
+                                 itemId: Number(selectedTopping.id),
+                                 quantity: toppingQuantity,
+                                 note: "Topping riêng lẻ",
+                                 // We don't need to specify isTopping here usually, the Item definition dictates it,
+                                 // but if needed we can pass custom fields or just rely on BE.
+                             });
+                             toast.success(`Đã thêm ${toppingQuantity} x ${selectedTopping.name}`);
+                             
+                             // Refresh Order
+                             if (isTakeaway) {
+                                const res = await axiosClient.get(`/orders/${currentOrderId}`);
+                                const orderData = res?.data?.metaData ?? res?.data;
+                                if (orderData) {
+                                    setTakeawayOrders(mapOrderToCartItems(orderData));
+                                }
+                             } else if (selectedTable) {
+                                fetchTableOrder(selectedTable);
+                             }
+
+                        } catch (err: any) {
+                             console.error(err);
+                             toast.error("Lỗi thêm topping: " + (err?.message || "Lỗi kết nối"));
+                        }
+                    } else {
+                        // Local Cart Only
+                        const cart = getCurrentCart();
+                        const newItem: CartItem = {
+                          id: `${selectedTopping.id}-${Date.now()}`,
+                          name: selectedTopping.name,
+                          price: selectedTopping.price,
+                          quantity: toppingQuantity,
+                          status: "pending",
+                          isTopping: true, // Mark as topping for UI distinction
+                          basePrice: selectedTopping.price,
+                          // Important: persist the real ID so we can sync later if order created
+                          inventoryItemId: Number(selectedTopping.id)
+                        };
+                        updateCurrentCart([...cart, newItem]);
+                        toast.success(
+                          `Đã thêm ${toppingQuantity} x ${selectedTopping.name}`
+                        );
+                    }
+
                     setToppingActionModalOpen(false);
                     setSelectedTopping(null);
                     setToppingQuantity(1);
@@ -4275,11 +5417,277 @@ useEffect(() => {
         onContinueIndividual={handleContinueIndividual}
       />
 
-      {/* Account Profile Modal */}
       <AccountProfileModal
         open={accountModalOpen}
         onOpenChange={setAccountModalOpen}
       />
+
+      {/* Cancel Item Modal */}
+      <Dialog open={cancelItemModalOpen} onOpenChange={setCancelItemModalOpen}>
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              Xác nhận giảm / Hủy món
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-slate-700">
+                Bạn có chắc chắn muốn xóa{" "}
+                <span className="font-semibold text-slate-900">
+                  {itemToCancel?.name}
+                </span>{" "}
+                khỏi đơn hàng không?
+              </p>
+              <div className="flex items-center gap-3 mt-3">
+                <span className="text-sm text-slate-600">Số lượng hủy:</span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCancelQuantity(Math.max(1, cancelQuantity - 1))}
+                    disabled={cancelQuantity <= 1}
+                    className="h-7 w-7 p-0"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </Button>
+                  <span className="text-sm font-medium w-8 text-center">
+                    {cancelQuantity}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCancelQuantity(Math.min(itemToCancel?.quantity || 1, cancelQuantity + 1))}
+                    disabled={cancelQuantity >= (itemToCancel?.quantity || 1)}
+                    className="h-7 w-7 p-0"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                  <span className="text-sm text-slate-600 ml-1">
+                    / {itemToCancel?.quantity || 1}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label
+                htmlFor="cancel-reason"
+                className="text-sm font-medium mb-2 block"
+              >
+                Lý do hủy <span className="text-red-500">*</span>
+              </Label>
+              <Select value={cancelReason} onValueChange={setCancelReason}>
+                <SelectTrigger id="cancel-reason">
+                  <SelectValue placeholder="Chọn lý do hủy..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {cancelReasons.map((reason) => (
+                    <SelectItem key={reason} value={reason}>
+                      {reason}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {cancelReason === "Khác" && (
+              <div>
+                <Label
+                  htmlFor="other-cancel-reason"
+                  className="text-sm font-medium mb-2 block"
+                >
+                  Ghi chú lý do khác
+                </Label>
+                <Input
+                  id="other-cancel-reason"
+                  placeholder="Nhập lý do hủy..."
+                  value={otherReason}
+                  onChange={(e) => setOtherReason(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCancelItemModalOpen(false);
+                setCancelReason("");
+                setOtherReason("");
+              }}
+            >
+              Bỏ qua
+            </Button>
+            <Button
+              onClick={handleConfirmCancel}
+              disabled={
+                !cancelReason ||
+                (cancelReason === "Khác" && !otherReason.trim())
+              }
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Chắc chắn
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Topping Modal */}
+      <Dialog open={cancelToppingModalOpen} onOpenChange={setCancelToppingModalOpen}>
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              Xác nhận hủy topping
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-slate-700">
+                Bạn có chắc chắn muốn hủy topping{" "}
+                <span className="font-semibold text-slate-900">
+                  {toppingToCancel?.topping.name}
+                </span>{" "}
+                khỏi món{" "}
+                <span className="font-semibold text-slate-900">
+                  {cart.find(i => i.id === toppingToCancel?.parentItemId)?.name}
+                </span>{" "}
+                không?
+              </p>
+              <div className="flex items-center gap-3 mt-3">
+                <span className="text-sm text-slate-600">Số lượng hủy:</span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCancelToppingQuantity(Math.max(1, cancelToppingQuantity - 1))}
+                    disabled={cancelToppingQuantity <= 1}
+                    className="h-7 w-7 p-0"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </Button>
+                  <span className="text-sm font-medium w-8 text-center">
+                    {cancelToppingQuantity}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCancelToppingQuantity(Math.min(toppingToCancel?.topping.quantity || 1, cancelToppingQuantity + 1))}
+                    disabled={cancelToppingQuantity >= (toppingToCancel?.topping.quantity || 1)}
+                    className="h-7 w-7 p-0"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                  <span className="text-sm text-slate-600 ml-1">
+                    / {toppingToCancel?.topping.quantity || 1}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label
+                htmlFor="cancel-topping-reason"
+                className="text-sm font-medium mb-2 block"
+              >
+                Lý do hủy <span className="text-red-500">*</span>
+              </Label>
+              <Select value={cancelToppingReason} onValueChange={setCancelToppingReason}>
+                <SelectTrigger id="cancel-topping-reason">
+                  <SelectValue placeholder="Chọn lý do hủy..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {cancelReasons.map((reason) => (
+                    <SelectItem key={reason} value={reason}>
+                      {reason}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {cancelToppingReason === "Khác" && (
+              <div>
+                <Label
+                  htmlFor="other-cancel-topping-reason"
+                  className="text-sm font-medium mb-2 block"
+                >
+                  Ghi chú lý do khác
+                </Label>
+                <Input
+                  id="other-cancel-topping-reason"
+                  placeholder="Nhập lý do hủy..."
+                  value={otherToppingReason}
+                  onChange={(e) => setOtherToppingReason(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCancelToppingModalOpen(false);
+                setCancelToppingReason("");
+                setOtherToppingReason("");
+                setToppingToCancel(null);
+              }}
+            >
+              Bỏ qua
+            </Button>
+            <Button
+              onClick={handleConfirmCancelTopping}
+              disabled={
+                !cancelToppingReason ||
+                (cancelToppingReason === "Khác" && !otherToppingReason.trim())
+              }
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Chắc chắn
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Topping Copy Dialog - shown when adding quantity to sent items with toppings */}
+      <Dialog open={toppingCopyDialogOpen} onOpenChange={setToppingCopyDialogOpen}>
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
+           <DialogHeader>
+             <DialogTitle>Thêm món có topping</DialogTitle>
+           </DialogHeader>
+           <div className="space-y-4">
+              <p>Bạn đang thêm <b>{pendingQuantityChange?.quantityToAdd || 1}</b> món <b>{pendingQuantityChange?.item?.name}</b></p>
+              <p className="text-sm text-slate-600">Món này có các topping đi kèm:</p>
+              <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+                {pendingQuantityChange?.item?.attachedToppings?.map((topping, idx) => (
+                  <div key={idx} className="text-sm text-amber-800">
+                    • {topping.name} x{topping.quantity}
+                  </div>
+                ))}
+              </div>
+              <p className="text-sm text-slate-600">Bạn có muốn thêm topping giống món cũ không?</p>
+           </div>
+           <DialogFooter className="flex flex-col sm:flex-row gap-2">
+             <Button variant="outline" onClick={handleCancelToppingCopy} className="sm:order-1">
+               Hủy
+             </Button>
+             <Button variant="secondary" onClick={handleAddItemWithoutToppings} className="sm:order-2">
+               Không có topping
+             </Button>
+             <Button onClick={handleAddItemWithToppings} className="bg-blue-600 hover:bg-blue-700 sm:order-3">
+               Có, thêm topping
+             </Button>
+           </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Animation Styles for Restock Notification */}
       <style>{`
@@ -4341,13 +5749,13 @@ useEffect(() => {
       `}</style>
       
       {/* Mobile Cart Toggle Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-40 lg:hidden flex items-center justify-between shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+      <div className="bottom-0 left-0 right-0 bg-white border-t p-4 z-40 lg:hidden flex items-center justify-between shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
         <div>
           <p className="font-semibold text-slate-900 text-sm">
             {totalItems} món đang chọn
           </p>
           <p className="text-blue-600 font-bold text-lg">
-            {totalAmount.toLocaleString()}đ
+            {displayTotalAmount.toLocaleString()}đ
           </p>
         </div>
         <Button

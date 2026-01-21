@@ -28,6 +28,10 @@ export const exportFinanceTransactions = (params?: Record<string, any>) => {
   return axiosClient.get('/finance/export', { params, responseType: 'blob' });
 };
 
+export const getCashBookStats = (params?: Record<string, any>) => {
+  return axiosClient.get('/finance/stats', { params });
+};
+
 // Categories
 export const getFinanceCategories = () => {
   return axiosClient.get('/finance/categories');
@@ -63,8 +67,8 @@ export const deleteBankAccount = (id: string | number) => {
 };
 
 // Finance Persons
-export const getFinancePersons = () => {
-  return axiosClient.get('/finance/persons');
+export const getFinancePersons = (params?: Record<string, any>) => {
+  return axiosClient.get('/finance/persons', { params });
 };
 
 export const createFinancePerson = (data: any) => {

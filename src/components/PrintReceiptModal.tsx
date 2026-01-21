@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Dialog,
   DialogContent,
@@ -115,21 +116,31 @@ export function PrintReceiptModal({
           </Button>
         </DialogFooter>
 
-        {/* Hidden print area */}
-        <div className="hidden">
-          <div id="print-area">
-            <ReceiptPrintContent
-              items={items}
-              totalAmount={totalAmount}
-              orderNumber={orderNumber}
-              customerName={customerName}
-              paymentMethod={paymentMethod}
-              receiptDate={new Date()}
-              tableNumber={tableNumber}
-              waiterName={waiterName}
-            />
-          </div>
-        </div>
+        {/* Print area - Rendered to body to avoid being hidden by parent styles during print if nested */}
+        {createPortal(
+            <div className="fixed left-0 top-0 w-full hidden print:block" id="print-area">
+              <style>{`
+                @media print {
+                  body > * { display: none !important; }
+                  #print-area { display: block !important; position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: white; z-index: 9999; }
+                  #print-area > *:not(style) { display: block !important; }
+                  /* Ensure style tags are hidden explicitly */
+                  style { display: none !important; }
+                }
+              `}</style>
+              <ReceiptPrintContent
+                items={items}
+                totalAmount={totalAmount}
+                orderNumber={orderNumber}
+                customerName={customerName}
+                paymentMethod={paymentMethod}
+                receiptDate={new Date()}
+                tableNumber={tableNumber}
+                waiterName={waiterName}
+              />
+            </div>,
+            document.body
+        )}
       </DialogContent>
     </Dialog>
   );
