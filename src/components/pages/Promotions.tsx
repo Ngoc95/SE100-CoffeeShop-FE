@@ -442,6 +442,39 @@ export function Promotions() {
     fetchPromotionData();
   };
 
+  const handleApplyFilter = () => {
+    if (selectedType != "all") {
+      switch (selectedType) {
+        case "percentage":
+          fetchPromotionsParams.typeId = 1;
+          break;
+        case "amount":
+          fetchPromotionsParams.typeId = 2;
+          break;
+        case "fixed-price":
+          fetchPromotionsParams.typeId = 3;
+          break;
+        case "free-item":
+          fetchPromotionsParams.typeId = 4;
+          break;
+      }
+    }
+    else fetchPromotionsParams.typeId = undefined
+
+    if (selectedStatus != "all") {
+      switch (selectedStatus) {
+        case "active":
+          fetchPromotionsParams.isActive = true;
+          break;
+        case "inactive":
+          fetchPromotionsParams.isActive = false;
+          break;
+      }
+    }
+    else fetchPromotionsParams.isActive = undefined
+    fetchPromotionData()
+  }
+
   const getSortIcon = (field: string) => {
     if (sortBy !== field || sortOrder === "none") {
       return null;
@@ -782,7 +815,7 @@ export function Promotions() {
             {/* Collapsible Filter Panel */}
             {showFilters && (
               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Type Filter */}
                   <div className="space-y-2">
                     <Label className="text-xs text-slate-600">
@@ -819,7 +852,17 @@ export function Promotions() {
                 </div>
 
                 {/* Clear Filters Button */}
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white hover:text-white"
+                    onClick={() => {
+                      handleApplyFilter();
+                    }}
+                  >
+                    Áp dụng bộ lọc
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -838,24 +881,6 @@ export function Promotions() {
           </div>
         </CardContent>
       </Card>
-      {/* Stats */}
-      <div className="space-y-2">
-        <Label className="text-xs text-slate-600">Thống kê</Label>
-        <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-1">
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-600">Tổng:</span>
-            <span className="font-medium text-slate-900">{totalPromotions}</span>
-          </div>
-          {/* <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Hoạt động:</span>
-                        <span className="font-medium text-emerald-600">{activePromotions}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Không hoạt động:</span>
-                        <span className="font-medium text-gray-600">{inactivePromotions}</span>
-                      </div> */}
-        </div>
-      </div>
 
       {/* Table */}
       <Card>
@@ -1286,7 +1311,24 @@ export function Promotions() {
         </CardContent>
       </Card>
 
-
+      {/* Stats */}
+      <div className="space-y-2">
+        <Label className="text-xs text-slate-600">Thống kê</Label>
+        <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-1">
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-600">Tổng:</span>
+            <span className="font-medium text-slate-900">{totalPromotions}</span>
+          </div>
+          {/* <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Hoạt động:</span>
+                        <span className="font-medium text-emerald-600">{activePromotions}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Không hoạt động:</span>
+                        <span className="font-medium text-gray-600">{inactivePromotions}</span>
+                      </div> */}
+        </div>
+      </div>
 
       {/* Form Dialog */}
       <PromotionFormDialog
