@@ -10,8 +10,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Checkbox } from "../ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { toast } from "sonner";
-import { CustomerGroupFormDialog } from "../CustomerGroupFormDialog";
-import { getCustomerGroups } from "../../api/customerGroup";
+import { AddCustomerGroup, CustomerGroupAddFormDialog, CustomerGroupEditFormDialog, EditCustomerGroup } from "../CustomerGroupFormDialog";
+import { createCustomerGroup, deleteCustomerGroup, getCustomerGroups, updateCustomerGroup } from "../../api/customerGroup";
 
 interface CustomerGroup {
   id: number,
@@ -37,8 +37,19 @@ export function CustomerGroups() {
   const canDelete = hasPermission('customer_groups:delete');
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingGroup, setEditingGroup] = useState<CustomerGroup | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<EditCustomerGroup>({
+    id: 0,
+    code: '',
+    name: '',
+    description: '',
+    priority: 0,
+    minSpend: 0,
+    minOrders: 0,
+    windowMonths: 12
+  }
+  );
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
   const [customerFilterOpen, setCustomerFilterOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
@@ -149,22 +160,82 @@ export function CustomerGroups() {
     fetchCustomerGroupsData()
   }
 
-  const handleSubmit = (formData: any /*{
-    name: string;
-    status: "active" | "inactive";
-    customers: Customer[];}*/
-  ) => {
-    // const newGroup: CustomerGroup = {
-    //   id: Date.now().toString(),
-    //   code: `NKH${String(groups.length + 1).padStart(3, "0")}`,
-    //   name: formData.name,
-    //   status: formData.status,
-    //   customers: formData.customers,
-    // };
-    // setGroups([...groups, newGroup]);
-    // setDialogOpen(false);
-    // toast.success("Đã thêm nhóm khách hàng mới");
+  const validateSubmitEdit = (formData: EditCustomerGroup) => {
+    if (!formData.name) {
+      toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
+      return false;
+    }
+
+    if (formData.windowMonths < 1 || formData.windowMonths > 60) {
+      toast.error("Số tháng xét hạng phải từ 1 đến 60");
+      return false;
+    }
+
+    return true;
+  }
+
+  const validateSubmitAdd = (formData: AddCustomerGroup) => {
+    if (!formData.name) {
+      toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
+      return false;
+    }
+
+    if (formData.windowMonths < 1 || formData.windowMonths > 60) {
+      toast.error("Số tháng xét hạng phải từ 1 đến 60");
+      return false;
+    }
+
+    return true;
+  }
+
+  const handleSubmitEdit = async (formData: EditCustomerGroup) => {
+    if (!formData) return;
+
+    if (!validateSubmitEdit(formData)) return;
+
+    try {
+      await updateCustomerGroup(
+        formData.id,
+        formData.name,
+        formData.description,
+        formData.priority,
+        formData.minSpend,
+        formData.minOrders,
+        formData.windowMonths
+      )
+      toast.success("Cập nhật nhóm khách hàng thành công");
+      await fetchCustomerGroupsData()
+    }
+    catch (error) {
+      toast.error("Cập nhật nhóm khách hàng thất bại. Lỗi: " + error.response.data.message);
+    }
+
+    setEditDialogOpen(false);
   };
+
+  const handleSubmitAdd = async (formData: AddCustomerGroup) => {
+    if (!formData) return;
+
+    if (!validateSubmitAdd(formData)) return;
+
+    try {
+      await createCustomerGroup(
+        formData.name,
+        formData.description,
+        formData.priority,
+        formData.minSpend,
+        formData.minOrders,
+        formData.windowMonths
+      )
+      toast.success("Thêm nhóm khách hàng thành công");
+      await fetchCustomerGroupsData()
+    }
+    catch (error) {
+      toast.error("Thêm nhóm khách hàng thất bại. Lỗi: " + error.response.data.message);
+    }
+
+    setAddDialogOpen(false);
+  }
 
   const handleEdit = (formData: any/*{
     name: string;
@@ -189,11 +260,11 @@ export function CustomerGroups() {
     // toast.success("Đã cập nhật nhóm khách hàng");
   };
 
-  const handleDeleteGroup = (id: string) => {
-    // if (confirm("Bạn có chắc chắn muốn xóa nhóm này?")) {
-    //   setGroups(groups.filter((g) => g.id !== id));
-    //   toast.success("Đã xóa nhóm khách hàng");
-    // }
+  const handleDelete = async (id: number) => {
+    if (confirm("Bạn có chắc chắn muốn xóa nhóm khách hàng này?")) {
+      await deleteCustomerGroup(id)
+      fetchCustomerGroupsData()
+    }
   };
 
   // const handleToggleStatus = (id: string) => {
@@ -214,8 +285,19 @@ export function CustomerGroups() {
   // };
 
   const openEditDialog = (group: CustomerGroup) => {
-    setEditingGroup(group);
-    setDialogOpen(true);
+    const tempEditCustomerGroup: EditCustomerGroup = {
+      id: group.id,
+      code: group.code,
+      name: group.name,
+      description: group.description,
+      priority: group.priority,
+      minSpend: group.minSpend,
+      minOrders: group.minOrders,
+      windowMonths: group.windowMonths
+    }
+
+    setEditingGroup(tempEditCustomerGroup);
+    setEditDialogOpen(true);
   };
 
   const totalGroups = groups.length;
@@ -261,8 +343,7 @@ export function CustomerGroups() {
           <Button
             className="bg-blue-600 hover:bg-blue-700"
             onClick={() => {
-              setEditingGroup(null);
-              setDialogOpen(true);
+              setAddDialogOpen(true);
             }}
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -367,6 +448,15 @@ export function CustomerGroups() {
                       {getSortIcon("minSpend")}
                     </div>
                   </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("windowMonths")}
+                  >
+                    <div className="flex items-center">
+                      Số tháng xét hạng
+                      {getSortIcon("windowMonths")}
+                    </div>
+                  </TableHead>
                   <TableHead className="w-16 text-sm text-center">Số khách hàng</TableHead>
                   <TableHead className="text-sm text-center">Thao tác</TableHead>
                 </TableRow>
@@ -406,6 +496,9 @@ export function CustomerGroups() {
                         {group.minSpend.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-sm text-slate-700">
+                        {group.windowMonths}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700">
                         {group.customerCount.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-sm text-right">
@@ -427,7 +520,7 @@ export function CustomerGroups() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                // onClick={() => handleDeleteGroup(group.id)}
+                                onClick={() => handleDelete(group.id)}
                                 className="hover:bg-red-50"
                               >
                                 <Trash2 className="w-4 h-4 text-red-600" />
@@ -454,17 +547,25 @@ export function CustomerGroups() {
           </div>
         </div>
       </div>
-      {/* Form Dialog */}
-      {/* <CustomerGroupFormDialog
-        open={dialogOpen}
+
+      {/*Edit Form Dialog */}
+      <CustomerGroupEditFormDialog
+        open={editDialogOpen}
         onClose={() => {
-          setDialogOpen(false);
-          setEditingGroup(null);
+          setEditDialogOpen(false);
         }}
-        onSubmit={editingGroup ? handleEditGroup : handleAddGroup}
+        onSubmit={(formData) => handleSubmitEdit(formData)}
         editingGroup={editingGroup}
-        availableCustomers={availableCustomers}
-      /> */}
+      />
+
+      {/*Add Form Dialog */}
+      <CustomerGroupAddFormDialog
+        open={addDialogOpen}
+        onClose={() => {
+          setAddDialogOpen(false);
+        }}
+        onSubmit={(formData) => handleSubmitAdd(formData)}
+      />
     </div>
   );
 }

@@ -1,103 +1,102 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { Label } from './ui/label';
 import { Input } from './ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
 import { Button } from './ui/button';
+import { cities } from './pages/Customers';
+import { getSupplierCategories } from '../api/supplier';
 
-interface Supplier {
-  id: string;
+export interface EditSupplier {
+  id: number;
   code: string;
   name: string;
-  category: string;
-  contact: string;
+  contactPerson: string;
   phone: string;
   email: string;
   address: string;
   city: string;
-  debt: number;
+  category: string;
   status: 'active' | 'inactive';
 }
 
-interface SupplierFormDialogProps {
+interface SupplierEditFormDialogProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (formData: Omit<Supplier, 'id' | 'code'>) => void;
-  editingSupplier: Supplier | null;
+  onSubmit: (formData: EditSupplier) => void;
+  editingSupplier: EditSupplier;
 }
 
-export function SupplierFormDialog({ 
-  open, 
-  onClose, 
-  onSubmit, 
-  editingSupplier 
-}: SupplierFormDialogProps) {
-  const [formData, setFormData] = useState({
-    name: '',
-    category: '',
-    contact: '',
-    phone: '',
-    email: '',
-    address: '',
-    city: '',
-    status: 'active' as 'active' | 'inactive',
+export function SupplierEditFormDialog(props: SupplierEditFormDialogProps) {
+  const [supplierCategories, setSupplierCategories] = useState([])
+
+  const [formData, setFormData] = useState<EditSupplier>({
+    id: 0,
+    code: "",
+    name: "",
+    contactPerson: "",
+    phone: "",
+    email: "",
+    address: "",
+    city: "",
+    category: "",
+    status: 'active'
   });
 
-  useEffect(() => {
-    if (editingSupplier) {
-      setFormData({
-        name: editingSupplier.name,
-        category: editingSupplier.category,
-        contact: editingSupplier.contact,
-        phone: editingSupplier.phone,
-        email: editingSupplier.email,
-        address: editingSupplier.address,
-        city: editingSupplier.city,
-        status: editingSupplier.status,
-      });
-    } else {
-      setFormData({
-        name: '',
-        category: '',
-        contact: '',
-        phone: '',
-        email: '',
-        address: '',
-        city: '',
-        status: 'active',
-      });
+  const fetchSupplierCategories = async () => {
+    const res = await getSupplierCategories()
+    const { categories } = res.data.metaData
+    if (categories) {
+      setSupplierCategories(categories)
     }
-  }, [editingSupplier, open]);
+  }
+
+  useEffect(() => {
+    setFormData({
+      id: props.editingSupplier.id,
+      code: props.editingSupplier.code,
+      name: props.editingSupplier.name,
+      contactPerson: props.editingSupplier.contactPerson,
+      phone: props.editingSupplier.phone,
+      email: props.editingSupplier.email,
+      address: props.editingSupplier.address,
+      city: props.editingSupplier.city,
+      category: props.editingSupplier.category,
+      status: props.editingSupplier.status
+    });
+
+    fetchSupplierCategories()
+  }, [props.editingSupplier, props.open]);
 
   const handleSubmit = () => {
-    onSubmit(formData);
+    props.onSubmit(formData);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={props.open} onOpenChange={props.onClose}>
       <DialogContent className="max-w-[700px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
-            {editingSupplier ? 'Chỉnh sửa nhà cung cấp' : 'Thêm nhà cung cấp mới'}
+            Chỉnh sửa nhà cung cấp
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Row 1: Tên NCC & Danh mục */}
+          <div>
+            <Label>
+              Mã nhà cung cấp
+            </Label>
+            <Input
+              type="text"
+              value={formData.code}
+              disabled={true}
+              placeholder="VD: Trung Nguyên"
+              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+            />
+          </div>
+          {/*Tên NCC & Danh mục */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>
@@ -114,13 +113,23 @@ export function SupplierFormDialog({
 
             <div>
               <Label>Danh mục</Label>
-              <Input
-                type="text"
+              <Select
                 value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder="VD: Cà phê, Trà, Sữa..."
-                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-              />
+                onValueChange={(value: string) => setFormData({ ...formData, category: value })}
+              >
+                <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                  <SelectValue placeholder="Chọn danh mục" />
+                </SelectTrigger>
+                <SelectContent>
+                  {
+                    supplierCategories.map((category, index) => (
+                      <SelectItem key={index} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))
+                  }
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -130,8 +139,8 @@ export function SupplierFormDialog({
               <Label>Người liên hệ</Label>
               <Input
                 type="text"
-                value={formData.contact}
-                onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
+                value={formData.contactPerson}
+                onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
                 placeholder="Nhập tên người liên hệ"
                 className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
@@ -168,20 +177,27 @@ export function SupplierFormDialog({
               <Label>Tỉnh / Thành phố</Label>
               <Select
                 value={formData.city}
-                onValueChange={(value) => setFormData({ ...formData, city: value })}
+                onValueChange={(value: string) => setFormData({ ...formData, city: value })}
               >
                 <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
                   <SelectValue placeholder="Chọn thành phố" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Hồ Chí Minh">Hồ Chí Minh</SelectItem>
+                  {
+                    cities.map((city, index) => (
+                      <SelectItem key={index} value={city}>
+                        {city}
+                      </SelectItem>
+                    ))
+                  }
+                  {/* <SelectItem value="Hồ Chí Minh">Hồ Chí Minh</SelectItem>
                   <SelectItem value="Hà Nội">Hà Nội</SelectItem>
                   <SelectItem value="Đà Nẵng">Đà Nẵng</SelectItem>
                   <SelectItem value="Cần Thơ">Cần Thơ</SelectItem>
                   <SelectItem value="Hải Phòng">Hải Phòng</SelectItem>
                   <SelectItem value="Nha Trang">Nha Trang</SelectItem>
                   <SelectItem value="Huế">Huế</SelectItem>
-                  <SelectItem value="Vũng Tàu">Vũng Tàu</SelectItem>
+                  <SelectItem value="Vũng Tàu">Vũng Tàu</SelectItem> */}
                 </SelectContent>
               </Select>
             </div>
@@ -199,34 +215,34 @@ export function SupplierFormDialog({
             />
           </div>
 
-          {/* Row 5: Trạng thái */}
+          {/* Status */}
           <div>
             <Label>Trạng thái</Label>
             <Select
-              value={formData.status}
-              onValueChange={(value) => setFormData({ ...formData, status: value as 'active' | 'inactive' })}
+              value={(formData.status == 'active') ? "Hoạt động" : "Không hoạt động"}
+              onValueChange={(value: string) => setFormData({ ...formData, status: (value === "Hoạt động" ? 'active' : 'inactive') })}
             >
               <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
-                <SelectValue />
+                <SelectValue placeholder="Chọn trạng thái" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">Hoạt động</SelectItem>
-                <SelectItem value="inactive">Không hoạt động</SelectItem>
+                <SelectItem value="Hoạt động">Hoạt động</SelectItem>
+                <SelectItem value="Không hoạt động">Không hoạt động</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={props.onClose}>
             Hủy
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!formData.name || !formData.phone}
+            // disabled={!formData.name || !formData.phone}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            {editingSupplier ? 'Cập nhật' : 'Thêm nhà cung cấp'}
+            Cập nhật
           </Button>
         </DialogFooter>
       </DialogContent>

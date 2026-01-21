@@ -11,9 +11,9 @@ import { Label } from "../ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { toast } from "sonner";
-import { SupplierFormDialog } from "../SupplierFormDialog";
+import { EditSupplier, SupplierEditFormDialog } from "../SupplierFormDialog";
 import { cities } from "./Customers";
-import { getSuppliers } from "../../api/supplier";
+import { deleteSupplier, getSuppliers, updateSupplier } from "../../api/supplier";
 
 interface Supplier {
   id: 1,
@@ -47,8 +47,20 @@ export function Suppliers() {
   const [selectedCity, setSelectedCity] = useState("all");
   const [sortBy, setSortBy] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"+" | "-" | "none">("none");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<EditSupplier>({
+    id: 0,
+    code: "",
+    name: "",
+    contactPerson: "",
+    phone: "",
+    email: "",
+    address: "",
+    city: "",
+    category: "",
+    status: 'active'
+  });
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -143,48 +155,70 @@ export function Suppliers() {
     // toast.success("Đã thêm nhà cung cấp mới");
   };
 
-  const handleEditSupplier = (formData: Omit<Supplier, "id" | "code">) => {
-    // if (!editingSupplier) return;
-    // setSuppliers(
-    //   suppliers.map((s) =>
-    //     s.id === editingSupplier.id ? { ...s, ...formData } : s
-    //   )
-    // );
-    // setEditingSupplier(null);
-    // setDialogOpen(false);
-    // toast.success("Đã cập nhật nhà cung cấp");
+  const handleEdit = (supplier: Supplier) => {
+    const tempEditSupplier: EditSupplier = {
+      id: supplier.id,
+      code: supplier.code,
+      name: supplier.name,
+      contactPerson: supplier.contactPerson,
+      phone: supplier.phone,
+      email: supplier.email,
+      address: supplier.address,
+      city: supplier.city,
+      category: supplier.category,
+      status: supplier.status
+    }
+    setEditingSupplier(tempEditSupplier)
+    setEditDialogOpen(true)
   };
 
-  const handleDeleteSupplier = (id: string) => {
-    // if (confirm("Bạn có chắc chắn muốn xóa nhà cung cấp này?")) {
-    //   setSuppliers(suppliers.filter((s) => s.id !== id));
-    //   toast.success("Đã xóa nhà cung cấp");
-    // }
+  const handleDelete = async (id: number) => {
+    if (confirm("Bạn có chắc chắn muốn xóa nhà cung cấp này?")) {
+      await deleteSupplier(id)
+      fetchSuppliersData()
+    }
   };
 
-  // const handleToggleStatus = (id: string) => {
-  //   setSuppliers(
-  //     suppliers.map((supplier) => {
-  //       if (supplier.id === id) {
-  //         const newStatus =
-  //           supplier.status === "active" ? "inactive" : "active";
-  //         toast.success(
-  //           newStatus === "active"
-  //             ? "Đã kích hoạt nhà cung cấp"
-  //             : "Đã vô hiệu hóa nhà cung cấp"
-  //         );
-  //         return { ...supplier, status: newStatus };
-  //       }
-  //       return supplier;
-  //     })
-  //   );
-  // };
+  const validateSubmitEdit = (formData: EditSupplier) => {
+    if (!formData.name || !formData.phone) {
+      toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
+      return false;
+    }
 
-  const openEditDialog = (e: React.MouseEvent, supplier: Supplier) => {
-    e.stopPropagation();
-    setEditingSupplier(supplier);
-    setDialogOpen(true);
-  };
+    if (!/^\d+$/.test(formData.phone)) {
+      toast.error("SĐT chỉ có chữ số!");
+      return false;
+    }
+
+    return true;
+  }
+
+  const handleSubmitEdit = async (formData: EditSupplier) => {
+    if (!formData) return;
+
+    if (!validateSubmitEdit(formData)) return;
+
+    try {
+      await updateSupplier(
+        formData.id,
+        formData.name,
+        formData.contactPerson,
+        formData.phone,
+        formData.email,
+        formData.address,
+        formData.city,
+        formData.category,
+        formData.status
+      )
+      toast.success("Cập nhật nhà cung cấp thành công");
+      await fetchSuppliersData()
+    }
+    catch (error) {
+      toast.error("Cập nhật nhà cung cấp thất bại. Lỗi: " + error.response.data.message);
+    }
+
+    setEditDialogOpen(false);
+  }
 
   const getStatusBadge = (status: "active" | "inactive") => {
     if (status === "active") {
@@ -252,8 +286,7 @@ export function Suppliers() {
             <Button
               className="bg-blue-600 hover:bg-blue-700"
               onClick={() => {
-                setEditingSupplier(null);
-                setDialogOpen(true);
+                // setDialogOpen(true);
               }}
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -457,7 +490,6 @@ export function Suppliers() {
                     return (
                       <React.Fragment key={supplier.code}>
                         <TableRow
-                          onClick={() => toggleExpand(supplier.code)}
                           className="cursor-pointer hover:bg-slate-50"
                         >
                           <TableCell>
@@ -525,7 +557,7 @@ export function Suppliers() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={(event: React.MouseEvent) => openEditDialog(event, supplier)}
+                                  onClick={(event: React.MouseEvent) => handleEdit(supplier)}
                                   className="hover:bg-blue-100"
                                 >
                                   <Pencil className="w-4 h-4" />
@@ -537,7 +569,7 @@ export function Suppliers() {
                                   size="sm"
                                   onClick={(event: React.MouseEvent) => {
                                     event.stopPropagation();
-                                    handleDeleteSupplier(supplier.code);
+                                    handleDelete(supplier.id);
                                   }}
                                   className="hover:bg-red-50"
                                 >
@@ -679,15 +711,14 @@ export function Suppliers() {
         </div>
       </div>
       {/* Form Dialog */}
-      {/* <SupplierFormDialog
-        open={dialogOpen}
+      <SupplierEditFormDialog
+        open={editDialogOpen}
         onClose={() => {
-          setDialogOpen(false);
-          setEditingSupplier(null);
+          setEditDialogOpen(false);
         }}
-        onSubmit={editingSupplier ? handleEditSupplier : handleAddSupplier}
+        onSubmit={(supplier) => handleSubmitEdit(supplier)}
         editingSupplier={editingSupplier}
-      /> */}
+      />
     </div>
   );
 }
