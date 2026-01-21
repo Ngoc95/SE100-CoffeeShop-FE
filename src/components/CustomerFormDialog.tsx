@@ -136,7 +136,7 @@ export function CustomerEditFormDialog(props: CustomerEditFormDialogProps) {
               placeholder="VD: 15/01/1990"
               value={formData.birthday ? formData.birthday : "2026-01-16"}
               onChange={(e) => { setFormData({ ...formData, birthday: e.target.value }) }}
-              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              className="mt-1.5 bg-white border-2 w-full rounded-sm p-1 border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
 
@@ -299,7 +299,7 @@ export function CustomerAddFormDialog(props: CustomerAddFormDialogProps) {
               placeholder="VD: 15/01/1990"
               value={formData.birthday ? formData.birthday : "2026-01-16"}
               onChange={(e) => { setFormData({ ...formData, birthday: e.target.value }) }}
-              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              className="mt-1.5 bg-white border-2 w-full rounded-sm p-1 border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
 

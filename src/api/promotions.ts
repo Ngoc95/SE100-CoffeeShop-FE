@@ -67,13 +67,174 @@ export interface PromotionCreatePayload {
   isActive?: boolean;
 }
 
-export interface PromotionUpdatePayload extends Partial<PromotionCreatePayload> {}
+export interface PromotionCreatePercentagePayload {
+  name: string,
+  description: string,
+  typeId: number,
+  discountValue: number,
+  minOrderValue: number,
+  maxDiscount: number,
+  startDateTime: string,
+  endDateTime: string,
+  maxTotalUsage: number, // nếu mã KM ko giới hạn lượt dùng => ko truyền
+  maxUsagePerCustomer: number, // nếu mã KM ko giới hạn lượt dùng từng người => ko truyền
+  isActive: boolean,
+  // 5 fields này nếu ko truyền thì be mặc định là false
+  applyToAllItems: boolean,
+  applyToAllCategories: boolean,
+  applyToAllCombos: boolean,
+  applyToAllCustomers: boolean,
+  applyToAllCustomerGroups: boolean,
+  applyToWalkIn: boolean,
+  applicableItemIds: number[],
+  applicableCategoryIds: number[],
+  applicableComboIds: number[],
+  applicableCustomerIds: number[],
+  applicableCustomerGroupIds: number[],
+  giftItemIds: number[]
+}
+
+export interface PromotionCreateAmountPayload {
+  name: string,
+  description: string,
+  typeId: number,
+  discountValue: number,
+  minOrderValue: number,
+  startDateTime: string,
+  endDateTime: string,
+  maxTotalUsage: number,
+  maxUsagePerCustomer: number,
+  isActive: boolean,
+  applyToAllItems: boolean,
+  applyToAllCategories: boolean,
+  applyToAllCombos: boolean,
+  applyToAllCustomers: boolean,
+  applyToAllCustomerGroups: boolean,
+  applyToWalkIn: boolean,
+  applicableItemIds: number[],
+  applicableCategoryIds: number[],
+  applicableComboIds: number[],
+  applicableCustomerIds: number[],
+  applicableCustomerGroupIds: number[],
+  giftItemIds: number[]
+}
+
+export interface PromotionCreateSamePricePayload {
+  name: string,
+  description: string,
+  typeId: number,
+  discountValue: number,
+  minOrderValue: number,
+  startDateTime: string,
+  endDateTime: string,
+  maxTotalUsage: number,
+  maxUsagePerCustomer: number,
+  isActive: boolean,
+  applyToAllItems: boolean,
+  applyToAllCategories: boolean,
+  applyToAllCombos: boolean,
+  applyToAllCustomers: boolean,
+  applyToAllCustomerGroups: boolean,
+  applyToWalkIn: boolean,
+  applicableItemIds: number[],
+  applicableCategoryIds: number[],
+  applicableComboIds: number[],
+  applicableCustomerIds: number[],
+  applicableCustomerGroupIds: number[],
+  giftItemIds: number[]
+}
+
+export interface PromotionCreateGiftPayload {
+  name: string,
+  description: string,
+  typeId: number,
+  buyQuantity: number,
+  getQuantity: number,
+  requireSameItem: boolean, //nếu true thì phải là 2 ly phải là cùng 1 item trong danh sách sản phẩm áp dụng
+  startDateTime: string,
+  endDateTime: string,
+  maxTotalUsage: number,
+  maxUsagePerCustomer: number,
+  isActive: boolean,
+  applyToAllItems: boolean,
+  applyToAllCategories: boolean,
+  applyToAllCombos: boolean,
+  applyToAllCustomers: boolean,
+  applyToAllCustomerGroups: boolean,
+  applyToWalkIn: boolean,
+  applicableItemIds: number[],
+  applicableCategoryIds: number[],
+  applicableComboIds: number[],
+  applicableCustomerIds: number[],
+  applicableCustomerGroupIds: number[],
+  giftItemIds: number[]
+}
+
+export interface PromotionUpdatePayload {
+  name: string,
+  description: string,
+  discountValue: number,
+  minOrderValue: number,
+  maxDiscount: number,
+  buyQuantity: number,
+  getQuantity: number,
+  requireSameItem: boolean,
+  startDateTime: string,
+  endDateTime: string,
+  maxTotalUsage: number,
+  maxUsagePerCustomer: number,
+  isActive: boolean,
+  applyToAllItems: boolean,
+  applyToAllCategories: boolean,
+  applyToAllCombos: boolean,
+  applyToAllCustomers: boolean,
+  applyToAllCustomerGroups: boolean,
+  applyToWalkIn: boolean,
+  applicableItemsId: number[],
+  applicableCategoryIds: number[],
+  applicableComboIds: number[],
+  applicableCustomerIds: number[],
+  applicableCustomerGroupIds: number[],
+  giftItemIds: number[],
+}
 
 export const createPromotion = (payload: PromotionCreatePayload) => {
   return axiosClient.post('/promotions', payload);
 };
 
+export const createPercentagePromotion = (payload: PromotionCreatePercentagePayload) => {
+  return axiosClient.post('/promotions', payload);
+}
+
+export const createAmountPromotion = (payload: PromotionCreateAmountPayload) => {
+  return axiosClient.post('/promotions', payload);
+}
+
+export const createSamePricePromotion = (payload: PromotionCreateSamePricePayload) => {
+  return axiosClient.post('/promotions', payload);
+}
+
+export const createGiftPromotion = (payload: PromotionCreateGiftPayload) => {
+  return axiosClient.post('/promotions', payload);
+}
+
 export const updatePromotion = (id: string | number, payload: PromotionUpdatePayload) => {
+  return axiosClient.patch(`/promotions/${id}`, payload);
+};
+
+export const updatePercentagePromotion = (id: string | number, payload: PromotionCreatePercentagePayload) => {
+  return axiosClient.patch(`/promotions/${id}`, payload);
+};
+
+export const updateAmountPromotion = (id: string | number, payload: PromotionCreateAmountPayload) => {
+  return axiosClient.patch(`/promotions/${id}`, payload);
+};
+
+export const updateSamePricePromotion = (id: string | number, payload: PromotionCreateSamePricePayload) => {
+  return axiosClient.patch(`/promotions/${id}`, payload);
+};
+
+export const updateGiftPromotion = (id: string | number, payload: PromotionCreateGiftPayload) => {
   return axiosClient.patch(`/promotions/${id}`, payload);
 };
 
