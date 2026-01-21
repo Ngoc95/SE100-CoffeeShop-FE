@@ -46,6 +46,14 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       },
 
       {
+        id: 'goods_pricing',
+        name: 'Thiết lập giá',
+        permissions: [
+          { id: 'goods_pricing:view', name: 'Xem' },
+          { id: 'goods_pricing:update', name: 'Cập nhật' },
+        ],
+      },
+      {
         id: 'goods_stock_check',
         name: 'Kiểm kho',
         permissions: [
