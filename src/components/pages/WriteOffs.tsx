@@ -79,6 +79,7 @@ import { vi } from "date-fns/locale";
 import { toast } from "sonner";
 import { useAuth } from "../../contexts/AuthContext";
 import { categories } from "../../data/categories";
+import { inventoryService } from "../../services/inventoryService";
 import { Card, CardContent } from "../ui/card";
 import { CustomerTimeFilter } from "../reports/CustomerTimeFilter";
 
@@ -102,6 +103,7 @@ interface InventoryItem {
 }
 
 interface WriteOffDetail {
+  itemId?: number;
   name: string;
   batchCode: string;
   quantity: number;
@@ -112,6 +114,7 @@ interface WriteOffDetail {
 }
 
 interface WriteOffItemForm {
+  itemId?: number;
   productId: string;
   productName: string;
   batchCode: string;
@@ -139,6 +142,10 @@ interface WriteOff {
 
 export function WriteOffs() {
   const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [availableItems, setAvailableItems] = useState<any[]>([]);
+  const [categoriesList, setCategoriesList] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
   // Date range filter states (similar to Finance.tsx)
@@ -185,10 +192,10 @@ export function WriteOffs() {
         const lastYear = subYears(now, 1);
         from = startOfYear(lastYear); to = endOfYear(lastYear); break;
     }
-    
+
     if (value !== 'custom') {
-        setDateFrom(from);
-        setDateTo(to);
+      setDateFrom(from);
+      setDateTo(to);
     }
   };
 
@@ -720,17 +727,61 @@ export function WriteOffs() {
     ];
   };
 
-  const [writeOffs, setWriteOffs] = useState<WriteOff[]>(() => loadWriteOffs());
+  const [writeOffs, setWriteOffs] = useState<WriteOff[]>([]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const response = await inventoryService.getWriteOffs(1, 100);
+      const writeOffsData = response.metaData?.writeOffs || [];
+
+      const formattedWriteOffs: WriteOff[] = writeOffsData.map((wo: any) => ({
+        id: wo.id,
+        code: wo.code,
+        date: format(new Date(wo.createdAt), "yyyy-MM-dd HH:mm"),
+        items: wo.items?.length || 0,
+        totalValue: wo.totalValue || 0,
+        reason: wo.reason || "het-han",
+        status: wo.status || "draft",
+        staff: wo.staff?.fullName || "N/A",
+        note: wo.note || "",
+        details: {
+          items: (wo.items || []).map((it: any) => ({
+            itemId: it.itemId,
+            name: it.itemName || "N/A",
+            batchCode: it.batchCode || "",
+            quantity: it.quantity || 0,
+            unit: it.unit || "",
+            unitPrice: it.unitPrice || 0,
+            total: it.totalPrice || 0,
+            reason: it.reason || ""
+          }))
+        }
+      }));
+
+      setWriteOffs(formattedWriteOffs);
+
+      // Fetch items for selection
+      const itemsRes = await inventoryService.getItems(1, 1000);
+      setAvailableItems(itemsRes.metaData?.items || []);
+
+      // Fetch categories
+      const categoriesRes = await inventoryService.getCategories();
+      setCategoriesList(categoriesRes.metaData || []);
+    } catch (error) {
+      console.error("Error fetching write-offs:", error);
+      toast.error("Không thể tải danh sách phiếu xuất hủy");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Save to localStorage whenever writeOffs change
-  useEffect(() => {
-    try {
-      localStorage.setItem("writeOffs", JSON.stringify(writeOffs));
-    } catch (error) {
-      console.error("Error saving write-offs to localStorage:", error);
-    }
-  }, [writeOffs]);
+
 
   // Generate next write-off code
   const generateNextWriteOffCode = (): string => {
@@ -1026,120 +1077,57 @@ export function WriteOffs() {
     setShowCreateDialog(true);
   };
 
-  const handleCreateWriteOff = (status: "draft" | "completed") => {
+  const handleCreateWriteOff = async (status: "draft" | "completed") => {
     if (writeOffItems.length === 0) {
       toast.error("Vui lòng thêm ít nhất một hàng hóa");
       return;
     }
 
-    const totalAmount = writeOffItems.reduce(
-      (sum, item) => sum + item.total,
-      0
-    );
-
-    const staffName = formData.staff || user?.fullName || "";
-
-    const writeOffDate = formatDateTime(
-      formData.date
-        ? new Date(formData.date + " " + new Date().toTimeString().slice(0, 5))
-        : new Date()
-    );
-
-    if (editingWriteOffId !== null) {
-      // Update existing write-off
-      setWriteOffs((prev) =>
-        prev.map((wo) =>
-          wo.id === editingWriteOffId
-            ? {
-              ...wo,
-              code: formData.code,
-              date: writeOffDate,
-              items: writeOffItems.length,
-              totalValue: totalAmount,
-              reason: formData.reason,
-              status: status,
-              note: formData.note,
-              staff: staffName,
-              details: {
-                items: writeOffItems.map((item) => ({
-                  name: item.productName,
-                  batchCode: item.batchCode,
-                  quantity: item.quantity,
-                  unit: item.unit,
-                  unitPrice: item.unitPrice,
-                  total: item.total,
-                  reason: item.reason,
-                })),
-              },
-            }
-            : wo
-        )
-      );
-      toast.success(
-        status === "completed"
-          ? "Đã cập nhật và hoàn thành phiếu xuất hủy"
-          : "Đã cập nhật phiếu xuất hủy"
-      );
-    } else {
-      // Create new write-off
-      const newWriteOff: WriteOff = {
-        id:
-          writeOffs.length > 0
-            ? Math.max(...writeOffs.map((w) => w.id)) + 1
-            : 1,
-        code: formData.code,
-        date: writeOffDate,
-        items: writeOffItems.length,
-        totalValue: totalAmount,
-        reason: formData.reason,
+    setIsSaving(true);
+    try {
+      const payload = {
+        reason: formData.reason || "khac",
         status: status,
-        note: formData.note,
-        staff: staffName,
-        details: {
-          items: writeOffItems.map((item) => ({
-            name: item.productName,
-            batchCode: item.batchCode,
-            quantity: item.quantity,
-            unit: item.unit,
-            unitPrice: item.unitPrice,
-            total: item.total,
-            reason: item.reason,
-          })),
-        },
+        notes: formData.note,
+        items: writeOffItems.map(item => ({
+          itemId: item.itemId || parseInt(item.productId),
+          batchCode: item.batchCode,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          unit: item.unit,
+          reason: item.reason
+        }))
       };
 
-      setWriteOffs([newWriteOff, ...writeOffs]);
-      toast.success(
-        status === "completed"
-          ? "Đã tạo phiếu xuất hủy"
-          : "Đã lưu nháp phiếu xuất hủy"
-      );
+      if (editingWriteOffId !== null) {
+        await inventoryService.updateWriteOff(editingWriteOffId, payload);
+        toast.success(status === "completed" ? "Đã hoàn thành phiếu xuất hủy" : "Đã cập nhật phiếu tạm");
+      } else {
+        await inventoryService.createWriteOff(payload);
+        toast.success(status === "completed" ? "Đã hoàn thành phiếu xuất hủy" : "Đã lưu nháp phiếu xuất hủy");
+      }
+
+      setShowCreateDialog(false);
+      fetchData();
+    } catch (error) {
+      console.error("Error saving write-off:", error);
+      toast.error("Không thể lưu phiếu xuất hủy");
+    } finally {
+      setIsSaving(false);
     }
-
-    setShowCreateDialog(false);
-    setEditingWriteOffId(null);
-
-    // Reset form
-    setFormData({
-      code: generateNextWriteOffCode(),
-      date: "",
-      reason: "",
-      note: "",
-      staff: user?.fullName || "",
-    });
-    setWriteOffItems([]);
   };
 
   const handleAddSelectedBatches = () => {
     const itemsToAdd: WriteOffItemForm[] = [];
 
     selectedBatches.forEach(({ productId, batchCode, unitPrice }) => {
-      const item = inventoryItems.find((i) => i.id === productId);
+      const item = availableItems.find((i) => i.id === productId);
       if (item) {
-        const batch = item.batches?.find((b) => b.batchCode === batchCode);
+        const batch = item.batches?.find((b: any) => b.batchCode === batchCode);
         if (batch && batch.quantity > 0) {
           itemsToAdd.push({
-            productId: item.id,
+            itemId: item.id,
+            productId: item.id.toString(),
             productName: item.name,
             batchCode: batch.batchCode,
             unit: item.unit,
@@ -1209,12 +1197,18 @@ export function WriteOffs() {
     window.print();
   };
 
-  const handleCancelWriteOff = (id: number) => {
+  const handleCancelWriteOff = async (id: number) => {
     if (window.confirm("Bạn có chắc chắn muốn huỷ phiếu xuất hủy này không?")) {
-      setWriteOffs(writeOffs.filter((w) => w.id !== id));
-      toast.success("Đã huỷ phiếu xuất hủy");
-      if (expandedRow === id) {
-        setExpandedRow(null);
+      try {
+        await inventoryService.cancelWriteOff(id);
+        toast.success("Đã huỷ phiếu xuất hủy");
+        fetchData();
+        if (expandedRow === id) {
+          setExpandedRow(null);
+        }
+      } catch (error) {
+        console.error("Error cancelling write-off:", error);
+        toast.error("Không thể huỷ phiếu xuất hủy");
       }
     }
   };
@@ -1365,384 +1359,384 @@ export function WriteOffs() {
       </Card>
 
       {/* Transactions Table */}
-        <div className="bg-white rounded-xl border border-blue-200 flex-1 overflow-hidden flex flex-col">
-          <div className="overflow-x-auto flex-1 rounded-xl">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-blue-100">
-                  <TableHead className="w-12 text-sm text-center"></TableHead>
-                  <TableHead className="w-16 text-sm text-center">STT</TableHead>
-                  <TableHead
-                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => handleSort("code")}
+      <div className="bg-white rounded-xl border border-blue-200 flex-1 overflow-hidden flex flex-col">
+        <div className="overflow-x-auto flex-1 rounded-xl">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-blue-100">
+                <TableHead className="w-12 text-sm text-center"></TableHead>
+                <TableHead className="w-16 text-sm text-center">STT</TableHead>
+                <TableHead
+                  className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("code")}
+                >
+                  <div className="flex items-center">
+                    Mã phiếu
+                    {getSortIcon("code")}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("date")}
+                >
+                  <div className="flex items-center">
+                    Ngày giờ
+                    {getSortIcon("date")}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("items")}
+                >
+                  <div className="flex items-center justify-center">
+                    Số mặt hàng
+                    {getSortIcon("items")}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-sm text-right cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("totalValue")}
+                >
+                  <div className="flex items-center justify-end">
+                    Tổng giá trị
+                    {getSortIcon("totalValue")}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("reason")}
+                >
+                  <div className="flex items-center">
+                    Lý do
+                    {getSortIcon("reason")}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("status")}
+                >
+                  <div className="flex items-center justify-center">
+                    Trạng thái
+                    {getSortIcon("status")}
+                  </div>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredWriteOffs.map((wo, index) => (
+                <>
+                  <TableRow
+                    key={wo.id}
+                    className="hover:bg-blue-100/50 cursor-pointer"
+                    onClick={() =>
+                      setExpandedRow(expandedRow === wo.id ? null : wo.id)
+                    }
                   >
-                    <div className="flex items-center">
-                      Mã phiếu
-                      {getSortIcon("code")}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => handleSort("date")}
-                  >
-                    <div className="flex items-center">
-                      Ngày giờ
-                      {getSortIcon("date")}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => handleSort("items")}
-                  >
-                    <div className="flex items-center justify-center">
-                      Số mặt hàng
-                      {getSortIcon("items")}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="text-sm text-right cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => handleSort("totalValue")}
-                  >
-                    <div className="flex items-center justify-end">
-                      Tổng giá trị
-                      {getSortIcon("totalValue")}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => handleSort("reason")}
-                  >
-                    <div className="flex items-center">
-                      Lý do
-                      {getSortIcon("reason")}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => handleSort("status")}
-                  >
-                    <div className="flex items-center justify-center">
-                      Trạng thái
-                      {getSortIcon("status")}
-                    </div>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredWriteOffs.map((wo, index) => (
-                  <>
-                    <TableRow
-                      key={wo.id}
-                      className="hover:bg-blue-100/50 cursor-pointer"
-                      onClick={() =>
-                        setExpandedRow(expandedRow === wo.id ? null : wo.id)
-                      }
-                    >
-                      <TableCell className="text-sm text-center">
-                        {expandedRow === wo.id ? (
-                          <ChevronDown className="w-4 h-4 text-slate-600" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4 text-slate-600" />
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-600 text-center">
-                        {index + 1}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <span className="text-blue-600">{wo.code}</span>
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-700">
-                        {wo.date}
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-700 text-center">
-                        {wo.items}
-                      </TableCell>
-                      <TableCell className="text-sm text-red-600 text-right">
-                        {wo.totalValue.toLocaleString("vi-VN")}đ
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-700">
-                        {getReasonText(wo.reason)}
-                      </TableCell>
-                      <TableCell className="text-sm text-center">
-                        <span
-                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${wo.status === "completed"
-                            ? "bg-green-50 text-green-700"
-                            : wo.status === "draft"
-                              ? "bg-orange-50 text-orange-700"
-                              : "bg-red-50 text-red-700"
-                            }`}
-                        >
-                          {wo.status === "completed"
-                            ? "Hoàn thành"
-                            : wo.status === "draft"
-                              ? "Phiếu tạm"
-                              : "Đã huỷ"}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                    {/* Expanded Row */}
-                    {expandedRow === wo.id && wo.details && (
-                      <TableRow>
-                        <TableCell colSpan={6} className="bg-slate-50 px-4 py-4">
-                          <Tabs defaultValue="info" className="w-full">
-                            <TabsList>
-                              <TabsTrigger value="info">Thông tin</TabsTrigger>
-                            </TabsList>
-                            <TabsContent
-                              value="info"
-                              className="space-y-4 mt-4"
-                            >
-                              {/* Thông tin phiếu xuất hủy */}
-                              <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4 text-sm">
-                                  <div className="space-y-2">
-                                    <div>
-                                      <span className="font-medium text-slate-600">
-                                        Mã phiếu:
-                                      </span>{" "}
-                                      <span className="text-slate-900">
-                                        {wo.code}
-                                      </span>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-slate-600">
-                                        Trạng thái:
-                                      </span>{" "}
-                                      <span
-                                        className={`px-2 py-1 rounded-full text-xs ${wo.status === "completed"
-                                          ? "bg-green-50 text-green-700"
-                                          : wo.status === "draft"
-                                            ? "bg-orange-50 text-orange-700"
-                                            : "bg-red-50 text-red-700"
-                                          }`}
-                                      >
-                                        {wo.status === "completed"
-                                          ? "Hoàn thành"
-                                          : wo.status === "draft"
-                                            ? "Phiếu tạm"
-                                            : "Đã huỷ"}
-                                      </span>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-slate-600">
-                                        Thời gian:
-                                      </span>{" "}
-                                      <span className="text-slate-900">{wo.date}</span>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-slate-600">
-                                        Lý do:
-                                      </span>{" "}
-                                      <span className="text-slate-900">
-                                        {getReasonText(wo.reason)}
-                                      </span>
-                                    </div>
+                    <TableCell className="text-sm text-center">
+                      {expandedRow === wo.id ? (
+                        <ChevronDown className="w-4 h-4 text-slate-600" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4 text-slate-600" />
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-slate-600 text-center">
+                      {index + 1}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <span className="text-blue-600">{wo.code}</span>
+                    </TableCell>
+                    <TableCell className="text-sm text-slate-700">
+                      {wo.date}
+                    </TableCell>
+                    <TableCell className="text-sm text-slate-700 text-center">
+                      {wo.items}
+                    </TableCell>
+                    <TableCell className="text-sm text-red-600 text-right">
+                      {wo.totalValue.toLocaleString("vi-VN")}đ
+                    </TableCell>
+                    <TableCell className="text-sm text-slate-700">
+                      {getReasonText(wo.reason)}
+                    </TableCell>
+                    <TableCell className="text-sm text-center">
+                      <span
+                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${wo.status === "completed"
+                          ? "bg-green-50 text-green-700"
+                          : wo.status === "draft"
+                            ? "bg-orange-50 text-orange-700"
+                            : "bg-red-50 text-red-700"
+                          }`}
+                      >
+                        {wo.status === "completed"
+                          ? "Hoàn thành"
+                          : wo.status === "draft"
+                            ? "Phiếu tạm"
+                            : "Đã huỷ"}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                  {/* Expanded Row */}
+                  {expandedRow === wo.id && wo.details && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="bg-slate-50 px-4 py-4">
+                        <Tabs defaultValue="info" className="w-full">
+                          <TabsList>
+                            <TabsTrigger value="info">Thông tin</TabsTrigger>
+                          </TabsList>
+                          <TabsContent
+                            value="info"
+                            className="space-y-4 mt-4"
+                          >
+                            {/* Thông tin phiếu xuất hủy */}
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div className="space-y-2">
+                                  <div>
+                                    <span className="font-medium text-slate-600">
+                                      Mã phiếu:
+                                    </span>{" "}
+                                    <span className="text-slate-900">
+                                      {wo.code}
+                                    </span>
                                   </div>
-                                  <div className="space-y-2"></div>
+                                  <div>
+                                    <span className="font-medium text-slate-600">
+                                      Trạng thái:
+                                    </span>{" "}
+                                    <span
+                                      className={`px-2 py-1 rounded-full text-xs ${wo.status === "completed"
+                                        ? "bg-green-50 text-green-700"
+                                        : wo.status === "draft"
+                                          ? "bg-orange-50 text-orange-700"
+                                          : "bg-red-50 text-red-700"
+                                        }`}
+                                    >
+                                      {wo.status === "completed"
+                                        ? "Hoàn thành"
+                                        : wo.status === "draft"
+                                          ? "Phiếu tạm"
+                                          : "Đã huỷ"}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium text-slate-600">
+                                      Thời gian:
+                                    </span>{" "}
+                                    <span className="text-slate-900">{wo.date}</span>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium text-slate-600">
+                                      Lý do:
+                                    </span>{" "}
+                                    <span className="text-slate-900">
+                                      {getReasonText(wo.reason)}
+                                    </span>
+                                  </div>
                                 </div>
+                                <div className="space-y-2"></div>
+                              </div>
 
-                                {/* Chi tiết hàng hóa */}
-                                <div className="border border-slate-200 rounded-lg overflow-hidden">
-                                  <table className="w-full">
-                                    <thead className="bg-slate-100">
-                                      <tr>
-                                        <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                          STT
-                                        </th>
-                                        <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                          Mã lô
-                                        </th>
-                                        <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                          Tên hàng hóa
-                                        </th>
-                                        <th className="px-4 py-2 text-center text-xs text-slate-600">
-                                          Số lượng
-                                        </th>
-                                        <th className="px-4 py-2 text-center text-xs text-slate-600">
-                                          Đơn vị
-                                        </th>
-                                        <th className="px-4 py-2 text-right text-xs text-slate-600">
-                                          Đơn giá
-                                        </th>
-                                        <th className="px-4 py-2 text-right text-xs text-slate-600">
-                                          Thành tiền
-                                        </th>
-                                        <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                          Lý do
-                                        </th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                      {wo.details.items.map((item, idx) => (
-                                        <tr key={idx}>
-                                          <td className="px-4 py-2 text-sm text-slate-600">
-                                            {idx + 1}
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-slate-600">
-                                            {item.batchCode}
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-slate-900">
-                                            {item.name}
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-slate-600 text-center">
-                                            {item.quantity}
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-slate-600 text-center">
-                                            {item.unit}
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-slate-600 text-right">
-                                            {item.unitPrice.toLocaleString(
-                                              "vi-VN"
-                                            )}
-                                            đ
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-red-600 text-right">
-                                            {item.total.toLocaleString("vi-VN")}
-                                            đ
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-slate-600">
-                                            {item.reason}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-
-                                {/* Summary */}
-                                {wo.details && wo.details.items && (
-                                  <div className="flex justify-end pt-4">
-                                    <div className="space-y-3 text-sm min-w-[400px] bg-slate-50 rounded-lg p-6">
-                                      <div className="flex items-center py-1">
-                                        <span className="text-slate-600 text-right w-[180px] pr-4">
-                                          Tổng số lượng:
-                                        </span>
-                                        <span className="text-slate-900 font-medium text-right flex-1">
-                                          {wo.details.items.reduce(
-                                            (sum, item) => sum + item.quantity,
-                                            0
-                                          )}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center py-1">
-                                        <span className="text-slate-600 text-right w-[180px] pr-4">
-                                          Tổng số mặt hàng:
-                                        </span>
-                                        <span className="text-slate-900 font-medium text-right flex-1">
-                                          {wo.details.items.length}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center border-t border-slate-300 pt-3 mt-2">
-                                        <span className="text-slate-900 font-semibold text-base text-right w-[180px] pr-4">
-                                          Tổng giá trị:
-                                        </span>
-                                        <span className="text-red-600 font-semibold text-base text-right flex-1">
-                                          {wo.totalValue.toLocaleString(
+                              {/* Chi tiết hàng hóa */}
+                              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                <table className="w-full">
+                                  <thead className="bg-slate-100">
+                                    <tr>
+                                      <th className="px-4 py-2 text-left text-xs text-slate-600">
+                                        STT
+                                      </th>
+                                      <th className="px-4 py-2 text-left text-xs text-slate-600">
+                                        Mã lô
+                                      </th>
+                                      <th className="px-4 py-2 text-left text-xs text-slate-600">
+                                        Tên hàng hóa
+                                      </th>
+                                      <th className="px-4 py-2 text-center text-xs text-slate-600">
+                                        Số lượng
+                                      </th>
+                                      <th className="px-4 py-2 text-center text-xs text-slate-600">
+                                        Đơn vị
+                                      </th>
+                                      <th className="px-4 py-2 text-right text-xs text-slate-600">
+                                        Đơn giá
+                                      </th>
+                                      <th className="px-4 py-2 text-right text-xs text-slate-600">
+                                        Thành tiền
+                                      </th>
+                                      <th className="px-4 py-2 text-left text-xs text-slate-600">
+                                        Lý do
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {wo.details.items.map((item, idx) => (
+                                      <tr key={idx}>
+                                        <td className="px-4 py-2 text-sm text-slate-600">
+                                          {idx + 1}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-600">
+                                          {item.batchCode}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-900">
+                                          {item.name}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-600 text-center">
+                                          {item.quantity}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-600 text-center">
+                                          {item.unit}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-600 text-right">
+                                          {item.unitPrice.toLocaleString(
                                             "vi-VN"
                                           )}
                                           đ
-                                        </span>
-                                      </div>
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-red-600 text-right">
+                                          {item.total.toLocaleString("vi-VN")}
+                                          đ
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-600">
+                                          {item.reason}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+
+                              {/* Summary */}
+                              {wo.details && wo.details.items && (
+                                <div className="flex justify-end pt-4">
+                                  <div className="space-y-3 text-sm min-w-[400px] bg-slate-50 rounded-lg p-6">
+                                    <div className="flex items-center py-1">
+                                      <span className="text-slate-600 text-right w-[180px] pr-4">
+                                        Tổng số lượng:
+                                      </span>
+                                      <span className="text-slate-900 font-medium text-right flex-1">
+                                        {wo.details.items.reduce(
+                                          (sum, item) => sum + item.quantity,
+                                          0
+                                        )}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center py-1">
+                                      <span className="text-slate-600 text-right w-[180px] pr-4">
+                                        Tổng số mặt hàng:
+                                      </span>
+                                      <span className="text-slate-900 font-medium text-right flex-1">
+                                        {wo.details.items.length}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center border-t border-slate-300 pt-3 mt-2">
+                                      <span className="text-slate-900 font-semibold text-base text-right w-[180px] pr-4">
+                                        Tổng giá trị:
+                                      </span>
+                                      <span className="text-red-600 font-semibold text-base text-right flex-1">
+                                        {wo.totalValue.toLocaleString(
+                                          "vi-VN"
+                                        )}
+                                        đ
+                                      </span>
                                     </div>
                                   </div>
-                                )}
-
-                                {/* Action Buttons */}
-                                <div className="flex items-center justify-end gap-2 mt-4">
-                                  {wo.status === "draft" ? (
-                                    <>
-                                      <Button
-                                        variant="outline"
-                                        className="gap-2"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleEditWriteOff(wo);
-                                        }}
-                                      >
-                                        <Pencil className="w-4 h-4" />
-                                        Chỉnh sửa
-                                      </Button>
-                                      <Button
-                                        className="bg-green-600 hover:bg-green-700 gap-2"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (
-                                            !wo.details?.items ||
-                                            wo.details.items.length === 0
-                                          ) {
-                                            toast.error(
-                                              "Phiếu xuất hủy không có hàng hóa"
-                                            );
-                                            return;
-                                          }
-                                          setWriteOffs(
-                                            writeOffs.map((w) =>
-                                              w.id === wo.id
-                                                ? {
-                                                  ...w,
-                                                  status: "completed" as const,
-                                                }
-                                                : w
-                                            )
-                                          );
-                                          toast.success(
-                                            "Đã hoàn thành phiếu xuất hủy"
-                                          );
-                                        }}
-                                      >
-                                        <Check className="w-4 h-4" />
-                                        Hoàn thành
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="text-red-600 hover:text-red-700"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleCancelWriteOff(wo.id);
-                                        }}
-                                      >
-                                        <Trash2 className="w-4 h-4 mr-2" />
-                                        Huỷ bỏ
-                                      </Button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handlePrintWriteOff();
-                                        }}
-                                      >
-                                        <Printer className="w-4 h-4 mr-2" />
-                                        In
-                                      </Button>
-                                    </>
-                                  )}
                                 </div>
-                              </div>
-                            </TabsContent>
-                          </Tabs>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                              )}
 
-          {/* Footer */}
-          <div className="px-4 py-3 border-t border-slate-200 bg-slate-50">
-            <p className="text-sm text-slate-600">
-              Hiển thị {filteredWriteOffs.length} phiếu xuất hủy
-            </p>
-          </div>
+                              {/* Action Buttons */}
+                              <div className="flex items-center justify-end gap-2 mt-4">
+                                {wo.status === "draft" ? (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      className="gap-2"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEditWriteOff(wo);
+                                      }}
+                                    >
+                                      <Pencil className="w-4 h-4" />
+                                      Chỉnh sửa
+                                    </Button>
+                                    <Button
+                                      className="bg-green-600 hover:bg-green-700 gap-2"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (
+                                          !wo.details?.items ||
+                                          wo.details.items.length === 0
+                                        ) {
+                                          toast.error(
+                                            "Phiếu xuất hủy không có hàng hóa"
+                                          );
+                                          return;
+                                        }
+                                        setWriteOffs(
+                                          writeOffs.map((w) =>
+                                            w.id === wo.id
+                                              ? {
+                                                ...w,
+                                                status: "completed" as const,
+                                              }
+                                              : w
+                                          )
+                                        );
+                                        toast.success(
+                                          "Đã hoàn thành phiếu xuất hủy"
+                                        );
+                                      }}
+                                    >
+                                      <Check className="w-4 h-4" />
+                                      Hoàn thành
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-red-600 hover:text-red-700"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleCancelWriteOff(wo.id);
+                                      }}
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Huỷ bỏ
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handlePrintWriteOff();
+                                      }}
+                                    >
+                                      <Printer className="w-4 h-4 mr-2" />
+                                      In
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </TabsContent>
+                        </Tabs>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
+              ))}
+            </TableBody>
+          </Table>
         </div>
+
+        {/* Footer */}
+        <div className="px-4 py-3 border-t border-slate-200 bg-slate-50">
+          <p className="text-sm text-slate-600">
+            Hiển thị {filteredWriteOffs.length} phiếu xuất hủy
+          </p>
+        </div>
+      </div>
 
 
       {/* Import Excel Dialog */}

@@ -6,7 +6,7 @@ const API_BASE_URL = "http://localhost:4000/api";
    AUTH TOKEN
 ====================== */
 const getAuthToken = (): string | null => {
-  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInRva2VuVHlwZSI6ImFjY2Vzc190b2tlbiIsImlhdCI6MTc2ODk2NTU1NywiZXhwIjoxNzY4OTY2NDU3fQ.8zQw6BvZZxDizToxsfdD9jqE1ATASzFez6Pu4CBUPuc";
+  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInRva2VuVHlwZSI6ImFjY2Vzc190b2tlbiIsImlhdCI6MTc2OTAwNzA3NywiZXhwIjoxNzY5MDA3OTc3fQ.pSbaogXGbnYo6YjN_mHlnYwWkpMQdXlaeSH_X6J4O70";
 };
 
 const getHeaders = (): HeadersInit => {
@@ -322,6 +322,326 @@ export const inventoryService = {
 
     if (!response.ok) {
       throw new Error(`CANCEL stock-check ${id} failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  /* ---------- Purchase Orders ---------- */
+
+  async getPurchaseOrders(
+    page = 1,
+    limit = 20,
+    filters?: {
+      status?: string;
+      supplierId?: string;
+      dateFrom?: string;
+      dateTo?: string;
+    }
+  ) {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+
+    if (filters?.status) params.append("status", filters.status);
+    if (filters?.supplierId) params.append("supplierId", filters.supplierId);
+    if (filters?.dateFrom) params.append("dateFrom", filters.dateFrom);
+    if (filters?.dateTo) params.append("dateTo", filters.dateTo);
+
+    const response = await fetch(
+      `${API_BASE_URL}/purchase-orders?${params.toString()}`,
+      {
+        headers: getHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`GET purchase-orders failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async getPurchaseOrderById(id: number | string) {
+    const response = await fetch(
+      `${API_BASE_URL}/purchase-orders/${id}`,
+      {
+        headers: getHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`GET purchase-order ${id} failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async createPurchaseOrder(data: any) {
+    const response = await fetch(
+      `${API_BASE_URL}/purchase-orders`,
+      {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`CREATE purchase-order failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async updatePurchaseOrder(id: number | string, data: any) {
+    const response = await fetch(
+      `${API_BASE_URL}/purchase-orders/${id}`,
+      {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`UPDATE purchase-order ${id} failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async completePurchaseOrder(id: number | string) {
+    const response = await fetch(
+      `${API_BASE_URL}/purchase-orders/${id}/complete`,
+      {
+        method: "PATCH",
+        headers: getHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`COMPLETE purchase-order ${id} failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async cancelPurchaseOrder(id: number | string) {
+    const response = await fetch(
+      `${API_BASE_URL}/purchase-orders/${id}/cancel`,
+      {
+        method: "PATCH",
+        headers: getHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`CANCEL purchase-order ${id} failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async addPurchaseOrderPayment(id: number | string, data: { amount: number; paymentMethod: string; bankAccountId?: number }) {
+    const response = await fetch(
+      `${API_BASE_URL}/purchase-orders/${id}/payment`,
+      {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`ADD payment to purchase-order ${id} failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async deletePurchaseOrder(id: number | string) {
+    const response = await fetch(
+      `${API_BASE_URL}/purchase-orders/${id}`,
+      {
+        method: "DELETE",
+        headers: getHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`DELETE purchase-order ${id} failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  /* ---------- Write-offs ---------- */
+
+  async getWriteOffs(
+    page = 1,
+    limit = 10,
+    filters?: {
+      status?: string;
+      sort?: string;
+    }
+  ) {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+
+    if (filters?.status) params.append("status", filters.status);
+    if (filters?.sort) params.append("sort", filters.sort);
+
+    const response = await fetch(
+      `${API_BASE_URL}/write-offs?${params.toString()}`,
+      {
+        headers: getHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`GET write-offs failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async getWriteOffById(id: number | string) {
+    const response = await fetch(
+      `${API_BASE_URL}/write-offs/${id}`,
+      {
+        headers: getHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`GET write-off ${id} failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async createWriteOff(data: any) {
+    const response = await fetch(
+      `${API_BASE_URL}/write-offs`,
+      {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`CREATE write-off failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async updateWriteOff(id: number | string, data: any) {
+    const response = await fetch(
+      `${API_BASE_URL}/write-offs/${id}`,
+      {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`UPDATE write-off ${id} failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async completeWriteOff(id: number | string) {
+    const response = await fetch(
+      `${API_BASE_URL}/write-offs/${id}/complete`,
+      {
+        method: "PATCH",
+        headers: getHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`COMPLETE write-off ${id} failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async cancelWriteOff(id: number | string) {
+    const response = await fetch(
+      `${API_BASE_URL}/write-offs/${id}/cancel`,
+      {
+        method: "PATCH",
+        headers: getHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`CANCEL write-off ${id} failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  /* ---------- Suppliers ---------- */
+
+  async getSuppliers() {
+    const response = await fetch(
+      `${API_BASE_URL}/suppliers`,
+      {
+        headers: getHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`GET suppliers failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  /* ---------- Bank Accounts ---------- */
+
+  async getBankAccounts() {
+    const response = await fetch(
+      `${API_BASE_URL}/finance/bank-accounts`,
+      {
+        headers: getHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`GET bank-accounts failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async createBankAccount(data: {
+    accountName: string;
+    accountNumber: string;
+    bankName: string;
+    ownerName: string;
+    notes?: string;
+  }) {
+    const response = await fetch(
+      `${API_BASE_URL}/finance/bank-accounts`,
+      {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`CREATE bank-account failed: ${response.status}`);
     }
 
     return response.json();

@@ -289,7 +289,16 @@ export function Inventory() {
           status,
           productStatus: item.productStatus || "selling",
           imageUrl: item.imageUrl || undefined,
-          batches: item.batches || undefined,
+          batches: (item.inventoryBatches && Array.isArray(item.inventoryBatches))
+            ? item.inventoryBatches.map((b: any) => ({
+              batchCode: b.batchCode || "",
+              entryDate: b.entryDate || "",
+              expiryDate: b.expiryDate || "",
+              quantity: Number(b.remainingQty ?? b.quantity) || 0,
+              unitCost: Number(b.unitCost) || 0,
+              supplier: b.supplier?.name || (typeof b.supplier === 'string' ? b.supplier : "")
+            }))
+            : (item.batches || undefined),
           ingredients: (item.ingredientOf && Array.isArray(item.ingredientOf))
             ? item.ingredientOf.map((io: any) => ({
               ingredientId: String(io.ingredientItemId),
@@ -662,37 +671,44 @@ export function Inventory() {
     setExpandedItemId(isExpanding ? itemId : null);
 
     if (isExpanding) {
-      const item = items.find((i) => i.id === itemId);
-      // For composite items, fetch details to get toppings/applicable products
-      if (item && item.type === "composite") {
-        try {
-          const res = await inventoryService.getItemById(itemId) as any;
-          const meta = res.metaData || res;
+      try {
+        const res = await inventoryService.getItemById(itemId) as any;
+        const meta = res.metaData || res;
 
-          setItems((prev) =>
-            prev.map((i) =>
-              i.id === itemId
-                ? {
-                  ...i,
-                  availableToppings: meta.availableToppings || [],
-                  applicableProducts: meta.applicableProducts || [],
-                  // Also update ingredients just in case
-                  ingredients: (meta.ingredientOf && Array.isArray(meta.ingredientOf))
-                    ? meta.ingredientOf.map((io: any) => ({
-                      ingredientId: String(io.ingredientItemId),
-                      ingredientName: io.ingredientItem?.name || "",
-                      unit: io.unit || io.ingredientItem?.unit?.name || "",
-                      quantity: Number(io.quantity) || 0,
-                      unitCost: Number(io.ingredientItem?.avgUnitCost) || 0,
-                    }))
-                    : (i.ingredients || []),
-                }
-                : i
-            )
-          );
-        } catch (error) {
-          console.error("Error fetching item details on expand:", error);
-        }
+        setItems((prev) =>
+          prev.map((i) =>
+            i.id === itemId
+              ? {
+                ...i,
+                availableToppings: meta.availableToppings || [],
+                applicableProducts: meta.applicableProducts || [],
+                // Update batches from inventoryBatches
+                batches: (meta.inventoryBatches && Array.isArray(meta.inventoryBatches))
+                  ? meta.inventoryBatches.map((b: any) => ({
+                    batchCode: b.batchCode || "",
+                    entryDate: b.entryDate || "",
+                    expiryDate: b.expiryDate || "",
+                    quantity: Number(b.remainingQty ?? b.quantity) || 0,
+                    unitCost: Number(b.unitCost) || 0,
+                    supplier: b.supplier?.name || (typeof b.supplier === 'string' ? b.supplier : "")
+                  }))
+                  : (i.batches || []),
+                // Also update ingredients just in case
+                ingredients: (meta.ingredientOf && Array.isArray(meta.ingredientOf))
+                  ? meta.ingredientOf.map((io: any) => ({
+                    ingredientId: String(io.ingredientItemId),
+                    ingredientName: io.ingredientItem?.name || "",
+                    unit: io.unit || io.ingredientItem?.unit?.name || "",
+                    quantity: Number(io.quantity) || 0,
+                    unitCost: Number(io.ingredientItem?.avgUnitCost) || 0,
+                  }))
+                  : (i.ingredients || []),
+              }
+              : i
+          )
+        );
+      } catch (error) {
+        console.error("Error fetching item details on expand:", error);
       }
     }
   };
