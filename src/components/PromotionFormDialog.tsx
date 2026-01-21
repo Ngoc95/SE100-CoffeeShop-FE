@@ -412,8 +412,9 @@ export function PromotionEditFormDialog({
     //   typeId: editingPromotion.typeId
     // });
 
-    fetchAllData();
-
+    if (open && editingPromotion.id > 0) {
+      fetchAllData();
+    }
   }, [editingPromotion, open]);
 
   const handleSubmit = (e: React.FormEvent) => {

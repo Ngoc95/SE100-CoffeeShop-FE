@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { AddPromotion, EditPromotion, PromotionAddFormDialog, PromotionEditFormDialog } from "../PromotionFormDialog";
 import { createPromotion, updatePromotion, deletePromotion, getPromotions, PromotionsQuery, getPromotionById, updatePercentagePromotion, updateAmountPromotion, updateSamePricePromotion, updateGiftPromotion, createPercentagePromotion, createAmountPromotion, createSamePricePromotion, createGiftPromotion } from "../../api/promotions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { useDebounce } from "../../hooks/useDebounce";
 
 export const PromotionTypes: Record<number, string> = {
   1: "Theo phần trăm",
@@ -253,9 +254,7 @@ const formatCurrency = (value: number) => {
 // };
 
 export function Promotions() {
-  let fetchPromotionsParams: PromotionsQuery = {
-    sort: "+code"
-  }
+
 
   const { hasPermission } = useAuth();
   const canCreate = hasPermission('promotions:create');
@@ -263,6 +262,7 @@ export function Promotions() {
   const canDelete = hasPermission('promotions:delete');
 
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [ediDialogOpen, setEditDialogOpen] = useState(false);
@@ -388,11 +388,43 @@ export function Promotions() {
   // };
 
   const fetchPromotionData = async () => {
-    const res = await getPromotions(fetchPromotionsParams);
-    if (!res) return;
-    const { promotions } = res.data.metaData
-    if (promotions) {
-      setPromotions(promotions)
+    const params: PromotionsQuery = {
+      sort: sortOrder !== "none" && sortBy ? sortOrder + sortBy : "+code"
+    };
+
+    if (debouncedSearchQuery) {
+      params.search = debouncedSearchQuery;
+    }
+
+    if (selectedType !== "all") {
+      switch (selectedType) {
+        case "percentage": params.typeId = 1; break;
+        case "amount": params.typeId = 2; break;
+        case "fixed-price": params.typeId = 3; break;
+        case "fixed": params.typeId = 3; break; // Handle potential mismatch
+        case "free-item": params.typeId = 4; break;
+        case "item": params.typeId = 4; break;
+      }
+    }
+
+    if (selectedStatus !== "all") {
+      params.isActive = selectedStatus === "active";
+    }
+
+    try {
+      setIsLoading(true);
+      const res = await getPromotions(params);
+      if (res && res.data && res.data.metaData) {
+        const { promotions } = res.data.metaData;
+        if (promotions) {
+           setPromotions(promotions);
+        }
+      }
+    } catch (error) {
+      console.log("Error when fetching promotions: ", error);
+      toast.error("Không thể tải danh sách khuyến mại");
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -411,14 +443,13 @@ export function Promotions() {
     setCurrentApplicableDetail(applicableDetail)
   }
 
+  // Effect to fetch data when dependencies change
   useEffect(() => {
-    try {
-      fetchPromotionData()
-    }
-    catch (error) {
-      console.log("Error when fetching promotions: ", error);
-    }
-  }, []);
+    fetchPromotionData();
+  }, [debouncedSearchQuery, selectedType, selectedStatus, sortBy, sortOrder]);
+
+  // Initial fetch is covered by the above useEffect because dependencies are initialized
+
 
   const handleSort = (field: string) => {
     let tempSortBy = sortBy;
@@ -448,48 +479,13 @@ export function Promotions() {
       tempSortOrder = "+"
     }
 
-    if (tempSortBy && tempSortOrder) {
-      fetchPromotionsParams.sort = tempSortOrder + tempSortBy;
-    }
-    else {
-      fetchPromotionsParams.sort = "+code"
-    }
+    // Sorting is handled by useEffect dependency on sortBy/sortOrder
+    // setSortOrder/setSortBy updates state -> trigger useEffect -> fetchPromotionData
 
-    fetchPromotionData();
   };
 
-  const handleApplyFilter = () => {
-    if (selectedType != "all") {
-      switch (selectedType) {
-        case "percentage":
-          fetchPromotionsParams.typeId = 1;
-          break;
-        case "amount":
-          fetchPromotionsParams.typeId = 2;
-          break;
-        case "fixed-price":
-          fetchPromotionsParams.typeId = 3;
-          break;
-        case "free-item":
-          fetchPromotionsParams.typeId = 4;
-          break;
-      }
-    }
-    else fetchPromotionsParams.typeId = undefined
+  // Removed manual handleApplyFilter as it's now automatic
 
-    if (selectedStatus != "all") {
-      switch (selectedStatus) {
-        case "active":
-          fetchPromotionsParams.isActive = true;
-          break;
-        case "inactive":
-          fetchPromotionsParams.isActive = false;
-          break;
-      }
-    }
-    else fetchPromotionsParams.isActive = undefined
-    fetchPromotionData()
-  }
 
   const getSortIcon = (field: string) => {
     if (sortBy !== field || sortOrder === "none") {
@@ -604,11 +600,8 @@ export function Promotions() {
   //   });
   // }
 
-  const handleSearch = () => {
-    if (!searchQuery) fetchPromotionsParams.search = ""
-    else fetchPromotionsParams.search = searchQuery
-    fetchPromotionData()
-  }
+  // Removed manual handleSearch as it's now automatic via debounce
+
 
   const handleAddPromotion = async (formData: Omit<Promotion, "id" | "code">) => {
     // try {
@@ -989,13 +982,10 @@ export function Promotions() {
   //   return "-";
   // };
 
+
+
   const totalPromotions = promotions.length;
-  // const activePromotions = promotions.filter(
-  //   (p) => p.status === "active"
-  // ).length;
-  // const inactivePromotions = promotions.filter(
-  //   (p) => p.status === "inactive"
-  // ).length;
+  const activePromotions = promotions.filter(p => p.isActive).length;
 
   const [showFilters, setShowFilters] = useState(false);
 
@@ -1049,6 +1039,22 @@ export function Promotions() {
         </div>
       </div>
 
+      {/* Stats - Moved to top */}
+      <div className="space-y-2">
+        <Label className="text-xs text-slate-600">Thống kê</Label>
+        <div className="bg-white border border-slate-200 rounded-lg p-3 flex gap-8 w-fit items-center shadow-sm">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-600">Tổng số khuyến mại:</span>
+            <span className="font-medium text-slate-900">{totalPromotions}</span>
+          </div>
+          <div className="h-4 w-px bg-slate-200"></div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-600">Đang hoạt động:</span>
+            <span className="font-medium text-emerald-600">{activePromotions}</span>
+          </div>
+        </div>
+      </div>
+
       {/* Search and Filter Bar */}
       <Card>
         <CardContent className="pt-6">
@@ -1061,26 +1067,10 @@ export function Promotions() {
                   placeholder="Tìm kiếm theo tên, mã và số điện thoại"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      handleSearch();
-                    }
-                  }}
                   className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
-                <X
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 w-5 h-5"
-                  onClick={() => setSearchQuery("")}
-                />
               </div>
-              <Button
-                className="bg-blue-600 hover:bg-blue-700"
-                onClick={() => {
-                  handleSearch();
-                }}
-              >
-                <Search className="w-4 h-4" />
-              </Button>
+              {/* Removed manual search button */}
               <Button
                 variant="outline"
                 onClick={() => setShowFilters(!showFilters)}
@@ -1140,20 +1130,11 @@ export function Promotions() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="bg-blue-600 hover:bg-blue-700 text-white hover:text-white"
-                    onClick={() => {
-                      handleApplyFilter();
-                    }}
-                  >
-                    Áp dụng bộ lọc
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
                     onClick={() => {
                       setSelectedType("all");
                       setSelectedStatus("all");
                       setSearchQuery("");
+                      // filter reset will trigger useEffect
                     }}
                   >
                     <X className="w-4 h-4 mr-2" />
@@ -1277,6 +1258,7 @@ export function Promotions() {
                       <React.Fragment key={promo.id}>
                         <TableRow
                           className="cursor-pointer hover:bg-slate-50"
+                          onClick={() => toggleExpand(promo.code)}
                         >
                           <TableCell className="text-center">
                             <Button
@@ -1331,7 +1313,7 @@ export function Promotions() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleEdit(promo)}
+                                  onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleEdit(promo); }}
                                   className="hover:bg-blue-100"
                                 >
                                   <Pencil className="w-4 h-4" />
@@ -1341,7 +1323,7 @@ export function Promotions() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleDelete(promo.id)}
+                                  onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleDelete(promo.id); }}
                                   className="hover:bg-red-50"
                                 >
                                   <Trash2 className="w-4 h-4 text-red-600" />
@@ -1595,24 +1577,7 @@ export function Promotions() {
         </CardContent>
       </Card>
 
-      {/* Stats */}
-      <div className="space-y-2">
-        <Label className="text-xs text-slate-600">Thống kê</Label>
-        <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-1">
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-600">Tổng:</span>
-            <span className="font-medium text-slate-900">{totalPromotions}</span>
-          </div>
-          {/* <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Hoạt động:</span>
-                        <span className="font-medium text-emerald-600">{activePromotions}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Không hoạt động:</span>
-                        <span className="font-medium text-gray-600">{inactivePromotions}</span>
-                      </div> */}
-        </div>
-      </div>
+
 
       {/* Form Dialog */}
 
@@ -1631,7 +1596,7 @@ export function Promotions() {
       <PromotionAddFormDialog
         open={addDialogOpen}
         onClose={() => {
-          setEditDialogOpen(false);
+          setAddDialogOpen(false);
           // setEditingPromotion(editingPromotion);
         }}
         onSubmit={(addPromotion) => { handleSubmitAdd(addPromotion) }}
