@@ -20,7 +20,7 @@ import {
   TableRow,
 } from '../ui/table';
 import { toast } from 'sonner';
-import { Role } from '../../types/account';
+import { Role, Permission } from '../../types/account';
 import { initialRoles } from '../../data/roleData';
 import roleApi from '../../api/roleApi';
 import React from 'react';
@@ -40,7 +40,7 @@ export function Accounts() {
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [expandedRoleId, setExpandedRoleId] = useState<number | null>(null);
   const [editingPermissionsRoleId, setEditingPermissionsRoleId] = useState<number | null>(null);
-  const [tempPermissions, setTempPermissions] = useState<string[]>([]);
+  const [tempPermissions, setTempPermissions] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Fetch roles on mount
@@ -150,7 +150,7 @@ export function Accounts() {
   const saveEditPermissions = async (role: Role) => {
     try {
       await roleApi.update(role.id, {
-        permissions: tempPermissions as any // Cast if type mismatch on strict checks
+        permissions: tempPermissions
       });
       toast.success('Đã cập nhật quyền hạn');
       setEditingPermissionsRoleId(null);
@@ -194,9 +194,8 @@ export function Accounts() {
             </TableHeader>
             <TableBody>
               {roles.map((role) => (
-                <>
+                <React.Fragment key={role.id}>
                   <TableRow
-                    key={role.id}
                     className="cursor-pointer hover:bg-slate-50 transition-colors"
                     onClick={() => toggleExpand(role.id)}
                   >
@@ -243,7 +242,7 @@ export function Accounts() {
                             variant="ghost"
                             size="sm"
                             className="h-8 w-8 p-0 text-slate-500 hover:text-blue-600"
-                            onClick={(e) => handleEditRole(role, e)}
+                            onClick={(e: React.MouseEvent) => handleEditRole(role, e)}
                           >
                             <Pencil className="w-4 h-4" />
                           </Button>
@@ -256,7 +255,7 @@ export function Accounts() {
                               ? 'text-slate-300 cursor-not-allowed'
                               : 'text-slate-500 hover:text-red-600'
                               }`}
-                            onClick={(e) => !role.isSystem && handleDeleteRole(role, e)}
+                            onClick={(e: React.MouseEvent) => !role.isSystem && handleDeleteRole(role, e)}
                             disabled={role.isSystem}
                           >
                             {role.isSystem ? (
@@ -318,7 +317,7 @@ export function Accounts() {
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </React.Fragment>
               ))}
             </TableBody>
           </Table>
