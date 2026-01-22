@@ -1,10 +1,10 @@
 //src/components/pages/Reports.tsx
-import { EndOfDayReport } from '../reports/EndOfDayReport';
+import { EndOfDayStatistics } from '../reports/EndOfDayStatistics';
 import { CustomerReport } from '../reports/CustomerReport';
 import { SupplierReport } from '../reports/SupplierReport';
 import { EmployeesReportTable } from '../reports/EmployeesReportTable';
 import { FinanceReport } from '../reports/FinanceReport';
-import { SalesReport } from './SalesReport';
+import { SalesStatistics } from '../reports/SalesStatistics';
 import { ProductsReportTable } from '../reports/ProductsReportTable';
 import { Button } from '../ui/button';
 import { Download } from 'lucide-react';
@@ -18,13 +18,13 @@ export function Reports({ initialTab = 'endofday' }: ReportsProps = {}) {
   const renderReportContent = () => {
     switch (initialTab) {
       case 'endofday':
-        return <EndOfDayReport />;
+        return <EndOfDayStatistics />;
       case 'finance':
         return <FinanceReport />;
       case 'products':
         return <ProductsReportTable />;
       case 'sales':
-        return <SalesReport />;
+        return <SalesStatistics />;
       case 'customers':
         return <CustomerReport />;
       case 'suppliers':
@@ -32,7 +32,7 @@ export function Reports({ initialTab = 'endofday' }: ReportsProps = {}) {
       case 'employees':
         return <EmployeesReportTable />;
       default:
-        return <EndOfDayReport />;
+        return <EndOfDayStatistics />;
     }
   };
 

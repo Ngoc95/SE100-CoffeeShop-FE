@@ -8,7 +8,7 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { CustomerTimeFilter } from '../reports/CustomerTimeFilter';
-import { getSalesStatistics } from '../../api/salesStatistics';
+import { getSalesStatistics } from '../../api/statistics/salesStatistics';
 import { toast } from 'sonner';
 import { convertPresetToDateRange, TimePreset } from '../../utils/timePresets';
 import { MultiSelectFilter } from '../MultiSelectFilter';
@@ -18,7 +18,7 @@ import { getTables, Table } from '../../api/table';
 type ViewType = 'chart' | 'report';
 type ConcernType = 'time' | 'profit' | 'invoice_discount' | 'returns' | 'tables' | 'categories';
 
-export function SalesReport() {
+export function SalesStatistics() {
   // Filter states
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewType, setViewType] = useState<ViewType>('report');
@@ -586,7 +586,7 @@ export function SalesReport() {
                 <MultiSelectFilter
                   items={areas}
                   selectedIds={selectedAreas}
-                  onSelectionChange={setSelectedAreas}
+                  onSelectionChange={(ids) => setSelectedAreas(ids as number[])}
                   label="Khu vực"
                   placeholder="Tìm khu vực..."
                 />
@@ -597,7 +597,7 @@ export function SalesReport() {
                 <MultiSelectFilter
                   items={tables}
                   selectedIds={selectedTables}
-                  onSelectionChange={setSelectedTables}
+                  onSelectionChange={(ids) => setSelectedTables(ids as number[])}
                   label="Phòng bàn"
                   placeholder="Tìm bàn..."
                 />

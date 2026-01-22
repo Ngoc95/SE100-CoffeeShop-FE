@@ -17,15 +17,15 @@ import {
 } from './ui/command';
 
 export interface SelectableItem {
-    id: number;
+    id: number | string;
     name: string;
     code?: string;
 }
 
 interface MultiSelectFilterProps {
     items: SelectableItem[];
-    selectedIds: number[];
-    onSelectionChange: (selectedIds: number[]) => void;
+    selectedIds: Array<number | string>;
+    onSelectionChange: (selectedIds: Array<number | string>) => void;
     label?: string;
     placeholder?: string;
 }
@@ -39,7 +39,7 @@ export function MultiSelectFilter({
 }: MultiSelectFilterProps) {
     const [searchOpen, setSearchOpen] = useState(false);
 
-    const toggleItem = (itemId: number) => {
+    const toggleItem = (itemId: number | string) => {
         const newSelection = selectedIds.includes(itemId)
             ? selectedIds.filter(id => id !== itemId)
             : [...selectedIds, itemId];

@@ -1,4 +1,4 @@
-import axiosClient from './axiosClient';
+import axiosClient from '../axiosClient';
 
 export interface SalesStatisticsParams {
     concern: 'time' | 'profit' | 'invoice_discount' | 'returns' | 'tables' | 'categories';
