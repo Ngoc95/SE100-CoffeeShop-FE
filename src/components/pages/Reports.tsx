@@ -1,38 +1,50 @@
 //src/components/pages/Reports.tsx
-import { EndOfDayReport } from '../reports/EndOfDayReport';
+import { EndOfDayStatistics } from '../reports/EndOfDayStatistics';
 import { CustomerReport } from '../reports/CustomerReport';
 import { SupplierReport } from '../reports/SupplierReport';
-import { EmployeesReportTable } from '../reports/EmployeesReportTable';
-import { FinanceReport } from '../reports/FinanceReport';
-import { SalesReport } from './SalesReport';
-import { ProductsReportTable } from '../reports/ProductsReportTable';
+import { FinancialStatistics } from '../reports/FinancialStatistics';
+import { SalesStatistics } from '../reports/SalesStatistics';
+import { ProductStatistics } from '../reports/ProductStatistics';
+import { StaffStatistics } from '../reports/StaffStatistics';
 import { Button } from '../ui/button';
 import { Download } from 'lucide-react';
 
 interface ReportsProps {
-  initialTab?: 'endofday' | 'sales' | 'finance' | 'products' | 'employees' | 'customers' | 'suppliers';
+  initialTab?: 'endofday' | 'sales' | 'finance' | 'products' | 'staff' | 'customers' | 'suppliers';
 }
 
-export function Reports({ initialTab = 'endofday' }: ReportsProps = {}) {
+import { ReportProvider, useReport } from '../../context/ReportContext';
+
+export function Reports(props: ReportsProps) {
+  return (
+    <ReportProvider>
+      <ReportsContent {...props} />
+    </ReportProvider>
+  );
+}
+
+function ReportsContent({ initialTab = 'endofday' }: ReportsProps) {
+  const { triggerExport } = useReport();
+  
   // Render the appropriate report component (each manages its own state and filters)
   const renderReportContent = () => {
     switch (initialTab) {
       case 'endofday':
-        return <EndOfDayReport />;
+        return <EndOfDayStatistics />;
       case 'finance':
-        return <FinanceReport />;
+        return <FinancialStatistics />;
       case 'products':
-        return <ProductsReportTable />;
+        return <ProductStatistics />;
       case 'sales':
-        return <SalesReport />;
+        return <SalesStatistics />;
+      case 'staff':
+        return <StaffStatistics />;
       case 'customers':
         return <CustomerReport />;
       case 'suppliers':
         return <SupplierReport />;
-      case 'employees':
-        return <EmployeesReportTable />;
       default:
-        return <EndOfDayReport />;
+        return <EndOfDayStatistics />;
     }
   };
 
@@ -43,9 +55,9 @@ export function Reports({ initialTab = 'endofday' }: ReportsProps = {}) {
       'finance': 'Báo cáo tài chính',
       'products': 'Báo cáo hàng hóa',
       'sales': 'Báo cáo bán hàng',
+      'staff': 'Báo cáo nhân viên',
       'customers': 'Báo cáo khách hàng',
       'suppliers': 'Báo cáo nhà cung cấp',
-      'employees': 'Báo cáo nhân viên',
     };
     return titles[initialTab] || 'Báo cáo';
   };
@@ -56,9 +68,9 @@ export function Reports({ initialTab = 'endofday' }: ReportsProps = {}) {
       'finance': 'Phân tích tài chính và dòng tiền',
       'products': 'Thống kê hàng hóa và tồn kho',
       'sales': 'Phân tích doanh thu và bán hàng',
+      'staff': 'Báo cáo lợi nhuận và hàng bán theo nhân viên',
       'customers': 'Thống kê và phân tích khách hàng',
       'suppliers': 'Quản lý và đánh giá nhà cung cấp',
-      'employees': 'Hiệu suất và đánh giá nhân viên',
     };
     return descriptions[initialTab] || 'Phân tích và thống kê toàn diện hoạt động kinh doanh';
   };
@@ -73,7 +85,11 @@ export function Reports({ initialTab = 'endofday' }: ReportsProps = {}) {
             <p className="text-slate-600 mt-1">{getReportDescription()}</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+            <Button 
+                size="sm" 
+                className="bg-blue-600 hover:bg-blue-700 font-medium"
+                onClick={triggerExport}
+            >
               <Download className="w-4 h-4 mr-2" />
               Xuất báo cáo
             </Button>

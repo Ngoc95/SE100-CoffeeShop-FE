@@ -16,6 +16,8 @@ import {
   Eye,
   EyeOff,
   Calendar,
+  Download,
+  Upload
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
@@ -59,6 +61,9 @@ import {
 import { toast } from "sonner";
 import { SimpleSearchSelect } from "../SimpleSearchSelect";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { excelService } from "../../services/excelService";
+import { ImportExcelDialog } from "../ImportExcelDialog";
+
 import { StaffMember, staffMembers as initialStaffMembers } from "../../data/staffData";
 import { initialAccounts } from "../../data/accountData";
 import { initialRoles } from "../../data/roleData";
@@ -134,6 +139,19 @@ export function Staff({
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
   const [viewingStaff, setViewingStaff] = useState<StaffMember | null>(null);
   const [detailTab, setDetailTab] = useState("info");
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+
+  /* Export handler */
+  const handleExport = async () => {
+    try {
+        toast.info("Đang xuất file...");
+        await excelService.exportData('staff');
+        toast.success("Xuất file thành công", { description: "File đã được tải xuống" });
+    } catch (err) {
+        console.error(err);
+        toast.error("Xuất file thất bại");
+    }
+  };
 
   // State for coefficient input popover
   const [coeffPopover, setCoeffPopover] = useState<{
@@ -272,7 +290,7 @@ export function Staff({
           joinDate: s.hireDate ? new Date(s.hireDate).toISOString().split('T')[0] : '',
           position: s.position || '',
           positionLabel: positions.find(p => p.value === s.position)?.label || s.position || '',
-          status: s.status as "active" | "quit", // Cast to match UI type
+          status: s.status === 'active' ? 'active' : 'inactive',
           salary: Number(s.salarySetting?.baseRate) || 0,
           address: {
               city: s.city || '',
@@ -474,7 +492,7 @@ export function Staff({
             align="start"
             side="bottom"
             sideOffset={4}
-            onOpenAutoFocus={(e) => {
+            onOpenAutoFocus={(e: Event) => {
               e.preventDefault();
             }}
           >
@@ -619,8 +637,6 @@ export function Staff({
       city: "",
       ward: "",
       addressDetail: "",
-      gender: "Nam",
-      birthDate: "",
     });
     setSalarySettings({
       salaryType: "shift",
@@ -639,6 +655,8 @@ export function Staff({
     setAccountForm({ username: "", password: "" });
     setSelectedRoleId("");
   };
+
+
 
   const handleAddNew = () => {
     resetForm();
@@ -698,14 +716,6 @@ export function Staff({
             // Account
             username: accountForm.username || undefined,
             password: accountForm.password || undefined,
-            roleId: selectedRoleId ? Number(selectedRoleId) : undefined,
-            // Salary
-            salaryType: salarySettings.salaryType === 'fixed' ? 'monthly' : 'hourly',
-            baseRate: Number(parseVNCurrency(salarySettings.salaryAmount)),
-
-            // Account
-            username: accountForm.username || undefined,
-            password: accountForm.password || undefined,
             roleId: selectedRoleId ? Number(selectedRoleId) : undefined
         };
 
@@ -722,7 +732,6 @@ export function Staff({
         setAddDialogOpen(false);
         resetForm();
         
-        // Refresh list
         // Refresh list
         fetchStaffs(); 
 
@@ -928,17 +937,26 @@ export function Staff({
                 Quản lý thông tin và thiết lập nhân viên
               </p>
             </div>
-            {canCreate('staff') && (
-              <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button 
-                    className="bg-blue-600 hover:bg-blue-700"
-                    onClick={handleAddNew}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Thêm nhân viên
-                  </Button>
-                </DialogTrigger>
+            <div className="flex items-center gap-2">
+              <Button onClick={() => setImportDialogOpen(true)} variant="outline" className="bg-white">
+                <Upload className="w-4 h-4 mr-2" />
+                Nhập file
+              </Button>
+              <Button onClick={handleExport} variant="outline" className="bg-white">
+                <Download className="w-4 h-4 mr-2" />
+                Xuất file
+              </Button>
+              {canCreate('staff') && (
+                <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button 
+                      className="bg-blue-600 hover:bg-blue-700"
+                      onClick={handleAddNew}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Thêm nhân viên
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent
                   className="max-w-4xl max-h-[90vh] overflow-y-auto"
                   style={{ maxWidth: "60rem" }}
@@ -1020,7 +1038,7 @@ export function Staff({
                               </Label>
                               <Select
                                 value={formData.gender}
-                                onValueChange={(value) =>
+                                onValueChange={(value: string) =>
                                   setFormData({ ...formData, gender: value })
                                 }
                               >
@@ -1065,7 +1083,7 @@ export function Staff({
                               </Label>
                               <Select
                                 value={formData.position}
-                                onValueChange={(value) =>
+                                onValueChange={(value: string) =>
                                   setFormData({ ...formData, position: value })
                                 }
                               >
@@ -1114,7 +1132,7 @@ export function Staff({
                               <div className="mt-1.5">
                                 <SimpleSearchSelect
                                   value={formData.city}
-                                  onValueChange={(value) =>
+                                  onValueChange={(value: string) =>
                                     setFormData({
                                       ...formData,
                                       city: value,
@@ -1133,7 +1151,7 @@ export function Staff({
                               <div className="mt-1.5">
                                 <SimpleSearchSelect
                                   value={formData.ward}
-                                  onValueChange={(value) =>
+                                  onValueChange={(value: string) =>
                                     setFormData({ ...formData, ward: value })
                                   }
                                   options={
@@ -1305,7 +1323,8 @@ export function Staff({
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-            )}
+              )}
+            </div>
           </div>
           {/* Search and Filter */}
           {/* Search and Filter */}
@@ -1347,7 +1366,7 @@ export function Staff({
                         <Label className="text-xs text-slate-600">Vị trí</Label>
                         <Select
                           value={filterPosition}
-                          onValueChange={(value) => setFilterPosition(value)}
+                          onValueChange={(value: string) => setFilterPosition(value)}
                         >
                           <SelectTrigger className="bg-white border-slate-300 shadow-none">
                             <SelectValue placeholder="Chọn vị trí" />
@@ -1368,7 +1387,7 @@ export function Staff({
                         <Label className="text-xs text-slate-600">Trạng thái</Label>
                         <Select
                           value={filterStatus}
-                          onValueChange={(value) => setFilterStatus(value)}
+                          onValueChange={(value: string) => setFilterStatus(value)}
                         >
                           <SelectTrigger className="bg-white border-slate-300 shadow-none">
                             <SelectValue placeholder="Chọn trạng thái" />
@@ -1641,7 +1660,7 @@ export function Staff({
                       </Label>
                       <Select
                         value={formData.gender}
-                        onValueChange={(value) =>
+                        onValueChange={(value: string) =>
                           setFormData({ ...formData, gender: value })
                         }
                       >
@@ -1686,7 +1705,7 @@ export function Staff({
                       </Label>
                       <Select
                         value={formData.position}
-                        onValueChange={(value) =>
+                        onValueChange={(value: string) =>
                           setFormData({ ...formData, position: value })
                         }
                       >
@@ -1915,6 +1934,13 @@ export function Staff({
           </DialogFooter>
         </DialogContent >
       </Dialog >
-    </div >
+      <ImportExcelDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        module="staff"
+        title="Import Nhân viên"
+        onSuccess={fetchStaffs}
+      />
+    </div>
   );
 }

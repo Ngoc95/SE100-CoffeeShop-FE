@@ -2720,8 +2720,14 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
   }, 0);
 
   // Decide display totals: prefer backend values when available
-  const displaySubtotal = orderSubtotal > 0 ? orderSubtotal : localTotalAmount;
-  const displayTotalAmount = orderTotalAmount > 0 ? orderTotalAmount : localTotalAmount;
+  // Guard: if there are no (non-topping) items, show 0 regardless of backend subtotals
+  const hasCartItems = totalItems > 0;
+  const displaySubtotal = hasCartItems
+    ? (orderSubtotal > 0 ? orderSubtotal : localTotalAmount)
+    : 0;
+  const displayTotalAmount = hasCartItems
+    ? (orderTotalAmount > 0 ? orderTotalAmount : localTotalAmount)
+    : 0;
 
   const getTableStatusColor = (status: Table["status"]) => {
     switch (status) {
@@ -3731,10 +3737,20 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
                           }}
                     >
                       <CardContent className="p-2">
-                        <div className="text-3xl mb-1 text-center">
-                          {product.image}
+                        <div className="aspect-square w-full mb-2 bg-slate-100 rounded-md overflow-hidden relative">
+                          {product.image ? (
+                             <img 
+                                src={product.image} 
+                                alt={product.name}
+                                className="absolute inset-0 h-full w-full object-cover"
+                             />
+                          ) : (
+                             <div className="h-full w-full flex items-center justify-center">
+                                <span className="text-3xl">{product.image || "☕"}</span>
+                             </div>
+                          )}
                         </div>
-                        <h3 className="text-xs text-slate-900 mb-0.5 line-clamp-2">
+                        <h3 className="text-sm font-medium text-slate-900 mb-0.5 line-clamp-2 min-h-[2.5em]">
                           {product.name}
                         </h3>
                         <p

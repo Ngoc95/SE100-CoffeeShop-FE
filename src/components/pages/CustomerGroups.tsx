@@ -223,7 +223,7 @@ export function CustomerGroups() {
       toast.success("Cập nhật nhóm khách hàng thành công");
       await fetchCustomerGroupsData()
     }
-    catch (error) {
+    catch (error: any) {
       toast.error("Cập nhật nhóm khách hàng thất bại. Lỗi: " + error.response.data.message);
     }
 
@@ -247,7 +247,7 @@ export function CustomerGroups() {
       toast.success("Thêm nhóm khách hàng thành công");
       await fetchCustomerGroupsData()
     }
-    catch (error) {
+    catch (error: any) {
       toast.error("Thêm nhóm khách hàng thất bại. Lỗi: " + error.response.data.message);
     }
 
@@ -333,30 +333,7 @@ export function CustomerGroups() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            onClick={() => toast.info("Chức năng import đang phát triển")}
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            Nhập file
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => toast.info("Chức năng export đang phát triển")}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Xuất file
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              toast.info("Chức năng in đang phát triển");
-              window.print();
-            }}
-          >
-            <Printer className="w-4 h-4 mr-2" />
-            In danh sách
-          </Button>
+
           <Button
             className="bg-blue-600 hover:bg-blue-700"
             onClick={() => {

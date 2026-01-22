@@ -111,7 +111,14 @@ export function Finance() {
   type SortOrder = "asc" | "desc" | "none";
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("none");
+
   const [timePreset, setTimePreset] = useState("this-month");
+  
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
 
   const handleTimePresetChange = (value: string) => {
     setTimePreset(value);
@@ -353,7 +360,10 @@ export function Finance() {
   const fetchTransactions = async () => {
       setLoading(true);
       try {
-        const params: any = {};
+        const params: any = {
+            page,
+            limit
+        };
         
         // Generic search
         if (debouncedSearchTerm) params.search = debouncedSearchTerm;
@@ -421,12 +431,16 @@ export function Finance() {
         const tranRes = await getFinanceTransactions(params);
 
         // Process Stats
-        // Extract stats from transaction response
         if (tranRes?.data?.metaData?.stats) {
              setStats(tranRes.data.metaData.stats);
         }
+        
+        // Update Pagination Info
+        if (tranRes?.data?.metaData?.totalPages) {
+            setTotalPages(tranRes.data.metaData.totalPages);
+            setTotalItems(tranRes.data.metaData.total || 0);
+        }
 
-        // Process Transactions
         // Process Transactions
         console.log("Finance Response:", tranRes.data);
         
@@ -620,6 +634,42 @@ export function Finance() {
 
   useEffect(() => {
     fetchTransactions();
+  }, [
+    dateFrom, 
+    dateTo, 
+    debouncedSearchTerm, 
+    debouncedSearchCode, 
+    debouncedSearchNote,
+    debouncedPersonName,
+    debouncedPersonPhone,
+    selectedTypes, 
+    selectedMethods, 
+    sortField, 
+    sortOrder,
+    statusCompleted,
+    statusCancelled,
+    selectedCreators,
+    dateTo, 
+    debouncedSearchTerm, 
+    debouncedSearchCode, 
+    debouncedSearchNote,
+    debouncedPersonName,
+    debouncedPersonPhone,
+    selectedTypes, 
+    selectedMethods, 
+    sortField, 
+    sortOrder,
+    statusCompleted,
+    statusCancelled,
+    selectedCreators,
+    selectedCategories,
+    page, // Add page dependency
+    limit
+  ]);
+  
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
   }, [
     dateFrom, 
     dateTo, 
@@ -1439,12 +1489,35 @@ export function Finance() {
                 </Table>
               </div>
               
-              {/* Pagination */}
-              <div className="flex items-center justify-between p-4 border-t border-slate-200">
-                <div className="text-sm text-slate-600">
-                  Số bản ghi: <span>{filteredTransactions.length}</span>
+            {/* Pagination */}
+            <div className="flex items-center justify-between px-4 py-4 border-t border-slate-200 bg-slate-50 rounded-b-lg">
+                <div className="text-sm text-slate-500">
+                    Hiển thị {((page - 1) * limit) + 1} - {Math.min(page * limit, totalItems)} trong tổng số {totalItems} bản ghi
                 </div>
-              </div>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        className="h-8 w-8 p-0"
+                    >
+                        <ChevronDown className="h-4 w-4 rotate-90" />
+                    </Button>
+                    <span className="text-sm font-medium text-slate-700">
+                        Trang {page} / {totalPages}
+                    </span>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages}
+                        className="h-8 w-8 p-0"
+                    >
+                        <ChevronDown className="h-4 w-4 -rotate-90" />
+                    </Button>
+                </div>
+            </div>
             </CardContent>
           </Card>
 
