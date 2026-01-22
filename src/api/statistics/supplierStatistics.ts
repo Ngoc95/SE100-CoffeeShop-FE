@@ -57,3 +57,10 @@ export const getSupplierStatistics = async (params: {
     const response = await axiosClient.get(url, { params });
     return response.data;
 };
+
+export const exportSupplierReport = async (params: any) => {
+    const response = await axiosClient.post('/reports/export/suppliers', params, {
+        responseType: 'blob',
+    });
+    return response.data;
+};

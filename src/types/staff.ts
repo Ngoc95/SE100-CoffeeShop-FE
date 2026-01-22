@@ -30,7 +30,7 @@ export interface Staff {
   position?: string;
   department?: string;
   hireDate?: string;
-  status: 'active' | 'quit';
+  status: 'active' | 'quit' | 'inactive';
   userId?: number;
   avatarUrl?: string;
   createdAt: string;
@@ -75,7 +75,7 @@ export interface UpdateStaffDto {
   position?: string;
   department?: string;
   hireDate?: string;
-  status?: 'active' | 'quit';
+  status?: 'active' | 'quit' | 'inactive';
   
   // Account Updates
   username?: string;

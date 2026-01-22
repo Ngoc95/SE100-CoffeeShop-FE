@@ -13,6 +13,8 @@ import { AddCustomer, CustomerAddFormDialog, CustomerEditFormDialog, EditCustome
 import { createCustomer, deleteCustomer, getCustomers, updateCustomer } from "../../api/customer";
 import { getCustomerGroups } from "../../api/customerGroup";
 import { useDebounce } from "../../hooks/useDebounce";
+import { excelService } from "../../services/excelService";
+import { ImportExcelDialog } from "../ImportExcelDialog";
 
 interface Customer {
   id: number,
@@ -72,6 +74,7 @@ export function Customers() {
   const [sortOrder, setSortOrder] = useState<"+" | "-" | "none">("none");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<EditCustomer>({
     id: 0,
     code: '',
@@ -373,6 +376,16 @@ export function Customers() {
   const totalCustomers = customers.length;
   const activeCustomers = customers.filter((c) => c.isActive === true).length;
 
+  const handleExport = async () => {
+    try {
+        toast.info("Đang xuất file...");
+        await excelService.exportData('customer');
+        toast.success("Xuất file thành công", { description: "File đã được tải xuống" });
+    } catch (err) {
+        toast.error("Xuất file thất bại");
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -384,30 +397,17 @@ export function Customers() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            onClick={() => toast.info("Chức năng import đang phát triển")}
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            Nhập file
+          {canCreate && (
+             <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+                <Upload className="w-4 h-4 mr-2" />
+                Nhập file
+             </Button>
+          )}
+          <Button variant="outline" onClick={handleExport}>
+             <Download className="w-4 h-4 mr-2" />
+             Xuất file
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => toast.info("Chức năng export đang phát triển")}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Xuất file
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              toast.info("Chức năng in đang phát triển");
-              window.print();
-            }}
-          >
-            <Printer className="w-4 h-4 mr-2" />
-            In danh sách
-          </Button>
+
           {canCreate && (
             <Button
               className="bg-blue-600 hover:bg-blue-700"
@@ -482,7 +482,7 @@ export function Customers() {
             {/* Collapsible Filter Panel */}
             {showFilters && (
               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Gender Filter */}
                   <div className="space-y-2">
                     <Label className="text-xs text-slate-600">Giới tính</Label>
@@ -764,6 +764,13 @@ export function Customers() {
           resetForm();
         }}
         onSubmit={(customers: AddCustomer) => handleSubmitAdd(customers)}
+      />
+      <ImportExcelDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        module="customer"
+        title="Import Khách hàng"
+        onSuccess={fetchCustomersData}
       />
     </div >
   );

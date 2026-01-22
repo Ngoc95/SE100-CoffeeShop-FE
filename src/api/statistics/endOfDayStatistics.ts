@@ -123,3 +123,10 @@ export const getEndOfDayReport = async (params: EndOfDayReportParams) => {
 
     return response.data;
 };
+
+export const exportEndOfDayReport = async (params: EndOfDayReportParams) => {
+    const response = await axiosClient.post('/reports/export/end-of-day', params, {
+        responseType: 'blob'
+    });
+    return response.data;
+};

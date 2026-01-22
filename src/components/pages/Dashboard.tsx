@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   TrendingUp,
   ShoppingCart,
@@ -33,120 +33,179 @@ import {
   Label,
   LabelList
 } from 'recharts';
+import { reportApi, DashboardSummary } from '../../api/reports';
+import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
 
 type TimeRange = 'today' | 'yesterday' | '7days' | 'thisMonth' | 'lastMonth';
-type SalesChartView = 'byHour' | 'byDay' | 'byWeekday';
+type SalesChartView = 'byHour' | 'byDay' | 'byWeekday'; // Note: Backend currently only supports auto-grouping based on range. "byWeekday" might need custom handling or just map "day" to weekday names.
 type TopProductsFilter = 'revenue' | 'quantity';
 
 export function Dashboard() {
   const [salesTimeRange, setSalesTimeRange] = useState<TimeRange>('7days');
-  const [salesChartView, setSalesChartView] = useState<SalesChartView>('byHour');
+  const [salesChartView, setSalesChartView] = useState<SalesChartView>('byHour'); // This might be redundant if backend decides grouping
   const [customersTimeRange, setCustomersTimeRange] = useState<TimeRange>('7days');
   const [topProductsTimeRange, setTopProductsTimeRange] = useState<TimeRange>('7days');
   const [topProductsFilter, setTopProductsFilter] = useState<TopProductsFilter>('revenue');
 
-  // Mock data for today's results
-  const todayStats = {
-    revenue: { today: 15850000, yesterday: 12450000 },
-    orders: { today: 47, yesterday: 38 },
-    customers: { today: 42, yesterday: 35 },
-    avgOrderValue: { today: 337234, yesterday: 327631 }
-  };
+  // Dashboard Summary State
+  const [todayStats, setTodayStats] = useState<DashboardSummary>({
+    revenue: { today: 0, yesterday: 0 },
+    orders: { today: 0, yesterday: 0 },
+    customers: { today: 0, yesterday: 0 },
+    avgOrderValue: { today: 0, yesterday: 0 }
+  });
 
-  // Sales chart data
-  const getSalesChartData = () => {
-    if (salesChartView === 'byHour') {
-      return [
-        { name: '08:00', value: 1200000 },
-        { name: '09:00', value: 2150000 },
-        { name: '10:00', value: 950000 },
-        { name: '20:00', value: 800000 },
-        { name: '21:00', value: 4200000 },
-        { name: '22:00', value: 6300000 },
-        { name: '23:00', value: 1650000 }
-      ];
-    } else if (salesChartView === 'byDay') {
-      return [
-        { name: '21/11', value: 3200000 },
-        { name: '22/11', value: 4100000 },
-        { name: '23/11', value: 2800000 },
-        { name: '24/11', value: 5200000 },
-        { name: '25/11', value: 3900000 },
-        { name: '26/11', value: 4700000 },
-        { name: '27/11', value: 6100000 }
-      ];
-    } else {
-      return [
-        { name: 'T2', value: 3200000 },
-        { name: 'T3', value: 4100000 },
-        { name: 'T4', value: 2800000 },
-        { name: 'T5', value: 5200000 },
-        { name: 'T6', value: 3900000 },
-        { name: 'T7', value: 4700000 },
-        { name: 'CN', value: 6100000 }
-      ];
+  // Chart States
+  const [salesChartData, setSalesChartData] = useState<any[]>([]);
+  const [customersChartData, setCustomersChartData] = useState<any[]>([]);
+  const [topProductsData, setTopProductsData] = useState<any[]>([]);
+
+  // Helper to get dates from range
+  const getDateRange = (range: TimeRange) => {
+    const now = new Date();
+    let start = new Date();
+    let end = new Date(); // default now
+
+    switch (range) {
+      case 'today':
+        start = startOfDay(now);
+        end = endOfDay(now);
+        break;
+      case 'yesterday':
+        start = startOfDay(subDays(now, 1));
+        end = endOfDay(subDays(now, 1));
+        break;
+      case '7days':
+        start = startOfDay(subDays(now, 6)); // 7 days inclusive today
+        end = endOfDay(now);
+        break;
+      case 'thisMonth':
+        start = startOfMonth(now);
+        end = endOfDay(now);
+        break;
+      case 'lastMonth':
+        start = startOfMonth(subMonths(now, 1));
+        end = endOfMonth(subMonths(now, 1));
+        break;
     }
+    return { 
+        startDate: start.toISOString(), 
+        endDate: end.toISOString() 
+    };
   };
 
-  // Customer count data
-  const customersChartData = [
-    { name: '08:00', value: 8 },
-    { name: '10:00', value: 8 },
-    { name: '12:00', value: 0 },
-    { name: '13:00', value: 0 },
-    { name: '14:00', value: 0 },
-    { name: '15:00', value: 0 },
-    { name: '16:00', value: 0 },
-    { name: '18:00', value: 0 },
-    { name: '19:00', value: 0 },
-    { name: '20:00', value: 11 },
-    { name: '22:00', value: 6 }
-  ];
+  // Fetch Dashboard Summary
+  useEffect(() => {
+    const fetchSummary = async () => {
+      try {
+        const response = await reportApi.getDashboardSummary();
+        if (response && response.data && response.data.metaData) {
+            setTodayStats(response.data.metaData);
+        }
+      } catch (error) {
+        console.error("Failed to fetch dashboard summary", error);
+      }
+    };
+    fetchSummary();
+  }, []);
 
-  // Top 10 products data by revenue
-  const topProductsByRevenue = [
-    { name: 'Phomac dây Nga', value: 3310000 },
-    { name: 'Cà phê sữa đá', value: 3000000 },
-    { name: 'Sữa hạnh tây sữu Phạm', value: 2400000 },
-    { name: 'Sữa kem giá rỗ huống', value: 2100000 },
-    { name: 'Thít nghệ & phomac viên chiên', value: 1800000 },
-    { name: 'Cbiami my sứt sỉ dàm bống cỉ phạm', value: 1500000 },
-    { name: 'Sữa kem viỉu Parm', value: 1200000 },
-    { name: 'Thuốc lá Marlboro', value: 900000 },
-    { name: 'Thuốc lá Vinataba', value: 600000 },
-    { name: 'Ghi FIZZ', value: 200000 },
-    // Items beyond top 10 (will be grouped as "Khác")
-    { name: 'Trà sữa trân châu', value: 150000 },
-    { name: 'Sinh tố bơ', value: 120000 },
-    { name: 'Nước ép cam', value: 100000 },
-    { name: 'Bánh mì thịt', value: 80000 },
-    { name: 'Cơm gà xối mỡ', value: 50000 }
-  ];
+  // Fetch Sales Chart
+  useEffect(() => {
+    const fetchSalesChart = async () => {
+      try {
+        const { startDate, endDate } = getDateRange(salesTimeRange);
+        // Map salesChartView to backend "grouping" implicitly handled by date range in backend?
+        // Actually backend SalesStatisticsServive.determineTimeGrouping manages it.
+        // We can't force 'byWeekday' easily unless we send specific flag if backend supported it.
+        // For now, let's just send the date range.
+        const response = await reportApi.getSalesStatistics({
+            concern: 'time',
+            startDate,
+            endDate,
+            displayType: 'chart'
+        });
+        
+        if (response.data?.metaData?.data) {
+            setSalesChartData(response.data.metaData.data.map((item: any) => ({
+                name: item.label,
+                value: item.netRevenue
+            })));
+        }
+      } catch (error) {
+        console.error("Failed to fetch sales chart", error);
+      }
+    };
+    fetchSalesChart();
+  }, [salesTimeRange]); // Removed salesChartView from dependency as backend decides grouping
 
-  // Top 10 products data by quantity
-  const topProductsByQuantity = [
-    { name: 'Cà phê sữa đá', value: 450 },
-    { name: 'Phomac dây Nga', value: 380 },
-    { name: 'Sữa kem giá rỗ huống', value: 320 },
-    { name: 'Sữa hạnh tây sữu Phạm', value: 280 },
-    { name: 'Ghi FIZZ', value: 250 },
-    { name: 'Sữa kem viỉu Parm', value: 210 },
-    { name: 'Thít nghệ & phomac viên chiên', value: 180 },
-    { name: 'Cbiami my sứt sỉ dàm bống cỉ phạm', value: 150 },
-    { name: 'Thuốc lá Marlboro', value: 120 },
-    { name: 'Thuốc lá Vinataba', value: 90 },
-    // Items beyond top 10 (will be grouped as "Khác")
-    { name: 'Trà sữa trân châu', value: 75 },
-    { name: 'Sinh tố bơ', value: 60 },
-    { name: 'Nước ép cam', value: 45 },
-    { name: 'Bánh mì thịt', value: 30 },
-    { name: 'Cơm gà xối mỡ', value: 20 }
-  ];
+  // Fetch Customers Chart
+  useEffect(() => {
+    const fetchCustomersChart = async () => {
+        try {
+            const { startDate, endDate } = getDateRange(customersTimeRange);
+            // Re-use 'time' concern but extract 'customers' from result
+            // I updated backend to return 'customers' count in time statistics
+            const response = await reportApi.getSalesStatistics({
+                concern: 'time',
+                startDate,
+                endDate,
+                displayType: 'chart'
+            });
 
-  // Get current top products data based on filter
-  const topProductsData = topProductsFilter === 'revenue' ? topProductsByRevenue : topProductsByQuantity;
+            if (response.data?.metaData?.data) {
+                setCustomersChartData(response.data.metaData.data.map((item: any) => ({
+                    name: item.label,
+                    value: item.customers 
+                })));
+            }
+        } catch (error) {
+            console.error("Failed to fetch customers chart", error);
+        }
+    };
+    fetchCustomersChart();
+  }, [customersTimeRange]);
 
-  const totalSales = getSalesChartData().reduce((sum, item) => sum + item.value, 0);
+  // Fetch Top Products
+  useEffect(() => {
+    const fetchTopProducts = async () => {
+        try {
+            const { startDate, endDate } = getDateRange(topProductsTimeRange);
+            const response = await reportApi.getSalesStatistics({
+                concern: 'products',
+                startDate,
+                endDate
+            });
+
+            if (response.data?.metaData?.products) {
+                // Backend returns all products sorted by revenue
+                const products = response.data.metaData.products;
+                // Client side sort/limit depending on filter
+                let sorted = [...products];
+                if (topProductsFilter === 'quantity') {
+                    sorted.sort((a: any, b: any) => b.quantity - a.quantity);
+                } else {
+                    sorted.sort((a: any, b: any) => b.revenue - a.revenue);
+                }
+
+                // Take top 10 (+ others?)
+                // Dashboard logic handled grouping "Others" in render, so just set full data or sliced?
+                // The mock data logic sliced top 10 and grouped others. 
+                // Let's pass the raw sorted data to state, let render handle slicing.
+                
+                setTopProductsData(sorted.map((p: any) => ({
+                    name: p.name,
+                    value: topProductsFilter === 'revenue' ? p.revenue : p.quantity
+                })));
+            }
+        } catch (error) {
+            console.error("Failed to fetch top products", error);
+        }
+    };
+    fetchTopProducts();
+  }, [topProductsTimeRange, topProductsFilter]);
+
+
+  const totalSales = salesChartData.reduce((sum, item) => sum + item.value, 0);
 
   return (
     <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-50">
@@ -250,7 +309,7 @@ export function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-base text-slate-900">
-                DOANH SỐ 7 NGÀY QUA
+                DOANH SỐ
                 <span className="ml-2 text-blue-600">
                   ○ {totalSales.toLocaleString()}
                 </span>
@@ -270,49 +329,19 @@ export function Dashboard() {
             </Select>
           </div>
 
-          {/* Chart View Tabs */}
           <div className="flex gap-4 mt-4 border-b border-slate-200">
             <button
-              onClick={() => setSalesChartView('byHour')}
-              className={`pb-2 px-1 text-sm transition-colors relative ${salesChartView === 'byHour'
-                ? 'text-blue-600'
-                : 'text-slate-600 hover:text-slate-900'
-                }`}
+              onClick={() => {}} // Disabled for now as backend handles grouping automatically
+              className={`pb-2 px-1 text-sm transition-colors relative text-blue-600`}
             >
-              Theo giờ
-              {salesChartView === 'byHour' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
-              )}
-            </button>
-            <button
-              onClick={() => setSalesChartView('byDay')}
-              className={`pb-2 px-1 text-sm transition-colors relative ${salesChartView === 'byDay'
-                ? 'text-blue-600'
-                : 'text-slate-600 hover:text-slate-900'
-                }`}
-            >
-              Theo ngày
-              {salesChartView === 'byDay' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
-              )}
-            </button>
-            <button
-              onClick={() => setSalesChartView('byWeekday')}
-              className={`pb-2 px-1 text-sm transition-colors relative ${salesChartView === 'byWeekday'
-                ? 'text-blue-600'
-                : 'text-slate-600 hover:text-slate-900'
-                }`}
-            >
-              Theo thứ
-              {salesChartView === 'byWeekday' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
-              )}
+              Doanh thu
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
             </button>
           </div>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={getSalesChartData()}>
+            <LineChart data={salesChartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
               <XAxis
                 dataKey="name"
@@ -321,7 +350,7 @@ export function Dashboard() {
               />
               <YAxis
                 tick={{ fill: '#64748b', fontSize: 11 }}
-                tickFormatter={(value) => `${(value / 1000000).toFixed(0)} tr`}
+                tickFormatter={(value) => `${(value / 1000000).toFixed(1)} tr`}
                 axisLine={false}
                 tickLine={false}
               />
@@ -344,7 +373,7 @@ export function Dashboard() {
                 <LabelList
                   dataKey="value"
                   position="top"
-                  formatter={(value: number) => `${(value / 1000000).toFixed(1)}tr`}
+                  formatter={(value: number) => value > 0 ? `${(value / 1000000).toFixed(1)}tr` : ''}
                   style={{ fill: '#64748b', fontSize: 10 }}
                 />
               </Line>
@@ -358,8 +387,8 @@ export function Dashboard() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base text-slate-900">
-              SỐ LƯỢNG KHÁCH 7 NGÀY QUA
-              <span className="ml-2 text-blue-600">○ 33</span>
+              SỐ LƯỢNG KHÁCH
+              <span className="ml-2 text-blue-600">○ {customersChartData.reduce((acc, curr) => acc + (curr.value||0), 0)}</span>
             </CardTitle>
             <Select value={customersTimeRange} onValueChange={(value) => setCustomersTimeRange(value as TimeRange)}>
               <SelectTrigger className="w-32 h-8 text-xs bg-white border border-slate-300 shadow-none">
@@ -421,7 +450,7 @@ export function Dashboard() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base text-slate-900">
-              TOP 10 HÀNG HÓA BÁN CHẠY 7 NGÀY QUA
+              TOP 10 HÀNG HÓA 
             </CardTitle>
             <div className="flex gap-2">
               <Select value={topProductsFilter} onValueChange={(value) => setTopProductsFilter(value as TopProductsFilter)}>
@@ -450,82 +479,91 @@ export function Dashboard() {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={400}>
-            <PieChart>
-              <Pie
-                data={(() => {
-                  // Get top 10 items
-                  const top10 = topProductsData.slice(0, 10);
-                  // Calculate "Khác" (Others) - sum of items beyond top 10
-                  const othersValue = topProductsData.slice(10).reduce((sum, item) => sum + item.value, 0);
+            {topProductsData.length > 0 ? (
+              <PieChart>
+                <Pie
+                  data={(() => {
+                    // Get top 10 items
+                    const top10 = topProductsData.slice(0, 10);
+                    // Calculate "Khác" (Others) - sum of items beyond top 10
+                    const othersValue = topProductsData.slice(10).reduce((sum, item) => sum + item.value, 0);
 
-                  // If there are items beyond top 10, add "Khác"
-                  if (othersValue > 0) {
-                    return [...top10, { name: 'Khác', value: othersValue }];
-                  }
-                  return top10;
-                })()}
-                cx="50%"
-                cy="50%"
-                labelLine={true}
-                label={(entry) => {
-                  const percent = ((entry.value / topProductsData.reduce((sum, item) => sum + item.value, 0)) * 100).toFixed(1);
-                  return `${entry.name}: ${percent}%`;
-                }}
-                outerRadius={120}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {(() => {
-                  const COLORS = [
-                    '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981',
-                    '#06b6d4', '#6366f1', '#f97316', '#14b8a6', '#a855f7',
-                    '#94a3b8' // Gray color for "Khác"
-                  ];
-                  const top10 = topProductsData.slice(0, 10);
-                  const othersValue = topProductsData.slice(10).reduce((sum, item) => sum + item.value, 0);
-                  const dataLength = othersValue > 0 ? top10.length + 1 : top10.length;
-
-                  return Array.from({ length: dataLength }, (_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ));
-                })()}
-              </Pie>
-              <Tooltip
-                formatter={(value: number) => [
-                  topProductsFilter === 'revenue'
-                    ? `${value.toLocaleString()}₫`
-                    : `${value} sản phẩm`,
-                  topProductsFilter === 'revenue' ? 'Doanh thu' : 'Số lượng'
-                ]}
-                contentStyle={{
-                  backgroundColor: 'white',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  fontSize: '12px'
-                }}
-              />
-              <Legend
-                layout="vertical"
-                align="right"
-                verticalAlign="middle"
-                wrapperStyle={{
-                  fontSize: '12px',
-                  paddingRight: '150px'
-                }}
-                formatter={(value) => {
-                  const item = topProductsData.find(p => p.name === value) ||
-                    (value === 'Khác' ? { value: topProductsData.slice(10).reduce((sum, item) => sum + item.value, 0) } : null);
-                  if (item) {
-                    if (topProductsFilter === 'revenue') {
-                      return `${value} (${(item.value / 1000000).toFixed(1)}tr)`;
-                    } else {
-                      return `${value} (${item.value})`;
+                    // If there are items beyond top 10, add "Khác"
+                    if (othersValue > 0) {
+                      return [...top10, { name: 'Khác', value: othersValue }];
                     }
-                  }
-                  return value;
-                }}
-              />
-            </PieChart>
+                    return top10;
+                  })()}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={true}
+                  label={(entry) => {
+                    const total = topProductsData.reduce((sum, item) => sum + item.value, 0);
+                    const percent = total > 0 ? ((entry.value / total) * 100).toFixed(1) : 0;
+                    return `${entry.name}: ${percent}%`;
+                  }}
+                  outerRadius={120}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {(() => {
+                    const COLORS = [
+                      '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981',
+                      '#06b6d4', '#6366f1', '#f97316', '#14b8a6', '#a855f7',
+                      '#94a3b8' // Gray color for "Khác"
+                    ];
+                    const top10 = topProductsData.slice(0, 10);
+                    const othersValue = topProductsData.slice(10).reduce((sum, item) => sum + item.value, 0);
+                    const dataLength = othersValue > 0 ? top10.length + 1 : top10.length;
+
+                    return Array.from({ length: dataLength }, (_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ));
+                  })()}
+                </Pie>
+                <Tooltip
+                  formatter={(value: number) => [
+                    topProductsFilter === 'revenue'
+                      ? `${value.toLocaleString()}₫`
+                      : `${value} sản phẩm`,
+                    topProductsFilter === 'revenue' ? 'Doanh thu' : 'Số lượng'
+                  ]}
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    fontSize: '12px'
+                  }}
+                />
+                <Legend
+                  layout="vertical"
+                  align="right"
+                  verticalAlign="middle"
+                  wrapperStyle={{
+                    fontSize: '12px',
+                    paddingRight: '0px'
+                  }}
+                  formatter={(value) => {
+                    // Try to find in top 10 first
+                    const item = topProductsData.slice(0, 10).find(p => p.name === value) ||
+                      (value === 'Khác' ? { value: topProductsData.slice(10).reduce((sum, item) => sum + item.value, 0) } : null);
+                    
+                    if (item) {
+                       if (topProductsFilter === 'revenue') {
+                        return `${value} (${(item.value / 1000000).toFixed(1)}tr)`;
+                      } else {
+                        return `${value} (${item.value})`;
+                      }
+                    }
+                    return value;
+                  }}
+                />
+              </PieChart>
+            ) : (
+                <div className="flex h-full items-center justify-center text-slate-500">
+                    Chưa có dữ liệu
+                </div>
+            )}
           </ResponsiveContainer>
         </CardContent>
       </Card>

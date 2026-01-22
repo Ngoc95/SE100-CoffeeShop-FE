@@ -91,3 +91,12 @@ export const getFinancialReport = async (
     const response = await axiosClient.post('/reports/financial', request)
     return response.data.metaData
 }
+
+export const exportFinancialReport = async (
+    request: FinancialReportRequest
+) => {
+    const response = await axiosClient.post('/reports/export/financial', request, {
+        responseType: 'blob'
+    })
+    return response.data
+}

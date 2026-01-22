@@ -1010,30 +1010,7 @@ export function Promotions() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            onClick={() => toast.info("Chức năng import đang phát triển")}
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            Nhập file
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => toast.info("Chức năng export đang phát triển")}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Xuất file
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              toast.info("Chức năng in đang phát triển");
-              window.print();
-            }}
-          >
-            <Printer className="w-4 h-4 mr-2" />
-            In danh sách
-          </Button>
+
           {canCreate && (
             <Button
               className="bg-blue-600 hover:bg-blue-700"

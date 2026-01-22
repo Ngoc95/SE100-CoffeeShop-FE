@@ -11,7 +11,7 @@ export interface StaffMember {
   positionLabel: string;
   joinDate: string;
   salary: number;
-  status: "active" | "inactive";
+  status: "active" | "inactive" | "quit";
   address: {
     city: string;
     ward: string;

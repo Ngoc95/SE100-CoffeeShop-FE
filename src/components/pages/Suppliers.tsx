@@ -15,6 +15,8 @@ import { EditSupplier, SupplierEditFormDialog } from "../SupplierFormDialog";
 import { cities } from "./Customers";
 import { deleteSupplier, getSuppliers, updateSupplier, getSupplierCategories, createSupplier } from "../../api/supplier";
 import { useDebounce } from "../../hooks/useDebounce";
+import { excelService } from "../../services/excelService";
+import { ImportExcelDialog } from "../ImportExcelDialog";
 
 interface Supplier {
   id: 1,
@@ -62,6 +64,7 @@ export function Suppliers() {
   const [sortOrder, setSortOrder] = useState<"+" | "-" | "none">("none");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<EditSupplier>({
     id: 0,
     code: "",
@@ -265,6 +268,16 @@ export function Suppliers() {
     }).format(amount);
   };
 
+  const handleExport = async () => {
+    try {
+        toast.info("Đang xuất file...");
+        await excelService.exportData('supplier');
+        toast.success("Xuất file thành công", { description: "File đã được tải xuống" });
+    } catch (err) {
+        toast.error("Xuất file thất bại");
+    }
+  };
+
   const totalSuppliers = suppliers.length;
   // const activeSuppliers = suppliers.filter((s) => s.isA === "active").length;
 
@@ -285,33 +298,16 @@ export function Suppliers() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            onClick={() =>
-              toast.success("Chức năng import đang phát triển")
-            }
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            Nhập file
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() =>
-              toast.success("Chức năng export đang phát triển")
-            }
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Xuất file
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              toast.success("Chức năng in đang phát triển");
-              window.print();
-            }}
-          >
-            <Printer className="w-4 h-4 mr-2" />
-            In danh sách
+
+          {canCreate && (
+             <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+                <Upload className="w-4 h-4 mr-2" />
+                Nhập file
+             </Button>
+          )}
+          <Button variant="outline" onClick={handleExport}>
+             <Download className="w-4 h-4 mr-2" />
+             Xuất file
           </Button>
           {canCreate && (
             <Button
@@ -779,6 +775,13 @@ export function Suppliers() {
           status: 'active'
         }}
         title="Thêm nhà cung cấp"
+      />
+      <ImportExcelDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        module="supplier"
+        title="Import Nhà cung cấp"
+        onSuccess={fetchSuppliersData}
       />
     </div>
   );

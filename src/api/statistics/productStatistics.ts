@@ -105,3 +105,12 @@ export const getProductStatistics = async (
     const response = await axiosClient.post('/reports/products', request)
     return response.data.metaData
 }
+
+export const exportProductReport = async (
+    request: ProductStatisticsRequest
+) => {
+    const response = await axiosClient.post('/reports/export/products', request, {
+        responseType: 'blob'
+    })
+    return response.data
+}

@@ -13,7 +13,19 @@ interface ReportsProps {
   initialTab?: 'endofday' | 'sales' | 'finance' | 'products' | 'staff' | 'customers' | 'suppliers';
 }
 
-export function Reports({ initialTab = 'endofday' }: ReportsProps = {}) {
+import { ReportProvider, useReport } from '../../context/ReportContext';
+
+export function Reports(props: ReportsProps) {
+  return (
+    <ReportProvider>
+      <ReportsContent {...props} />
+    </ReportProvider>
+  );
+}
+
+function ReportsContent({ initialTab = 'endofday' }: ReportsProps) {
+  const { triggerExport } = useReport();
+  
   // Render the appropriate report component (each manages its own state and filters)
   const renderReportContent = () => {
     switch (initialTab) {
@@ -73,7 +85,11 @@ export function Reports({ initialTab = 'endofday' }: ReportsProps = {}) {
             <p className="text-slate-600 mt-1">{getReportDescription()}</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+            <Button 
+                size="sm" 
+                className="bg-blue-600 hover:bg-blue-700 font-medium"
+                onClick={triggerExport}
+            >
               <Download className="w-4 h-4 mr-2" />
               Xuất báo cáo
             </Button>

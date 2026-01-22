@@ -18,6 +18,7 @@ import {
   ArrowDown,
   Download,
   Filter,
+  Loader2,
 } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";
@@ -79,10 +80,12 @@ import { vi } from "date-fns/locale";
 import { toast } from "sonner";
 import { useAuth } from "../../contexts/AuthContext";
 import { categories } from "../../data/categories";
+import { inventoryService } from "../../services/inventoryService";
 import { Card, CardContent } from "../ui/card";
 import { CustomerTimeFilter } from "../reports/CustomerTimeFilter";
 
 interface BatchInfo {
+  id?: number;
   batchCode: string;
   quantity: number;
   unitCost: number;
@@ -96,12 +99,14 @@ interface InventoryItem {
   name: string;
   type: "ingredient" | "ready-made" | "composite";
   category: string;
+  categoryId?: string | number;
   currentStock: number;
   unit: string;
   batches?: BatchInfo[];
 }
 
 interface WriteOffDetail {
+  itemId?: number;
   name: string;
   batchCode: string;
   quantity: number;
@@ -112,14 +117,17 @@ interface WriteOffDetail {
 }
 
 interface WriteOffItemForm {
+  itemId?: number;
   productId: string;
   productName: string;
   batchCode: string;
+  batchId?: number;
   unit: string;
   quantity: number;
   unitPrice: number;
   total: number;
   reason: string;
+  maxQuantity?: number;
 }
 
 interface WriteOff {
@@ -139,6 +147,10 @@ interface WriteOff {
 
 export function WriteOffs() {
   const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [availableItems, setAvailableItems] = useState<any[]>([]);
+  const [categoriesList, setCategoriesList] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
   // Date range filter states (similar to Finance.tsx)
@@ -185,10 +197,10 @@ export function WriteOffs() {
         const lastYear = subYears(now, 1);
         from = startOfYear(lastYear); to = endOfYear(lastYear); break;
     }
-    
+
     if (value !== 'custom') {
-        setDateFrom(from);
-        setDateTo(to);
+      setDateFrom(from);
+      setDateTo(to);
     }
   };
 
@@ -215,7 +227,7 @@ export function WriteOffs() {
   const [selectedCategoryFilter, setSelectedCategoryFilter] =
     useState<string>("all");
   const [selectedBatches, setSelectedBatches] = useState<
-    Array<{ productId: string; batchCode: string; unitPrice: number }>
+    Array<{ productId: string; batchCode: string; unitPrice: number; entryDate?: string; batchId?: number }>
   >([]);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -523,9 +535,7 @@ export function WriteOffs() {
     ];
   };
 
-  const [inventoryItems] = useState<InventoryItem[]>(() =>
-    loadInventoryItems()
-  );
+  const [inventoryItems] = useState<InventoryItem[]>([]);
 
   // Load write-offs - using mock data only
   const loadWriteOffs = (): WriteOff[] => {
@@ -720,17 +730,95 @@ export function WriteOffs() {
     ];
   };
 
-  const [writeOffs, setWriteOffs] = useState<WriteOff[]>(() => loadWriteOffs());
+  const [writeOffs, setWriteOffs] = useState<WriteOff[]>([]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const response = await inventoryService.getWriteOffs(1, 100);
+      const writeOffsData = response.metaData?.writeOffs || [];
+
+      const formattedWriteOffs: WriteOff[] = writeOffsData.map((wo: any) => ({
+        id: wo.id,
+        code: wo.code,
+        date: format(new Date(wo.createdAt), "yyyy-MM-dd HH:mm"),
+        items: wo.items?.length || 0,
+        totalValue: wo.totalValue || 0,
+        reason: wo.reason || "het-han",
+        status: wo.status || "draft",
+        staff: wo.staff?.fullName || "N/A",
+        note: wo.note || "",
+        details: {
+          items: (wo.items || []).map((it: any) => ({
+            itemId: it.itemId,
+            name: it.itemName || "N/A",
+            batchCode: it.batchCode || "",
+            quantity: it.quantity || 0,
+            unit: it.unit || "",
+            unitPrice: it.unitPrice || 0,
+            total: it.totalPrice || 0,
+            reason: it.reason || ""
+          }))
+        }
+      }));
+
+      setWriteOffs(formattedWriteOffs);
+
+      // Fetch items for selection
+      const itemsRes = await inventoryService.getItems(1, 1000);
+      const itemsArray = itemsRes?.metaData?.items || [];
+
+      // Map API response to InventoryItem type
+      const mappedItems: InventoryItem[] = itemsArray.map((item: any) => {
+        let type: "ingredient" | "ready-made" | "composite" = "ingredient";
+        if (item.itemType?.name) {
+          const t = item.itemType.name.toLowerCase();
+          if (t === "ready-made" || t === "ready_made") type = "ready-made";
+          else if (t === "composite") type = "composite";
+          else if (t === "ingredient") type = "ingredient";
+        }
+
+        return {
+          id: String(item.id),
+          name: item.name || "",
+          type,
+          category: item.category?.name || "",
+          categoryId: item.category?.id,
+          currentStock: Number(item.currentStock) || 0,
+          unit: item.unit?.name || "",
+          batches: item.inventoryBatches
+            ? item.inventoryBatches.map((b: any) => ({
+              id: b.id,
+              batchCode: b.batchCode || "",
+              quantity: Number(b.remainingQty ?? b.quantity) || 0,
+              unitCost: Number(b.unitCost) || 0,
+              entryDate: b.entryDate || "",
+              expiryDate: b.expiryDate || "",
+              supplier: b.supplier?.name || (typeof b.supplier === 'string' ? b.supplier : ""),
+            }))
+            : [],
+        };
+      });
+
+      setAvailableItems(mappedItems);
+
+      // Fetch categories
+      const categoriesRes = await inventoryService.getCategories();
+      setCategoriesList(categoriesRes.metaData || []);
+    } catch (error) {
+      console.error("Error fetching write-offs:", error);
+      toast.error("Không thể tải danh sách phiếu xuất hủy");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Save to localStorage whenever writeOffs change
-  useEffect(() => {
-    try {
-      localStorage.setItem("writeOffs", JSON.stringify(writeOffs));
-    } catch (error) {
-      console.error("Error saving write-offs to localStorage:", error);
-    }
-  }, [writeOffs]);
+
 
   // Generate next write-off code
   const generateNextWriteOffCode = (): string => {
@@ -800,8 +888,9 @@ export function WriteOffs() {
   };
 
   // Get available items for write-off (ingredients and ready-made only)
-  const availableItemsForWriteOff = inventoryItems.filter(
-    (item) => item.type === "ingredient" || item.type === "ready-made"
+  // Only show items that are currently in stock
+  const availableItemsForWriteOff = availableItems.filter(
+    (item) => (item.type === "ingredient" || item.type === "ready-made") && item.currentStock > 0
   );
 
   // Get filtered items based on search and category
@@ -812,7 +901,7 @@ export function WriteOffs() {
         item.id.toLowerCase().includes(itemSearchQuery.toLowerCase());
       const matchesCategory =
         selectedCategoryFilter === "all" ||
-        selectedCategoryFilter === item.category;
+        String(selectedCategoryFilter) === String(item.categoryId);
       return matchesSearch && matchesCategory;
     });
   };
@@ -820,32 +909,49 @@ export function WriteOffs() {
   const filteredAvailableItems = getFilteredAvailableItems();
 
   // Batch selection helpers
-  const isBatchSelected = (productId: string, batchCode: string): boolean => {
+  const isBatchSelected = (productId: string, batchCode: string, entryDate?: string, batchId?: number): boolean => {
+    if (batchId) {
+      return selectedBatches.some((b) => b.batchId === batchId);
+    }
     return selectedBatches.some(
-      (b) => b.productId === productId && b.batchCode === batchCode
+      (b) => b.productId === productId && b.batchCode === batchCode && b.entryDate === entryDate
     );
   };
 
   const toggleBatchSelection = (
     productId: string,
     batchCode: string,
-    unitPrice: number
+    unitPrice: number,
+    entryDate?: string,
+    batchId?: number
   ) => {
     setSelectedBatches((prev) => {
-      const exists = prev.some(
-        (b) => b.productId === productId && b.batchCode === batchCode
-      );
+      // Check if exists
+      let exists = false;
+      if (batchId) {
+        exists = prev.some((b) => b.batchId === batchId);
+      } else {
+        exists = prev.some(
+          (b) => b.productId === productId && b.batchCode === batchCode && b.entryDate === entryDate
+        );
+      }
+
       if (exists) {
+        if (batchId) {
+          return prev.filter((b) => b.batchId !== batchId);
+        }
         return prev.filter(
-          (b) => !(b.productId === productId && b.batchCode === batchCode)
+          (b) => !(b.productId === productId && b.batchCode === batchCode && b.entryDate === entryDate)
         );
       } else {
-        return [...prev, { productId, batchCode, unitPrice }];
+        return [...prev, { productId, batchCode, unitPrice, entryDate, batchId }];
       }
     });
   };
 
-  const toggleItemExpand = (itemId: string) => {
+  const toggleItemExpand = async (itemId: string) => {
+    const isExpanding = !expandedItems.has(itemId);
+
     setExpandedItems((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(itemId)) {
@@ -855,6 +961,35 @@ export function WriteOffs() {
       }
       return newSet;
     });
+
+    if (isExpanding) {
+      try {
+        const res = await inventoryService.getItemById(itemId) as any;
+        const meta = res.metaData || res;
+
+        setAvailableItems(prev => prev.map(item => {
+          if (item.id === itemId) {
+            return {
+              ...item,
+              batches: (meta.inventoryBatches && Array.isArray(meta.inventoryBatches))
+                ? meta.inventoryBatches.map((b: any) => ({
+                  id: b.id,
+                  batchCode: b.batchCode || "",
+                  quantity: Number(b.remainingQty ?? b.quantity) || 0,
+                  unitCost: Number(b.unitCost) || 0,
+                  entryDate: b.entryDate || "",
+                  expiryDate: b.expiryDate || "",
+                  supplier: b.supplier?.name || (typeof b.supplier === 'string' ? b.supplier : ""),
+                }))
+                : []
+            };
+          }
+          return item;
+        }));
+      } catch (error) {
+        console.error("Error fetching item details on expand:", error);
+      }
+    }
   };
 
   const toggleStatus = (status: string) => {
@@ -975,6 +1110,7 @@ export function WriteOffs() {
     (w) => w.status === "cancelled"
   ).length;
 
+  // When opening the create dialog, preselect batches already in writeOffItems
   const handleOpenCreateDialog = () => {
     const nextCode = generateNextWriteOffCode();
     const writeOffDate = formatDateTime(new Date());
@@ -989,9 +1125,31 @@ export function WriteOffs() {
     });
     setWriteOffItems([]);
     setShowCreateDialog(true);
+    // Pre-tick batches in add item dialog if dialog is opened after create
+    setSelectedBatches([]);
   };
 
-  const handleEditWriteOff = (wo: WriteOff) => {
+  const getReasonCode = (reasonText: string): string => {
+    const textToCode: { [key: string]: string } = {
+      "Hết hạn sử dụng": "het-han",
+      "Hư hỏng": "hu-hong",
+      "Mất mát": "mat-mat",
+      "Lý do khác": "khac"
+    };
+    // Reverse lookup or direct match
+    if (textToCode[reasonText]) return textToCode[reasonText];
+
+    // Also try case-insensitive match
+    const lower = reasonText.toLowerCase();
+    for (const [key, val] of Object.entries(textToCode)) {
+      if (key.toLowerCase() === lower) return val;
+    }
+
+    // Return as is if it might already be a code (e.g. 'het-han')
+    return reasonText;
+  };
+
+  const handleEditWriteOff = async (wo: WriteOff) => {
     if (wo.status !== "draft") {
       toast.error("Chỉ có thể chỉnh sửa phiếu tạm");
       return;
@@ -999,17 +1157,98 @@ export function WriteOffs() {
     setEditingWriteOffId(wo.id);
 
     // Load write-off items into form
+    // Load write-off items into form
+    // Identify items that we need to ensure we have details for.
+    // The list 'availableItems' might not have batch details if they came from the bulk list API.
+    // We fetch details for all items in the write-off to hold fresh batch info.
+    const itemIds = Array.from(new Set(wo.details?.items.map(i => i.itemId))).filter(id => id !== undefined) as number[];
+
+    // We update availableItems with fresh data. 
+    // We create a temporary map to hold the new items to avoid multiple state updates or race conditions.
+    const freshItemsMap = new Map<string, any>();
+
+    // Pre-fill with existing available items to keep what we have
+    availableItems.forEach(i => freshItemsMap.set(String(i.id), i));
+
+    setIsSaving(true); // Show loading state roughly
+    try {
+      await Promise.all(itemIds.map(async (id) => {
+        try {
+          const res = await inventoryService.getItemById(id) as any;
+          const meta = res.metaData || res;
+          // Map this item to InventoryItem format
+          const mapped: any = {
+            id: String(meta.id),
+            name: meta.name || "",
+            type: "ingredient", // Simplified default or check type
+            category: meta.category?.name || "",
+            categoryId: meta.category?.id,
+            currentStock: Number(meta.currentStock) || 0,
+            unit: meta.unit?.name || "",
+            batches: (meta.inventoryBatches && Array.isArray(meta.inventoryBatches))
+              ? meta.inventoryBatches.map((b: any) => ({
+                id: b.id,
+                batchCode: b.batchCode || "",
+                quantity: Number(b.remainingQty ?? b.quantity) || 0,
+                unitCost: Number(b.unitCost) || 0,
+                entryDate: b.entryDate || "",
+                expiryDate: b.expiryDate || "",
+                supplier: b.supplier?.name || (typeof b.supplier === 'string' ? b.supplier : ""),
+              }))
+              : []
+          };
+
+          // Correct type logic if needed
+          if (meta.itemType?.name) {
+            const t = meta.itemType.name.toLowerCase();
+            if (t === "ready-made" || t === "ready_made") mapped.type = "ready-made";
+            else if (t === "composite") mapped.type = "composite";
+            else if (t === "ingredient") mapped.type = "ingredient";
+          }
+
+          freshItemsMap.set(String(meta.id), mapped);
+        } catch (e) {
+          console.error(`Failed to fetch details for item ${id}`, e);
+        }
+      }));
+    } catch (err) {
+      console.error("Error fetching items for edit", err);
+    } finally {
+      setIsSaving(false);
+    }
+
+    const updatedAvailableItems = Array.from(freshItemsMap.values());
+    setAvailableItems(updatedAvailableItems);
+
     const items: WriteOffItemForm[] =
-      wo.details?.items.map((item) => ({
-        productId: "", // We don't store productId in details, but that's okay
-        productName: item.name,
-        batchCode: item.batchCode,
-        unit: item.unit,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        total: item.total,
-        reason: item.reason || "",
-      })) || [];
+      wo.details?.items.map((item) => {
+        // Attempt to find the full inventory item to get productId and batch details
+        const inventoryItem = freshItemsMap.get(String(item.itemId));
+        let maxQuantity = 0;
+        let batchId: number | undefined;
+
+        if (inventoryItem && inventoryItem.batches) {
+          const batch = inventoryItem.batches.find((b: any) => b.batchCode === item.batchCode);
+          if (batch) {
+            maxQuantity = batch.quantity;
+            batchId = batch.id;
+          }
+        }
+
+        return {
+          itemId: item.itemId,
+          productId: inventoryItem ? inventoryItem.id : "",
+          productName: item.name,
+          batchCode: item.batchCode,
+          batchId: batchId,
+          unit: item.unit,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.total,
+          reason: item.reason || "",
+          maxQuantity: maxQuantity
+        };
+      }) || [];
 
     setWriteOffItems(items);
 
@@ -1019,139 +1258,113 @@ export function WriteOffs() {
     setFormData({
       code: wo.code,
       date: datePart,
-      reason: wo.reason,
+      reason: getReasonCode(wo.reason),
       note: wo.note || "",
       staff: wo.staff || user?.fullName || "",
     });
     setShowCreateDialog(true);
   };
 
-  const handleCreateWriteOff = (status: "draft" | "completed") => {
+  const handleCreateWriteOff = async (status: "draft" | "completed") => {
     if (writeOffItems.length === 0) {
       toast.error("Vui lòng thêm ít nhất một hàng hóa");
       return;
     }
 
-    const totalAmount = writeOffItems.reduce(
-      (sum, item) => sum + item.total,
-      0
-    );
-
-    const staffName = formData.staff || user?.fullName || "";
-
-    const writeOffDate = formatDateTime(
-      formData.date
-        ? new Date(formData.date + " " + new Date().toTimeString().slice(0, 5))
-        : new Date()
-    );
-
-    if (editingWriteOffId !== null) {
-      // Update existing write-off
-      setWriteOffs((prev) =>
-        prev.map((wo) =>
-          wo.id === editingWriteOffId
-            ? {
-              ...wo,
-              code: formData.code,
-              date: writeOffDate,
-              items: writeOffItems.length,
-              totalValue: totalAmount,
-              reason: formData.reason,
-              status: status,
-              note: formData.note,
-              staff: staffName,
-              details: {
-                items: writeOffItems.map((item) => ({
-                  name: item.productName,
-                  batchCode: item.batchCode,
-                  quantity: item.quantity,
-                  unit: item.unit,
-                  unitPrice: item.unitPrice,
-                  total: item.total,
-                  reason: item.reason,
-                })),
-              },
-            }
-            : wo
-        )
-      );
-      toast.success(
-        status === "completed"
-          ? "Đã cập nhật và hoàn thành phiếu xuất hủy"
-          : "Đã cập nhật phiếu xuất hủy"
-      );
-    } else {
-      // Create new write-off
-      const newWriteOff: WriteOff = {
-        id:
-          writeOffs.length > 0
-            ? Math.max(...writeOffs.map((w) => w.id)) + 1
-            : 1,
-        code: formData.code,
-        date: writeOffDate,
-        items: writeOffItems.length,
-        totalValue: totalAmount,
-        reason: formData.reason,
-        status: status,
-        note: formData.note,
-        staff: staffName,
-        details: {
-          items: writeOffItems.map((item) => ({
-            name: item.productName,
-            batchCode: item.batchCode,
-            quantity: item.quantity,
-            unit: item.unit,
-            unitPrice: item.unitPrice,
-            total: item.total,
-            reason: item.reason,
-          })),
-        },
+    setIsSaving(true);
+    try {
+      // Construct payload according to requirements:
+      // {
+      //   "writeOffDate": "2026-01-10",
+      //   "reason": "Hết hạn sử dụng",
+      //   "notes": "Huỷ lô hàng hết hạn",
+      //   "items": [ ... ]
+      // }
+      const payload = {
+        writeOffDate: formData.date,
+        reason: getReasonText(formData.reason), // Ensure we send the text description if that's what is wanted, though usually codes are better. 
+        // Given the user example shows "Hết hạn sử dụng", we send the text. 
+        // If the backend actually wants the code, we might need to change this back.
+        // But "reason" field in my state is mapped to text in table, so let's try sending text or fallback to code.
+        // Actually, let's keep it safe: if the input is a known code, convert to text. If not (edit mode?), keep as is.
+        // Actually, standard is usually code. But user said "send payload: reason: 'Hết hạn sử dụng'". I will obey.
+        notes: formData.note,
+        status: "draft", // We always save as draft first (or create/update)
+        items: writeOffItems.map(item => ({
+          itemId: item.itemId || parseInt(item.productId),
+          batchId: item.batchId,
+          batchCode: item.batchCode, // Maintain backward compat if needed
+          quantity: item.quantity,
+          unit: item.unit,
+          unitCost: item.unitPrice, // Map unitPrice to unitCost
+          reason: item.reason
+        }))
       };
 
-      setWriteOffs([newWriteOff, ...writeOffs]);
-      toast.success(
-        status === "completed"
-          ? "Đã tạo phiếu xuất hủy"
-          : "Đã lưu nháp phiếu xuất hủy"
-      );
+      let currentId = editingWriteOffId;
+
+      if (currentId !== null) {
+        await inventoryService.updateWriteOff(currentId, payload);
+      } else {
+        const res = await inventoryService.createWriteOff(payload);
+        // Robust ID extraction: check top level, data, and metaData
+        currentId = res?.id || res?.data?.id || res?.metaData?.id;
+
+        if (!currentId) {
+          console.error("Could not determine Write-off ID from response:", res);
+          // If we can't get the ID, we can't complete it.
+          if (status === "completed") {
+            toast.warning("Đã lưu phiếu nhưng không thể tự động hoàn thành. Vui lòng kiểm tra lại danh sách.");
+            status = "draft"; // Prevent complete call attempt
+          }
+        }
+      }
+
+      if (status === "completed" && currentId) {
+        await inventoryService.completeWriteOff(currentId);
+        toast.success("Đã hoàn thành phiếu xuất hủy");
+      } else {
+        toast.success("Đã lưu nháp phiếu xuất hủy");
+      }
+
+      setShowCreateDialog(false);
+      fetchData();
+    } catch (error) {
+      console.error("Error saving write-off:", error);
+      toast.error("Không thể lưu phiếu xuất hủy");
+    } finally {
+      setIsSaving(false);
     }
-
-    setShowCreateDialog(false);
-    setEditingWriteOffId(null);
-
-    // Reset form
-    setFormData({
-      code: generateNextWriteOffCode(),
-      date: "",
-      reason: "",
-      note: "",
-      staff: user?.fullName || "",
-    });
-    setWriteOffItems([]);
   };
 
+  // Prevent duplicate batches in write-off list, and set maxQuantity for each item
   const handleAddSelectedBatches = () => {
     const itemsToAdd: WriteOffItemForm[] = [];
-
-    selectedBatches.forEach(({ productId, batchCode, unitPrice }) => {
-      const item = inventoryItems.find((i) => i.id === productId);
+    selectedBatches.forEach(({ productId, batchCode, unitPrice, entryDate, batchId }) => {
+      // Prevent duplicate batch in writeOffItems (check both batchId and code)
+      if (writeOffItems.some((w) => (batchId && w.batchId === batchId) || (w.productId === productId && w.batchCode === batchCode))) return;
+      const item = availableItems.find((i) => i.id === productId);
       if (item) {
-        const batch = item.batches?.find((b) => b.batchCode === batchCode);
+        const batch = item.batches?.find((b: any) =>
+          b.batchCode === batchCode && b.entryDate === entryDate
+        );
         if (batch && batch.quantity > 0) {
           itemsToAdd.push({
-            productId: item.id,
+            itemId: Number(item.id),
+            productId: item.id.toString(),
             productName: item.name,
             batchCode: batch.batchCode,
+            batchId: batch.id,
             unit: item.unit,
             quantity: 0, // User will input
             unitPrice: unitPrice,
             total: 0,
             reason: "",
+            maxQuantity: batch.quantity, // Add maxQuantity for later use
           });
         }
       }
     });
-
     setWriteOffItems([...writeOffItems, ...itemsToAdd]);
     setShowAddItemDialog(false);
     setSelectedBatches([]);
@@ -1209,12 +1422,18 @@ export function WriteOffs() {
     window.print();
   };
 
-  const handleCancelWriteOff = (id: number) => {
+  const handleCancelWriteOff = async (id: number) => {
     if (window.confirm("Bạn có chắc chắn muốn huỷ phiếu xuất hủy này không?")) {
-      setWriteOffs(writeOffs.filter((w) => w.id !== id));
-      toast.success("Đã huỷ phiếu xuất hủy");
-      if (expandedRow === id) {
-        setExpandedRow(null);
+      try {
+        await inventoryService.cancelWriteOff(id);
+        toast.success("Đã huỷ phiếu xuất hủy");
+        fetchData();
+        if (expandedRow === id) {
+          setExpandedRow(null);
+        }
+      } catch (error) {
+        console.error("Error cancelling write-off:", error);
+        toast.error("Không thể huỷ phiếu xuất hủy");
       }
     }
   };
@@ -1365,384 +1584,380 @@ export function WriteOffs() {
       </Card>
 
       {/* Transactions Table */}
-        <div className="bg-white rounded-xl border border-blue-200 flex-1 overflow-hidden flex flex-col">
-          <div className="overflow-x-auto flex-1 rounded-xl">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-blue-100">
-                  <TableHead className="w-12 text-sm text-center"></TableHead>
-                  <TableHead className="w-16 text-sm text-center">STT</TableHead>
-                  <TableHead
-                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => handleSort("code")}
+      <div className="bg-white rounded-xl border border-blue-200 flex-1 overflow-hidden flex flex-col">
+        <div className="overflow-x-auto flex-1 rounded-xl">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-blue-100">
+                <TableHead className="w-12 text-sm text-center"></TableHead>
+                <TableHead className="w-16 text-sm text-center">STT</TableHead>
+                <TableHead
+                  className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("code")}
+                >
+                  <div className="flex items-center">
+                    Mã phiếu
+                    {getSortIcon("code")}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("date")}
+                >
+                  <div className="flex items-center">
+                    Ngày giờ
+                    {getSortIcon("date")}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("items")}
+                >
+                  <div className="flex items-center justify-center">
+                    Số mặt hàng
+                    {getSortIcon("items")}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-sm text-right cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("totalValue")}
+                >
+                  <div className="flex items-center justify-end">
+                    Tổng giá trị
+                    {getSortIcon("totalValue")}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("reason")}
+                >
+                  <div className="flex items-center">
+                    Lý do
+                    {getSortIcon("reason")}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleSort("status")}
+                >
+                  <div className="flex items-center justify-center">
+                    Trạng thái
+                    {getSortIcon("status")}
+                  </div>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredWriteOffs.map((wo, index) => (
+                <>
+                  <TableRow
+                    key={wo.id}
+                    className="hover:bg-blue-100/50 cursor-pointer"
+                    onClick={() =>
+                      setExpandedRow(expandedRow === wo.id ? null : wo.id)
+                    }
                   >
-                    <div className="flex items-center">
-                      Mã phiếu
-                      {getSortIcon("code")}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => handleSort("date")}
-                  >
-                    <div className="flex items-center">
-                      Ngày giờ
-                      {getSortIcon("date")}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => handleSort("items")}
-                  >
-                    <div className="flex items-center justify-center">
-                      Số mặt hàng
-                      {getSortIcon("items")}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="text-sm text-right cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => handleSort("totalValue")}
-                  >
-                    <div className="flex items-center justify-end">
-                      Tổng giá trị
-                      {getSortIcon("totalValue")}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => handleSort("reason")}
-                  >
-                    <div className="flex items-center">
-                      Lý do
-                      {getSortIcon("reason")}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="text-sm text-center cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => handleSort("status")}
-                  >
-                    <div className="flex items-center justify-center">
-                      Trạng thái
-                      {getSortIcon("status")}
-                    </div>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredWriteOffs.map((wo, index) => (
-                  <>
-                    <TableRow
-                      key={wo.id}
-                      className="hover:bg-blue-100/50 cursor-pointer"
-                      onClick={() =>
-                        setExpandedRow(expandedRow === wo.id ? null : wo.id)
-                      }
-                    >
-                      <TableCell className="text-sm text-center">
-                        {expandedRow === wo.id ? (
-                          <ChevronDown className="w-4 h-4 text-slate-600" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4 text-slate-600" />
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-600 text-center">
-                        {index + 1}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <span className="text-blue-600">{wo.code}</span>
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-700">
-                        {wo.date}
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-700 text-center">
-                        {wo.items}
-                      </TableCell>
-                      <TableCell className="text-sm text-red-600 text-right">
-                        {wo.totalValue.toLocaleString("vi-VN")}đ
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-700">
-                        {getReasonText(wo.reason)}
-                      </TableCell>
-                      <TableCell className="text-sm text-center">
-                        <span
-                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${wo.status === "completed"
-                            ? "bg-green-50 text-green-700"
-                            : wo.status === "draft"
-                              ? "bg-orange-50 text-orange-700"
-                              : "bg-red-50 text-red-700"
-                            }`}
-                        >
-                          {wo.status === "completed"
-                            ? "Hoàn thành"
-                            : wo.status === "draft"
-                              ? "Phiếu tạm"
-                              : "Đã huỷ"}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                    {/* Expanded Row */}
-                    {expandedRow === wo.id && wo.details && (
-                      <TableRow>
-                        <TableCell colSpan={6} className="bg-slate-50 px-4 py-4">
-                          <Tabs defaultValue="info" className="w-full">
-                            <TabsList>
-                              <TabsTrigger value="info">Thông tin</TabsTrigger>
-                            </TabsList>
-                            <TabsContent
-                              value="info"
-                              className="space-y-4 mt-4"
-                            >
-                              {/* Thông tin phiếu xuất hủy */}
-                              <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4 text-sm">
-                                  <div className="space-y-2">
-                                    <div>
-                                      <span className="font-medium text-slate-600">
-                                        Mã phiếu:
-                                      </span>{" "}
-                                      <span className="text-slate-900">
-                                        {wo.code}
-                                      </span>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-slate-600">
-                                        Trạng thái:
-                                      </span>{" "}
-                                      <span
-                                        className={`px-2 py-1 rounded-full text-xs ${wo.status === "completed"
-                                          ? "bg-green-50 text-green-700"
-                                          : wo.status === "draft"
-                                            ? "bg-orange-50 text-orange-700"
-                                            : "bg-red-50 text-red-700"
-                                          }`}
-                                      >
-                                        {wo.status === "completed"
-                                          ? "Hoàn thành"
-                                          : wo.status === "draft"
-                                            ? "Phiếu tạm"
-                                            : "Đã huỷ"}
-                                      </span>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-slate-600">
-                                        Thời gian:
-                                      </span>{" "}
-                                      <span className="text-slate-900">{wo.date}</span>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-slate-600">
-                                        Lý do:
-                                      </span>{" "}
-                                      <span className="text-slate-900">
-                                        {getReasonText(wo.reason)}
-                                      </span>
-                                    </div>
+                    <TableCell className="text-sm text-center">
+                      {expandedRow === wo.id ? (
+                        <ChevronDown className="w-4 h-4 text-slate-600" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4 text-slate-600" />
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-slate-600 text-center">
+                      {index + 1}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <span className="text-blue-600">{wo.code}</span>
+                    </TableCell>
+                    <TableCell className="text-sm text-slate-700">
+                      {wo.date}
+                    </TableCell>
+                    <TableCell className="text-sm text-slate-700 text-center">
+                      {wo.items}
+                    </TableCell>
+                    <TableCell className="text-sm text-red-600 text-right">
+                      {wo.totalValue.toLocaleString("vi-VN")}đ
+                    </TableCell>
+                    <TableCell className="text-sm text-slate-700">
+                      {getReasonText(wo.reason)}
+                    </TableCell>
+                    <TableCell className="text-sm text-center">
+                      <span
+                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${wo.status === "completed"
+                          ? "bg-green-50 text-green-700"
+                          : wo.status === "draft"
+                            ? "bg-orange-50 text-orange-700"
+                            : "bg-red-50 text-red-700"
+                          }`}
+                      >
+                        {wo.status === "completed"
+                          ? "Hoàn thành"
+                          : wo.status === "draft"
+                            ? "Phiếu tạm"
+                            : "Đã huỷ"}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                  {/* Expanded Row */}
+                  {expandedRow === wo.id && wo.details && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="bg-slate-50 px-4 py-4">
+                        <Tabs defaultValue="info" className="w-full">
+                          <TabsList>
+                            <TabsTrigger value="info">Thông tin</TabsTrigger>
+                          </TabsList>
+                          <TabsContent
+                            value="info"
+                            className="space-y-4 mt-4"
+                          >
+                            {/* Thông tin phiếu xuất hủy */}
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div className="space-y-2">
+                                  <div>
+                                    <span className="font-medium text-slate-600">
+                                      Mã phiếu:
+                                    </span>{" "}
+                                    <span className="text-slate-900">
+                                      {wo.code}
+                                    </span>
                                   </div>
-                                  <div className="space-y-2"></div>
+                                  <div>
+                                    <span className="font-medium text-slate-600">
+                                      Trạng thái:
+                                    </span>{" "}
+                                    <span
+                                      className={`px-2 py-1 rounded-full text-xs ${wo.status === "completed"
+                                        ? "bg-green-50 text-green-700"
+                                        : wo.status === "draft"
+                                          ? "bg-orange-50 text-orange-700"
+                                          : "bg-red-50 text-red-700"
+                                        }`}
+                                    >
+                                      {wo.status === "completed"
+                                        ? "Hoàn thành"
+                                        : wo.status === "draft"
+                                          ? "Phiếu tạm"
+                                          : "Đã huỷ"}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium text-slate-600">
+                                      Thời gian:
+                                    </span>{" "}
+                                    <span className="text-slate-900">{wo.date}</span>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium text-slate-600">
+                                      Lý do:
+                                    </span>{" "}
+                                    <span className="text-slate-900">
+                                      {getReasonText(wo.reason)}
+                                    </span>
+                                  </div>
                                 </div>
+                                <div className="space-y-2"></div>
+                              </div>
 
-                                {/* Chi tiết hàng hóa */}
-                                <div className="border border-slate-200 rounded-lg overflow-hidden">
-                                  <table className="w-full">
-                                    <thead className="bg-slate-100">
-                                      <tr>
-                                        <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                          STT
-                                        </th>
-                                        <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                          Mã lô
-                                        </th>
-                                        <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                          Tên hàng hóa
-                                        </th>
-                                        <th className="px-4 py-2 text-center text-xs text-slate-600">
-                                          Số lượng
-                                        </th>
-                                        <th className="px-4 py-2 text-center text-xs text-slate-600">
-                                          Đơn vị
-                                        </th>
-                                        <th className="px-4 py-2 text-right text-xs text-slate-600">
-                                          Đơn giá
-                                        </th>
-                                        <th className="px-4 py-2 text-right text-xs text-slate-600">
-                                          Thành tiền
-                                        </th>
-                                        <th className="px-4 py-2 text-left text-xs text-slate-600">
-                                          Lý do
-                                        </th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                      {wo.details.items.map((item, idx) => (
-                                        <tr key={idx}>
-                                          <td className="px-4 py-2 text-sm text-slate-600">
-                                            {idx + 1}
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-slate-600">
-                                            {item.batchCode}
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-slate-900">
-                                            {item.name}
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-slate-600 text-center">
-                                            {item.quantity}
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-slate-600 text-center">
-                                            {item.unit}
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-slate-600 text-right">
-                                            {item.unitPrice.toLocaleString(
-                                              "vi-VN"
-                                            )}
-                                            đ
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-red-600 text-right">
-                                            {item.total.toLocaleString("vi-VN")}
-                                            đ
-                                          </td>
-                                          <td className="px-4 py-2 text-sm text-slate-600">
-                                            {item.reason}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-
-                                {/* Summary */}
-                                {wo.details && wo.details.items && (
-                                  <div className="flex justify-end pt-4">
-                                    <div className="space-y-3 text-sm min-w-[400px] bg-slate-50 rounded-lg p-6">
-                                      <div className="flex items-center py-1">
-                                        <span className="text-slate-600 text-right w-[180px] pr-4">
-                                          Tổng số lượng:
-                                        </span>
-                                        <span className="text-slate-900 font-medium text-right flex-1">
-                                          {wo.details.items.reduce(
-                                            (sum, item) => sum + item.quantity,
-                                            0
-                                          )}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center py-1">
-                                        <span className="text-slate-600 text-right w-[180px] pr-4">
-                                          Tổng số mặt hàng:
-                                        </span>
-                                        <span className="text-slate-900 font-medium text-right flex-1">
-                                          {wo.details.items.length}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center border-t border-slate-300 pt-3 mt-2">
-                                        <span className="text-slate-900 font-semibold text-base text-right w-[180px] pr-4">
-                                          Tổng giá trị:
-                                        </span>
-                                        <span className="text-red-600 font-semibold text-base text-right flex-1">
-                                          {wo.totalValue.toLocaleString(
+                              {/* Chi tiết hàng hóa */}
+                              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                <table className="w-full">
+                                  <thead className="bg-slate-100">
+                                    <tr>
+                                      <th className="px-4 py-2 text-left text-xs text-slate-600">
+                                        STT
+                                      </th>
+                                      <th className="px-4 py-2 text-left text-xs text-slate-600">
+                                        Mã lô
+                                      </th>
+                                      <th className="px-4 py-2 text-left text-xs text-slate-600">
+                                        Tên hàng hóa
+                                      </th>
+                                      <th className="px-4 py-2 text-center text-xs text-slate-600">
+                                        Số lượng
+                                      </th>
+                                      <th className="px-4 py-2 text-center text-xs text-slate-600">
+                                        Đơn vị
+                                      </th>
+                                      <th className="px-4 py-2 text-right text-xs text-slate-600">
+                                        Đơn giá
+                                      </th>
+                                      <th className="px-4 py-2 text-right text-xs text-slate-600">
+                                        Thành tiền
+                                      </th>
+                                      <th className="px-4 py-2 text-left text-xs text-slate-600">
+                                        Lý do
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {wo.details.items.map((item, idx) => (
+                                      <tr key={idx}>
+                                        <td className="px-4 py-2 text-sm text-slate-600">
+                                          {idx + 1}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-600">
+                                          {item.batchCode}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-900">
+                                          {item.name}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-600 text-center">
+                                          {item.quantity}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-600 text-center">
+                                          {item.unit}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-600 text-right">
+                                          {item.unitPrice.toLocaleString(
                                             "vi-VN"
                                           )}
                                           đ
-                                        </span>
-                                      </div>
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-red-600 text-right">
+                                          {item.total.toLocaleString("vi-VN")}
+                                          đ
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-600">
+                                          {item.reason}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+
+                              {/* Summary */}
+                              {wo.details && wo.details.items && (
+                                <div className="flex justify-end pt-4">
+                                  <div className="space-y-3 text-sm min-w-[400px] bg-slate-50 rounded-lg p-6">
+                                    <div className="flex items-center py-1">
+                                      <span className="text-slate-600 text-right w-[180px] pr-4">
+                                        Tổng số lượng:
+                                      </span>
+                                      <span className="text-slate-900 font-medium text-right flex-1">
+                                        {wo.details.items.reduce(
+                                          (sum, item) => sum + item.quantity,
+                                          0
+                                        )}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center py-1">
+                                      <span className="text-slate-600 text-right w-[180px] pr-4">
+                                        Tổng số mặt hàng:
+                                      </span>
+                                      <span className="text-slate-900 font-medium text-right flex-1">
+                                        {wo.details.items.length}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center border-t border-slate-300 pt-3 mt-2">
+                                      <span className="text-slate-900 font-semibold text-base text-right w-[180px] pr-4">
+                                        Tổng giá trị:
+                                      </span>
+                                      <span className="text-red-600 font-semibold text-base text-right flex-1">
+                                        {wo.totalValue.toLocaleString(
+                                          "vi-VN"
+                                        )}
+                                        đ
+                                      </span>
                                     </div>
                                   </div>
-                                )}
-
-                                {/* Action Buttons */}
-                                <div className="flex items-center justify-end gap-2 mt-4">
-                                  {wo.status === "draft" ? (
-                                    <>
-                                      <Button
-                                        variant="outline"
-                                        className="gap-2"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleEditWriteOff(wo);
-                                        }}
-                                      >
-                                        <Pencil className="w-4 h-4" />
-                                        Chỉnh sửa
-                                      </Button>
-                                      <Button
-                                        className="bg-green-600 hover:bg-green-700 gap-2"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (
-                                            !wo.details?.items ||
-                                            wo.details.items.length === 0
-                                          ) {
-                                            toast.error(
-                                              "Phiếu xuất hủy không có hàng hóa"
-                                            );
-                                            return;
-                                          }
-                                          setWriteOffs(
-                                            writeOffs.map((w) =>
-                                              w.id === wo.id
-                                                ? {
-                                                  ...w,
-                                                  status: "completed" as const,
-                                                }
-                                                : w
-                                            )
-                                          );
-                                          toast.success(
-                                            "Đã hoàn thành phiếu xuất hủy"
-                                          );
-                                        }}
-                                      >
-                                        <Check className="w-4 h-4" />
-                                        Hoàn thành
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="text-red-600 hover:text-red-700"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleCancelWriteOff(wo.id);
-                                        }}
-                                      >
-                                        <Trash2 className="w-4 h-4 mr-2" />
-                                        Huỷ bỏ
-                                      </Button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handlePrintWriteOff();
-                                        }}
-                                      >
-                                        <Printer className="w-4 h-4 mr-2" />
-                                        In
-                                      </Button>
-                                    </>
-                                  )}
                                 </div>
-                              </div>
-                            </TabsContent>
-                          </Tabs>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                              )}
 
-          {/* Footer */}
-          <div className="px-4 py-3 border-t border-slate-200 bg-slate-50">
-            <p className="text-sm text-slate-600">
-              Hiển thị {filteredWriteOffs.length} phiếu xuất hủy
-            </p>
-          </div>
+                              {/* Action Buttons */}
+                              <div className="flex items-center justify-end gap-2 mt-4">
+                                {wo.status === "draft" ? (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      className="gap-2"
+                                      size="sm"
+                                      onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                        e.stopPropagation();
+                                        handleEditWriteOff(wo);
+                                      }}
+                                    >
+                                      <Pencil className="w-4 h-4" />
+                                      Chỉnh sửa
+                                    </Button>
+                                    <Button
+                                      className="bg-green-600 hover:bg-green-700 gap-2"
+                                      size="sm"
+                                      onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
+                                        e.stopPropagation();
+                                        if (
+                                          !wo.details?.items ||
+                                          wo.details.items.length === 0
+                                        ) {
+                                          toast.error(
+                                            "Phiếu xuất hủy không có hàng hóa"
+                                          );
+                                          return;
+                                        }
+
+                                        try {
+                                          await inventoryService.completeWriteOff(wo.id);
+                                          toast.success("Đã hoàn thành phiếu xuất hủy");
+                                          fetchData();
+                                        } catch (error) {
+                                          console.error("Error completing write-off:", error);
+                                          toast.error("Không thể hoàn thành phiếu xuất hủy");
+                                        }
+                                      }}
+                                    >
+                                      <Check className="w-4 h-4" />
+                                      Hoàn thành
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-red-600 hover:text-red-700"
+                                      onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                        e.stopPropagation();
+                                        handleCancelWriteOff(wo.id);
+                                      }}
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Huỷ bỏ
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                        e.stopPropagation();
+                                        handlePrintWriteOff();
+                                      }}
+                                    >
+                                      <Printer className="w-4 h-4 mr-2" />
+                                      In
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </TabsContent>
+                        </Tabs>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
+              ))}
+            </TableBody>
+          </Table>
         </div>
+
+        {/* Footer */}
+        <div className="px-4 py-3 border-t border-slate-200 bg-slate-50">
+          <p className="text-sm text-slate-600">
+            Hiển thị {filteredWriteOffs.length} phiếu xuất hủy
+          </p>
+        </div>
+      </div>
 
 
       {/* Import Excel Dialog */}
@@ -1798,10 +2013,10 @@ export function WriteOffs() {
         <DialogContent
           className="min-w-[1100px] max-w-[1400px] w-[95vw] max-h-[90vh] overflow-hidden flex flex-col"
           aria-describedby={undefined}
-          onInteractOutside={(e) => {
+          onInteractOutside={(e: any) => {
             e.preventDefault();
           }}
-          onEscapeKeyDown={(e) => {
+          onEscapeKeyDown={(e: any) => {
             e.preventDefault();
           }}
         >
@@ -1948,14 +2163,13 @@ export function WriteOffs() {
                       </tr>
                     ) : (
                       writeOffItems.map((item, index) => {
-                        const inventoryItem = inventoryItems.find(
-                          (i) => i.id === item.productId
-                        );
-                        const batch = inventoryItem?.batches?.find(
-                          (b) => b.batchCode === item.batchCode
-                        );
-                        const maxQuantity = batch?.quantity || 0;
-
+                        // Use maxQuantity from item if available, fallback to batch quantity
+                        let maxQuantity = item.maxQuantity;
+                        if (typeof maxQuantity !== 'number') {
+                          const inventoryItem = inventoryItems.find((i) => i.id === item.productId);
+                          const batch = inventoryItem?.batches?.find((b) => b.batchCode === item.batchCode);
+                          maxQuantity = batch?.quantity || 0;
+                        }
                         return (
                           <tr key={index}>
                             <td className="px-4 py-2 text-sm text-slate-600">
@@ -1976,8 +2190,7 @@ export function WriteOffs() {
                                   type="number"
                                   value={item.quantity || ""}
                                   onChange={(e) => {
-                                    const numValue =
-                                      Number(e.target.value) || 0;
+                                    const numValue = Number(e.target.value) || 0;
                                     if (numValue > maxQuantity) {
                                       toast.error(
                                         `Số lượng hủy không được vượt quá ${maxQuantity} ${item.unit}`
@@ -2091,10 +2304,10 @@ export function WriteOffs() {
             height: "90vh",
           }}
           aria-describedby={undefined}
-          onInteractOutside={(e) => {
+          onInteractOutside={(e: any) => {
             e.preventDefault();
           }}
-          onEscapeKeyDown={(e) => {
+          onEscapeKeyDown={(e: any) => {
             e.preventDefault();
           }}
         >
@@ -2145,7 +2358,7 @@ export function WriteOffs() {
 
             {/* Category Tabs */}
             <div className="mb-4 flex gap-2 flex-wrap">
-              {categories.map((cat) => {
+              {[{ id: 'all', name: 'Tất cả' }, ...categoriesList].map((cat) => {
                 const isActive = selectedCategoryFilter === cat.id;
                 return (
                   <button
@@ -2191,29 +2404,23 @@ export function WriteOffs() {
                     {filteredAvailableItems.length > 0 ? (
                       filteredAvailableItems.map((item) => {
                         const isExpanded = expandedItems.has(item.id);
-                        const allBatches = item.batches || [];
-                        const availableBatches = allBatches.filter(
-                          (b) => b.quantity > 0
-                        );
-                        const hasBatches = allBatches.length > 0;
+                        const batches = item.batches || [];
+                        const hasStock = item.currentStock > 0;
+                        const hasBatches = batches.length > 0;
 
                         return (
                           <React.Fragment key={item.id}>
                             {/* Main Row - Item */}
                             <tr
                               className="hover:bg-slate-50 cursor-pointer"
-                              onClick={() =>
-                                hasBatches && toggleItemExpand(item.id)
-                              }
+                              onClick={() => toggleItemExpand(item.id)}
                             >
                               <td className="px-4 py-3 border-r border-slate-100">
-                                {hasBatches ? (
-                                  isExpanded ? (
-                                    <ChevronDown className="w-4 h-4 text-slate-600" />
-                                  ) : (
-                                    <ChevronRight className="w-4 h-4 text-slate-400" />
-                                  )
-                                ) : null}
+                                {isExpanded ? (
+                                  <ChevronDown className="w-4 h-4 text-slate-600" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                                )}
                               </td>
                               <td className="px-4 py-3 text-sm text-slate-600 whitespace-nowrap border-r border-slate-100">
                                 {item.id}
@@ -2222,14 +2429,9 @@ export function WriteOffs() {
                                 {item.name}
                               </td>
                               <td
-                                className="px-4 py-3 text-sm text-blue-600 cursor-pointer hover:text-blue-700 hover:underline whitespace-nowrap border-r border-slate-100"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedCategoryFilter(item.category);
-                                }}
+                                className="px-4 py-3 text-sm text-slate-600 whitespace-nowrap border-r border-slate-100"
                               >
-                                {categories.find((c) => c.id === item.category)
-                                  ?.name ?? "-"}
+                                {item.category || "-"}
                               </td>
                               <td className="px-4 py-3 text-sm text-slate-600 text-center whitespace-nowrap border-r border-slate-100">
                                 {item.unit}
@@ -2239,186 +2441,208 @@ export function WriteOffs() {
                               </td>
                             </tr>
 
-                            {/* Expanded Row - Batches Table */}
-                            {isExpanded && hasBatches && (
+                            {isExpanded && (
                               <tr>
                                 <td
                                   colSpan={6}
                                   className="px-4 py-4 bg-slate-50"
                                 >
-                                  <div className="ml-8">
-                                    <table className="w-full border border-slate-200 rounded-lg overflow-hidden bg-white">
-                                      <thead className="bg-slate-100">
-                                        <tr>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 w-12">
-                                            <Checkbox
-                                              checked={
-                                                allBatches.length > 0 &&
-                                                allBatches
-                                                  .filter((b: BatchInfo) => b.quantity > 0)
-                                                  .every((b) =>
-                                                    isBatchSelected(
-                                                      item.id,
-                                                      b.batchCode
-                                                    )
-                                                  )
-                                              }
-                                              onCheckedChange={(checked: boolean) => {
-                                                allBatches
-                                                  .filter((b: BatchInfo) => b.quantity > 0)
-                                                  .forEach((b) => {
-                                                    const isSelected =
+                                  {(hasBatches || hasStock) ? (
+                                    <div className="ml-8">
+                                      <table className="w-full border border-slate-200 rounded-lg overflow-hidden bg-white">
+                                        <thead className="bg-slate-100">
+                                          <tr>
+                                            <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 w-12">
+                                              <Checkbox
+                                                checked={
+                                                  batches.length > 0 &&
+                                                  batches
+                                                    .filter((b: BatchInfo) => b.quantity > 0)
+                                                    .every((b: BatchInfo) =>
                                                       isBatchSelected(
                                                         item.id,
-                                                        b.batchCode
-                                                      );
-                                                    if (
-                                                      checked &&
-                                                      !isSelected
-                                                    ) {
-                                                      toggleBatchSelection(
-                                                        item.id,
                                                         b.batchCode,
-                                                        b.unitCost
-                                                      );
-                                                    } else if (
-                                                      !checked &&
-                                                      isSelected
-                                                    ) {
-                                                      toggleBatchSelection(
-                                                        item.id,
-                                                        b.batchCode,
-                                                        b.unitCost
-                                                      );
-                                                    }
-                                                  });
-                                              }}
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                              }}
-                                            />
-                                          </th>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-slate-600">
-                                            Mã lô
-                                          </th>
-                                          <th className="px-4 py-2 text-center text-xs font-medium text-slate-600">
-                                            SL
-                                          </th>
-                                          <th className="px-4 py-2 text-center text-xs font-medium text-slate-600">
-                                            ĐVT
-                                          </th>
-                                          <th className="px-4 py-2 text-center text-xs font-medium text-slate-600">
-                                            HSD
-                                          </th>
-                                          <th className="px-4 py-2 text-right text-xs font-medium text-slate-600">
-                                            Giá nhập
-                                          </th>
-                                        </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-slate-100">
-                                        {allBatches.map((batch) => {
-                                          const canSelect = batch.quantity > 0;
-                                          const isSelected = isBatchSelected(
-                                            item.id,
-                                            batch.batchCode
-                                          );
-
-                                          return (
-                                            <tr
-                                              key={batch.batchCode}
-                                              className={`${canSelect
-                                                ? "hover:bg-slate-50 cursor-pointer"
-                                                : "opacity-50"
-                                                }`}
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (canSelect) {
-                                                  toggleBatchSelection(
-                                                    item.id,
-                                                    batch.batchCode,
-                                                    batch.unitCost
-                                                  );
+                                                        b.entryDate,
+                                                        b.id
+                                                      )
+                                                    )
                                                 }
-                                              }}
-                                            >
-                                              <td className="px-4 py-2">
-                                                <div
-                                                  onClick={(e) =>
-                                                    e.stopPropagation()
-                                                  }
-                                                >
-                                                  <Checkbox
-                                                    checked={isSelected}
-                                                    disabled={!canSelect}
-                                                    onCheckedChange={(
-                                                      checked
-                                                    ) => {
-                                                      if (canSelect) {
+                                                onCheckedChange={(checked: boolean) => {
+                                                  batches
+                                                    .filter((b: BatchInfo) => b.quantity > 0)
+                                                    .forEach((b: BatchInfo) => {
+                                                      const isSelected =
+                                                        isBatchSelected(
+                                                          item.id,
+                                                          b.batchCode,
+                                                          b.entryDate,
+                                                          b.id
+                                                        );
+                                                      if (
+                                                        checked &&
+                                                        !isSelected
+                                                      ) {
                                                         toggleBatchSelection(
                                                           item.id,
-                                                          batch.batchCode,
-                                                          batch.unitCost
+                                                          b.batchCode,
+                                                          b.unitCost,
+                                                          b.entryDate,
+                                                          b.id
+                                                        );
+                                                      } else if (
+                                                        !checked &&
+                                                        isSelected
+                                                      ) {
+                                                        toggleBatchSelection(
+                                                          item.id,
+                                                          b.batchCode,
+                                                          b.unitCost,
+                                                          b.entryDate,
+                                                          b.id
                                                         );
                                                       }
-                                                    }}
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                    }}
-                                                  />
-                                                </div>
-                                              </td>
-                                              <td className="px-4 py-2 text-sm font-medium text-slate-900">
-                                                {batch.batchCode}
-                                              </td>
-                                              <td className="px-4 py-2 text-sm text-center">
-                                                <span
-                                                  className={
-                                                    canSelect
-                                                      ? "text-slate-900"
-                                                      : "text-red-500"
-                                                  }
-                                                >
-                                                  {batch.quantity}
-                                                </span>
-                                              </td>
-                                              <td className="px-4 py-2 text-sm text-slate-600 text-center">
-                                                {item.unit}
-                                              </td>
-                                              <td className="px-4 py-2 text-sm text-slate-600 text-center">
-                                                {batch.expiryDate
-                                                  ? format(
-                                                    new Date(
-                                                      batch.expiryDate
-                                                    ),
-                                                    "dd/MM/yyyy",
-                                                    { locale: vi }
-                                                  )
-                                                  : "—"}
-                                              </td>
-                                              <td className="px-4 py-2 text-sm font-medium text-slate-900 text-right">
-                                                {batch.unitCost.toLocaleString(
-                                                  "vi-VN"
-                                                )}
-                                                đ
+                                                    });
+                                                }}
+                                                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                                  e.stopPropagation();
+                                                }}
+                                              />
+                                            </th>
+                                            <th className="px-4 py-2 text-left text-xs font-medium text-slate-600">
+                                              Mã lô
+                                            </th>
+                                            <th className="px-4 py-2 text-center text-xs font-medium text-slate-600">
+                                              SL
+                                            </th>
+                                            <th className="px-4 py-2 text-center text-xs font-medium text-slate-600">
+                                              ĐVT
+                                            </th>
+                                            <th className="px-4 py-2 text-center text-xs font-medium text-slate-600">
+                                              HSD
+                                            </th>
+                                            <th className="px-4 py-2 text-right text-xs font-medium text-slate-600">
+                                              Giá nhập
+                                            </th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                          {batches.length === 0 && hasStock ? (
+                                            <tr>
+                                              <td colSpan={6} className="px-4 py-4 text-center">
+                                                <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+                                                Đang tải lô hàng...
                                               </td>
                                             </tr>
-                                          );
-                                        })}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
+                                          ) : batches.length > 0 ? (
+                                            batches.map((batch: BatchInfo) => {
+                                              const canSelect = batch.quantity > 0;
+                                              const isSelected = isBatchSelected(
+                                                item.id,
+                                                batch.batchCode,
+                                                batch.entryDate,
+                                                batch.id
+                                              );
 
-                            {/* No batches available */}
-                            {!hasBatches && (
-                              <tr>
-                                <td
-                                  colSpan={6}
-                                  className="px-4 py-3 text-sm text-slate-500 text-center"
-                                >
-                                  Không có lô hàng
+                                              return (
+                                                <tr
+                                                  key={batch.batchCode}
+                                                  className={`${canSelect
+                                                    ? "hover:bg-slate-50 cursor-pointer"
+                                                    : "opacity-50"
+                                                    }`}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (canSelect) {
+                                                      toggleBatchSelection(
+                                                        item.id,
+                                                        batch.batchCode,
+                                                        batch.unitCost,
+                                                        batch.entryDate,
+                                                        batch.id
+                                                      );
+                                                    }
+                                                  }}
+                                                >
+                                                  <td className="px-4 py-2">
+                                                    <div
+                                                      onClick={(e) =>
+                                                        e.stopPropagation()
+                                                      }
+                                                    >
+                                                      <Checkbox
+                                                        checked={isSelected}
+                                                        disabled={!canSelect}
+                                                        onCheckedChange={(
+                                                          checked: boolean
+                                                        ) => {
+                                                          if (canSelect) {
+                                                            toggleBatchSelection(
+                                                              item.id,
+                                                              batch.batchCode,
+                                                              batch.unitCost,
+                                                              batch.entryDate,
+                                                              batch.id
+                                                            );
+                                                          }
+                                                        }}
+                                                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                                          e.stopPropagation();
+                                                        }}
+                                                      />
+                                                    </div>
+                                                  </td>
+                                                  <td className="px-4 py-2 text-sm font-medium text-slate-900">
+                                                    {batch.batchCode}
+                                                  </td>
+                                                  <td className="px-4 py-2 text-sm text-center">
+                                                    <span
+                                                      className={
+                                                        canSelect
+                                                          ? "text-slate-900"
+                                                          : "text-red-500"
+                                                      }
+                                                    >
+                                                      {batch.quantity}
+                                                    </span>
+                                                  </td>
+                                                  <td className="px-4 py-2 text-sm text-slate-600 text-center">
+                                                    {item.unit}
+                                                  </td>
+                                                  <td className="px-4 py-2 text-sm text-slate-600 text-center">
+                                                    {batch.expiryDate
+                                                      ? format(
+                                                        new Date(
+                                                          batch.expiryDate
+                                                        ),
+                                                        "dd/MM/yyyy",
+                                                        { locale: vi }
+                                                      )
+                                                      : "—"}
+                                                  </td>
+                                                  <td className="px-4 py-2 text-sm font-medium text-slate-900 text-right">
+                                                    {batch.unitCost.toLocaleString(
+                                                      "vi-VN"
+                                                    )}
+                                                    đ
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })
+                                          ) : (
+                                            <tr>
+                                              <td colSpan={6} className="px-4 py-4 text-center text-sm text-slate-500">
+                                                Không có lô hàng
+                                              </td>
+                                            </tr>
+                                          )}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  ) : (
+                                    <div className="text-center text-sm text-slate-500 py-2">
+                                      Không có lô hàng
+                                    </div>
+                                  )}
                                 </td>
                               </tr>
                             )}
