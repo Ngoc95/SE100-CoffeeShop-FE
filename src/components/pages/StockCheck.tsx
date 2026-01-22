@@ -12,6 +12,7 @@ import {
   ArrowDown,
   Filter,
   Trash2,
+  Calendar as CalendarIcon,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
@@ -36,6 +37,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Calendar } from "../ui/calendar";
+import { format } from "date-fns";
+import { vi } from "date-fns/locale";
+import { cn } from "../ui/utils";
 import { StockCheckImportDialog } from "../StockCheckImportDialog";
 import { useAuth } from "../../contexts/AuthContext";
 import { inventoryService } from "../../services/inventoryService";
@@ -1088,33 +1094,39 @@ export function StockCheck() {
                   className="bg-slate-100 border-slate-300"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 flex flex-col">
                 <Label>Ngày kiểm kho *</Label>
-                <div className="relative">
-                  <Input
-                    type="datetime-local"
-                    value={newDate}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewDate(e.target.value)}
-                    className="bg-white border-slate-300 shadow-none pr-10 focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                  />
-                  <style
-                    dangerouslySetInnerHTML={{
-                      __html: `
-                      input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-                        position: absolute;
-                        right: 8px;
-                        top: 50%;
-                        transform: translateY(-50%);
-                        cursor: pointer;
-                      }
-                      input[type="datetime-local"]::-webkit-inner-spin-button {
-                        position: absolute;
-                        right: 8px;
-                      }
-                    `,
-                    }}
-                  />
-                </div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-white border border-slate-300 shadow-none focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2",
+                        !newDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {newDate ? (
+                        format(new Date(newDate), "dd/MM/yyyy")
+                      ) : (
+                        <span>Chọn ngày</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={newDate ? new Date(newDate) : undefined}
+                      onSelect={(date: Date | undefined) => {
+                        if (date) {
+                          setNewDate(format(date, "yyyy-MM-dd"));
+                        }
+                      }}
+                      initialFocus
+                      locale={vi}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label>Ghi chú</Label>

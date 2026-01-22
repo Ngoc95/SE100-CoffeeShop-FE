@@ -88,6 +88,7 @@ import { categories } from "../../data/categories";
 import { Card, CardContent } from "../ui/card";
 import { CustomerTimeFilter } from "../reports/CustomerTimeFilter";
 import { inventoryService } from "../../services/inventoryService";
+import { cn } from "../ui/utils";
 
 interface PurchaseOrderItem {
   itemId?: number;
@@ -2199,18 +2200,42 @@ export function PurchaseOrders() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 flex flex-col">
                 <Label>Ngày nhập *</Label>
-                <div className="relative">
-                  <Input
-                    type="datetime-local"
-                    value={formData.date}
-                    onChange={(e) =>
-                      setFormData({ ...formData, date: e.target.value })
-                    }
-                    className="bg-white border-slate-300 shadow-none pr-10 focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                  />
-                </div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-white border border-slate-300 shadow-none focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2",
+                        !formData.date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.date ? (
+                        format(new Date(formData.date), "dd/MM/yyyy")
+                      ) : (
+                        <span>Chọn ngày</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.date ? new Date(formData.date) : undefined}
+                      onSelect={(date: Date | undefined) => {
+                        if (date) {
+                          setFormData({
+                            ...formData,
+                            date: format(date, "yyyy-MM-dd"),
+                          });
+                        }
+                      }}
+                      initialFocus
+                      locale={vi}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label>Nhân viên nhập *</Label>
@@ -2365,17 +2390,37 @@ export function PurchaseOrders() {
                                 />
                               </td>
                               <td className="px-2 py-2">
-                                <Input
-                                  type="date"
-                                  value={item.expiryDate || ""}
-                                  onChange={(e) =>
-                                    handleChangeItem(
-                                      "expiryDate",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="text-sm h-8 w-full bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                                />
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant={"outline"}
+                                      className={cn(
+                                        "w-full justify-start text-left font-normal bg-white border border-slate-300 shadow-none h-8 px-2 text-xs",
+                                        !item.expiryDate && "text-muted-foreground"
+                                      )}
+                                    >
+                                      <CalendarIcon className="mr-2 h-3 w-3" />
+                                      {item.expiryDate ? (
+                                        format(new Date(item.expiryDate), "dd/MM/yyyy")
+                                      ) : (
+                                        <span>HSD</span>
+                                      )}
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                      mode="single"
+                                      selected={item.expiryDate ? new Date(item.expiryDate) : undefined}
+                                      onSelect={(date: Date | undefined) => {
+                                        if (date) {
+                                          handleChangeItem("expiryDate", format(date, "yyyy-MM-dd"));
+                                        }
+                                      }}
+                                      initialFocus
+                                      locale={vi}
+                                    />
+                                  </PopoverContent>
+                                </Popover>
                               </td>
                               <td className="px-2 py-2">
                                 <Input

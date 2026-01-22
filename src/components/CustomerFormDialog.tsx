@@ -4,6 +4,12 @@ import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from './ui/select';
 import { Button } from './ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Calendar } from './ui/calendar';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import { vi } from 'date-fns/locale';
+import { cn } from './ui/utils';
 import { activeStatus, cities, genders } from './pages/Customers';
 
 export interface EditCustomer {
@@ -129,15 +135,42 @@ export function CustomerEditFormDialog(props: CustomerEditFormDialogProps) {
           </div>
 
           {/* Ngày sinh */}
-          <div>
+          <div className="flex flex-col gap-1.5">
             <Label>Ngày sinh</Label>
-            <Input
-              type="date"
-              placeholder="VD: 15/01/1990"
-              value={formData.birthday ? formData.birthday : "2026-01-16"}
-              onChange={(e) => { setFormData({ ...formData, birthday: e.target.value }) }}
-              className="mt-1.5 bg-white border-2 w-full rounded-sm p-1 border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-            />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-full justify-start text-left font-normal bg-white border-2 rounded-sm p-2 border-slate-300 shadow-none focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2",
+                    !formData.birthday && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {formData.birthday ? (
+                    format(new Date(formData.birthday), "dd/MM/yyyy")
+                  ) : (
+                    <span>Chọn ngày sinh</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={formData.birthday ? new Date(formData.birthday) : undefined}
+                  onSelect={(date: Date | undefined) => {
+                    if (date) {
+                      setFormData({
+                        ...formData,
+                        birthday: format(date, "yyyy-MM-dd"),
+                      });
+                    }
+                  }}
+                  initialFocus
+                  locale={vi}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Số điện thoại */}
@@ -292,15 +325,42 @@ export function CustomerAddFormDialog(props: CustomerAddFormDialogProps) {
           </div>
 
           {/* Ngày sinh */}
-          <div>
+          <div className="flex flex-col gap-1.5">
             <Label>Ngày sinh</Label>
-            <Input
-              type="date"
-              placeholder="VD: 15/01/1990"
-              value={formData.birthday ? formData.birthday : "2026-01-16"}
-              onChange={(e) => { setFormData({ ...formData, birthday: e.target.value }) }}
-              className="mt-1.5 bg-white border-2 w-full rounded-sm p-1 border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-            />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-full justify-start text-left font-normal bg-white border-2 rounded-sm p-2 border-slate-300 shadow-none focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2",
+                    !formData.birthday && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {formData.birthday ? (
+                    format(new Date(formData.birthday), "dd/MM/yyyy")
+                  ) : (
+                    <span>Chọn ngày sinh</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={formData.birthday ? new Date(formData.birthday) : undefined}
+                  onSelect={(date: Date | undefined) => {
+                    if (date) {
+                      setFormData({
+                        ...formData,
+                        birthday: format(date, "yyyy-MM-dd"),
+                      });
+                    }
+                  }}
+                  initialFocus
+                  locale={vi}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Số điện thoại */}

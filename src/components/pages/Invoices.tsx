@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Eye, Download, ChevronDown, ChevronRight, Receipt, CreditCard, Calendar as CalendarIcon, ArrowUp, ArrowDown, Filter, X } from 'lucide-react';
 import { CustomerTimeFilter } from '../reports/CustomerTimeFilter';
 import { Checkbox } from '../ui/checkbox';
@@ -6,12 +6,6 @@ import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Calendar } from '../ui/calendar';
-import { format } from 'date-fns';
-import { vi } from 'date-fns/locale';
-import { formatDate } from '../../utils/format';
 import {
   Table,
   TableBody,
@@ -20,6 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from '../ui/table';
+import { getOrders } from '../../api/order';
+import { toast } from 'sonner';
+import { format, subDays, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subMonths, subQuarters, subYears } from 'date-fns';
 
 interface InvoiceItem {
   id: number;
@@ -45,7 +42,8 @@ interface Invoice {
   paymentMethod: string;
   status: 'completed' | 'cancelled';
   promotionCode?: string;
-  rewardPoints?: number;
+  discountAmount?: number;
+  taxAmount?: number;
   itemDetails: InvoiceItem[];
 }
 
@@ -53,106 +51,144 @@ export function Invoices() {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRangeType, setDateRangeType] = useState<'preset' | 'custom'>('preset');
   const [timePreset, setTimePreset] = useState('today');
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
-  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  
+  // Initialize with today's date correctly
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
+  const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
+
+  const handleTimePresetChange = (preset: string) => {
+    setTimePreset(preset);
+    const now = new Date();
+    let start: Date | undefined;
+    let end: Date | undefined;
+
+    switch (preset) {
+      case 'today':
+        start = now;
+        end = now;
+        break;
+      case 'yesterday':
+        start = subDays(now, 1);
+        end = subDays(now, 1);
+        break;
+      case 'this-week':
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+        start = new Date(now.setDate(diff));
+        end = new Date(now.setDate(diff + 6));
+        break;
+      case 'last-week':
+        const lastWeek = subDays(now, 7);
+        const lastDay = lastWeek.getDay();
+        const lastDiff = lastWeek.getDate() - lastDay + (lastDay === 0 ? -6 : 1);
+        start = new Date(lastWeek.setDate(lastDiff));
+        end = new Date(lastWeek.setDate(lastDiff + 6));
+        break;
+      case 'last-7-days':
+        start = subDays(now, 6);
+        end = now;
+        break;
+      case 'this-month':
+        start = startOfMonth(now);
+        end = endOfMonth(now);
+        break;
+      case 'last-month':
+        const lastMonth = subMonths(now, 1);
+        start = startOfMonth(lastMonth);
+        end = endOfMonth(lastMonth);
+        break;
+      case 'last-30-days':
+        start = subDays(now, 29);
+        end = now;
+        break;
+      case 'this-quarter':
+        start = startOfQuarter(now);
+        end = endOfQuarter(now);
+        break;
+      case 'last-quarter':
+        const lastQuarter = subQuarters(now, 1);
+        start = startOfQuarter(lastQuarter);
+        end = endOfQuarter(lastQuarter);
+        break;
+      case 'this-year':
+        start = startOfYear(now);
+        end = endOfYear(now);
+        break;
+      case 'last-year':
+        const lastYear = subYears(now, 1);
+        start = startOfYear(lastYear);
+        end = endOfYear(lastYear);
+        break;
+    }
+    setDateFrom(start);
+    setDateTo(end);
+  };
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['completed', 'cancelled']);
-  const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<string[]>(['cash', 'transfer', 'momo']);
+  const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<string[]>(['cash', 'transfer']);
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<number | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-
+  
   // Sort states
   type SortField = "code" | "date" | "customer" | "items" | "total" | "paymentMethod" | "status" | null;
   type SortOrder = "asc" | "desc" | "none";
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("none");
 
-  // Mock data
-  const invoices: Invoice[] = [
-    {
-      id: 1,
-      code: 'HD001',
-      date: '2024-12-04 10:30',
-      customer: 'Khách lẻ',
-      customerId: 'KL001',
-      staffId: 'NV001',
-      staffName: 'Nguyễn Văn A',
-      tableId: 'B05',
-      orderCode: 'DM001',
-      items: 3,
-      total: 125000,
-      paymentMethod: 'cash',
-      status: 'completed',
-      promotionCode: 'KM001',
-      rewardPoints: 12,
-      itemDetails: [
-        { id: 1, name: 'Cà phê đen đá', unit: 'ly', quantity: 2, price: 25000, total: 50000 },
-        { id: 2, name: 'Bạc xỉu', unit: 'ly', quantity: 1, price: 30000, total: 30000 },
-        { id: 3, name: 'Bánh croissant', unit: 'cái', quantity: 1, price: 45000, total: 45000 },
-      ]
-    },
-    {
-      id: 2,
-      code: 'HD002',
-      date: '2024-12-04 11:15',
-      customer: 'Nguyễn Văn B',
-      customerId: 'KH002',
-      staffId: 'NV002',
-      staffName: 'Trần Thị C',
-      tableId: 'B03',
-      items: 5,
-      total: 250000,
-      paymentMethod: 'transfer',
-      status: 'completed',
-      rewardPoints: 25,
-      itemDetails: [
-        { id: 1, name: 'Trà sữa trân châu', unit: 'ly', quantity: 3, price: 35000, total: 105000 },
-        { id: 2, name: 'Cà phê sữa', unit: 'ly', quantity: 2, price: 30000, total: 60000 },
-        { id: 3, name: 'Bánh mì', unit: 'cái', quantity: 2, price: 25000, total: 50000 },
-        { id: 4, name: 'Nước suối', unit: 'chai', quantity: 2, price: 10000, total: 20000 },
-        { id: 5, name: 'Sữa chua', unit: 'hộp', quantity: 1, price: 15000, total: 15000 },
-      ]
-    },
-    {
-      id: 3,
-      code: 'HD003',
-      date: '2024-12-04 12:00',
-      customer: 'Khách lẻ',
-      customerId: 'KL002',
-      staffId: 'NV001',
-      staffName: 'Nguyễn Văn A',
-      items: 2,
-      total: 75000,
-      paymentMethod: 'cash',
-      status: 'completed',
-      rewardPoints: 7,
-      itemDetails: [
-        { id: 1, name: 'Cà phê đen nóng', unit: 'ly', quantity: 1, price: 25000, total: 25000 },
-        { id: 2, name: 'Trà đào', unit: 'ly', quantity: 1, price: 50000, total: 50000 },
-      ]
-    },
-    {
-      id: 4,
-      code: 'HD004',
-      date: '2024-12-04 14:45',
-      customer: 'Trần Thị D',
-      customerId: 'KH003',
-      staffId: 'NV003',
-      staffName: 'Lê Văn E',
-      tableId: 'B07',
-      orderCode: 'DM002',
-      items: 4,
-      total: 180000,
-      paymentMethod: 'momo',
-      status: 'completed',
-      promotionCode: 'KM002',
-      rewardPoints: 18,
-      itemDetails: [
-        { id: 1, name: 'Trà sữa ô long', unit: 'ly', quantity: 2, price: 40000, total: 80000 },
-        { id: 2, name: 'Bánh flan', unit: 'cái', quantity: 2, price: 25000, total: 50000 },
-        { id: 3, name: 'Cà phê latte', unit: 'ly', quantity: 1, price: 50000, total: 50000 },
-      ]
-    },
-  ];
+  // Data state
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch data
+  const fetchInvoices = async () => {
+    setIsLoading(true);
+    try {
+      const params: any = {};
+      // Filter by date if present
+      if (dateFrom) params.fromDate = format(dateFrom, 'yyyy-MM-dd');
+      if (dateTo) params.toDate = format(dateTo, 'yyyy-MM-dd');
+      
+      const response = await getOrders(params);
+      const apiOrders = response.data?.metaData?.orders || [];
+      
+      const mappedInvoices: Invoice[] = apiOrders.map((order: any) => ({
+        id: order.id,
+        code: order.orderCode,
+        date: new Date(order.createdAt).toLocaleString('vi-VN'),
+        customer: order.customer?.name || 'Khách lẻ',
+        customerId: order.customerId ? `KH${order.customerId}` : 'GUEST',
+        staffId: order.staff?.code || `NV${order.staffId}`,
+        staffName: order.staff?.fullName || '',
+        tableId: order.table?.tableName,
+        orderCode: order.orderCode,
+        items: order._count?.orderItems || order.orderItems?.length || 0,
+        total: Number(order.totalAmount),
+        paymentMethod: order.paymentMethod || 'cash',
+        status: order.status,
+        promotionCode: order.promotionId ? `KM${order.promotionId}` : undefined,
+        discountAmount: Number(order.discountAmount || 0),
+        taxAmount: Number(order.taxAmount || 0),
+        itemDetails: (order.orderItems || []).map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          unit: item.item?.unit?.name || 'Phần',
+          quantity: item.quantity,
+          price: Number(item.unitPrice),
+          total: Number(item.totalPrice)
+        }))
+      }));
+
+      setInvoices(mappedInvoices);
+    } catch (error) {
+      console.error("Error fetching invoices:", error);
+      toast.error("Không thể tải danh sách hóa đơn");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInvoices();
+  }, [dateFrom, dateTo]);
 
   const toggleStatus = (status: string) => {
     setSelectedStatuses(prev =>
@@ -211,14 +247,14 @@ export function Invoices() {
   };
 
   let filteredInvoices = invoices.filter(invoice => {
-    const matchesSearch = invoice.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.customer.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = invoice.code.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         invoice.customer.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(invoice.status);
     const matchesPayment = selectedPaymentMethods.length === 0 || selectedPaymentMethods.includes(invoice.paymentMethod);
     return matchesSearch && matchesStatus && matchesPayment;
   });
 
-  // Apply sorting
+  // Apply sorting (same logic)
   if (sortField && sortOrder !== "none") {
     filteredInvoices = [...filteredInvoices].sort((a, b) => {
       let aValue: any;
@@ -228,8 +264,8 @@ export function Invoices() {
         aValue = a.code;
         bValue = b.code;
       } else if (sortField === "date") {
-        aValue = new Date(a.date.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1')).getTime();
-        bValue = new Date(b.date.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1')).getTime();
+        aValue = a.date;
+        bValue = b.date;
       } else if (sortField === "customer") {
         aValue = a.customer;
         bValue = b.customer;
@@ -301,9 +337,9 @@ export function Invoices() {
               >
                 <Filter className="w-4 h-4" />
                 Bộ lọc
-                {(selectedStatuses.length < 2 || selectedPaymentMethods.length < 3) && (
+                {(selectedStatuses.length < 2 || selectedPaymentMethods.length < 2) && (
                   <Badge className="ml-1 bg-blue-500 text-white px-1.5 py-0.5 text-xs">
-                    {(selectedStatuses.length < 2 ? 1 : 0) + (selectedPaymentMethods.length < 3 ? 1 : 0)}
+                    {(selectedStatuses.length < 2 ? 1 : 0) + (selectedPaymentMethods.length < 2 ? 1 : 0)}
                   </Badge>
                 )}
               </Button>
@@ -322,7 +358,7 @@ export function Invoices() {
                       dateFrom={dateFrom}
                       dateTo={dateTo}
                       onDateRangeTypeChange={setDateRangeType}
-                      onTimePresetChange={setTimePreset}
+                      onTimePresetChange={handleTimePresetChange}
                       onDateFromChange={setDateFrom}
                       onDateToChange={setDateTo}
                     />
@@ -340,7 +376,7 @@ export function Invoices() {
                             { id: 'cancelled', label: 'Đã hủy' },
                           ].map((status) => (
                             <div key={status.id} className="flex items-center space-x-2">
-                              <Checkbox
+                              <Checkbox 
                                 id={status.id}
                                 checked={selectedStatuses.includes(status.id)}
                                 onCheckedChange={() => toggleStatus(status.id)}
@@ -359,10 +395,9 @@ export function Invoices() {
                           {[
                             { id: 'cash', label: 'Tiền mặt' },
                             { id: 'transfer', label: 'Chuyển khoản' },
-                            { id: 'momo', label: 'Ví MoMo' },
                           ].map((method) => (
                             <div key={method.id} className="flex items-center space-x-2">
-                              <Checkbox
+                              <Checkbox 
                                 id={method.id}
                                 checked={selectedPaymentMethods.includes(method.id)}
                                 onCheckedChange={() => togglePaymentMethod(method.id)}
@@ -409,12 +444,12 @@ export function Invoices() {
                     size="sm"
                     onClick={() => {
                       setSelectedStatuses(['completed', 'cancelled']);
-                      setSelectedPaymentMethods(['cash', 'transfer', 'momo']);
+                      setSelectedPaymentMethods(['cash', 'transfer']);
                       setSearchTerm("");
                       setDateRangeType('preset');
-                      setTimePreset('today');
-                      setDateFrom(undefined);
-                      setDateTo(undefined);
+                      handleTimePresetChange('today');
+                      // setDateFrom(undefined); // Handled by handleTimePresetChange
+                      // setDateTo(undefined); // Handled by handleTimePresetChange
                     }}
                   >
                     <X className="w-4 h-4 mr-2" />
@@ -504,153 +539,151 @@ export function Invoices() {
                       {getSortIcon("status")}
                     </div>
                   </TableHead>
-                  <TableHead className="text-sm text-center">Thao tác</TableHead>
+                  {/* Removed Thao tác column header */}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredInvoices.map((invoice, index) => (
-                  <>
-                    <TableRow
-                      key={invoice.id}
-                      className="hover:bg-blue-100/50 cursor-pointer"
-                      onClick={() => toggleExpand(invoice.id)}
-                    >
-                      <TableCell className="text-sm text-center">
-                        {expandedInvoiceId === invoice.id ? (
-                          <ChevronDown className="w-4 h-4 text-slate-600" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4 text-slate-600" />
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-600 text-center">
-                        {index + 1}
-                      </TableCell>
-                      <TableCell className="text-sm text-blue-600">{invoice.code}</TableCell>
-                      <TableCell className="text-sm text-slate-700">{formatDate(invoice.date)}</TableCell>
-                      <TableCell className="text-sm text-slate-900">{invoice.customer}</TableCell>
-                      <TableCell className="text-sm text-slate-700 text-center">{invoice.items}</TableCell>
-                      <TableCell className="text-sm text-slate-900 text-right">
-                        {invoice.total.toLocaleString('vi-VN')}đ
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-700">{getPaymentMethodLabel(invoice.paymentMethod)}</TableCell>
-                      <TableCell className="text-sm text-center">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${invoice.status === 'completed'
-                          ? 'bg-green-50 text-green-700'
-                          : 'bg-red-50 text-red-700'
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8">
+                      Đang tải dữ liệu...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredInvoices.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8">
+                      Không có hóa đơn nào
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredInvoices.map((invoice, index) => (
+                    <>
+                      <TableRow 
+                        key={invoice.id} 
+                        className="hover:bg-blue-100/50 cursor-pointer"
+                        onClick={() => toggleExpand(invoice.id)}
+                      >
+                        <TableCell className="text-sm text-center">
+                          {expandedInvoiceId === invoice.id ? (
+                            <ChevronDown className="w-4 h-4 text-slate-600" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-slate-600" />
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-600 text-center">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell className="text-sm text-blue-600">{invoice.code}</TableCell>
+                        <TableCell className="text-sm text-slate-700">{invoice.date}</TableCell>
+                        <TableCell className="text-sm text-slate-900">{invoice.customer}</TableCell>
+                        <TableCell className="text-sm text-slate-700 text-center">{invoice.items}</TableCell>
+                        <TableCell className="text-sm text-slate-900 text-right">
+                          {invoice.total.toLocaleString('vi-VN')}đ
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-700">{getPaymentMethodLabel(invoice.paymentMethod)}</TableCell>
+                        <TableCell className="text-sm text-center">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
+                            invoice.status === 'completed' 
+                              ? 'bg-green-50 text-green-700' 
+                              : 'bg-red-50 text-red-700'
                           }`}>
-                          {invoice.status === 'completed' ? 'Hoàn thành' : 'Đã hủy'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-sm text-center" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-center gap-2">
-                          <button className="text-blue-600 hover:text-blue-700 p-1">
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button className="text-slate-600 hover:text-slate-700 p-1">
-                            <Download className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-
-                    {/* Expanded Detail Row */}
-                    {expandedInvoiceId === invoice.id && (
-                      <TableRow>
-                        <TableCell colSpan={10} className="px-4 py-4 bg-slate-50">
-                          <div className="bg-white rounded-lg border border-slate-200 p-6">
-                            {/* Invoice Info Grid */}
-                            <div className="grid grid-cols-2 gap-x-8 gap-y-3 mb-6">
-                              <div className="flex gap-2">
-                                <span className="text-sm text-slate-600 w-40">Mã hóa đơn:</span>
-                                <span className="text-sm text-slate-900 font-medium">{invoice.code}</span>
-                              </div>
-                              <div className="flex gap-2">
-                                <span className="text-sm text-slate-600 w-40">Mã NV:</span>
-                                <span className="text-sm text-slate-900">{invoice.staffId} - {invoice.staffName}</span>
-                              </div>
-
-                              <div className="flex gap-2">
-                                <span className="text-sm text-slate-600 w-40">Mã KH:</span>
-                                <span className="text-sm text-slate-900">{invoice.customerId}</span>
-                              </div>
-                              <div className="flex gap-2">
-                                <span className="text-sm text-slate-600 w-40">Ngày lập:</span>
-                                <span className="text-sm text-slate-900">{formatDate(invoice.date)}</span>
-                              </div>
-
-                              <div className="flex gap-2">
-                                <span className="text-sm text-slate-600 w-40">Mã bàn:</span>
-                                <span className="text-sm text-slate-900">{invoice.tableId || '-'}</span>
-                              </div>
-                              <div className="flex gap-2">
-                                <span className="text-sm text-slate-600 w-40">Mã phiếu đặt món:</span>
-                                <span className="text-sm text-slate-900">{invoice.orderCode || '-'}</span>
-                              </div>
-
-                              <div className="flex gap-2">
-                                <span className="text-sm text-slate-600 w-40">Phương thức thanh toán:</span>
-                                <span className="text-sm text-slate-900">{getPaymentMethodLabel(invoice.paymentMethod)}</span>
-                              </div>
-                              <div className="flex gap-2">
-                                <span className="text-sm text-slate-600 w-40"></span>
-                                <span className="text-sm text-slate-900"></span>
+                            {invoice.status === 'completed' ? 'Hoàn thành' : 'Đã hủy'}
+                          </span>
+                        </TableCell>
+                        {/* Removed Thao tác column cell */}
+                      </TableRow>
+                      
+                      {/* Expanded Detail Row */}
+                      {expandedInvoiceId === invoice.id && (
+                        <TableRow>
+                          <TableCell colSpan={9} className="px-4 py-4 bg-slate-50">
+                            <div className="bg-white rounded-lg border border-slate-200 p-6">
+                              {/* Invoice Info Grid */}
+                              <div className="grid grid-cols-2 gap-x-8 gap-y-3 mb-6">
+                                <div className="flex gap-2">
+                                  <span className="text-sm text-slate-600 w-40">Mã hóa đơn:</span>
+                                  <span className="text-sm text-slate-900 font-medium">{invoice.code}</span>
+                                </div>
+                                <div className="flex gap-2">
+                                  <span className="text-sm text-slate-600 w-40">Mã NV:</span>
+                                  <span className="text-sm text-slate-900">{invoice.staffId} - {invoice.staffName}</span>
+                                </div>
+                                
+                                <div className="flex gap-2">
+                                  <span className="text-sm text-slate-600 w-40">Mã KH:</span>
+                                  <span className="text-sm text-slate-900">{invoice.customerId}</span>
+                                </div>
+                                <div className="flex gap-2">
+                                  <span className="text-sm text-slate-600 w-40">Ngày lập:</span>
+                                  <span className="text-sm text-slate-900">{invoice.date}</span>
+                                </div>
+                                
+                                <div className="flex gap-2">
+                                  <span className="text-sm text-slate-600 w-40">Mã bàn:</span>
+                                  <span className="text-sm text-slate-900">{invoice.tableId || '-'}</span>
+                                </div>
+                                
+                                <div className="flex gap-2">
+                                  <span className="text-sm text-slate-600 w-40">Phương thức thanh toán:</span>
+                                  <span className="text-sm text-slate-900">{getPaymentMethodLabel(invoice.paymentMethod)}</span>
+                                </div>
+                                
+                                <div className="flex gap-2">
+                                  <span className="text-sm text-slate-600 w-40">Mã khuyến mãi:</span>
+                                  <span className="text-sm text-slate-900">{invoice.promotionCode || '-'}</span>
+                                </div>
+                                <div className="flex gap-2">
+                                  <span className="text-sm text-slate-600 w-40">Giảm giá:</span>
+                                  <span className="text-sm text-red-600 font-medium">{invoice.discountAmount?.toLocaleString('vi-VN') || 0}đ</span>
+                                </div>
                               </div>
 
-                              <div className="flex gap-2">
-                                <span className="text-sm text-slate-600 w-40">Mã khuyến mãi:</span>
-                                <span className="text-sm text-slate-900">{invoice.promotionCode || '-'}</span>
-                              </div>
-                              <div className="flex gap-2">
-                                <span className="text-sm text-slate-600 w-40">Điểm thưởng:</span>
-                                <span className="text-sm text-green-600 font-medium">{invoice.rewardPoints || 0} điểm</span>
-                              </div>
-                            </div>
-
-                            {/* Items Table */}
-                            <div className="border border-slate-200 rounded-lg overflow-hidden">
-                              <table className="w-full">
-                                <thead className="bg-slate-50">
-                                  <tr>
-                                    <th className="px-4 py-2 text-left text-xs text-slate-600">STT</th>
-                                    <th className="px-4 py-2 text-left text-xs text-slate-600">Mặt hàng</th>
-                                    <th className="px-4 py-2 text-center text-xs text-slate-600">ĐVT</th>
-                                    <th className="px-4 py-2 text-right text-xs text-slate-600">Số lượng</th>
-                                    <th className="px-4 py-2 text-right text-xs text-slate-600">Đơn giá</th>
-                                    <th className="px-4 py-2 text-right text-xs text-slate-600">Thành tiền</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                  {invoice.itemDetails.map((item, index) => (
-                                    <tr key={item.id}>
-                                      <td className="px-4 py-2 text-sm text-slate-600">{index + 1}</td>
-                                      <td className="px-4 py-2 text-sm text-slate-900">{item.name}</td>
-                                      <td className="px-4 py-2 text-sm text-slate-600 text-center">{item.unit}</td>
-                                      <td className="px-4 py-2 text-sm text-slate-900 text-right">{item.quantity}</td>
-                                      <td className="px-4 py-2 text-sm text-slate-900 text-right">
-                                        {item.price.toLocaleString('vi-VN')}đ
+                              {/* Items Table */}
+                              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                <table className="w-full">
+                                  <thead className="bg-slate-50">
+                                    <tr>
+                                      <th className="px-4 py-2 text-left text-xs text-slate-600">STT</th>
+                                      <th className="px-4 py-2 text-left text-xs text-slate-600">Mặt hàng</th>
+                                      <th className="px-4 py-2 text-center text-xs text-slate-600">ĐVT</th>
+                                      <th className="px-4 py-2 text-right text-xs text-slate-600">Số lượng</th>
+                                      <th className="px-4 py-2 text-right text-xs text-slate-600">Đơn giá</th>
+                                      <th className="px-4 py-2 text-right text-xs text-slate-600">Thành tiền</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {invoice.itemDetails.map((item, index) => (
+                                      <tr key={item.id}>
+                                        <td className="px-4 py-2 text-sm text-slate-600">{index + 1}</td>
+                                        <td className="px-4 py-2 text-sm text-slate-900">{item.name}</td>
+                                        <td className="px-4 py-2 text-sm text-slate-600 text-center">{item.unit}</td>
+                                        <td className="px-4 py-2 text-sm text-slate-900 text-right">{item.quantity}</td>
+                                        <td className="px-4 py-2 text-sm text-slate-900 text-right">
+                                          {item.price.toLocaleString('vi-VN')}đ
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-slate-900 text-right font-medium">
+                                          {item.total.toLocaleString('vi-VN')}đ
+                                        </td>
+                                      </tr>
+                                    ))}
+                                    <tr className="bg-slate-50">
+                                      <td colSpan={5} className="px-4 py-2 text-sm text-slate-900 font-medium text-right">
+                                        Tổng cộng:
                                       </td>
-                                      <td className="px-4 py-2 text-sm text-slate-900 text-right font-medium">
-                                        {item.total.toLocaleString('vi-VN')}đ
+                                      <td className="px-4 py-2 text-sm text-green-600 text-right font-semibold">
+                                        {invoice.total.toLocaleString('vi-VN')}đ
                                       </td>
                                     </tr>
-                                  ))}
-                                  <tr className="bg-slate-50">
-                                    <td colSpan={5} className="px-4 py-2 text-sm text-slate-900 font-medium text-right">
-                                      Tổng cộng:
-                                    </td>
-                                    <td className="px-4 py-2 text-sm text-green-600 text-right font-semibold">
-                                      {invoice.total.toLocaleString('vi-VN')}đ
-                                    </td>
-                                  </tr>
-                                </tbody>
-                              </table>
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </>
-                ))}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { cn } from './ui/utils';
 import { X, Plus, Trash2, ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { PromotionTypes } from './pages/Promotions';
@@ -9,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Checkbox } from './ui/checkbox';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { Calendar } from './ui/calendar';
+import { Calendar as CalendarIcon } from 'lucide-react';
 import { getInventoryItemCategories, getInventoryItems } from '../api/inventoryItem';
 import { getActiveCombos } from '../api/combo';
 import { getCustomers } from '../api/customer';
@@ -659,30 +662,72 @@ export function PromotionEditFormDialog({
               <Label>
                 Thời gian bắt đầu <span className="text-red-500">*</span>
               </Label>
-              <input
-                type="datetime-local"
-                value={formData.startDateTime || formatDateTimeLocal(new Date())}
-                onChange={(e) => setFormData({ ...formData, startDateTime: e.target.value })}
-                className="mt-1.5 bg-white border-2 w-full rounded-sm p-1 border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-              />
-              <p className="text-[10px] text-slate-500 mt-1 italic">
-                Định dạng hiển thị: {formData.startDateTime ? format(new Date(formData.startDateTime), 'dd/MM/yyyy HH:mm', { locale: vi }) : format(new Date(), 'dd/MM/yyyy HH:mm', { locale: vi })}
-              </p>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal mt-1.5 bg-white border-2 border-slate-300 h-10",
+                      !formData.startDateTime && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.startDateTime ? (
+                      format(new Date(formData.startDateTime), 'dd/MM/yyyy', { locale: vi })
+                    ) : (
+                      <span>Chọn ngày</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={formData.startDateTime ? new Date(formData.startDateTime) : undefined}
+                    onSelect={(date: Date | undefined) => {
+                      if (date) {
+                        setFormData({ ...formData, startDateTime: format(date, 'yyyy-MM-dd') });
+                      }
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             {/* Thoi gian ket thuc */}
             <div>
               <Label>
                 Thời gian kết thúc <span className="text-red-500">*</span>
               </Label>
-              <input
-                type="datetime-local"
-                value={formData.endDateTime || formatDateTimeLocal(getNextMonth())}
-                onChange={(e) => setFormData({ ...formData, endDateTime: e.target.value })}
-                className="mt-1.5 bg-white border-2 w-full rounded-sm p-1 border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-              />
-              <p className="text-[10px] text-slate-500 mt-1 italic">
-                Định dạng hiển thị: {formData.endDateTime ? format(new Date(formData.endDateTime), 'dd/MM/yyyy HH:mm', { locale: vi }) : format(getNextMonth(), 'dd/MM/yyyy HH:mm', { locale: vi })}
-              </p>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal mt-1.5 bg-white border-2 border-slate-300 h-10",
+                      !formData.endDateTime && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.endDateTime ? (
+                      format(new Date(formData.endDateTime), 'dd/MM/yyyy', { locale: vi })
+                    ) : (
+                      <span>Chọn ngày</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={formData.endDateTime ? new Date(formData.endDateTime) : undefined}
+                    onSelect={(date: Date | undefined) => {
+                      if (date) {
+                        setFormData({ ...formData, endDateTime: format(date, 'yyyy-MM-dd') });
+                      }
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             {/* So luot su dung toi da */}
             <div>
@@ -1847,30 +1892,73 @@ export function PromotionAddFormDialog({
               <Label>
                 Thời gian bắt đầu <span className="text-red-500">*</span>
               </Label>
-              <input
-                type="datetime-local"
-                value={formData.startDateTime || formatDateTimeLocal(new Date())}
-                onChange={(e) => setFormData({ ...formData, startDateTime: e.target.value })}
-                className="mt-1.5 bg-white border-2 w-full rounded-sm p-1 border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-              />
-              <p className="text-[10px] text-slate-500 mt-1 italic">
-                Định dạng hiển thị: {formData.startDateTime ? format(new Date(formData.startDateTime), 'dd/MM/yyyy HH:mm', { locale: vi }) : format(new Date(), 'dd/MM/yyyy HH:mm', { locale: vi })}
-              </p>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal mt-1.5 bg-white border-2 border-slate-300 h-10",
+                      !formData.startDateTime && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.startDateTime ? (
+                      format(new Date(formData.startDateTime), 'dd/MM/yyyy', { locale: vi })
+                    ) : (
+                      <span>Chọn ngày</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={formData.startDateTime ? new Date(formData.startDateTime) : undefined}
+                    onSelect={(date: Date | undefined) => {
+                      if (date) {
+                        // Keep as date string for simplicity
+                        setFormData({ ...formData, startDateTime: format(date, 'yyyy-MM-dd') });
+                      }
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             {/* Thoi gian ket thuc */}
             <div>
               <Label>
                 Thời gian kết thúc <span className="text-red-500">*</span>
               </Label>
-              <input
-                type="datetime-local"
-                value={formData.endDateTime || formatDateTimeLocal(getNextMonth())}
-                onChange={(e) => setFormData({ ...formData, endDateTime: e.target.value })}
-                className="mt-1.5 bg-white border-2 w-full rounded-sm p-1 border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-              />
-              <p className="text-[10px] text-slate-500 mt-1 italic">
-                Định dạng hiển thị: {formData.endDateTime ? format(new Date(formData.endDateTime), 'dd/MM/yyyy HH:mm', { locale: vi }) : format(getNextMonth(), 'dd/MM/yyyy HH:mm', { locale: vi })}
-              </p>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal mt-1.5 bg-white border-2 border-slate-300 h-10",
+                      !formData.endDateTime && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.endDateTime ? (
+                      format(new Date(formData.endDateTime), 'dd/MM/yyyy', { locale: vi })
+                    ) : (
+                      <span>Chọn ngày</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={formData.endDateTime ? new Date(formData.endDateTime) : undefined}
+                    onSelect={(date: Date | undefined) => {
+                      if (date) {
+                        setFormData({ ...formData, endDateTime: format(date, 'yyyy-MM-dd') });
+                      }
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             {/* So luot su dung toi da */}
             <div>

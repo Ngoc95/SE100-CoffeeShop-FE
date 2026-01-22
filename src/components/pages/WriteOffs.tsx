@@ -81,6 +81,7 @@ import { toast } from "sonner";
 import { useAuth } from "../../contexts/AuthContext";
 import { categories } from "../../data/categories";
 import { inventoryService } from "../../services/inventoryService";
+import { cn } from "../ui/utils";
 import { Card, CardContent } from "../ui/card";
 import { CustomerTimeFilter } from "../reports/CustomerTimeFilter";
 
@@ -2062,16 +2063,42 @@ export function WriteOffs() {
                   className="bg-slate-100 border-slate-300 shadow-none"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 flex flex-col">
                 <Label>Ngày xuất hủy *</Label>
-                <Input
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) =>
-                    setFormData({ ...formData, date: e.target.value })
-                  }
-                  className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-white border border-slate-300 shadow-none focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2",
+                        !formData.date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.date ? (
+                        format(new Date(formData.date), "dd/MM/yyyy")
+                      ) : (
+                        <span>Chọn ngày</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.date ? new Date(formData.date) : undefined}
+                      onSelect={(date: Date | undefined) => {
+                        if (date) {
+                          setFormData({
+                            ...formData,
+                            date: format(date, "yyyy-MM-dd"),
+                          });
+                        }
+                      }}
+                      initialFocus
+                      locale={vi}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label>Lý do *</Label>
