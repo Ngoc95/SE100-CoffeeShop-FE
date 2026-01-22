@@ -1,222 +1,384 @@
 import { useState, useEffect } from 'react';
-import svgPaths from '../imports/svg-uemarp4dxh';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Label } from './ui/label';
+import { Input } from './ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from './ui/select';
+import { Button } from './ui/button';
+import { activeStatus, cities, genders } from './pages/Customers';
 
-interface Customer {
-  id: string;
-  code: string;
-  name: string;
-  gender: string;
-  birthday: string;
-  phone: string;
-  email: string;
-  city: string;
-  address: string;
-  group: string;
-  orders: number;
-  totalSpent: number;
-  status: 'active' | 'inactive';
+export interface EditCustomer {
+  id: number,
+  code: string,
+  name: string,
+  phone: string,
+  city: string,
+  gender: string,
+  birthday: string,
+  address: string,
+  isActive: boolean
 }
 
-interface CustomerFormDialogProps {
+export interface AddCustomer {
+  name: string,
+  phone: string,
+  city: string,
+  gender: string,
+  birthday: string,
+  address: string,
+  isActive: boolean
+}
+
+interface CustomerEditFormDialogProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (formData: {
-    name: string;
-    gender: string;
-    birthday: string;
-    phone: string;
-    city: string;
-    address: string;
-  }) => void;
-  editingCustomer: Customer | null;
+  onSubmit: (customer: EditCustomer) => void;
+  editingCustomer: EditCustomer;
 }
 
-export function CustomerFormDialog({ open, onClose, onSubmit, editingCustomer }: CustomerFormDialogProps) {
-  const [formData, setFormData] = useState({
+interface CustomerAddFormDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (customer: AddCustomer) => void;
+}
+
+export function CustomerEditFormDialog(props: CustomerEditFormDialogProps) {
+  const [formData, setFormData] = useState<EditCustomer>({
+    id: 0,
+    code: '',
     name: '',
-    gender: '',
-    birthday: '',
     phone: '',
     city: '',
+    gender: '',
+    birthday: '',
     address: '',
+    isActive: true
   });
 
   useEffect(() => {
-    if (editingCustomer) {
-      setFormData({
-        name: editingCustomer.name,
-        gender: editingCustomer.gender,
-        birthday: editingCustomer.birthday,
-        phone: editingCustomer.phone,
-        city: editingCustomer.city,
-        address: editingCustomer.address,
-      });
-    } else {
-      setFormData({
-        name: '',
-        gender: '',
-        birthday: '',
-        phone: '',
-        city: '',
-        address: '',
-      });
-    }
-  }, [editingCustomer, open]);
+    setFormData({
+      id: props.editingCustomer.id,
+      code: props.editingCustomer.code,
+      name: props.editingCustomer.name,
+      phone: props.editingCustomer.phone,
+      city: props.editingCustomer.city,
+      gender: props.editingCustomer.gender,
+      birthday: props.editingCustomer.birthday,
+      address: props.editingCustomer.address,
+      isActive: props.editingCustomer.isActive
+    })
+  }, [props.editingCustomer, props.open]);
 
   const handleSubmit = () => {
-    onSubmit(formData);
+    props.onSubmit(formData);
   };
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white border border-[rgba(0,0,0,0.1)] border-solid rounded-[10px] shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] w-[508.391px] relative">
-        {/* Title */}
-        <div className="pt-6 px-6">
-          <p className="font-['Arimo:Regular',sans-serif] font-normal leading-[18px] text-[18px] text-neutral-950">
-            {editingCustomer ? 'Chỉnh sửa khách hàng' : 'Thêm khách hàng mới'}
-          </p>
-        </div>
+    <Dialog open={props.open} onOpenChange={props.onClose}>
+      <DialogContent className="max-w-[600px]" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle className="text-lg font-semibold">
+            Chỉnh sửa khách hàng
+          </DialogTitle>
+        </DialogHeader>
 
-        {/* Close Button */}
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 opacity-70 hover:opacity-100 w-4 h-4 flex items-center justify-center"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 12 12">
-            <path d={svgPaths.p31ac93c0} stroke="#0A0A0A" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.33333" />
-            <path d={svgPaths.p1c3aed40} stroke="#0A0A0A" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.33333" />
-          </svg>
-        </button>
-
-        {/* Form Fields */}
-        <div className="px-6 pt-[34px] pb-6 flex flex-col gap-4">
-          {/* Tên khách hàng */}
-          <div className="flex flex-col gap-[3px]">
-            <label className="font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950">
-              Tên khách hàng
-            </label>
-            <input
+        <div className="space-y-4">
+          {/* Mã khách hàng */}
+          <div>
+            <Label>Mã khách hàng</Label>
+            <Input
               type="text"
-              placeholder="VD: Nguyễn Văn A..."
+              disabled={true}
+              placeholder="KH001"
+              value={formData.code}
+              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+            />
+          </div>
+
+          {/* Tên khách hàng */}
+          <div>
+            <Label>Tên khách hàng <Label className="text-red-600">*</Label></Label>
+            <Input
+              type="text"
+              placeholder="VD: Nguyễn Văn A"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="bg-[#f3f3f5] border border-[rgba(0,0,0,0)] rounded-[8px] h-[36px] px-3 py-1 font-['Arimo:Regular',sans-serif] text-[14px] text-neutral-950 placeholder:text-[#717182] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(e) => { setFormData({ ...formData, name: e.target.value }) }}
+              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
 
           {/* Giới tính */}
-          <div className="flex flex-col gap-[3px]">
-            <label className="font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950">
-              Giới tính
-            </label>
-            <div className="relative">
-              <select
-                value={formData.gender}
-                onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                className="bg-[#f3f3f5] border border-[rgba(0,0,0,0)] rounded-[8px] h-[36px] px-3 w-full font-['Arimo:Regular',sans-serif] text-[14px] text-neutral-950 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Chọn giới tính</option>
-                <option value="Nam">Nam</option>
-                <option value="Nữ">Nữ</option>
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50">
-                <svg className="w-[10px] h-[6px]" fill="none" viewBox="0 0 10 6">
-                  <path d={svgPaths.p1112dfa0} stroke="#717182" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.33333" />
-                </svg>
-              </div>
-            </div>
+          <div>
+            <Label>Giới tính</Label>
+            <Select
+              value={formData.gender}
+              onValueChange={(value: string) => setFormData({ ...formData, gender: value })}
+            >
+              <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                <SelectValue placeholder="Chọn giới tính" />
+              </SelectTrigger>
+              <SelectContent>
+                {
+                  genders.map((gender, index) => (
+                    <SelectItem key={index} value={gender}>
+                      {gender === 'male' ? 'Nam' : (gender === 'female' ? 'Nữ' : gender)}
+                    </SelectItem>
+                  ))
+                }
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Ngày sinh */}
-          <div className="flex flex-col gap-[3px]">
-            <label className="font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950">
-              Ngày sinh
-            </label>
-            <input
-              type="text"
-              placeholder="VD: 15/01/1990..."
-              value={formData.birthday}
-              onChange={(e) => setFormData({ ...formData, birthday: e.target.value })}
-              className="bg-[#f3f3f5] border border-[rgba(0,0,0,0)] rounded-[8px] h-[36px] px-3 py-1 font-['Arimo:Regular',sans-serif] text-[14px] text-neutral-950 placeholder:text-[#717182] focus:outline-none focus:ring-2 focus:ring-blue-500"
+          <div>
+            <Label>Ngày sinh</Label>
+            <Input
+              type="date"
+              placeholder="VD: 15/01/1990"
+              value={formData.birthday ? formData.birthday : "2026-01-16"}
+              onChange={(e) => { setFormData({ ...formData, birthday: e.target.value }) }}
+              className="mt-1.5 bg-white border-2 w-full rounded-sm p-1 border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
 
           {/* Số điện thoại */}
-          <div className="flex flex-col gap-[3px]">
-            <label className="font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950">
-              Số điện thoại
-            </label>
-            <input
+          <div>
+            <Label>Số điện thoại <Label className="text-red-600">*</Label></Label>
+            <Input
               type="tel"
-              placeholder="VD: 0901234567..."
+              placeholder="VD: 0901234567"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              className="bg-[#f3f3f5] border border-[rgba(0,0,0,0)] rounded-[8px] h-[36px] px-3 py-1 font-['Arimo:Regular',sans-serif] text-[14px] text-neutral-950 placeholder:text-[#717182] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
           </div>
 
           {/* Tỉnh / Thành phố */}
-          <div className="flex flex-col gap-[3px]">
-            <label className="font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950">
-              Tỉnh / Thành phố
-            </label>
-            <div className="relative">
-              <select
-                value={formData.city}
-                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                className="bg-[#f3f3f5] border border-[rgba(0,0,0,0)] rounded-[8px] h-[36px] px-3 w-full font-['Arimo:Regular',sans-serif] text-[14px] text-neutral-950 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Chọn tỉnh/thành phố</option>
-                <option value="Hồ Chí Minh">Hồ Chí Minh</option>
-                <option value="Hà Nội">Hà Nội</option>
-                <option value="Đà Nẵng">Đà Nẵng</option>
-                <option value="Cần Thơ">Cần Thơ</option>
-                <option value="Hải Phòng">Hải Phòng</option>
-                <option value="Nha Trang">Nha Trang</option>
-                <option value="Huế">Huế</option>
-                <option value="Vũng Tàu">Vũng Tàu</option>
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50">
-                <svg className="w-[10px] h-[6px]" fill="none" viewBox="0 0 10 6">
-                  <path d={svgPaths.p1112dfa0} stroke="#717182" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.33333" />
-                </svg>
-              </div>
-            </div>
+          <div>
+            <Label>Tỉnh / Thành phố</Label>
+            <Select
+              value={formData.city}
+              onValueChange={(value: string) => setFormData({ ...formData, city: value })}
+            >
+              <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                <SelectValue placeholder="Chọn tỉnh/thành phố" />
+              </SelectTrigger>
+              <SelectContent>
+                {
+                  cities.map((city, index) => (
+                    <SelectItem key={index} value={city}>
+                      {city}
+                    </SelectItem>
+                  ))
+                }
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Địa chỉ */}
-          <div className="flex flex-col gap-[3px]">
-            <label className="font-['Arimo:Regular',sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950">
-              Địa chỉ
-            </label>
-            <input
+          <div>
+            <Label>Địa chỉ</Label>
+            <Input
               type="text"
-              placeholder="VD: 123 Đường ABC, Quận 1..."
+              placeholder="VD: 123 Đường ABC, Quận 1"
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              className="bg-[#f3f3f5] border border-[rgba(0,0,0,0)] rounded-[8px] h-[36px] px-3 py-1 font-['Arimo:Regular',sans-serif] text-[14px] text-neutral-950 placeholder:text-[#717182] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
+          </div>
+
+          {/* Status */}
+          <div>
+            <Label>Trạng thái</Label>
+            <Select
+              value={(formData.isActive) ? "Hoạt động" : "Không hoạt động"}
+              onValueChange={(value: string) => setFormData({ ...formData, isActive: (value === "Hoạt động" ? true : false) })}
+            >
+              <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                <SelectValue placeholder="Chọn trạng thái" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Hoạt động">Hoạt động</SelectItem>
+                <SelectItem value="Không hoạt động">Không hoạt động</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        {/* Buttons */}
-        <div className="px-6 pb-6 flex gap-2 justify-end">
-          <button
-            onClick={onClose}
-            className="bg-white border border-[rgba(0,0,0,0.1)] h-[36px] px-4 rounded-[8px] font-['Arimo:Regular',sans-serif] text-[14px] text-neutral-950 hover:bg-gray-50 transition-colors"
-          >
+        <DialogFooter>
+          <Button variant="outline" onClick={props.onClose}>
             Hủy
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleSubmit}
-            className="bg-[#155dfc] h-[36px] px-4 rounded-[8px] font-['Arimo:Regular',sans-serif] text-[14px] text-white hover:bg-[#0d4fd8] transition-colors"
+            className="bg-blue-600 hover:bg-blue-700"
           >
-            {editingCustomer ? 'Cập nhật khách hàng' : 'Thêm khách hàng'}
-          </button>
+            Cập nhật khách hàng
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function CustomerAddFormDialog(props: CustomerAddFormDialogProps) {
+  const [formData, setFormData] = useState<AddCustomer>({
+    name: "",
+    phone: "",
+    city: "",
+    gender: "male",
+    birthday: "",
+    address: "",
+    isActive: true
+  });
+
+  useEffect(() => {
+    setFormData({
+      name: "",
+      phone: "",
+      city: "",
+      gender: "male",
+      birthday: "",
+      address: "",
+      isActive: true
+    })
+  }, [props.open]);
+
+  const handleSubmit = () => {
+    props.onSubmit(formData);
+  };
+
+  return (
+    <Dialog open={props.open} onOpenChange={props.onClose}>
+      <DialogContent className="max-w-[600px]" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle className="text-lg font-semibold">
+            Thêm khách hàng
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Tên khách hàng */}
+          <div>
+            <Label>Tên khách hàng <Label className="text-red-600">*</Label></Label>
+            <Input
+              type="text"
+              placeholder="VD: Nguyễn Văn A"
+              value={formData.name}
+              onChange={(e) => { setFormData({ ...formData, name: e.target.value }) }}
+              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+            />
+          </div>
+
+          {/* Giới tính */}
+          <div>
+            <Label>Giới tính</Label>
+            <Select
+              value={formData.gender}
+              onValueChange={(value: string) => setFormData({ ...formData, gender: value })}
+            >
+              <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                <SelectValue placeholder="Chọn giới tính" />
+              </SelectTrigger>
+              <SelectContent>
+                {
+                  genders.map((gender, index) => (
+                    <SelectItem key={index} value={gender}>
+                      {gender === 'male' ? 'Nam' : (gender === 'female' ? 'Nữ' : gender)}
+                    </SelectItem>
+                  ))
+                }
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Ngày sinh */}
+          <div>
+            <Label>Ngày sinh</Label>
+            <Input
+              type="date"
+              placeholder="VD: 15/01/1990"
+              value={formData.birthday ? formData.birthday : "2026-01-16"}
+              onChange={(e) => { setFormData({ ...formData, birthday: e.target.value }) }}
+              className="mt-1.5 bg-white border-2 w-full rounded-sm p-1 border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+            />
+          </div>
+
+          {/* Số điện thoại */}
+          <div>
+            <Label>Số điện thoại <Label className="text-red-600">*</Label></Label>
+            <Input
+              type="tel"
+              placeholder="VD: 0901234567"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+            />
+          </div>
+
+          {/* Tỉnh / Thành phố */}
+          <div>
+            <Label>Tỉnh / Thành phố</Label>
+            <Select
+              value={formData.city}
+              onValueChange={(value: string) => setFormData({ ...formData, city: value })}
+            >
+              <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                <SelectValue placeholder="Chọn tỉnh/thành phố" />
+              </SelectTrigger>
+              <SelectContent>
+                {
+                  cities.map((city, index) => (
+                    <SelectItem key={index} value={city}>
+                      {city}
+                    </SelectItem>
+                  ))
+                }
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Địa chỉ */}
+          <div>
+            <Label>Địa chỉ</Label>
+            <Input
+              type="text"
+              placeholder="VD: 123 Đường ABC, Quận 1"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+            />
+          </div>
+
+          {/* Status */}
+          {/* <div>
+            <Label>Trạng thái</Label>
+            <Select
+              value={(formData.isActive) ? "Hoạt động" : "Không hoạt động"}
+              onValueChange={(value: string) => setFormData({ ...formData, isActive: (value === "Hoạt động" ? true : false) })}
+            >
+              <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                <SelectValue placeholder="Chọn trạng thái" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Hoạt động">Hoạt động</SelectItem>
+                <SelectItem value="Không hoạt động">Không hoạt động</SelectItem>
+              </SelectContent>
+            </Select>
+          </div> */}
         </div>
-      </div>
-    </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={props.onClose}>
+            Hủy
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Thêm khách hàng
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

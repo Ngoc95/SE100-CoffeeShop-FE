@@ -52,7 +52,7 @@ export function SimpleSearchSelect({
         variant="outline"
         role="combobox"
         aria-expanded={open}
-        className="w-full justify-between"
+        className="w-full justify-between bg-white border-slate-300"
         disabled={disabled}
         onClick={() => setOpen(!open)}
       >
@@ -64,15 +64,15 @@ export function SimpleSearchSelect({
 
       {open && (
         <div 
-          className="absolute z-[10000] w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg"
+          className="absolute z-[10000] w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg"
           style={{ maxHeight: '300px' }}
         >
-          <div className="p-2 border-b border-slate-200">
+          <div className="p-2 border-b border-slate-300">
             <Input
               placeholder="Tìm kiếm..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-8"
+              className="h-8 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               onClick={(e) => e.stopPropagation()}
             />
           </div>

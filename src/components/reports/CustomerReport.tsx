@@ -1,8 +1,12 @@
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { Download } from 'lucide-react';
+import { Badge } from '../ui/badge';
+import { Input } from '../ui/input';
+import { Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { CustomerTimeFilter } from './CustomerTimeFilter';
 import {
   BarChart,
   Bar,
@@ -10,122 +14,138 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
-  Legend
+  ResponsiveContainer
 } from 'recharts';
+import { getCustomerStatistics, CustomerReportResponse, CustomerChartResponse } from '../../api/statistics/customerStatistics';
+import { MultiSelectFilter } from '../MultiSelectFilter';
+import { getCustomerGroups } from '../../api/customerGroup';
+import { convertPresetToDateRange } from '../../utils/timePresets';
+import { toast } from 'sonner';
+import { useReport } from '../../context/ReportContext';
+import { exportCustomerReport } from '../../api/statistics/customerStatistics';
 
-interface CustomerReportProps {
-  dateFrom?: Date;
-  dateTo?: Date;
-  customerSearch: string;
-  viewType: 'chart' | 'report';
-  concernType: 'sales' | 'debt' | 'products';
-}
+export function CustomerReport() {
+  // Filter panel state
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-export function CustomerReport({ 
-  dateFrom,
-  dateTo,
-  customerSearch,
-  viewType,
-  concernType
-}: CustomerReportProps) {
-  // Sample customer data
-  const allCustomerData = [
-    {
-      id: 'KH000005',
-      code: 'KH000005',
-      name: 'Anh Giang - Kim Mã',
-      phone: '0901234567',
-      totalRevenue: 14320000,
-      returns: 0,
-      netRevenue: 14320000,
-      transactionCount: 232,
-      quantitySold: 232,
-      lastPurchase: new Date(2025, 10, 26),
-    },
-    {
-      id: 'KH000002',
-      code: 'KH000002',
-      name: 'Phạm Thu Hương',
-      phone: '0912345678',
-      totalRevenue: 11720000,
-      returns: 0,
-      netRevenue: 11720000,
-      transactionCount: 133,
-      quantitySold: 133,
-      lastPurchase: new Date(2025, 10, 25),
-    },
-    {
-      id: 'KH000001',
-      code: 'KH000001',
-      name: 'Nguyễn Văn Hải',
-      phone: '0923456789',
-      totalRevenue: 10015000,
-      returns: 0,
-      netRevenue: 10015000,
-      transactionCount: 135,
-      quantitySold: 135,
-      lastPurchase: new Date(2025, 10, 24),
-    },
-    {
-      id: 'KH000004',
-      code: 'KH000004',
-      name: 'Anh Hoàng - Sài Gòn',
-      phone: '0934567890',
-      totalRevenue: 4815000,
-      returns: 0,
-      netRevenue: 4815000,
-      transactionCount: 95,
-      quantitySold: 95,
-      lastPurchase: new Date(2025, 10, 20),
-    },
-    {
-      id: 'KH000003',
-      code: 'KH000003',
-      name: 'Tuấn - Hà Nội',
-      phone: '0945678901',
-      totalRevenue: 3500000,
-      returns: 0,
-      netRevenue: 3500000,
-      transactionCount: 28,
-      quantitySold: 28,
-      lastPurchase: new Date(2025, 10, 15),
-    },
-    {
-      id: 'GUEST',
-      code: 'Khách lẻ',
-      name: 'Khách lẻ',
-      phone: '-',
-      totalRevenue: 30000,
-      returns: 0,
-      netRevenue: 30000,
-      transactionCount: 1,
-      quantitySold: 1,
-      lastPurchase: new Date(2025, 10, 10),
-    },
-  ];
+  // Filter states
+  const [viewType, setViewType] = useState<'chart' | 'report'>('chart');
+  const [customerSearch, setCustomerSearch] = useState('');
 
-  // Filter customer data
-  const filteredCustomerData = allCustomerData.filter(item => {
-    // Date filter - check if last purchase is within range
-    if (dateFrom && dateTo) {
-      if (item.lastPurchase < dateFrom || item.lastPurchase > dateTo) return false;
+  // Time filter states
+  const [dateRangeType, setDateRangeType] = useState<'preset' | 'custom'>('preset');
+  const [timePreset, setTimePreset] = useState('this-week');
+  const thisWeekRange = convertPresetToDateRange('this-week');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(thisWeekRange.from);
+  const [dateTo, setDateTo] = useState<Date | undefined>(thisWeekRange.to);
+
+  // Customer Group Filter
+  const [customerGroups, setCustomerGroups] = useState<Array<{ id: number; name: string }>>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>([]);
+
+  // Data states
+  const [loading, setLoading] = useState(false);
+  const [reportData, setReportData] = useState<CustomerReportResponse | null>(null);
+  const [chartData, setChartData] = useState<CustomerChartResponse | null>(null);
+
+  const { setExportHandler } = useReport();
+
+  const handleExport = useCallback(async () => {
+    if (!dateFrom || !dateTo) return;
+
+    try {
+      const params = {
+        displayType: 'report',
+        startDate: format(dateFrom, 'yyyy-MM-dd'),
+        endDate: format(dateTo, 'yyyy-MM-dd'),
+        customerGroupIds: selectedGroupIds.length > 0 ? selectedGroupIds : undefined,
+        search: customerSearch || undefined
+      };
+
+      const blob = await exportCustomerReport(params);
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `BaoCaoKhachHang_${format(new Date(), 'ddMMyyyy_HHmm')}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Xuất báo cáo thành công');
+    } catch (error) {
+      console.error('Error exporting customer report:', error);
+      toast.error('Lỗi khi xuất báo cáo');
     }
+  }, [dateFrom, dateTo, selectedGroupIds, customerSearch]);
 
-    // Customer search filter
-    if (customerSearch) {
-      const searchLower = customerSearch.toLowerCase();
-      if (
-        !item.name.toLowerCase().includes(searchLower) &&
-        !item.code.toLowerCase().includes(searchLower) &&
-        !item.phone.includes(customerSearch)
-      ) {
-        return false;
+  // Register export handler
+  useEffect(() => {
+    setExportHandler(handleExport);
+    return () => setExportHandler(null as any);
+  }, [handleExport, setExportHandler]);
+
+  // Fetch customer groups on mount
+  useEffect(() => {
+    const fetchGroups = async () => {
+      try {
+        const response = await getCustomerGroups({ limit: 100 });
+        if (response.data?.metaData?.groups) {
+          setCustomerGroups(response.data.metaData.groups.map((g: any) => ({ id: g.id, name: g.name })));
+        }
+      } catch (error) {
+        console.error('Error fetching customer groups:', error);
       }
-    }
+    };
+    fetchGroups();
+  }, []);
 
-    return true;
-  });
+  // Convert time preset to dates when preset changes
+  useEffect(() => {
+    if (dateRangeType === 'preset' && timePreset) {
+      const { from, to } = convertPresetToDateRange(timePreset as any);
+      setDateFrom(from);
+      setDateTo(to);
+    }
+  }, [dateRangeType, timePreset]);
+
+  // Fetch data when filters change
+  useEffect(() => {
+    fetchData();
+  }, [viewType, dateFrom, dateTo, selectedGroupIds, customerSearch]);
+  // debouncing search might be good but let's stick to simple effect for now or add debounce if needed. 
+  // Ideally search should be debounced or triggered by enter/button. 
+  // But user request didn't specify. I'll use it directly but maybe with a small delay or just direct. 
+  // Given standard current impl in other files, direct is common but might spam. 
+  // I'll keep it direct for consistency with other reports if they function that way.
+
+  const fetchData = async () => {
+    if (!dateFrom || !dateTo) return;
+
+    setLoading(true);
+    try {
+      const params = {
+        displayType: viewType,
+        startDate: format(dateFrom, 'yyyy-MM-dd'),
+        endDate: format(dateTo, 'yyyy-MM-dd'),
+        customerGroupIds: selectedGroupIds.length > 0 ? selectedGroupIds : undefined,
+        search: customerSearch || undefined
+      };
+
+      const response = await getCustomerStatistics(params);
+
+      if (response.metaData) {
+        if (viewType === 'report') {
+          setReportData(response.metaData as CustomerReportResponse);
+        } else {
+          setChartData(response.metaData as CustomerChartResponse);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching customer statistics:', error);
+      toast.error('Lỗi khi tải báo cáo khách hàng');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getDateRangeDisplay = () => {
     if (dateFrom && dateTo) {
@@ -135,112 +155,93 @@ export function CustomerReport({
   };
 
   const renderFilterSummary = () => {
-    const filterLines: JSX.Element[] = [];
-    
-    if (customerSearch) {
-      filterLines.push(
-        <p key="customer" className="text-sm text-slate-600">
-          Tìm kiếm: {customerSearch}
-        </p>
+    return null; // Suppress summary line to match original mock simplicity
+  };
+
+  // Chart Content
+  const renderChart = () => {
+    if (!chartData || !chartData.data || chartData.data.length === 0) {
+      return (
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center">
+              <p className="text-slate-600 italic">Báo cáo không có dữ liệu</p>
+            </div>
+          </CardContent>
+        </Card>
       );
     }
 
-    // Add concern type
-    const concernTypeLabels = {
-      sales: 'Bán hàng',
-      debt: 'Công nợ',
-      products: 'Hàng bán theo khách'
-    };
-  
-    
-    if (filterLines.length === 0) return null;
-    
-    return <>{filterLines}</>;
-  };
-
-  const totalRevenue = filteredCustomerData.reduce((sum, item) => sum + item.totalRevenue, 0);
-  const totalReturns = filteredCustomerData.reduce((sum, item) => sum + item.returns, 0);
-  const totalNetRevenue = filteredCustomerData.reduce((sum, item) => sum + item.netRevenue, 0);
-  const totalQuantitySold = filteredCustomerData.reduce((sum, item) => sum + item.quantitySold, 0);
-
-  // Prepare chart data for horizontal bar chart
-  const topCustomers = filteredCustomerData.slice(0, 10);
-  const chartData = topCustomers.map(item => ({
-    name: item.name,
-    revenue: item.netRevenue,
-  })).reverse(); // Reverse to show highest at top
-
-  // Get title based on concern type
-  const getChartTitle = () => {
-    if (concernType === 'sales') {
-      return 'Top 10 khách hàng mua nhiều nhất';
-    }
-    return 'Top 10 khách hàng mua nhiều nhất';
-  };
-
-  // Render chart view
-  if (viewType === 'chart') {
     return (
-      <div className="space-y-6">
-        {filteredCustomerData.length === 0 ? (
-          <Card>
-            <CardContent className="py-12">
-              <div className="text-center">
-                <p className="text-slate-600 italic">Báo cáo không có dữ liệu</p>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border-slate-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-slate-900">{getChartTitle()}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 30 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis 
-                    type="number"
-                    tick={{ fill: '#64748b', fontSize: 11 }}
-                    tickFormatter={(value) => {
-                      if (value >= 1000000) return `${(value / 1000000).toFixed(0)} tr`;
-                      if (value >= 1000) return `${(value / 1000).toFixed(0)} k`;
-                      return value;
-                    }}
-                  />
-                  <YAxis 
-                    type="category"
-                    dataKey="name" 
-                    width={150}
-                    tick={{ fill: '#64748b', fontSize: 11 }}
-                  />
-                  <Tooltip 
-                    formatter={(value: number) => `${value.toLocaleString()}₫`}
-                    contentStyle={{ 
-                      backgroundColor: 'white', 
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px'
-                    }}
-                  />
-                  <Bar dataKey="revenue" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Doanh thu" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      <Card className="border-blue-200">
+        <CardHeader className="pb-3 border-b border-blue-100 bg-blue-50/50">
+          <CardTitle className="text-blue-900">Top 10 khách hàng mua nhiều nhất (theo doanh thu)</CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          <ResponsiveContainer width="100%" height={500}>
+            <BarChart data={chartData.data} layout="vertical" margin={{ top: 0, right: 80, left: 20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+              <XAxis
+                type="number"
+                tick={{ fill: '#64748b', fontSize: 12 }}
+                tickFormatter={(value) => {
+                  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                  if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
+                  return value;
+                }}
+              />
+              <YAxis
+                type="category"
+                dataKey="customerName"
+                width={150}
+                tick={{ fill: '#64748b', fontSize: 12 }}
+              />
+              <Tooltip
+                formatter={(value: number) => [`${value.toLocaleString('vi-VN')}₫`, 'Doanh thu']}
+                contentStyle={{
+                  backgroundColor: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: '8px'
+                }}
+              />
+              <Bar
+                name="Doanh thu"
+                dataKey="revenue"
+                fill="#3b82f6"
+                radius={[0, 4, 4, 0]}
+                barSize={32}
+                label={{
+                  position: 'right',
+                  fill: '#1e40af',
+                  fontWeight: 'bold',
+                  fontSize: 12,
+                  formatter: (value: number) => value ? value.toLocaleString('vi-VN') : '0'
+                }}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
     );
-  }
-
-  // Handle export functionality
-  const handleExportAll = () => {
-    console.log('Exporting all data...');
-    // TODO: Implement export functionality
   };
 
-  // Render report view (table)
-  return (
-    <div className="space-y-4">
+  // Report Content
+  const renderReport = () => {
+    if (!reportData || reportData.customers.length === 0) {
+      return (
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center">
+              <p className="text-slate-600 italic">Báo cáo không có dữ liệu</p>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    const { totals, customers } = reportData;
+
+    return (
       <Card>
         <CardContent className="p-0">
           <div className="bg-white rounded-lg overflow-hidden">
@@ -249,7 +250,7 @@ export function CustomerReport({
               <p className="text-sm text-slate-600 mb-2">
                 Ngày lập {format(new Date(), 'dd/MM/yyyy HH:mm', { locale: vi })}
               </p>
-              <h2 className="text-xl text-slate-900 mb-1">Báo cáo hàng bán theo khách</h2>
+              <h2 className="text-xl text-slate-900 mb-1">Báo cáo khách hàng</h2>
               {dateFrom && dateTo && (
                 <p className="text-sm text-slate-600">
                   {getDateRangeDisplay()}
@@ -260,58 +261,183 @@ export function CustomerReport({
 
             {/* Table */}
             <div className="overflow-x-auto">
-              {filteredCustomerData.length === 0 ? (
-                <div className="bg-yellow-50 py-12 text-center">
-                  <p className="text-slate-600 italic">Báo cáo không có dữ liệu</p>
-                </div>
-              ) : (
-                <table className="w-full">
-                  <thead className="bg-blue-100">
-                    <tr>
-                      <th className="text-left py-3 px-4 text-sm text-slate-900">Mã KH</th>
-                      <th className="text-left py-3 px-4 text-sm text-slate-900">Khách hàng</th>
-                      <th className="text-right py-3 px-4 text-sm text-slate-900">SL Mua</th>
-                      <th className="text-right py-3 px-4 text-sm text-slate-900">Doanh thu</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/* Summary row */}
-                    <tr className="bg-slate-50 border-b-2 border-slate-300">
-                      <td colSpan={2} className="py-3 px-4 text-sm text-slate-900">
-                        SL Khách hàng: {filteredCustomerData.length}
-                      </td>
-                      <td className="text-right py-3 px-4 text-sm text-slate-900">
-                        {totalQuantitySold}
-                      </td>
-                      <td className="text-right py-3 px-4 text-sm text-blue-600">
-                        {totalRevenue.toLocaleString()}
-                      </td>
-                    </tr>
-                    
-                    {/* Customer rows */}
-                    {filteredCustomerData.map((item) => (
-                      <tr key={item.id} className="border-b border-slate-200 hover:bg-slate-50">
-                        <td className="py-3 px-4 text-sm text-blue-600">{item.code}</td>
-                        <td className="py-3 px-4 text-sm text-slate-900">{item.name}</td>
-                        <td className="text-right py-3 px-4 text-sm text-slate-900">
-                          {item.quantitySold}
-                        </td>
-                        <td className="text-right py-3 px-4 text-sm text-slate-900">
-                          {item.totalRevenue.toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+              <table className="w-full">
+                <thead className="bg-blue-100">
+                  <tr>
+                    <th className="text-left py-3 px-4 text-sm text-slate-900">Mã KH</th>
+                    <th className="text-left py-3 px-4 text-sm text-slate-900">Khách hàng</th>
+                    <th className="text-left py-3 px-4 text-sm text-slate-900">SĐT</th>
+                    <th className="text-left py-3 px-4 text-sm text-slate-900">Nhóm khách hàng</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">Tổng hóa đơn</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">SL Mua</th>
+                    <th className="text-right py-3 px-4 text-sm text-slate-900">Doanh thu</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Summary row */}
+                  <tr className="bg-amber-50 border-b border-amber-100 font-semibold">
+                    <td colSpan={4} className="py-3 px-4 text-sm text-slate-900">
+                      Tổng cộng ({totals.totalCustomers} khách hàng)
+                    </td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900">
+                      {totals.totalOrders.toLocaleString('vi-VN')}
+                    </td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900">
+                      {totals.totalQuantity.toLocaleString('vi-VN')}
+                    </td>
+                    <td className="text-right py-3 px-4 text-sm text-slate-900">
+                      {totals.totalRevenue.toLocaleString('vi-VN')}
+                    </td>
+                  </tr>
 
-            {/* Footer */}
-            <div className="py-4 text-center border-t">
+                  {/* Customer rows */}
+                  {customers.map((item) => (
+                    <tr key={item.customerId} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 text-sm text-blue-600">{item.customerCode}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700">{item.customerName}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600">{item.phone}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600">
+                        <Badge variant="outline" className="font-normal bg-slate-50">
+                          {item.groupName}
+                        </Badge>
+                      </td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">
+                        {item.totalOrders.toLocaleString('vi-VN')}
+                      </td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">
+                        {item.totalQuantity.toLocaleString('vi-VN')}
+                      </td>
+                      <td className="text-right px-4 py-3 text-sm text-slate-700">
+                        {item.totalRevenue.toLocaleString('vi-VN')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </CardContent>
       </Card>
-    </div>
+    );
+  };
+
+  return (
+    <div className="w-full p-6 space-y-6">
+      {/* Filter Panel */}
+      <div className="bg-white rounded-lg border border-slate-200">
+        <div className="p-4 border-b border-slate-200 flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className="gap-2"
+          >
+            <Filter className="w-4 h-4" />
+            Bộ lọc
+            {(customerSearch || selectedGroupIds.length > 0) && (
+              <Badge variant="secondary" className="ml-1 px-1.5 h-5 min-w-5">
+                {(customerSearch ? 1 : 0) + (selectedGroupIds.length > 0 ? 1 : 0)}
+              </Badge>
+            )}
+            {isFilterOpen ? (
+              <ChevronUp className="w-4 h-4 ml-2 opacity-50" />
+            ) : (
+              <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
+            )}
+          </Button>
+          {(customerSearch || selectedGroupIds.length > 0) && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setCustomerSearch('');
+                setSelectedGroupIds([]);
+              }}
+              className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+            >
+              Xóa bộ lọc
+            </Button>
+          )}
+        </div>
+
+        {isFilterOpen && (
+          <div className="p-6 bg-slate-50/50">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Thời gian */}
+              <div className="md:col-span-2 lg:col-span-3">
+                <h3 className="text-sm font-medium text-slate-900 mb-3">Thời gian</h3>
+                <CustomerTimeFilter
+                  dateRangeType={dateRangeType}
+                  timePreset={timePreset}
+                  dateFrom={dateFrom}
+                  dateTo={dateTo}
+                  onDateRangeTypeChange={setDateRangeType}
+                  onTimePresetChange={setTimePreset}
+                  onDateFromChange={setDateFrom}
+                  onDateToChange={setDateTo}
+                />
+              </div>
+
+              {/* Tìm kiếm khách hàng */}
+              <div>
+                <h3 className="text-sm text-slate-900 mb-3">Tìm kiếm khách hàng</h3>
+                <Input
+                  placeholder="Theo tên, SĐT"
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  className="text-sm bg-white border border-slate-300"
+                />
+              </div>
+
+              {/* Nhóm khách hàng */}
+              <div>
+                <MultiSelectFilter
+                  label="Nhóm khách hàng"
+                  placeholder="Chọn nhóm khách..."
+                  items={customerGroups}
+                  selectedIds={selectedGroupIds}
+                  onSelectionChange={(ids) => setSelectedGroupIds(ids as number[])}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* View Type Toggle - Below filter panel */}
+      <div className="flex justify-start">
+        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+          <button
+            onClick={() => setViewType('chart')}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${viewType === 'chart'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-slate-600 hover:text-slate-900'
+              }`}
+          >
+            Biểu đồ
+          </button>
+          <button
+            onClick={() => setViewType('report')}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${viewType === 'report'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-slate-600 hover:text-slate-900'
+              }`}
+          >
+            Báo cáo
+          </button>
+        </div>
+      </div>
+
+      {/* Content Area */}
+      {
+        loading ? (
+          <div className="flex justify-center items-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : (
+          viewType === 'chart' ? renderChart() : renderReport()
+        )
+      }
+    </div >
   );
 }

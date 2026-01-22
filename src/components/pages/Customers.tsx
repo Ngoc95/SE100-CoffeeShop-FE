@@ -1,52 +1,53 @@
-import { useState } from 'react';
-import { Plus, Search, Pencil, Trash2, Filter, X, Power, PowerOff, Eye, Upload, Download, Printer } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Badge } from '../ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogDescription,
-} from '../ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
-import { Label } from '../ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../ui/table';
-import { toast } from 'sonner@2.0.3';
-import { CustomerFormDialog } from '../CustomerFormDialog';
+import { useEffect, useState } from "react";
+import { useAuth } from "../../contexts/AuthContext";
+import { Plus, Search, Pencil, Trash2, Filter, X, Power, PowerOff, Upload, Download, Printer, ArrowUp, ArrowDown } from "lucide-react";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Badge } from "../ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { Label } from "../ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
+import { toast } from "sonner";
+import { AddCustomer, CustomerAddFormDialog, CustomerEditFormDialog, EditCustomer } from "../CustomerFormDialog";
+import { createCustomer, deleteCustomer, getCustomers, updateCustomer } from "../../api/customer";
+import { getCustomerGroups } from "../../api/customerGroup";
+import { useDebounce } from "../../hooks/useDebounce";
+import { excelService } from "../../services/excelService";
+import { ImportExcelDialog } from "../ImportExcelDialog";
 
 interface Customer {
-  id: string;
-  code: string;
-  name: string;
-  gender: string;
-  birthday: string;
-  phone: string;
-  email: string;
-  city: string;
-  address: string;
-  group: string;
-  orders: number;
-  totalSpent: number;
-  status: 'active' | 'inactive';
+  id: number,
+  code: string,
+  name: string,
+  gender: string,
+  birthday: string,
+  phone: string,
+  address: string,
+  city: "TP. Hồ Chí Minh",
+  groupName: "Khách thường",
+  totalOrders: 5,
+  totalSpent: 1500000,
+  isActive: true,
+  createdAt: "2026-01-17T08:36:16.868Z",
+  updatedAt: "2026-01-17T08:36:16.868Z"
 }
+
+export const genders = ["male", "female"];
+export const cities = [
+  "Hồ Chí Minh",
+  "Hà Nội",
+  "Đà Nẵng",
+  "Cần Thơ",
+  "Hải Phòng",
+  "Nha Trang",
+  "Huế",
+  "Vũng Tàu"
+]
+export const activeStatus = [
+  "Hoạt động",
+  "Không hoạt động"
+]
 
 interface CustomerGroup {
   id: string;
@@ -54,516 +55,663 @@ interface CustomerGroup {
 }
 
 export function Customers() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedGroup, setSelectedGroup] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('all');
-  const [selectedGender, setSelectedGender] = useState('all');
-  const [selectedCity, setSelectedCity] = useState('all');
-  const [sortBy, setSortBy] = useState<'name' | 'orders' | 'totalSpent'>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [quickGroupDialogOpen, setQuickGroupDialogOpen] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const { hasPermission } = useAuth();
+  let fetchCustomersParams: Record<string, any> = { "sort": "+code" }
 
-  // Mock data
-  const [customers, setCustomers] = useState<Customer[]>([
-    {
-      id: '1',
-      code: 'KH001',
-      name: 'Nguyễn Văn A',
-      gender: 'Nam',
-      birthday: '15/01/1990',
-      phone: '0901234567',
-      email: 'nguyenvana@email.com',
-      city: 'Hồ Chí Minh',
-      address: '123 Đường ABC, Quận 1',
-      group: 'vip',
-      orders: 15,
-      totalSpent: 25500000,
-      status: 'active',
-    },
-    {
-      id: '2',
-      code: 'KH002',
-      name: 'Trần Thị B',
-      gender: 'Nữ',
-      birthday: '22/05/1992',
-      phone: '0912345678',
-      email: 'tranthib@email.com',
-      city: 'Hà Nội',
-      address: '456 Đường XYZ, Hoàn Kiếm',
-      group: 'regular',
-      orders: 8,
-      totalSpent: 12300000,
-      status: 'active',
-    },
-    {
-      id: '3',
-      code: 'KH003',
-      name: 'Lê Văn C',
-      gender: 'Nam',
-      birthday: '10/03/1988',
-      phone: '0923456789',
-      email: 'levanc@email.com',
-      city: 'Đà Nẵng',
-      address: '789 Đường DEF, Hải Châu',
-      group: 'vip',
-      orders: 22,
-      totalSpent: 35800000,
-      status: 'inactive',
-    },
-    {
-      id: '4',
-      code: 'KH004',
-      name: 'Phạm Thị D',
-      gender: 'Nữ',
-      birthday: '18/07/1995',
-      phone: '0934567890',
-      email: 'phamthid@email.com',
-      city: 'Cần Thơ',
-      address: '321 Đường GHI, Ninh Kiều',
-      group: 'new',
-      orders: 5,
-      totalSpent: 8500000,
-      status: 'active',
-    },
-    {
-      id: '5',
-      code: 'KH005',
-      name: 'Hoàng Văn E',
-      gender: 'Nam',
-      birthday: '25/11/1985',
-      phone: '0945678901',
-      email: 'hoangvane@email.com',
-      city: 'Hải Phòng',
-      address: '654 Đường JKL, Lê Chân',
-      group: 'regular',
-      orders: 18,
-      totalSpent: 28900000,
-      status: 'active',
-    },
-    {
-      id: '6',
-      code: 'KH006',
-      name: 'Vũ Thị F',
-      gender: 'Nữ',
-      birthday: '05/09/1993',
-      phone: '0956789012',
-      email: 'vuthif@email.com',
-      city: 'Nha Trang',
-      address: '987 Đường MNO, Vĩnh Hải',
-      group: 'regular',
-      orders: 12,
-      totalSpent: 19200000,
-      status: 'inactive',
-    },
-    {
-      id: '7',
-      code: 'KH007',
-      name: 'Đặng Văn G',
-      gender: 'Nam',
-      birthday: '30/12/1991',
-      phone: '0967890123',
-      email: 'dangvang@email.com',
-      city: 'Huế',
-      address: '147 Đường PQR, Phú Nhuận',
-      group: 'new',
-      orders: 9,
-      totalSpent: 14700000,
-      status: 'active',
-    },
-    {
-      id: '8',
-      code: 'KH008',
-      name: 'Bùi Thị H',
-      gender: 'Nữ',
-      birthday: '14/04/1994',
-      phone: '0978901234',
-      email: 'buithih@email.com',
-      city: 'Vũng Tàu',
-      address: '258 Đường STU, Phường 1',
-      group: 'vip',
-      orders: 7,
-      totalSpent: 11400000,
-      status: 'active',
-    },
-  ]);
 
-  const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([
-    { id: 'vip', name: 'VIP' },
-    { id: 'regular', name: 'Thường xuyên' },
-    { id: 'new', name: 'Khách mới' },
-  ]);
+  const canCreate = hasPermission('customers:create');
+  const canUpdate = hasPermission('customers:update');
+  const canDelete = hasPermission('customers:delete');
 
-  const [newGroupName, setNewGroupName] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+  const [filterGroup, setFilterGroup] = useState("all");
+  const [filterActive, setFilterActive] = useState("all");
+  const [filterGender, setFilterGender] = useState("all");
+  const [filterCity, setFilterCity] = useState("all");
 
-  // Filtering and sorting
-  const filteredCustomers = customers
-    .filter((customer) => {
-      const matchesSearch = 
-        customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        customer.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        customer.phone.includes(searchQuery);
-      const matchesGroup = selectedGroup === 'all' || customer.group === selectedGroup;
-      const matchesStatus = selectedStatus === 'all' || customer.status === selectedStatus;
-      const matchesGender = selectedGender === 'all' || customer.gender === selectedGender;
-      const matchesCity = selectedCity === 'all' || customer.city === selectedCity;
-      return matchesSearch && matchesGroup && matchesStatus && matchesGender && matchesCity;
-    })
-    .sort((a, b) => {
-      let comparison = 0;
-      if (sortBy === 'name') {
-        comparison = a.name.localeCompare(b.name, 'vi');
-      } else if (sortBy === 'orders') {
-        comparison = a.orders - b.orders;
-      } else if (sortBy === 'totalSpent') {
-        comparison = a.totalSpent - b.totalSpent;
-      }
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
+  const [sortBy, setSortBy] = useState<string | null>();
+  const [sortOrder, setSortOrder] = useState<"+" | "-" | "none">("none");
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<EditCustomer>({
+    id: 0,
+    code: '',
+    name: '',
+    phone: '',
+    city: '',
+    gender: '',
+    birthday: '',
+    address: '',
+    isActive: true
+  });
+  const [showFilters, setShowFilters] = useState(false);
 
-  const handleSort = (field: 'name' | 'orders' | 'totalSpent') => {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+
+  const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
+
+
+  // Functions
+  const fetchCustomersData = async () => {
+    const res = await getCustomers(fetchCustomersParams)
+    if (!res) return;
+    let { customers, statistics } = res.data.metaData
+    if (customers) {
+      customers.map((customer: EditCustomer) => {
+        if (customer.birthday) customer.birthday = customer.birthday.split("T")[0]
+      })
+      setCustomers(customers)
+      setTotalRevenue(statistics.totalRevenue)
+    }
+  }
+
+  const fetchCustomerGroupsData = async () => {
+    const res = await getCustomerGroups()
+    const { groups } = res.data.metaData
+    if (groups) {
+      setCustomerGroups(groups)
+    }
+  }
+
+  useEffect(() => {
+    // Combine fetch logic for debounce and filters
+    if (debouncedSearchQuery) {
+        fetchCustomersParams["search"] = debouncedSearchQuery
+    } else {
+        delete fetchCustomersParams["search"]
+    }
+
+    if (filterActive != "all") {
+      fetchCustomersParams["isActive"] = filterActive === "Hoạt động" ? true : false
+    }
+    else delete fetchCustomersParams["isActive"]
+    if (filterGroup != "all") {
+      fetchCustomersParams["groupId"] = filterGroup
+    }
+    else delete fetchCustomersParams["groupId"]
+    if (filterGender != "all") {
+      fetchCustomersParams["gender"] = filterGender
+    }
+    else delete fetchCustomersParams["gender"]
+    if (filterCity != "all") {
+      fetchCustomersParams["city"] = filterCity
+    }
+    else delete fetchCustomersParams["city"]
+
+    try {
+      fetchCustomersData()
+    }
+    catch (error) {
+      console.log("Error when fetching customers: ", error);
+    }
+  }, [debouncedSearchQuery, filterGroup, filterActive, filterGender, filterCity])
+
+  useEffect(() => {
+    try {
+      fetchCustomerGroupsData()
+    }
+    catch (error) {
+      console.log("Error when fetching customer groups: ", error);
+    }
+  }, [])
+
+  const handleSort = (field: string) => {
+    let tempSortBy = sortBy;
+    let tempSortOrder = sortOrder;
     if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+      // Cycle through: asc -> desc -> none -> asc
+      if (sortOrder === "+") {
+        setSortOrder("-");
+
+        tempSortOrder = "-"
+      }
+      else if (sortOrder === "-") {
+        setSortOrder("none");
+        setSortBy(null);
+
+        tempSortBy = null;
+      } else {
+        setSortOrder("+");
+
+        tempSortOrder = "+"
+      }
     } else {
       setSortBy(field);
-      setSortOrder('asc');
+      setSortOrder("+");
+
+      tempSortBy = field;
+      tempSortOrder = "+"
     }
+
+    if (tempSortBy && tempSortOrder) {
+      fetchCustomersParams["sort"] = tempSortOrder + tempSortBy;
+    }
+    else {
+      fetchCustomersParams["sort"] = "+code"
+    }
+
+    fetchCustomersData();
   };
 
-  const getSortIcon = (field: 'name' | 'orders' | 'totalSpent') => {
-    if (sortBy !== field) return null;
-    return sortOrder === 'asc' ? ' ↑' : ' ↓';
+  const getSortIcon = (field: string) => {
+    if (sortBy !== field || sortOrder === "none") return null;
+    if (sortOrder === "+") {
+      return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
+    }
+    return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
   };
 
-  const handleSubmit = (formData: any) => {
-    if (!formData.name || !formData.phone || !formData.group) {
-      toast.error('Vui lòng điền đầy đủ thông tin bắt buộc');
-      return;
+  const handleApplyFilter = () => {
+    if (filterActive != "all") {
+      fetchCustomersParams["isActive"] = filterActive === "Hoạt động" ? true : false
+    }
+    else delete fetchCustomersParams["isActive"]
+    if (filterGroup != "all") {
+      fetchCustomersParams["groupId"] = filterGroup
+    }
+    else delete fetchCustomersParams["groupId"]
+    if (filterGender != "all") {
+      fetchCustomersParams["gender"] = filterGender
+    }
+    else delete fetchCustomersParams["gender"]
+    if (filterCity != "all") {
+      fetchCustomersParams["city"] = filterCity
+    }
+    else delete fetchCustomersParams["city"]
+    fetchCustomersData()
+  }
+
+  const handleSearch = () => {
+    if (!searchQuery) delete fetchCustomersParams["search"]
+    else fetchCustomersParams["search"] = searchQuery
+    fetchCustomersData()
+  }
+
+  const validateSubmitEdit = (formData: EditCustomer) => {
+    if (!formData.name || !formData.phone) {
+      toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
+      return false;
     }
 
-    if (editingCustomer) {
-      // Update existing customer
-      setCustomers(customers.map(customer =>
-        customer.id === editingCustomer.id
-          ? { ...customer, ...formData }
-          : customer
-      ));
-      toast.success('Cập nhật khách hàng thành công');
-    } else {
-      // Add new customer
-      const newCustomer: Customer = {
-        id: Date.now().toString(),
-        code: `KH${String(customers.length + 1).padStart(3, '0')}`,
-        name: formData.name,
-        gender: formData.gender,
-        birthday: formData.birthday,
-        phone: formData.phone,
-        email: formData.email,
-        city: formData.city,
-        address: formData.address,
-        group: formData.group,
-        orders: 0,
-        totalSpent: 0,
-        status: 'active',
-      };
-      setCustomers([...customers, newCustomer]);
-      toast.success('Thêm khách hàng mới thành công');
+    if (!/^\d+$/.test(formData.phone) || formData.phone.length !== 10) {
+      toast.error("SĐT phải có 10 ký tự và chỉ có chữ số!");
+      return false;
     }
 
-    setDialogOpen(false);
+    return true;
+  }
+
+  const validateSubmitAdd = (formData: AddCustomer) => {
+    if (!formData.name || !formData.phone) {
+      toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
+      return false;
+    }
+
+    if (!/^\d+$/.test(formData.phone) || formData.phone.length !== 10) {
+      toast.error("SĐT phải có 10 ký tự và chỉ có chữ số!");
+      return false;
+    }
+
+    return true;
+  }
+
+  const handleSubmitEdit = async (formData: EditCustomer) => {
+    if (!formData) return;
+
+    if (!validateSubmitEdit(formData)) return;
+
+    try {
+      await updateCustomer(
+        formData.id,
+        formData.name,
+        formData.phone,
+        formData.city,
+        formData.gender,
+        formData.birthday,
+        formData.address,
+        formData.isActive
+      )
+      toast.success("Cập nhật khách hàng thành công");
+      await fetchCustomersData()
+    }
+    catch (error: any) {
+      toast.error("Cập nhật khách hàng thất bại. Lỗi: " + error.response.data.message);
+    }
+
+    setEditDialogOpen(false);
     resetForm();
   };
 
+  const handleSubmitAdd = async (formData: AddCustomer) => {
+    if (!formData) return;
+
+    if (!validateSubmitAdd(formData)) return;
+
+    try {
+      await createCustomer(
+        formData.name,
+        formData.phone,
+        formData.city,
+        formData.gender,
+        formData.birthday,
+        formData.address,
+        formData.isActive
+      )
+      toast.success("Thêm khách hàng thành công");
+      await fetchCustomersData()
+    }
+    catch (error: any) {
+      toast.error("Thêm khách hàng thất bại. Lỗi: " + error.response.data.message);
+    }
+
+    setAddDialogOpen(false);
+  }
+
   const handleEdit = (customer: Customer) => {
-    setEditingCustomer(customer);
-    setDialogOpen(true);
+    const tempEditCustomer: EditCustomer = {
+      id: customer.id,
+      code: customer.code,
+      name: customer.name,
+      phone: customer.phone,
+      city: customer.city,
+      gender: customer.gender,
+      birthday: customer.birthday,
+      address: customer.address,
+      isActive: customer.isActive
+    }
+    setEditingCustomer(tempEditCustomer);
+    setEditDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Bạn có chắc chắn muốn xóa khách hàng này?')) {
-      setCustomers(customers.filter(customer => customer.id !== id));
-      toast.success('Xóa khách hàng thành công');
+  const handleAddNew = () => {
+    setAddDialogOpen(true);
+  };
+
+  const handleDelete = async (id: number) => {
+    if (confirm("Bạn có chắc chắn muốn xóa khách hàng này?")) {
+      await deleteCustomer(id)
+      fetchCustomersData()
     }
   };
 
-  const handleToggleStatus = (id: string) => {
-    setCustomers(customers.map(customer => {
-      if (customer.id === id) {
-        const newStatus = customer.status === 'active' ? 'inactive' : 'active';
-        toast.success(newStatus === 'active' ? 'Đã kích hoạt khách hàng' : 'Đã vô hiệu hóa khách hàng');
-        return { ...customer, status: newStatus };
-      }
-      return customer;
-    }));
-  };
+  // const handleToggleStatus = (id: string) => {
+  //   // setCustomers(
+  //   //   customers.map((customer) => {
+  //   //     if (customer.id === id) {
+  //   //       const newStatus =
+  //   //         customer.status === "active" ? "inactive" : "active";
+  //   //       toast.success(
+  //   //         newStatus === "active"
+  //   //           ? "Đã kích hoạt khách hàng"
+  //   //           : "Đã vô hiệu hóa khách hàng"
+  //   //       );
+  //   //       return { ...customer, status: newStatus };
+  //   //     }
+  //   //     return customer;
+  //   //   })
+  //   // );
+  // };
 
   const resetForm = () => {
-    setEditingCustomer(null);
+    // setEditingCustomer(null);
   };
 
-  const handleAddGroup = () => {
-    if (!newGroupName.trim()) {
-      toast.error('Vui lòng nhập tên nhóm khách hàng');
-      return;
-    }
-
-    const newGroup: CustomerGroup = {
-      id: Date.now().toString(),
-      name: newGroupName,
-    };
-    setCustomerGroups([...customerGroups, newGroup]);
-    toast.success('Thêm nhóm khách hàng mới thành công');
-    setNewGroupName('');
-    setQuickGroupDialogOpen(false);
-  };
-
-  const getStatusBadge = (status: 'active' | 'inactive') => {
-    if (status === 'active') {
+  const getStatusBadge = (status: true | false) => {
+    if (status === true) {
       return <Badge className="bg-emerald-500">Hoạt động</Badge>;
     }
     return <Badge className="bg-red-500">Không hoạt động</Badge>;
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
     }).format(amount);
   };
 
   const totalCustomers = customers.length;
-  const activeCustomers = customers.filter(c => c.status === 'active').length;
-  const inactiveCustomers = customers.filter(c => c.status === 'inactive').length;
-  const totalRevenue = customers.reduce((sum, c) => sum + c.totalSpent, 0);
+  const activeCustomers = customers.filter((c) => c.isActive === true).length;
+
+  const handleExport = async () => {
+    try {
+        toast.info("Đang xuất file...");
+        await excelService.exportData('customer');
+        toast.success("Xuất file thành công", { description: "File đã được tải xuống" });
+    } catch (err) {
+        toast.error("Xuất file thất bại");
+    }
+  };
 
   return (
-    <div className="flex h-full bg-slate-50">
-      {/* Left Sidebar - Filters */}
-      <div className="w-64 bg-white border-r p-6 overflow-auto">
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-sm text-slate-700 mb-3 flex items-center gap-2">
-              <Filter className="w-4 h-4" />
-              Bộ lọc
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <Label className="text-xs text-slate-600">Giới tính</Label>
-                <Select value={selectedGender} onValueChange={setSelectedGender}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tất cả giới tính</SelectItem>
-                    <SelectItem value="Nam">Nam</SelectItem>
-                    <SelectItem value="Nữ">Nữ</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label className="text-xs text-slate-600">Tỉnh / Thành phố</Label>
-                <Select value={selectedCity} onValueChange={setSelectedCity}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tất cả thành phố</SelectItem>
-                    <SelectItem value="Hồ Chí Minh">Hồ Chí Minh</SelectItem>
-                    <SelectItem value="Hà Nội">Hà Nội</SelectItem>
-                    <SelectItem value="Đà Nẵng">Đà Nẵng</SelectItem>
-                    <SelectItem value="Cần Thơ">Cần Thơ</SelectItem>
-                    <SelectItem value="Hải Phòng">Hải Phòng</SelectItem>
-                    <SelectItem value="Nha Trang">Nha Trang</SelectItem>
-                    <SelectItem value="Huế">Huế</SelectItem>
-                    <SelectItem value="Vũng Tàu">Vũng Tàu</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label className="text-xs text-slate-600">Trạng thái</Label>
-                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                    <SelectItem value="active">Hoạt động</SelectItem>
-                    <SelectItem value="inactive">Không hoạt động</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t">
-            <h3 className="text-sm text-slate-700 mb-3">Thống kê</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Tổng khách hàng</span>
-                <span className="text-slate-900">{totalCustomers}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Đang hoạt động</span>
-                <span className="text-emerald-600">{activeCustomers}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Không hoạt động</span>
-                <span className="text-gray-600">{inactiveCustomers}</span>
-              </div>
-              <div className="flex justify-between text-sm pt-2 border-t">
-                <span className="text-slate-600">Tổng doanh thu</span>
-                <span className="text-blue-600">{formatCurrency(totalRevenue)}</span>
-              </div>
-            </div>
-          </div>
-
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => {
-              setSelectedGroup('all');
-              setSelectedGender('all');
-              setSelectedStatus('all');
-              setSelectedCity('all');
-              setSearchQuery('');
-            }}
-          >
-            <X className="w-4 h-4 mr-2" />
-            Xóa bộ lọc
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-blue-900 text-2xl font-semibold mb-2">Khách hàng</h1>
+          <p className="text-slate-600 text-sm">
+            Quản lý thông tin khách hàng
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {canCreate && (
+             <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+                <Upload className="w-4 h-4 mr-2" />
+                Nhập file
+             </Button>
+          )}
+          <Button variant="outline" onClick={handleExport}>
+             <Download className="w-4 h-4 mr-2" />
+             Xuất file
           </Button>
+
+          {canCreate && (
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                handleAddNew();
+              }}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Thêm khách hàng
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="bg-white border-b p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-slate-900 mb-2">Khách hàng</h1>
-              <p className="text-slate-600 text-sm">Quản lý thông tin khách hàng</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                onClick={() => toast.info('Chức năng import đang phát triển')}
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Import Excel
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => toast.info('Chức năng export đang phát triển')}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export Excel
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  toast.info('Chức năng in đang phát triển');
-                  window.print();
-                }}
-              >
-                <Printer className="w-4 h-4 mr-2" />
-                In danh sách
-              </Button>
-              <Button
-                className="bg-blue-600 hover:bg-blue-700"
-                onClick={() => {
-                  setEditingCustomer(null);
-                  setDialogOpen(true);
-                }}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Thêm khách hàng
-              </Button>
-            </div>
+      {/* Stats */}
+      <div className="space-y-2">
+        <Label className="text-xs text-slate-600">Thống kê</Label>
+        <div className="bg-white border border-slate-200 rounded-lg p-3 flex gap-8 w-fit items-center shadow-sm">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-600">Tổng số khách hàng:</span>
+            <span className="font-medium text-slate-900">{totalCustomers}</span>
           </div>
-
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-            <Input
-              placeholder="Tìm kiếm theo tên, mã, số điện thoại..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+           <div className="h-4 w-px bg-slate-200"></div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-600">Đang hoạt động:</span>
+            <span className="font-medium text-emerald-600">{activeCustomers}</span>
+          </div>
+          <div className="h-4 w-px bg-slate-200"></div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-600">Tổng doanh thu:</span>
+            <span className="font-medium text-blue-600">{formatCurrency(totalRevenue)}</span>
           </div>
         </div>
+      </div>
 
-        {/* Table */}
-        <div className="flex-1 overflow-auto p-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                Danh sách khách hàng ({filteredCustomers.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
+      {/* Search and Filter Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            {/* Search and Filter Toggle */}
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input
+                  placeholder="Tìm kiếm theo tên, mã và số điện thoại"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                />
+                {searchQuery && (
+                    <X
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 w-5 h-5 cursor-pointer"
+                    onClick={() => setSearchQuery("")}
+                    />
+                )}
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className="gap-2"
+              >
+                <Filter className="w-4 h-4" />
+                Bộ lọc
+                {(filterGender !== "all" || filterCity !== "all" || filterActive !== "all" || filterGroup !== "all") && (
+                  <Badge className="ml-1 bg-blue-500 text-white px-1.5 py-0.5 text-xs">
+                    {(filterGender !== "all" ? 1 : 0) + (filterCity !== "all" ? 1 : 0) + (filterActive !== "all" ? 1 : 0) + (filterGroup !== "all" ? 1 : 0)}
+                  </Badge>
+                )}
+              </Button>
+            </div>
+
+            {/* Collapsible Filter Panel */}
+            {showFilters && (
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Gender Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Giới tính</Label>
+                    <Select
+                      value={filterGender}
+                      onValueChange={setFilterGender}
+                    >
+                      <SelectTrigger className="bg-white border-slate-300 shadow-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả giới tính</SelectItem>
+                        {
+                          genders.map((gender, index) => (
+                            <SelectItem key={index} value={gender}>
+                              {gender === 'male' ? 'Nam' : (gender === 'female' ? 'Nữ' : gender)}
+                            </SelectItem>
+                          ))
+                        }
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* City Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">
+                      Tỉnh / Thành phố
+                    </Label>
+                    <Select value={filterCity} onValueChange={setFilterCity}>
+                      <SelectTrigger className="bg-white border-slate-300 shadow-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả thành phố</SelectItem>
+                        {
+                          cities.map((city, index) => (
+                            <SelectItem key={index} value={city}>
+                              {city}
+                            </SelectItem>
+                          ))
+                        }
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Group Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Nhóm khách hàng</Label>
+                    <Select value={filterGroup} onValueChange={setFilterGroup}>
+                      <SelectTrigger className="bg-white border-slate-300 shadow-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả nhóm</SelectItem>
+                        {customerGroups.map((group) => (
+                          <SelectItem key={group.id} value={group.id}>
+                            {group.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Status Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Trạng thái</Label>
+                    <Select value={filterActive} onValueChange={setFilterActive}>
+                      <SelectTrigger className="bg-white border-slate-300 shadow-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                        {
+                          activeStatus.map((status, index) => (
+                            <SelectItem key={index} value={status}>
+                              {status}
+                            </SelectItem>
+                          ))
+                        }
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Clear Filters Button */}
+                <div className="flex justify-end gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white hover:text-white hidden"
+                    onClick={() => {
+                        // handleApplyFilter(); // No longer needed
+                    }}
+                  >
+                    Áp dụng bộ lọc
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setFilterGroup("all");
+                      setFilterGender("all");
+                      setFilterActive("all");
+                      setFilterCity("all");
+                      setSearchQuery("");
+                    }}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Xóa bộ lọc
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            Danh sách khách hàng ({customers.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto rounded-xl">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-blue-100">
+                  <TableHead className="w-16 text-sm text-center">STT</TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("code")}
+                  >
+                    <div className="flex items-center">
+                      Mã KH
+                      {getSortIcon("code")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("name")}
+                  >
+                    <div className="flex items-center">
+                      Tên khách hàng
+                      {getSortIcon("name")}
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-sm">Giới tính</TableHead>
+                  <TableHead className="text-sm">Ngày sinh</TableHead>
+                  <TableHead className="text-sm">Liên hệ</TableHead>
+                  <TableHead className="text-sm">Địa chỉ</TableHead>
+                  <TableHead className="text-sm">Nhóm KH</TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("totalOrders")}
+                  >
+                    <div className="flex items-center">
+                      Đơn hàng
+                      {getSortIcon("orders")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("totalSpent")}
+                  >
+                    <div className="flex items-center">
+                      Tổng chi tiêu
+                      {getSortIcon("totalSpent")}
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-sm">Trạng thái</TableHead>
+                  <TableHead className="text-sm text-center">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {customers.length === 0 ? (
                   <TableRow>
-                    <TableHead>Mã KH</TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-slate-50"
-                      onClick={() => handleSort('name')}
+                    <TableCell
+                      colSpan={11}
+                      className="text-center py-8 text-slate-500"
                     >
-                      Tên khách hàng{getSortIcon('name')}
-                    </TableHead>
-                    <TableHead>Giới tính</TableHead>
-                    <TableHead>Ngày sinh</TableHead>
-                    <TableHead>Liên hệ</TableHead>
-                    <TableHead>Địa chỉ</TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-slate-50"
-                      onClick={() => handleSort('orders')}
-                    >
-                      Đơn hàng{getSortIcon('orders')}
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-slate-50"
-                      onClick={() => handleSort('totalSpent')}
-                    >
-                      Tổng chi tiêu{getSortIcon('totalSpent')}
-                    </TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                    <TableHead className="text-right">Thao tác</TableHead>
+                      Không tìm thấy khách hàng nào
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredCustomers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-slate-500">
-                        Không tìm thấy khách hàng nào
+                ) : (
+                  customers.map((customer, index) => (
+                    <TableRow key={customer.id}>
+                      <TableCell className="text-slate-600 text-center">
+                        {index + 1}
                       </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredCustomers.map((customer) => (
-                      <TableRow key={customer.id}>
-                        <TableCell className="text-slate-900">{customer.code}</TableCell>
-                        <TableCell className="text-slate-900">{customer.name}</TableCell>
-                        <TableCell className="text-slate-600">{customer.gender}</TableCell>
-                        <TableCell className="text-slate-600">{customer.birthday}</TableCell>
-                        <TableCell className="text-slate-600">{customer.phone}</TableCell>
-                        <TableCell className="text-slate-600">
-                          <div className="flex flex-col gap-0.5">
-                            <span>{customer.city}</span>
-                            {customer.address && (
-                              <span className="text-xs text-slate-500">{customer.address}</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-slate-600">{customer.orders}</TableCell>
-                        <TableCell className="text-slate-900">
-                          {formatCurrency(customer.totalSpent)}
-                        </TableCell>
-                        <TableCell>{getStatusBadge(customer.status)}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
+                      <TableCell className="text-slate-900">
+                        {customer.code}
+                      </TableCell>
+                      <TableCell className="text-slate-900">
+                        {customer.name}
+                      </TableCell>
+                      <TableCell className="text-slate-600">
+                        {customer.gender === 'male' ? 'Nam' : (customer.gender === 'female' ? 'Nữ' : customer.gender)}
+                      </TableCell>
+                      <TableCell className="text-slate-600">
+                        {customer.birthday}
+                      </TableCell>
+                      <TableCell className="text-slate-600">
+                        {customer.phone}
+                      </TableCell>
+                      <TableCell className="text-slate-600">
+                        <div className="flex flex-col gap-0.5">
+                          <span>{customer.city}</span>
+                          {customer.address && (
+                            <span className="text-xs text-slate-500">
+                              {customer.address}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-slate-600">
+                        {customer.groupName}
+                      </TableCell>
+                      <TableCell className="text-slate-600">
+                        {customer.totalOrders}
+                      </TableCell>
+                      <TableCell className="text-slate-900">
+                        {formatCurrency(customer.totalSpent)}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(customer.isActive)}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex justify-center gap-2">
+                          {canUpdate && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -572,6 +720,8 @@ export function Customers() {
                             >
                               <Pencil className="w-4 h-4" />
                             </Button>
+                          )}
+                          {canDelete && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -581,37 +731,47 @@ export function Customers() {
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleToggleStatus(customer.id)}
-                              className={customer.status === 'active' ? 'text-red-600 hover:text-red-700 hover:bg-red-50' : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'}
-                              title={customer.status === 'active' ? 'Vô hiệu hóa' : 'Kích hoạt'}
-                            >
-                              {customer.status === 'active' ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Customer Form Dialog */}
-      <CustomerFormDialog
-        open={dialogOpen}
+
+
+      {/* Customer Edit Form Dialog */}
+      <CustomerEditFormDialog
+        open={editDialogOpen}
         onClose={() => {
-          setDialogOpen(false);
+          setEditDialogOpen(false);
           resetForm();
         }}
-        onSubmit={handleSubmit}
+        onSubmit={(customers: EditCustomer) => handleSubmitEdit(customers)}
         editingCustomer={editingCustomer}
       />
-    </div>
+
+      {/* Customer Add Form Dialog */}
+      <CustomerAddFormDialog
+        open={addDialogOpen}
+        onClose={() => {
+          setAddDialogOpen(false);
+          resetForm();
+        }}
+        onSubmit={(customers: AddCustomer) => handleSubmitAdd(customers)}
+      />
+      <ImportExcelDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        module="customer"
+        title="Import Khách hàng"
+        onSuccess={fetchCustomersData}
+      />
+    </div >
   );
 }

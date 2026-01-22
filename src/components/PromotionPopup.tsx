@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
-import { 
-  Percent, 
-  X, 
-  Tag, 
-  AlertCircle, 
-  CheckCircle2, 
+import { useAuth } from "../contexts/AuthContext";
+import { useState, useEffect } from "react";
+import {
+  Percent,
+  X,
+  Tag,
+  AlertCircle,
+  CheckCircle2,
   Loader2,
   Gift,
   Info,
@@ -15,15 +16,22 @@ import {
   ChevronDown,
   ChevronUp,
   ShoppingBag,
-  Package
-} from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Badge } from './ui/badge';
-import { Card } from './ui/card';
-import { Label } from './ui/label';
-import { toast } from 'sonner@2.0.3';
+  Package,
+} from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "./ui/dialog";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Badge } from "./ui/badge";
+import { Card } from "./ui/card";
+import { Label } from "./ui/label";
+import { toast } from "sonner";
+import { getAvailablePromotions, applyPromotion, getPromotions as fetchPromotions } from "../api/promotions";
 
 interface OrderItem {
   id: string;
@@ -38,7 +46,7 @@ interface Customer {
   name: string;
   phone: string;
   code?: string;
-  membershipTier?: 'Đồng' | 'Bạc' | 'Vàng' | 'Kim cương';
+  membershipTier?: "Đồng" | "Bạc" | "Vàng" | "Kim cương";
   points: number;
 }
 
@@ -51,19 +59,28 @@ interface ComboItem {
 interface ComboCondition {
   requiredItems: ComboItem[];
   discount: {
-    type: 'percentage' | 'fixed';
+    type: "percentage" | "fixed";
     value: number;
   };
 }
 
 interface Promotion {
+  id?: number | string;
   code: string;
   name: string;
   description: string;
-  type: 'percentage' | 'fixed' | 'item' | 'combo';
+  type: "percentage" | "fixed" | "fixed_price" | "gift" | "item" | "combo";
   value: number;
   minOrderValue?: number;
+  maxDiscount?: number;
+  // Product scope flags
+  applyToAllItems?: boolean;
+  applyToAllCategories?: boolean;
+  applyToAllCombos?: boolean;
+  applicableItemIds?: (string | number)[];
   applicableCategories?: string[];
+  applicableCategoryIds?: (string | number)[];
+  applicableComboIds?: (string | number)[];
   maxUsage?: number;
   currentUsage?: number;
   expiryDate?: Date;
@@ -74,9 +91,20 @@ interface Promotion {
   applicableCustomerIds?: string[];
   applicableMembershipTiers?: string[];
   requiresCustomer?: boolean;
+  // Walk-in and groups
+  applyToAllCustomers?: boolean;
+  applyToAllCustomerGroups?: boolean;
+  applyToWalkIn?: boolean;
+  applicableCustomerGroupIds?: string[];
+  maxTotalUsage?: number;
+  maxUsagePerCustomer?: number | null;
   // NEW: Combo-specific fields
   isCombo?: boolean;
   comboCondition?: ComboCondition;
+  // Gift fields
+  buyQuantity?: number;
+  getQuantity?: number;
+  requireSameItem?: boolean;
 }
 
 interface PromotionPopupProps {
@@ -85,7 +113,12 @@ interface PromotionPopupProps {
   orderTotal: number;
   orderItems: OrderItem[];
   selectedCustomer?: Customer | null;
-  onApply: (promotion: Promotion | null, pointsToUse?: number, customer?: Customer | null) => void;
+  orderId?: number | string;
+  onApply: (
+    promotion: Promotion | null,
+    pointsToUse?: number,
+    customer?: Customer | null
+  ) => void;
 }
 
 export function PromotionPopup({
@@ -94,192 +127,78 @@ export function PromotionPopup({
   orderTotal,
   orderItems,
   selectedCustomer: initialCustomer,
-  onApply
+  orderId,
+  onApply,
 }: PromotionPopupProps) {
-  const [promoCode, setPromoCode] = useState('');
-  const [validationState, setValidationState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [validationMessage, setValidationMessage] = useState('');
+  const { hasPermission } = useAuth();
+  const [notAuthorized, setNotAuthorized] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [validationState, setValidationState] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+  const [validationMessage, setValidationMessage] = useState("");
   const [selectedPromo, setSelectedPromo] = useState<Promotion | null>(null);
   const [pointsToUse, setPointsToUse] = useState(0);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
-  
+
   // NEW: Customer selection state
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(initialCustomer || null);
-  const [customerSearch, setCustomerSearch] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
+    initialCustomer || null
+  );
+  const [customerSearch, setCustomerSearch] = useState("");
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
-  
+
   // NEW: Combo expansion state
   const [expandedCombos, setExpandedCombos] = useState<Set<string>>(new Set());
 
   // Mock customer database
   const mockCustomers: Customer[] = [
     {
-      id: 'KH001',
-      name: 'Nguyễn Văn An',
-      phone: '0901234567',
-      code: 'KH001',
-      membershipTier: 'Vàng',
+      id: "KH001",
+      name: "Nguyễn Văn An",
+      phone: "0901234567",
+      code: "KH001",
+      membershipTier: "Vàng",
       points: 250,
     },
     {
-      id: 'KH002',
-      name: 'Trần Thị Bình',
-      phone: '0907654321',
-      code: 'KH002',
-      membershipTier: 'Bạc',
+      id: "KH002",
+      name: "Trần Thị Bình",
+      phone: "0907654321",
+      code: "KH002",
+      membershipTier: "Bạc",
       points: 120,
     },
     {
-      id: 'KH003',
-      name: 'Lê Hoàng Cường',
-      phone: '0912345678',
-      code: 'KH003',
-      membershipTier: 'Kim cương',
+      id: "KH003",
+      name: "Lê Hoàng Cường",
+      phone: "0912345678",
+      code: "KH003",
+      membershipTier: "Kim cương",
       points: 500,
     },
     {
-      id: 'KH004',
-      name: 'Phạm Minh Đức',
-      phone: '0923456789',
-      code: 'KH004',
-      membershipTier: 'Đồng',
+      id: "KH004",
+      name: "Phạm Minh Đức",
+      phone: "0923456789",
+      code: "KH004",
+      membershipTier: "Đồng",
       points: 50,
     },
   ];
 
-  // Mock promotions data with customer-specific fields
-  const availablePromotions: Promotion[] = [
-    {
-      code: 'KM10',
-      name: 'Giảm 10% hóa đơn',
-      description: 'Giảm 10% tổng giá trị hóa đơn',
-      type: 'percentage',
-      value: 10,
-      minOrderValue: 100000,
-      isActive: true,
-      maxUsage: 100,
-      currentUsage: 45,
-      applicableMembershipTiers: ['Bạc', 'Vàng', 'Kim cương'],
-    },
-    {
-      code: 'VIPGOLD',
-      name: 'Ưu đãi VIP Vàng',
-      description: 'Giảm 15% dành riêng cho hạng Vàng',
-      type: 'percentage',
-      value: 15,
-      minOrderValue: 50000,
-      isActive: true,
-      customerSpecific: true,
-      applicableMembershipTiers: ['Vàng'],
-      requiresCustomer: true,
-    },
-    {
-      code: 'GIAMCF',
-      name: 'Giảm 5.000đ Cà phê',
-      description: 'Giảm 5.000đ cho món Cà phê',
-      type: 'item',
-      value: 5000,
-      applicableCategories: ['coffee'],
-      isActive: true,
-      maxUsage: 50,
-      currentUsage: 30,
-    },
-    {
-      code: 'DIAMOND20',
-      name: 'Kim cương giảm 20%',
-      description: 'Giảm 20% cho khách hàng Kim cương',
-      type: 'percentage',
-      value: 20,
-      minOrderValue: 200000,
-      isActive: true,
-      customerSpecific: true,
-      applicableMembershipTiers: ['Kim cương'],
-      requiresCustomer: true,
-    },
-    {
-      code: 'GIAM20K',
-      name: 'Giảm 20.000đ hóa đơn',
-      description: 'Giảm 20.000đ cho đơn hàng',
-      type: 'fixed',
-      value: 20000,
-      minOrderValue: 150000,
-      isActive: true,
-      conflictsWith: ['KM10'],
-    },
-    {
-      code: 'KHCU001',
-      name: 'Ưu đãi khách hàng Nguyễn Văn An',
-      description: 'Giảm 30.000đ dành riêng',
-      type: 'fixed',
-      value: 30000,
-      isActive: true,
-      customerSpecific: true,
-      applicableCustomerIds: ['KH001'],
-      requiresCustomer: true,
-    },
-    {
-      code: 'TRATHANH',
-      name: 'Giảm 10.000đ Trà',
-      description: 'Giảm 10.000đ cho món Trà',
-      type: 'item',
-      value: 10000,
-      applicableCategories: ['tea'],
-      isActive: true,
-    },
-    // NEW: Combo Promotions
-    {
-      code: 'COMBO1CF',
-      name: 'Combo 1 Cà phê + 1 Bánh',
-      description: 'Mua 1 Cà phê + 1 Bánh giảm 20.000đ',
-      type: 'combo',
-      value: 20000,
-      isActive: true,
-      isCombo: true,
-      comboCondition: {
-        requiredItems: [
-          { category: 'coffee', minQuantity: 1 },
-          { category: 'pastry', minQuantity: 1 }
-        ],
-        discount: { type: 'fixed', value: 20000 }
-      }
-    },
-    {
-      code: 'COMBO2TRA',
-      name: 'Combo 2 Trà + 1 Sinh tố',
-      description: 'Mua 2 Trà + 1 Sinh tố giảm 15%',
-      type: 'combo',
-      value: 15,
-      isActive: true,
-      isCombo: true,
-      comboCondition: {
-        requiredItems: [
-          { category: 'tea', minQuantity: 2 },
-          { category: 'smoothie', minQuantity: 1 }
-        ],
-        discount: { type: 'percentage', value: 15 }
-      },
-      applicableMembershipTiers: ['Vàng', 'Kim cương'],
-    },
-    {
-      code: 'COMBOVIP',
-      name: 'Combo VIP 3 Cà phê',
-      description: 'Mua 3 Cà phê giảm 30.000đ',
-      type: 'combo',
-      value: 30000,
-      minOrderValue: 100000,
-      isActive: true,
-      isCombo: true,
-      comboCondition: {
-        requiredItems: [
-          { category: 'coffee', minQuantity: 3 }
-        ],
-        discount: { type: 'fixed', value: 30000 }
-      },
-      customerSpecific: true,
-      applicableMembershipTiers: ['Vàng', 'Kim cương'],
-      requiresCustomer: true,
-    },
-  ];
+  // Backend-driven promotions list
+  const [availablePromotions, setAvailablePromotions] = useState<Promotion[]>([]);
+  const [isLoadingPromos, setIsLoadingPromos] = useState(false);
+
+  // Permission gate: avoid backend calls when lacking permission
+  useEffect(() => {
+    if (!hasPermission("promotions:view" as any)) {
+      setNotAuthorized(true);
+    } else {
+      setNotAuthorized(false);
+    }
+  }, [hasPermission]);
 
   useEffect(() => {
     if (initialCustomer) {
@@ -287,64 +206,208 @@ export function PromotionPopup({
     }
   }, [initialCustomer]);
 
-  const validatePromoCode = (code: string, customer: Customer | null = selectedCustomer) => {
-    setValidationState('loading');
-    
-    // Simulate API call
-    setTimeout(() => {
-      const promo = availablePromotions.find(p => p.code.toLowerCase() === code.toLowerCase());
-      
-      if (!promo) {
-        setValidationState('error');
-        setValidationMessage('Mã không hợp lệ');
-        return;
-      }
+  // Load available promotions from backend when modal opens or dependencies change
+  useEffect(() => {
+    const loadAvailable = async () => {
+      if (!open || notAuthorized) return;
+      setIsLoadingPromos(true);
+      try {
+        // Flexible extractor to handle various API response shapes
+        const extractItems = (res: any): any[] => {
+          const data = res?.data ?? res;
+          const candidates = [
+            data?.metaData?.promotions,
+            data?.metaData?.items,
+            data?.metaData?.data?.items,
+            data?.metaData?.data,
+            data?.data?.items,
+            data?.data?.records,
+            data?.data?.list,
+            data?.items,
+            data?.records,
+            data?.list,
+            data?.metaData,
+            Array.isArray(data) ? data : undefined,
+          ];
+          for (const c of candidates) {
+            if (Array.isArray(c)) return c;
+          }
+          // As a last resort, scan enumerable properties and return the first array
+          if (data && typeof data === "object") {
+            for (const key of Object.keys(data)) {
+              if (Array.isArray((data as any)[key])) return (data as any)[key];
+            }
+          }
+          return [];
+        };
 
-      if (!promo.isActive) {
-        setValidationState('error');
-        setValidationMessage('Mã khuyến mãi đã hết hạn');
-        return;
-      }
-
-      // Check customer requirement
-      if (promo.requiresCustomer && !customer) {
-        setValidationState('error');
-        setValidationMessage('Mã này yêu cầu chọn khách hàng');
-        return;
-      }
-
-      // Check customer-specific eligibility
-      if (customer && promo.customerSpecific) {
-        if (promo.applicableCustomerIds && !promo.applicableCustomerIds.includes(customer.id)) {
-          setValidationState('error');
-          setValidationMessage('Mã này không áp dụng cho khách hàng này');
-          return;
+        let list: any[] = [];
+        if (orderId) {
+          const res = await getAvailablePromotions({
+            orderId,
+            customerId: selectedCustomer?.id,
+          });
+          list = extractItems(res);
+        } else {
+          const res = await fetchPromotions({ isActive: true, limit: 50 });
+          list = extractItems(res);
         }
+        const mapTypeId = (typeId: any): Promotion["type"] => {
+          const id = Number(typeId);
+          switch (id) {
+            case 1:
+              return "percentage";
+            case 2:
+              return "fixed";
+            case 3:
+              return "fixed_price";
+            case 4:
+              return "gift";
+            default: {
+              const t = (typeof typeId === "string" ? typeId : "percentage").toLowerCase();
+              return (t === "percentage" || t === "fixed" || t === "fixed_price" || t === "gift" || t === "item" || t === "combo") ? (t as Promotion["type"]) : "percentage";
+            }
+          }
+        };
 
-        if (promo.applicableMembershipTiers && customer.membershipTier && 
-            !promo.applicableMembershipTiers.includes(customer.membershipTier)) {
-          setValidationState('error');
-          setValidationMessage(`Mã này chỉ áp dụng cho hạng: ${promo.applicableMembershipTiers.join(', ')}`);
-          return;
+        let mapped: Promotion[] = list.map((p: any) => ({
+          id: Number(p.id ?? p.promotionId ?? 0),
+          code: String(p.code ?? p.promotionCode ?? p.id ?? ""),
+          name: String(p.name ?? p.title ?? "Khuyến mãi"),
+          description: String(p.description ?? ""),
+          type: mapTypeId(p.typeId ?? p.type),
+          value: Number(p.discountValue ?? p.value ?? p.promotionValue ?? 0),
+          minOrderValue: p.minOrderValue != null ? Number(p.minOrderValue) : undefined,
+          maxDiscount: p.maxDiscount != null ? Number(p.maxDiscount) : undefined,
+          applyToAllItems: Boolean(p.applyToAllItems),
+          applyToAllCategories: Boolean(p.applyToAllCategories),
+          applyToAllCombos: Boolean(p.applyToAllCombos),
+          applicableItemIds: Array.isArray(p.applicableItemIds) ? p.applicableItemIds : undefined,
+          applicableCategories: Array.isArray(p.applicableCategories) ? p.applicableCategories : undefined,
+          applicableCategoryIds: Array.isArray(p.applicableCategoryIds) ? p.applicableCategoryIds : undefined,
+          applicableComboIds: Array.isArray(p.applicableComboIds) ? p.applicableComboIds : undefined,
+          maxUsage: p.maxUsage != null ? Number(p.maxUsage) : undefined,
+          currentUsage: p.currentUsage != null ? Number(p.currentUsage) : undefined,
+          expiryDate: p.expiryDate ? new Date(p.expiryDate) : undefined,
+          isActive: p.isActive != null ? Boolean(p.isActive) : true,
+          conflictsWith: Array.isArray(p.conflictsWith) ? p.conflictsWith : undefined,
+          customerSpecific: Boolean(p.customerSpecific ?? false),
+          applicableCustomerIds: Array.isArray(p.applicableCustomerIds) ? p.applicableCustomerIds : undefined,
+          applicableMembershipTiers: Array.isArray(p.applicableMembershipTiers) ? p.applicableMembershipTiers : undefined,
+          requiresCustomer: Boolean(p.requiresCustomer ?? false),
+          isCombo: Boolean(p.isCombo),
+          comboCondition: p.comboCondition ?? undefined,
+          buyQuantity: p.buyQuantity != null ? Number(p.buyQuantity) : undefined,
+          getQuantity: p.getQuantity != null ? Number(p.getQuantity) : undefined,
+          requireSameItem: Boolean(p.requireSameItem),
+        }));
+
+        // Fallback: if filtered listing returned empty, try unfiltered list
+        if (!orderId && mapped.length === 0) {
+          try {
+            const res2 = await fetchPromotions();
+            const list2: any[] = extractItems(res2);
+            mapped = list2.map((p: any) => ({
+              id: Number(p.id ?? p.promotionId ?? 0),
+              code: String(p.code ?? p.promotionCode ?? p.id ?? ""),
+              name: String(p.name ?? p.title ?? "Khuyến mãi"),
+              description: String(p.description ?? ""),
+              type: mapTypeId(p.typeId ?? p.type),
+              value: Number(p.discountValue ?? p.value ?? p.promotionValue ?? 0),
+              minOrderValue: p.minOrderValue != null ? Number(p.minOrderValue) : undefined,
+              maxDiscount: p.maxDiscount != null ? Number(p.maxDiscount) : undefined,
+              applyToAllItems: Boolean(p.applyToAllItems),
+              applyToAllCategories: Boolean(p.applyToAllCategories),
+              applyToAllCombos: Boolean(p.applyToAllCombos),
+              applicableItemIds: Array.isArray(p.applicableItemIds) ? p.applicableItemIds : undefined,
+              applicableCategories: Array.isArray(p.applicableCategories) ? p.applicableCategories : undefined,
+              applicableCategoryIds: Array.isArray(p.applicableCategoryIds) ? p.applicableCategoryIds : undefined,
+              applicableComboIds: Array.isArray(p.applicableComboIds) ? p.applicableComboIds : undefined,
+              maxUsage: p.maxUsage != null ? Number(p.maxUsage) : undefined,
+              currentUsage: p.currentUsage != null ? Number(p.currentUsage) : undefined,
+              expiryDate: p.expiryDate ? new Date(p.expiryDate) : undefined,
+              isActive: p.isActive != null ? Boolean(p.isActive) : true,
+              conflictsWith: Array.isArray(p.conflictsWith) ? p.conflictsWith : undefined,
+              customerSpecific: Boolean(p.customerSpecific ?? false),
+              applicableCustomerIds: Array.isArray(p.applicableCustomerIds) ? p.applicableCustomerIds : undefined,
+              applicableMembershipTiers: Array.isArray(p.applicableMembershipTiers) ? p.applicableMembershipTiers : undefined,
+              requiresCustomer: Boolean(p.requiresCustomer ?? false),
+              isCombo: Boolean(p.isCombo),
+              comboCondition: p.comboCondition ?? undefined,
+              buyQuantity: p.buyQuantity != null ? Number(p.buyQuantity) : undefined,
+              getQuantity: p.getQuantity != null ? Number(p.getQuantity) : undefined,
+              requireSameItem: Boolean(p.requireSameItem),
+            }));
+          } catch {}
         }
+        setAvailablePromotions(mapped);
+      } catch (err: any) {
+        const status = err?.response?.status;
+        if (status === 403) {
+          setNotAuthorized(true);
+          toast.error("Không thể tải khuyến mãi (403 - thiếu quyền)");
+        } else {
+          toast.error("Không tải được khuyến mãi", {
+            description: err?.message || "Lỗi kết nối API",
+          });
+        }
+        setAvailablePromotions([]);
+      } finally {
+        setIsLoadingPromos(false);
       }
+    };
+    loadAvailable();
+  }, [open, orderId, selectedCustomer, notAuthorized]);
 
-      if (promo.minOrderValue && orderTotal < promo.minOrderValue) {
-        setValidationState('error');
-        setValidationMessage(`Đơn hàng phải từ ${promo.minOrderValue.toLocaleString('vi-VN')}đ`);
-        return;
-      }
+  // Early UI guard: show friendly message if lacking permission
+  if (notAuthorized) {
+    return (
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Khuyến mãi</DialogTitle>
+          </DialogHeader>
+          <div className="p-2 text-center text-slate-600">
+            Bạn không có quyền xem/áp dụng khuyến mãi.
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
-      if (promo.maxUsage && promo.currentUsage && promo.currentUsage >= promo.maxUsage) {
-        setValidationState('error');
-        setValidationMessage('Mã khuyến mãi đã hết lượt sử dụng');
-        return;
-      }
-
-      setValidationState('success');
-      setValidationMessage('Mã hợp lệ');
-      setSelectedPromo(promo);
-    }, 500);
+  const validatePromoCode = (
+    code: string,
+    customer: Customer | null = selectedCustomer
+  ) => {
+    setValidationState("loading");
+    const promo = availablePromotions.find(
+      (p) => p.code.toLowerCase() === code.toLowerCase()
+    );
+    if (!promo) {
+      setValidationState("error");
+      setValidationMessage("Mã không hợp lệ hoặc không khả dụng cho đơn này");
+      return;
+    }
+    if (promo.requiresCustomer && !customer) {
+      setValidationState("error");
+      setValidationMessage("Mã này yêu cầu chọn khách hàng");
+      return;
+    }
+    if (promo.minOrderValue && orderTotal < promo.minOrderValue) {
+      setValidationState("error");
+      setValidationMessage(
+        `Đơn hàng phải từ ${promo.minOrderValue.toLocaleString("vi-VN")}đ`
+      );
+      return;
+    }
+    setValidationState("success");
+    setValidationMessage("Mã hợp lệ");
+    setSelectedPromo(promo);
   };
 
   const handleApplyCode = () => {
@@ -358,18 +421,59 @@ export function PromotionPopup({
     let orderDiscount = 0;
     const itemDiscounts: { itemName: string; discount: number }[] = [];
 
-    if (promo.type === 'percentage') {
+    const totalQty = orderItems.reduce((sum, i) => sum + i.quantity, 0);
+
+    if (promo.type === "percentage") {
       orderDiscount = (orderTotal * promo.value) / 100;
-    } else if (promo.type === 'fixed') {
-      orderDiscount = promo.value;
-    } else if (promo.type === 'item' && promo.applicableCategories) {
-      orderItems.forEach(item => {
-        if (item.category && promo.applicableCategories?.includes(item.category)) {
-          const discount = Math.min(promo.value * item.quantity, item.price * item.quantity);
+      if (promo.maxDiscount != null) {
+        orderDiscount = Math.min(orderDiscount, Number(promo.maxDiscount));
+      }
+      orderDiscount = Math.min(orderDiscount, orderTotal);
+    } else if (promo.type === "fixed") {
+      orderDiscount = Math.min(promo.value, orderTotal);
+    } else if (promo.type === "fixed_price") {
+      const finalPrice = Number(promo.value) * totalQty;
+      orderDiscount = Math.max(0, orderTotal - finalPrice);
+    } else if (promo.type === "gift") {
+      const buyQ = Number(promo.buyQuantity) || 0;
+      const getQ = Number(promo.getQuantity) || 0;
+      const requireSame = Boolean(promo.requireSameItem);
+
+      let giftCount = 0;
+      if (buyQ > 0 && getQ > 0) {
+        if (requireSame) {
+          giftCount = orderItems.reduce((sum, i) => sum + Math.floor(i.quantity / buyQ) * getQ, 0);
+        } else {
+          giftCount = Math.floor(totalQty / buyQ) * getQ;
+        }
+      } else if (getQ > 0) {
+        giftCount = getQ;
+      }
+      if (giftCount > 0) {
+        const unitPrices: number[] = [];
+        orderItems.forEach((i) => {
+          const unitPrice = i.price;
+          for (let q = 0; q < i.quantity; q++) unitPrices.push(unitPrice);
+        });
+        unitPrices.sort((a, b) => a - b);
+        const take = Math.min(giftCount, unitPrices.length);
+        orderDiscount = unitPrices.slice(0, take).reduce((s, p) => s + p, 0);
+      }
+      orderDiscount = Math.min(orderDiscount, orderTotal);
+    } else if (promo.type === "item" && promo.applicableCategories) {
+      orderItems.forEach((item) => {
+        if (
+          item.category &&
+          promo.applicableCategories?.includes(item.category)
+        ) {
+          const discount = Math.min(
+            promo.value * item.quantity,
+            item.price * item.quantity
+          );
           itemDiscounts.push({ itemName: item.name, discount });
         }
       });
-    } else if (promo.type === 'combo' && promo.isCombo) {
+    } else if (promo.type === "combo" && promo.isCombo) {
       // Calculate combo discount
       const comboStatus = checkComboEligibility(promo);
       if (comboStatus.eligible) {
@@ -377,112 +481,153 @@ export function PromotionPopup({
       }
     }
 
-    const totalItemDiscount = itemDiscounts.reduce((sum, item) => sum + item.discount, 0);
+    const totalItemDiscount = itemDiscounts.reduce(
+      (sum, item) => sum + item.discount,
+      0
+    );
     const totalDiscount = orderDiscount + totalItemDiscount;
 
     return { orderDiscount, itemDiscounts, total: totalDiscount };
   };
 
-  const getPromoTypeLabel = (type: Promotion['type']) => {
+  const getPromoTypeLabel = (type: Promotion["type"]) => {
     switch (type) {
-      case 'percentage':
-        return '% Hóa đơn';
-      case 'fixed':
-        return 'Giảm tiền';
-      case 'item':
-        return 'Theo món';
-      case 'combo':
-        return 'Combo';
+      case "percentage":
+        return "% Hóa đơn";
+      case "fixed":
+        return "Giảm tiền";
+      case "fixed_price":
+        return "Đồng giá";
+      case "gift":
+        return "Tặng món";
+      case "item":
+        return "Theo món";
+      case "combo":
+        return "Combo";
     }
   };
 
-  const getPromoTypeBadgeColor = (type: Promotion['type']) => {
+  const getPromoTypeBadgeColor = (type: Promotion["type"]) => {
     switch (type) {
-      case 'percentage':
-        return 'bg-blue-100 text-blue-700 border-blue-300';
-      case 'fixed':
-        return 'bg-green-100 text-green-700 border-green-300';
-      case 'item':
-        return 'bg-purple-100 text-purple-700 border-purple-300';
-      case 'combo':
-        return 'bg-orange-100 text-orange-700 border-orange-300';
+      case "percentage":
+        return "bg-blue-100 text-blue-700 border-blue-300";
+      case "fixed":
+        return "bg-green-100 text-green-700 border-green-300";
+      case "fixed_price":
+        return "bg-indigo-100 text-indigo-700 border-indigo-300";
+      case "gift":
+        return "bg-amber-100 text-amber-700 border-amber-300";
+      case "item":
+        return "bg-purple-100 text-purple-700 border-purple-300";
+      case "combo":
+        return "bg-orange-100 text-orange-700 border-orange-300";
     }
   };
 
   const getMembershipTierColor = (tier?: string) => {
     switch (tier) {
-      case 'Kim cương':
-        return 'bg-cyan-100 text-cyan-700 border-cyan-300';
-      case 'Vàng':
-        return 'bg-yellow-100 text-yellow-700 border-yellow-300';
-      case 'Bạc':
-        return 'bg-slate-100 text-slate-700 border-slate-300';
-      case 'Đồng':
-        return 'bg-orange-100 text-orange-700 border-orange-300';
+      case "Kim cương":
+        return "bg-cyan-100 text-cyan-700 border-cyan-300";
+      case "Vàng":
+        return "bg-yellow-100 text-yellow-700 border-yellow-300";
+      case "Bạc":
+        return "bg-slate-100 text-slate-700 border-slate-300";
+      case "Đồng":
+        return "bg-orange-100 text-orange-700 border-orange-300";
       default:
-        return 'bg-slate-100 text-slate-700 border-slate-300';
+        return "bg-slate-100 text-slate-700 border-slate-300";
     }
   };
 
   const isPromoApplicable = (promo: Promotion) => {
-    if (!promo.isActive) return { applicable: false, reason: 'Mã đã hết hạn' };
-    
+    if (!promo.isActive) return { applicable: false, reason: "Mã đã hết hạn" };
+
     // Check customer requirement
     if (promo.requiresCustomer && !selectedCustomer) {
-      return { applicable: false, reason: 'Yêu cầu chọn khách hàng' };
+      return { applicable: false, reason: "Yêu cầu chọn khách hàng" };
     }
 
     // Check customer-specific eligibility
     if (selectedCustomer && promo.customerSpecific) {
-      if (promo.applicableCustomerIds && !promo.applicableCustomerIds.includes(selectedCustomer.id)) {
-        return { applicable: false, reason: 'Mã này chỉ áp dụng cho khách hàng khác' };
+      if (
+        promo.applicableCustomerIds &&
+        !promo.applicableCustomerIds.includes(selectedCustomer.id)
+      ) {
+        return {
+          applicable: false,
+          reason: "Mã này chỉ áp dụng cho khách hàng khác",
+        };
       }
 
-      if (promo.applicableMembershipTiers && selectedCustomer.membershipTier && 
-          !promo.applicableMembershipTiers.includes(selectedCustomer.membershipTier)) {
-        return { 
-          applicable: false, 
-          reason: `Yêu cầu hạng: ${promo.applicableMembershipTiers.join(', ')}` 
+      if (
+        promo.applicableMembershipTiers &&
+        selectedCustomer.membershipTier &&
+        !promo.applicableMembershipTiers.includes(
+          selectedCustomer.membershipTier
+        )
+      ) {
+        return {
+          applicable: false,
+          reason: `Yêu cầu hạng: ${promo.applicableMembershipTiers.join(", ")}`,
         };
       }
     }
 
     // If promo has membership requirement but no customer selected
-    if (!selectedCustomer && promo.applicableMembershipTiers && promo.applicableMembershipTiers.length > 0) {
-      return { 
-        applicable: false, 
-        reason: `Yêu cầu hạng: ${promo.applicableMembershipTiers.join(', ')}` 
+    if (
+      !selectedCustomer &&
+      promo.applicableMembershipTiers &&
+      promo.applicableMembershipTiers.length > 0
+    ) {
+      return {
+        applicable: false,
+        reason: `Yêu cầu hạng: ${promo.applicableMembershipTiers.join(", ")}`,
       };
     }
 
     if (promo.minOrderValue && orderTotal < promo.minOrderValue) {
-      return { 
-        applicable: false, 
-        reason: `Đơn hàng phải từ ${promo.minOrderValue.toLocaleString('vi-VN')}đ` 
+      return {
+        applicable: false,
+        reason: `Đơn hàng phải từ ${promo.minOrderValue.toLocaleString(
+          "vi-VN"
+        )}đ`,
       };
     }
-    
-    if (promo.maxUsage && promo.currentUsage && promo.currentUsage >= promo.maxUsage) {
-      return { applicable: false, reason: 'Đã hết lượt sử dụng' };
+
+    if (
+      promo.maxUsage &&
+      promo.currentUsage &&
+      promo.currentUsage >= promo.maxUsage
+    ) {
+      return { applicable: false, reason: "Đã hết lượt sử dụng" };
     }
-    
+
     if (selectedPromo && promo.conflictsWith?.includes(selectedPromo.code)) {
-      return { applicable: false, reason: `Xung đột với mã ${selectedPromo.code}` };
+      return {
+        applicable: false,
+        reason: `Xung đột với mã ${selectedPromo.code}`,
+      };
     }
-    
-    return { applicable: true, reason: '' };
+
+    return { applicable: true, reason: "" };
   };
 
   const isCustomerEligible = (promo: Promotion) => {
     if (!selectedCustomer) return false;
     if (!promo.customerSpecific) return true;
 
-    if (promo.applicableCustomerIds && !promo.applicableCustomerIds.includes(selectedCustomer.id)) {
+    if (
+      promo.applicableCustomerIds &&
+      !promo.applicableCustomerIds.includes(selectedCustomer.id)
+    ) {
       return false;
     }
 
-    if (promo.applicableMembershipTiers && selectedCustomer.membershipTier && 
-        !promo.applicableMembershipTiers.includes(selectedCustomer.membershipTier)) {
+    if (
+      promo.applicableMembershipTiers &&
+      selectedCustomer.membershipTier &&
+      !promo.applicableMembershipTiers.includes(selectedCustomer.membershipTier)
+    ) {
       return false;
     }
 
@@ -497,17 +642,19 @@ export function PromotionPopup({
         timesApplicable: 0,
         matchedItems: [],
         missingItems: [],
-        totalDiscount: 0
+        totalDiscount: 0,
       };
     }
 
     const requiredItems = promo.comboCondition.requiredItems;
     const matchedItems: OrderItem[] = [];
     const missingItems: ComboItem[] = [];
-    
+
     // Count available items by category
-    const categoryCount: { [key: string]: { total: number; items: OrderItem[] } } = {};
-    orderItems.forEach(item => {
+    const categoryCount: {
+      [key: string]: { total: number; items: OrderItem[] };
+    } = {};
+    orderItems.forEach((item) => {
       if (item.category) {
         if (!categoryCount[item.category]) {
           categoryCount[item.category] = { total: 0, items: [] };
@@ -521,19 +668,19 @@ export function PromotionPopup({
     let minTimesApplicable = Infinity;
     let allRequirementsMet = true;
 
-    requiredItems.forEach(required => {
+    requiredItems.forEach((required) => {
       if (required.category) {
         const available = categoryCount[required.category]?.total || 0;
         const times = Math.floor(available / required.minQuantity);
-        
+
         if (times === 0) {
           allRequirementsMet = false;
           missingItems.push(required);
         } else {
           minTimesApplicable = Math.min(minTimesApplicable, times);
           // Add matched items
-          categoryCount[required.category]?.items.forEach(item => {
-            if (!matchedItems.find(m => m.id === item.id)) {
+          categoryCount[required.category]?.items.forEach((item) => {
+            if (!matchedItems.find((m) => m.id === item.id)) {
               matchedItems.push(item);
             }
           });
@@ -542,16 +689,21 @@ export function PromotionPopup({
     });
 
     const timesApplicable = allRequirementsMet ? minTimesApplicable : 0;
-    
+
     // Calculate total discount
     let totalDiscount = 0;
     if (timesApplicable > 0) {
-      if (promo.comboCondition.discount.type === 'fixed') {
+      if (promo.comboCondition.discount.type === "fixed") {
         totalDiscount = promo.comboCondition.discount.value * timesApplicable;
-      } else if (promo.comboCondition.discount.type === 'percentage') {
+      } else if (promo.comboCondition.discount.type === "percentage") {
         // Calculate based on matched items total
-        const matchedTotal = matchedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-        totalDiscount = (matchedTotal * promo.comboCondition.discount.value / 100) * timesApplicable;
+        const matchedTotal = matchedItems.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0
+        );
+        totalDiscount =
+          ((matchedTotal * promo.comboCondition.discount.value) / 100) *
+          timesApplicable;
       }
     }
 
@@ -560,7 +712,7 @@ export function PromotionPopup({
       timesApplicable,
       matchedItems,
       missingItems,
-      totalDiscount
+      totalDiscount,
     };
   };
 
@@ -570,52 +722,73 @@ export function PromotionPopup({
   const totalSavings = discount.total + pointsValue;
   const finalTotal = Math.max(0, orderTotal - totalSavings);
 
-  const autocompleteMatches = availablePromotions.filter(p => 
-    p.code.toLowerCase().includes(promoCode.toLowerCase()) && 
-    p.isActive &&
-    promoCode.length > 0
+  const autocompleteMatches = availablePromotions.filter(
+    (p) =>
+      p.code.toLowerCase().includes(promoCode.toLowerCase()) &&
+      p.isActive &&
+      promoCode.length > 0
   );
 
-  const customerMatches = mockCustomers.filter(c => 
-    (c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-     c.phone.includes(customerSearch) ||
-     c.code?.toLowerCase().includes(customerSearch.toLowerCase())) &&
-    customerSearch.length > 0
+  const customerMatches = mockCustomers.filter(
+    (c) =>
+      (c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+        c.phone.includes(customerSearch) ||
+        c.code?.toLowerCase().includes(customerSearch.toLowerCase())) &&
+      customerSearch.length > 0
   );
 
-  const handleApply = () => {
+  const handleApply = async () => {
     if (!selectedPromo && pointsToUse === 0) {
-      toast.error('Vui lòng chọn khuyến mãi hoặc nhập điểm');
+      toast.error("Vui lòng chọn khuyến mãi hoặc nhập điểm");
       return;
     }
 
     if (selectedPromo?.requiresCustomer && !selectedCustomer) {
-      toast.error('Vui lòng chọn khách hàng');
+      toast.error("Vui lòng chọn khách hàng");
       return;
     }
 
+    // Require permission to apply
+    if (!hasPermission("promotions:apply" as any)) {
+      toast.error("Bạn không có quyền áp dụng khuyến mãi");
+      return;
+    }
+
+    // Best-effort backend apply before notifying UI
+    if (orderId && selectedPromo) {
+      try {
+        await applyPromotion({
+          orderId,
+          promotionId: selectedPromo.id,
+          customerId: selectedCustomer?.id,
+          pointsToUse: pointsToUse,
+        } as any);
+      } catch (err: any) {
+        toast.error("Áp dụng khuyến mãi backend thất bại", {
+          description: err?.message || "API lỗi",
+        });
+      }
+    }
+
     onApply(selectedPromo, pointsToUse, selectedCustomer);
-    toast.success(`Đã áp dụng! Tiết kiệm ${totalSavings.toLocaleString('vi-VN')}đ`);
+    toast.success(
+      `Đã áp dụng! Tiết kiệm ${totalSavings.toLocaleString("vi-VN")}đ`
+    );
     onClose();
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-h-[90vh] overflow-y-auto"
+        style={{ width: "70vw", maxWidth: "1600px" }}
+      >
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2">
               <Percent className="w-5 h-5 text-blue-600" />
               Khuyến mãi
             </DialogTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              onClick={onClose}
-            >
-              <X className="w-4 h-4" />
-            </Button>
           </div>
         </DialogHeader>
 
@@ -626,7 +799,7 @@ export function PromotionPopup({
               <User className="w-4 h-4 text-blue-600" />
               Áp dụng cho khách hàng
             </Label>
-            
+
             {!selectedCustomer ? (
               <div className="relative">
                 <div className="relative">
@@ -639,20 +812,20 @@ export function PromotionPopup({
                       setShowCustomerSearch(true);
                     }}
                     onFocus={() => setShowCustomerSearch(true)}
-                    className="pl-10"
+                    className="pl-10 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   />
                 </div>
 
                 {/* Customer search results */}
                 {showCustomerSearch && customerMatches.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-64 overflow-y-auto">
-                    {customerMatches.map(customer => (
+                    {customerMatches.map((customer) => (
                       <button
                         key={customer.id}
                         className="w-full text-left px-3 py-2.5 hover:bg-slate-50 border-b border-slate-100 last:border-0"
                         onClick={() => {
                           setSelectedCustomer(customer);
-                          setCustomerSearch('');
+                          setCustomerSearch("");
                           setShowCustomerSearch(false);
                           setPointsToUse(0);
                           // Re-validate selected promo with new customer
@@ -663,19 +836,24 @@ export function PromotionPopup({
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex-1">
-                            <div className="text-sm text-slate-900">{customer.name}</div>
+                            <div className="text-sm text-slate-900">
+                              {customer.name}
+                            </div>
                             <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
                               <span className="flex items-center gap-1">
                                 <Phone className="w-3 h-3" />
                                 {customer.phone}
                               </span>
-                              {customer.code && (
-                                <span>• {customer.code}</span>
-                              )}
+                              {customer.code && <span>• {customer.code}</span>}
                             </div>
                           </div>
                           {customer.membershipTier && (
-                            <Badge variant="outline" className={`text-xs ${getMembershipTierColor(customer.membershipTier)}`}>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${getMembershipTierColor(
+                                customer.membershipTier
+                              )}`}
+                            >
                               <Star className="w-3 h-3 mr-1" />
                               {customer.membershipTier}
                             </Badge>
@@ -692,9 +870,16 @@ export function PromotionPopup({
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <User className="w-4 h-4 text-slate-600" />
-                      <h4 className="text-sm text-slate-900">{selectedCustomer.name}</h4>
+                      <h4 className="text-sm text-slate-900">
+                        {selectedCustomer.name}
+                      </h4>
                       {selectedCustomer.membershipTier && (
-                        <Badge variant="outline" className={`text-xs ${getMembershipTierColor(selectedCustomer.membershipTier)}`}>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${getMembershipTierColor(
+                            selectedCustomer.membershipTier
+                          )}`}
+                        >
                           <Star className="w-3 h-3 mr-1" />
                           {selectedCustomer.membershipTier}
                         </Badge>
@@ -762,16 +947,16 @@ export function PromotionPopup({
                   onChange={(e) => {
                     setPromoCode(e.target.value.toUpperCase());
                     setShowAutocomplete(true);
-                    setValidationState('idle');
+                    setValidationState("idle");
                   }}
                   onFocus={() => setShowAutocomplete(true)}
-                  className="uppercase"
+                  className="bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
-                
+
                 {/* Autocomplete suggestions */}
                 {showAutocomplete && autocompleteMatches.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
-                    {autocompleteMatches.map(promo => (
+                    {autocompleteMatches.map((promo) => (
                       <button
                         key={promo.code}
                         className="w-full text-left px-3 py-2 hover:bg-slate-50 text-sm"
@@ -781,43 +966,51 @@ export function PromotionPopup({
                           validatePromoCode(promo.code);
                         }}
                       >
-                        <div className="font-medium text-slate-900">{promo.code}</div>
-                        <div className="text-xs text-slate-500">{promo.description}</div>
+                        <div className="font-medium text-slate-900">
+                          {promo.code}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {promo.description}
+                        </div>
                       </button>
                     ))}
                   </div>
                 )}
 
                 {/* Validation indicator */}
-                {validationState !== 'idle' && (
+                {validationState !== "idle" && (
                   <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    {validationState === 'loading' && (
+                    {validationState === "loading" && (
                       <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
                     )}
-                    {validationState === 'success' && (
+                    {validationState === "success" && (
                       <CheckCircle2 className="w-4 h-4 text-green-600" />
                     )}
-                    {validationState === 'error' && (
+                    {validationState === "error" && (
                       <AlertCircle className="w-4 h-4 text-red-600" />
                     )}
                   </div>
                 )}
               </div>
-              <Button 
+              <Button
                 onClick={handleApplyCode}
                 className="bg-blue-600 hover:bg-blue-700"
-                disabled={!promoCode.trim() || validationState === 'loading'}
+                disabled={!promoCode.trim() || validationState === "loading"}
               >
                 Áp dụng
               </Button>
             </div>
-            
+
             {/* Validation message */}
             {validationMessage && (
-              <p className={`text-xs flex items-center gap-1 ${
-                validationState === 'success' ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {validationState === 'success' ? (
+              <p
+                className={`text-xs flex items-center gap-1 ${
+                  validationState === "success"
+                    ? "text-green-600"
+                    : "text-red-600"
+                }`}
+              >
+                {validationState === "success" ? (
                   <CheckCircle2 className="w-3 h-3" />
                 ) : (
                   <AlertCircle className="w-3 h-3" />
@@ -830,166 +1023,115 @@ export function PromotionPopup({
           {/* Section: Suggested Promotions */}
           <div className="space-y-3">
             <Label>Mã khuyến mãi gợi ý</Label>
-            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-              {availablePromotions.filter(p => p.isActive && !p.isCombo).map(promo => {
-                const { applicable, reason } = isPromoApplicable(promo);
-                const isSelected = selectedPromo?.code === promo.code;
-                const isEligible = selectedCustomer ? isCustomerEligible(promo) : !promo.customerSpecific;
+            <div className="flex flex-wrap gap-3 max-h-80 overflow-y-auto pr-1">
+                {availablePromotions
+                  .filter((p) => p.isActive)
+                .map((promo) => {
+                  const { applicable, reason } = isPromoApplicable(promo);
+                  const isSelected = selectedPromo?.code === promo.code;
+                  const isEligible = selectedCustomer
+                    ? isCustomerEligible(promo)
+                    : !promo.customerSpecific;
 
-                return (
-                  <Card
-                    key={promo.code}
-                    className={`p-3 cursor-pointer transition-all ${
-                      isSelected 
-                        ? 'border-2 border-blue-500 bg-blue-50' 
-                        : applicable
-                        ? 'border border-slate-200 hover:border-blue-300 hover:shadow-sm'
-                        : 'border border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed'
-                    }`}
-                    onClick={() => {
-                      if (applicable) {
-                        setSelectedPromo(isSelected ? null : promo);
-                        setPromoCode(isSelected ? '' : promo.code);
-                        setValidationState('idle');
-                      }
-                    }}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <Tag className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                          <h4 className="text-sm text-slate-900">{promo.code}</h4>
-                          <Badge 
-                            variant="outline" 
-                            className={`text-xs ${getPromoTypeBadgeColor(promo.type)}`}
-                          >
-                            {getPromoTypeLabel(promo.type)}
-                          </Badge>
-                          {promo.customerSpecific && (
-                            <Badge variant="outline" className="text-xs bg-pink-100 text-pink-700 border-pink-300">
-                              <User className="w-3 h-3 mr-1" />
-                              Khách hàng
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-slate-700 mb-2">{promo.description}</p>
-                        
-                        {/* Conditions */}
-                        <div className="space-y-0.5">
-                          {promo.minOrderValue && (
-                            <p className="text-xs text-slate-500">
-                              • Áp dụng cho đơn từ {promo.minOrderValue.toLocaleString('vi-VN')}đ
-                            </p>
-                          )}
-                          {promo.applicableCategories && (
-                            <p className="text-xs text-slate-500">
-                              • Áp dụng cho món: {promo.applicableCategories.join(', ')}
-                            </p>
-                          )}
-                          {promo.applicableMembershipTiers && (
-                            <p className="text-xs text-slate-500">
-                              • Áp dụng cho hạng: {promo.applicableMembershipTiers.join(', ')}
-                            </p>
-                          )}
-                          {promo.applicableCustomerIds && (
-                            <p className="text-xs text-slate-500">
-                              • Dành riêng cho khách hàng cụ thể
-                            </p>
-                          )}
-                          {promo.maxUsage && (
-                            <p className="text-xs text-slate-500">
-                              • Còn {promo.maxUsage - (promo.currentUsage || 0)} lượt sử dụng
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Customer eligibility indicator */}
-                        {selectedCustomer && promo.customerSpecific && applicable && (
-                          <div className="mt-2 pt-2 border-t border-slate-200">
-                            {isEligible ? (
-                              <Badge className="bg-green-100 text-green-700 border-green-300 text-xs">
-                                <CheckCircle2 className="w-3 h-3 mr-1" />
-                                Khách hàng phù hợp
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-orange-100 text-orange-700 border-orange-300 text-xs">
-                                <AlertCircle className="w-3 h-3 mr-1" />
-                                Mã này chỉ áp dụng cho khách hàng khác
-                              </Badge>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Status indicator */}
-                      {isSelected && (
-                        <div className="flex-shrink-0">
-                          <CheckCircle2 className="w-5 h-5 text-blue-600" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Not applicable warning */}
-                    {!applicable && (
-                      <div className="mt-2 pt-2 border-t border-slate-200">
-                        <p className="text-xs text-orange-600 flex items-center gap-1">
-                          <Info className="w-3 h-3" />
-                          {reason}
-                        </p>
-                      </div>
-                    )}
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* NEW Section: Combo Promotions */}
-          <div className="space-y-3">
-            <Label className="flex items-center gap-2">
-              <ShoppingBag className="w-4 h-4 text-orange-600" />
-              Khuyến mãi Combo khả dụng
-            </Label>
-            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-              {availablePromotions.filter(p => p.isActive && p.isCombo).map(promo => {
-                const { applicable, reason } = isPromoApplicable(promo);
-                const isSelected = selectedPromo?.code === promo.code;
-                const isEligible = selectedCustomer ? isCustomerEligible(promo) : !promo.customerSpecific;
-                const comboStatus = checkComboEligibility(promo);
-                const isExpanded = expandedCombos.has(promo.code);
-
-                return (
-                  <Card
-                    key={promo.code}
-                    className={`p-3 transition-all ${
-                      isSelected 
-                        ? 'border-2 border-blue-500 bg-blue-50' 
-                        : applicable && comboStatus.eligible
-                        ? 'border border-slate-200 hover:border-blue-300 hover:shadow-sm'
-                        : 'border border-slate-200 bg-slate-50 opacity-60'
-                    }`}
-                  >
-                    <div className="space-y-2">
-                      {/* Header */}
+                  return (
+                    <Card
+                      key={promo.code}
+                      className={`p-3 cursor-pointer transition-all min-w-[280px] flex-shrink-0 ${
+                        isSelected
+                          ? "border-2 border-blue-500 bg-blue-50"
+                          : applicable
+                          ? "border border-slate-200 hover:border-blue-300 hover:shadow-sm"
+                          : "border border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed"
+                      }`}
+                      onClick={() => {
+                        if (applicable) {
+                          setSelectedPromo(isSelected ? null : promo);
+                          setPromoCode(isSelected ? "" : promo.code);
+                          setValidationState("idle");
+                        }
+                      }}
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <Package className="w-4 h-4 text-orange-600 flex-shrink-0" />
-                            <h4 className="text-sm text-slate-900">{promo.name}</h4>
-                            <Badge 
-                              variant="outline" 
-                              className={`text-xs ${getPromoTypeBadgeColor(promo.type)}`}
+                            <Tag className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                            <h4 className="text-sm text-slate-900">
+                              {promo.code}
+                            </h4>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${getPromoTypeBadgeColor(
+                                promo.type
+                              )}`}
                             >
-                              Combo
+                              {getPromoTypeLabel(promo.type)}
                             </Badge>
                             {promo.customerSpecific && (
-                              <Badge variant="outline" className="text-xs bg-pink-100 text-pink-700 border-pink-300">
+                              <Badge
+                                variant="outline"
+                                className="text-xs bg-pink-100 text-pink-700 border-pink-300"
+                              >
                                 <User className="w-3 h-3 mr-1" />
                                 Khách hàng
                               </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-slate-700 mb-2">{promo.description}</p>
+                          <p className="text-sm text-slate-700 mb-2">
+                            {promo.description}
+                          </p>
+
+                          {/* Conditions */}
+                          <div className="space-y-0.5">
+                            {promo.minOrderValue && (
+                              <p className="text-xs text-slate-500">
+                                • Áp dụng cho đơn từ{" "}
+                                {promo.minOrderValue.toLocaleString("vi-VN")}đ
+                              </p>
+                            )}
+                            {promo.applicableCategories && (
+                              <p className="text-xs text-slate-500">
+                                • Áp dụng cho món:{" "}
+                                {promo.applicableCategories.join(", ")}
+                              </p>
+                            )}
+                            {promo.applicableMembershipTiers && (
+                              <p className="text-xs text-slate-500">
+                                • Áp dụng cho hạng:{" "}
+                                {promo.applicableMembershipTiers.join(", ")}
+                              </p>
+                            )}
+                            {promo.applicableCustomerIds && (
+                              <p className="text-xs text-slate-500">
+                                • Dành riêng cho khách hàng cụ thể
+                              </p>
+                            )}
+                            {promo.maxUsage && (
+                              <p className="text-xs text-slate-500">
+                                • Còn{" "}
+                                {promo.maxUsage - (promo.currentUsage || 0)}{" "}
+                                lượt sử dụng
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Customer eligibility indicator */}
+                          {selectedCustomer &&
+                            promo.customerSpecific &&
+                            applicable && (
+                              <div className="mt-2 pt-2 border-t border-slate-200">
+                                {isEligible ? (
+                                  <Badge className="bg-green-100 text-green-700 border-green-300 text-xs">
+                                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                                    Khách hàng phù hợp
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-orange-100 text-orange-700 border-orange-300 text-xs">
+                                    <AlertCircle className="w-3 h-3 mr-1" />
+                                    Mã này chỉ áp dụng cho khách hàng khác
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
                         </div>
 
                         {/* Status indicator */}
@@ -1000,218 +1142,367 @@ export function PromotionPopup({
                         )}
                       </div>
 
-                      {/* Combo Condition Block */}
-                      {promo.comboCondition && (
-                        <div className="bg-slate-100 rounded p-2.5 space-y-1.5">
-                          <div className="text-xs text-slate-600 mb-1.5">Điều kiện combo:</div>
-                          {promo.comboCondition.requiredItems.map((item, idx) => (
-                            <div key={idx} className="flex items-center gap-2 text-xs">
-                              <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div>
-                              <span className="text-slate-700">
-                                {item.minQuantity} {item.category}
-                              </span>
-                            </div>
-                          ))}
-                          <div className="flex items-center gap-2 text-xs pt-1 border-t border-slate-300 mt-1.5">
-                            <span className="text-green-700">
-                              → Giảm {promo.comboCondition.discount.type === 'percentage' 
-                                ? `${promo.comboCondition.discount.value}%` 
-                                : `${promo.comboCondition.discount.value.toLocaleString('vi-VN')}đ`}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Eligibility Status */}
-                      {comboStatus.eligible ? (
-                        <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded p-2">
-                          <Badge className="bg-green-100 text-green-700 border-green-300 text-xs">
-                            <CheckCircle2 className="w-3 h-3 mr-1" />
-                            Đủ điều kiện combo {comboStatus.timesApplicable > 1 ? `(${comboStatus.timesApplicable} lần)` : '(1 lần)'}
-                          </Badge>
-                          {comboStatus.timesApplicable > 0 && (
-                            <span className="text-xs text-green-700">
-                              Combo áp dụng được {comboStatus.timesApplicable} lần — Giảm {comboStatus.totalDiscount.toLocaleString('vi-VN')}đ
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="bg-orange-50 border border-orange-200 rounded p-2">
-                          <Badge className="bg-orange-100 text-orange-700 border-orange-300 text-xs">
-                            <AlertCircle className="w-3 h-3 mr-1" />
-                            Thiếu món để hoàn thành combo
-                          </Badge>
-                        </div>
-                      )}
-
-                      {/* Additional Conditions */}
-                      <div className="space-y-0.5">
-                        {promo.minOrderValue && (
-                          <p className="text-xs text-slate-500">
-                            • Áp dụng cho đơn từ {promo.minOrderValue.toLocaleString('vi-VN')}đ
-                          </p>
-                        )}
-                        {promo.applicableMembershipTiers && (
-                          <p className="text-xs text-slate-500 flex items-center gap-1">
-                            • Chỉ áp dụng cho hạng: {promo.applicableMembershipTiers.map((tier, idx) => (
-                              <Badge 
-                                key={idx}
-                                variant="outline" 
-                                className={`text-xs ${getMembershipTierColor(tier)}`}
-                              >
-                                {tier}
-                              </Badge>
-                            ))}
-                          </p>
-                        )}
-                        {promo.maxUsage && (
-                          <p className="text-xs text-slate-500">
-                            • Còn {promo.maxUsage - (promo.currentUsage || 0)} lượt sử dụng
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Customer eligibility indicator */}
-                      {selectedCustomer && promo.customerSpecific && applicable && comboStatus.eligible && (
-                        <div className="pt-2 border-t border-slate-200">
-                          {isEligible ? (
-                            <Badge className="bg-green-100 text-green-700 border-green-300 text-xs">
-                              <CheckCircle2 className="w-3 h-3 mr-1" />
-                              Khách hàng phù hợp
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-orange-100 text-orange-700 border-orange-300 text-xs">
-                              <AlertCircle className="w-3 h-3 mr-1" />
-                              Mã này chỉ áp dụng cho hạng {promo.applicableMembershipTiers?.join(', ')}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Expandable: Items Breakdown */}
-                      {comboStatus.matchedItems.length > 0 && (
-                        <div>
-                          <button
-                            onClick={() => {
-                              const newExpanded = new Set(expandedCombos);
-                              if (isExpanded) {
-                                newExpanded.delete(promo.code);
-                              } else {
-                                newExpanded.add(promo.code);
-                              }
-                              setExpandedCombos(newExpanded);
-                            }}
-                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
-                          >
-                            {isExpanded ? (
-                              <>
-                                <ChevronUp className="w-3.5 h-3.5" />
-                                Thu gọn chi tiết
-                              </>
-                            ) : (
-                              <>
-                                <ChevronDown className="w-3.5 h-3.5" />
-                                Xem chi tiết món trong giỏ
-                              </>
-                            )}
-                          </button>
-
-                          {isExpanded && (
-                            <div className="mt-2 space-y-2 pl-3 border-l-2 border-blue-200">
-                              <div>
-                                <p className="text-xs text-slate-600 mb-1">Món khớp với combo:</p>
-                                {comboStatus.matchedItems.map(item => (
-                                  <div key={item.id} className="flex items-center justify-between text-xs py-1">
-                                    <span className="text-slate-700">
-                                      <CheckCircle2 className="w-3 h-3 inline mr-1 text-green-600" />
-                                      {item.name} ({item.category})
-                                    </span>
-                                    <span className="text-slate-500">x{item.quantity}</span>
-                                  </div>
-                                ))}
-                              </div>
-
-                              {orderItems.filter(item => 
-                                !comboStatus.matchedItems.find(m => m.id === item.id)
-                              ).length > 0 && (
-                                <div>
-                                  <p className="text-xs text-slate-600 mb-1">Món không áp dụng:</p>
-                                  {orderItems.filter(item => 
-                                    !comboStatus.matchedItems.find(m => m.id === item.id)
-                                  ).map(item => (
-                                    <div key={item.id} className="flex items-center justify-between text-xs py-1">
-                                      <span className="text-slate-500">
-                                        <X className="w-3 h-3 inline mr-1 text-slate-400" />
-                                        {item.name} ({item.category || 'Khác'})
-                                      </span>
-                                      <span className="text-slate-400">x{item.quantity}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Apply Button or Not Applicable Warning */}
-                      {comboStatus.eligible && applicable ? (
-                        <Button
-                          variant={isSelected ? "outline" : "default"}
-                          size="sm"
-                          className={`w-full ${isSelected ? 'border-blue-500 text-blue-600' : 'bg-blue-600 hover:bg-blue-700'}`}
-                          onClick={() => {
-                            if (promo.requiresCustomer && !selectedCustomer) {
-                              toast.error('Vui lòng chọn khách hàng');
-                              return;
-                            }
-                            setSelectedPromo(isSelected ? null : promo);
-                            setPromoCode(isSelected ? '' : promo.code);
-                            setValidationState('idle');
-                          }}
-                        >
-                          {isSelected ? 'Đã chọn combo này' : 'Áp dụng combo'}
-                        </Button>
-                      ) : (
-                        <div className="pt-2 border-t border-slate-200">
+                      {/* Not applicable warning */}
+                      {!applicable && (
+                        <div className="mt-2 pt-2 border-t border-slate-200">
                           <p className="text-xs text-orange-600 flex items-center gap-1">
                             <Info className="w-3 h-3" />
-                            {!comboStatus.eligible 
-                              ? 'Thiếu món trong giỏ hàng' 
-                              : reason
-                            }
+                            {reason}
                           </p>
                         </div>
                       )}
-                    </div>
-                  </Card>
-                );
-              })}
+                    </Card>
+                  );
+                })}
+              {availablePromotions.filter((p) => p.isActive).length === 0 && !isLoadingPromos && (
+                <Card className="p-4 border-slate-200 bg-slate-50 w-full">
+                  <p className="text-sm text-slate-700">Không có khuyến mãi khả dụng.</p>
+                  <p className="text-xs text-slate-500 mt-1">Thử làm mới hoặc kiểm tra quyền truy cập.</p>
+                </Card>
+              )}
             </div>
           </div>
 
-          {/* Section: Discount Preview */}
+          {/* NEW Section: Combo Promotions */}
+          {/* <div className="space-y-3">
+            <Label className="flex items-center gap-2">
+              <ShoppingBag className="w-4 h-4 text-orange-600" />
+              Khuyến mãi Combo khả dụng
+            </Label>
+            <div className="flex flex-wrap gap-3 max-h-80 overflow-y-auto pr-1">
+              {availablePromotions
+                .filter((p) => p.isActive && p.isCombo)
+                .map((promo) => {
+                  const { applicable, reason } = isPromoApplicable(promo);
+                  const isSelected = selectedPromo?.code === promo.code;
+                  const isEligible = selectedCustomer
+                    ? isCustomerEligible(promo)
+                    : !promo.customerSpecific;
+                  const comboStatus = checkComboEligibility(promo);
+                  const isExpanded = expandedCombos.has(promo.code);
+
+                  return (
+                    <Card
+                      key={promo.code}
+                      className={`p-3 transition-all min-w-[320px] flex-shrink-0 ${
+                        isSelected
+                          ? "border-2 border-blue-500 bg-blue-50"
+                          : applicable && comboStatus.eligible
+                          ? "border border-slate-200 hover:border-blue-300 hover:shadow-sm"
+                          : "border border-slate-200 bg-slate-50 opacity-60"
+                      }`}
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <Package className="w-4 h-4 text-orange-600 flex-shrink-0" />
+                              <h4 className="text-sm text-slate-900">
+                                {promo.name}
+                              </h4>
+                              <Badge
+                                variant="outline"
+                                className={`text-xs ${getPromoTypeBadgeColor(
+                                  promo.type
+                                )}`}
+                              >
+                                Combo
+                              </Badge>
+                              {promo.customerSpecific && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs bg-pink-100 text-pink-700 border-pink-300"
+                                >
+                                  <User className="w-3 h-3 mr-1" />
+                                  Khách hàng
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-slate-700 mb-2">
+                              {promo.description}
+                            </p>
+                          </div>
+
+                          {isSelected && (
+                            <div className="flex-shrink-0">
+                              <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                            </div>
+                          )}
+                        </div>
+
+                        {promo.comboCondition && (
+                          <div className="bg-slate-100 rounded p-2.5 space-y-1.5">
+                            <div className="text-xs text-slate-600 mb-1.5">
+                              Điều kiện combo:
+                            </div>
+                            {promo.comboCondition.requiredItems.map(
+                              (item, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-center gap-2 text-xs"
+                                >
+                                  <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div>
+                                  <span className="text-slate-700">
+                                    {item.minQuantity} {item.category}
+                                  </span>
+                                </div>
+                              )
+                            )}
+                            <div className="flex items-center gap-2 text-xs pt-1 border-t border-slate-300 mt-1.5">
+                              <span className="text-green-700">
+                                → Giảm{" "}
+                                {promo.comboCondition.discount.type ===
+                                "percentage"
+                                  ? `${promo.comboCondition.discount.value}%`
+                                  : `${promo.comboCondition.discount.value.toLocaleString(
+                                      "vi-VN"
+                                    )}đ`}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {comboStatus.eligible ? (
+                          <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded p-2">
+                            <Badge className="bg-green-100 text-green-700 border-green-300 text-xs">
+                              <CheckCircle2 className="w-3 h-3 mr-1" />
+                              Đủ điều kiện combo{" "}
+                              {comboStatus.timesApplicable > 1
+                                ? `(${comboStatus.timesApplicable} lần)`
+                                : "(1 lần)"}
+                            </Badge>
+                            {comboStatus.timesApplicable > 0 && (
+                              <span className="text-xs text-green-700">
+                                Combo áp dụng được {comboStatus.timesApplicable}{" "}
+                                lần — Giảm{" "}
+                                {comboStatus.totalDiscount.toLocaleString(
+                                  "vi-VN"
+                                )}
+                                đ
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="bg-orange-50 border border-orange-200 rounded p-2">
+                            <Badge className="bg-orange-100 text-orange-700 border-orange-300 text-xs">
+                              <AlertCircle className="w-3 h-3 mr-1" />
+                              Thiếu món để hoàn thành combo
+                            </Badge>
+                          </div>
+                        )}
+
+                        <div className="space-y-0.5">
+                          {promo.minOrderValue && (
+                            <p className="text-xs text-slate-500">
+                              • Áp dụng cho đơn từ{" "}
+                              {promo.minOrderValue.toLocaleString("vi-VN")}đ
+                            </p>
+                          )}
+                          {promo.applicableMembershipTiers && (
+                            <p className="text-xs text-slate-500 flex items-center gap-1">
+                              • Chỉ áp dụng cho hạng:{" "}
+                              {promo.applicableMembershipTiers.map(
+                                (tier, idx) => (
+                                  <Badge
+                                    key={idx}
+                                    variant="outline"
+                                    className={`text-xs ${getMembershipTierColor(
+                                      tier
+                                    )}`}
+                                  >
+                                    {tier}
+                                  </Badge>
+                                )
+                              )}
+                            </p>
+                          )}
+                          {promo.maxUsage && (
+                            <p className="text-xs text-slate-500">
+                              • Còn {promo.maxUsage - (promo.currentUsage || 0)}{" "}
+                              lượt sử dụng
+                            </p>
+                          )}
+                        </div>
+
+                        {selectedCustomer &&
+                          promo.customerSpecific &&
+                          applicable &&
+                          comboStatus.eligible && (
+                            <div className="pt-2 border-t border-slate-200">
+                              {isEligible ? (
+                                <Badge className="bg-green-100 text-green-700 border-green-300 text-xs">
+                                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                                  Khách hàng phù hợp
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-orange-100 text-orange-700 border-orange-300 text-xs">
+                                  <AlertCircle className="w-3 h-3 mr-1" />
+                                  Mã này chỉ áp dụng cho hạng{" "}
+                                  {promo.applicableMembershipTiers?.join(", ")}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+
+                        {comboStatus.matchedItems.length > 0 && (
+                          <div>
+                            <button
+                              onClick={() => {
+                                const newExpanded = new Set(expandedCombos);
+                                if (isExpanded) {
+                                  newExpanded.delete(promo.code);
+                                } else {
+                                  newExpanded.add(promo.code);
+                                }
+                                setExpandedCombos(newExpanded);
+                              }}
+                              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
+                            >
+                              {isExpanded ? (
+                                <>
+                                  <ChevronUp className="w-3.5 h-3.5" />
+                                  Thu gọn chi tiết
+                                </>
+                              ) : (
+                                <>
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                  Xem chi tiết món trong giỏ
+                                </>
+                              )}
+                            </button>
+
+                            {isExpanded && (
+                              <div className="mt-2 space-y-2 pl-3 border-l-2 border-blue-200">
+                                <div>
+                                  <p className="text-xs text-slate-600 mb-1">
+                                    Món khớp với combo:
+                                  </p>
+                                  {comboStatus.matchedItems.map((item) => (
+                                    <div
+                                      key={item.id}
+                                      className="flex items-center justify-between text-xs py-1"
+                                    >
+                                      <span className="text-slate-700">
+                                        <CheckCircle2 className="w-3 h-3 inline mr-1 text-green-600" />
+                                        {item.name} ({item.category})
+                                      </span>
+                                      <span className="text-slate-500">
+                                        x{item.quantity}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {orderItems.filter(
+                                  (item) =>
+                                    !comboStatus.matchedItems.find(
+                                      (m) => m.id === item.id
+                                    )
+                                ).length > 0 && (
+                                  <div>
+                                    <p className="text-xs text-slate-600 mb-1">
+                                      Món không áp dụng:
+                                    </p>
+                                    {orderItems
+                                      .filter(
+                                        (item) =>
+                                          !comboStatus.matchedItems.find(
+                                            (m) => m.id === item.id
+                                          )
+                                      )
+                                      .map((item) => (
+                                        <div
+                                          key={item.id}
+                                          className="flex items-center justify-between text-xs py-1"
+                                        >
+                                          <span className="text-slate-500">
+                                            <X className="w-3 h-3 inline mr-1 text-slate-400" />
+                                            {item.name} (
+                                            {item.category || "Khác"})
+                                          </span>
+                                          <span className="text-slate-400">
+                                            x{item.quantity}
+                                          </span>
+                                        </div>
+                                      ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {comboStatus.eligible && applicable ? (
+                          <Button
+                            variant={isSelected ? "outline" : "default"}
+                            size="sm"
+                            className={`w-full ${
+                              isSelected
+                                ? "border-blue-500 text-blue-600"
+                                : "bg-blue-600 hover:bg-blue-700"
+                            }`}
+                            onClick={() => {
+                              if (promo.requiresCustomer && !selectedCustomer) {
+                                toast.error("Vui lòng chọn khách hàng");
+                                return;
+                              }
+                              setSelectedPromo(isSelected ? null : promo);
+                              setPromoCode(isSelected ? "" : promo.code);
+                              setValidationState("idle");
+                            }}
+                          >
+                            {isSelected ? "Đã chọn combo này" : "Áp dụng combo"}
+                          </Button>
+                        ) : (
+                          <div className="pt-2 border-t border-slate-200">
+                            <p className="text-xs text-orange-600 flex items-center gap-1">
+                              <Info className="w-3 h-3" />
+                              {!comboStatus.eligible
+                                ? "Thiếu món trong giỏ hàng"
+                                : reason}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  );
+                })}
+            </div>
+          </div> */}
+
           {(selectedPromo || pointsToUse > 0) && (
             <div className="bg-slate-50 rounded-lg p-4 space-y-2 border border-slate-200">
-              <h4 className="text-sm text-slate-700 mb-3">Tính toán giảm giá</h4>
-              
+              <h4 className="text-sm text-slate-700 mb-3">
+                Tính toán giảm giá
+              </h4>
+
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Giá trị hóa đơn ban đầu</span>
-                <span className="text-slate-900">{orderTotal.toLocaleString('vi-VN')}đ</span>
+                <span className="text-slate-900">
+                  {orderTotal.toLocaleString("vi-VN")}đ
+                </span>
               </div>
 
               {discount.orderDiscount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-600 flex items-center gap-1">
-                    {selectedPromo?.isCombo && <Package className="w-3.5 h-3.5 text-orange-600" />}
-                    Giảm từ {selectedPromo?.isCombo ? 'combo' : 'khuyến mãi'}
-                    {selectedPromo?.isCombo && checkComboEligibility(selectedPromo).timesApplicable > 1 && (
-                      <span className="text-xs text-orange-600">
-                        (x{checkComboEligibility(selectedPromo).timesApplicable})
-                      </span>
+                    {selectedPromo?.isCombo && (
+                      <Package className="w-3.5 h-3.5 text-orange-600" />
                     )}
+                    Giảm từ {selectedPromo?.isCombo ? "combo" : "khuyến mãi"}
+                    {selectedPromo?.isCombo &&
+                      checkComboEligibility(selectedPromo).timesApplicable >
+                        1 && (
+                        <span className="text-xs text-orange-600">
+                          (x
+                          {checkComboEligibility(selectedPromo).timesApplicable}
+                          )
+                        </span>
+                      )}
                   </span>
-                  <span className="text-green-600">-{discount.orderDiscount.toLocaleString('vi-VN')}đ</span>
+                  <span className="text-green-600">
+                    -{discount.orderDiscount.toLocaleString("vi-VN")}đ
+                  </span>
                 </div>
               )}
 
@@ -1219,9 +1510,14 @@ export function PromotionPopup({
                 <div className="space-y-1">
                   <p className="text-sm text-slate-600">Giảm theo món:</p>
                   {discount.itemDiscounts.map((item, idx) => (
-                    <div key={idx} className="flex justify-between text-sm pl-4">
+                    <div
+                      key={idx}
+                      className="flex justify-between text-sm pl-4"
+                    >
                       <span className="text-slate-500">{item.itemName}</span>
-                      <span className="text-green-600">-{item.discount.toLocaleString('vi-VN')}đ</span>
+                      <span className="text-green-600">
+                        -{item.discount.toLocaleString("vi-VN")}đ
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -1229,25 +1525,34 @@ export function PromotionPopup({
 
               {pointsToUse > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Giảm từ điểm thưởng ({pointsToUse} điểm)</span>
-                  <span className="text-green-600">-{pointsValue.toLocaleString('vi-VN')}đ</span>
+                  <span className="text-slate-600">
+                    Giảm từ điểm thưởng ({pointsToUse} điểm)
+                  </span>
+                  <span className="text-green-600">
+                    -{pointsValue.toLocaleString("vi-VN")}đ
+                  </span>
                 </div>
               )}
 
               <div className="border-t border-slate-300 pt-2 mt-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-700">Tổng giảm</span>
-                  <span className="text-green-600">{totalSavings.toLocaleString('vi-VN')}đ</span>
+                  <span className="text-green-600">
+                    {totalSavings.toLocaleString("vi-VN")}đ
+                  </span>
                 </div>
                 <div className="flex justify-between mt-1">
-                  <span className="text-slate-900">Số tiền phải thanh toán</span>
-                  <span className="text-blue-700">{finalTotal.toLocaleString('vi-VN')}đ</span>
+                  <span className="text-slate-900">
+                    Số tiền phải thanh toán
+                  </span>
+                  <span className="text-blue-700">
+                    {finalTotal.toLocaleString("vi-VN")}đ
+                  </span>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Section: Reward Points */}
           {selectedCustomer && customerPoints > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -1255,13 +1560,15 @@ export function PromotionPopup({
                   <Gift className="w-4 h-4 text-orange-600" />
                   Điểm thưởng
                 </Label>
-                <span className="text-sm text-slate-600">Bạn có {customerPoints} điểm</span>
+                <span className="text-sm text-slate-600">
+                  Bạn có {customerPoints} điểm
+                </span>
               </div>
               <div className="flex gap-2 items-center">
                 <Input
                   type="number"
                   placeholder="Nhập số điểm muốn đổi"
-                  value={pointsToUse || ''}
+                  value={pointsToUse || ""}
                   onChange={(e) => {
                     const value = parseInt(e.target.value) || 0;
                     setPointsToUse(Math.min(value, customerPoints));
@@ -1270,7 +1577,7 @@ export function PromotionPopup({
                   min={0}
                 />
                 <span className="text-sm text-slate-600 whitespace-nowrap">
-                  = {pointsValue.toLocaleString('vi-VN')}đ
+                  = {pointsValue.toLocaleString("vi-VN")}đ
                 </span>
               </div>
               {pointsToUse > customerPoints && (
@@ -1283,21 +1590,21 @@ export function PromotionPopup({
           )}
 
           {/* Conflict Warning */}
-          {selectedPromo && selectedPromo.conflictsWith && selectedPromo.conflictsWith.length > 0 && (
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-              <p className="text-sm text-orange-800 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                Mã này không thể kết hợp với: {selectedPromo.conflictsWith.join(', ')}
-              </p>
-            </div>
-          )}
+          {selectedPromo &&
+            selectedPromo.conflictsWith &&
+            selectedPromo.conflictsWith.length > 0 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                <p className="text-sm text-orange-800 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  Mã này không thể kết hợp với:{" "}
+                  {selectedPromo.conflictsWith.join(", ")}
+                </p>
+              </div>
+            )}
         </div>
 
         <DialogFooter className="gap-2">
-          <Button
-            variant="outline"
-            onClick={onClose}
-          >
+          <Button variant="outline" onClick={onClose}>
             Hủy
           </Button>
           <Button
@@ -1305,10 +1612,11 @@ export function PromotionPopup({
             onClick={handleApply}
             disabled={!selectedPromo && pointsToUse === 0}
           >
-            {totalSavings > 0 
-              ? `Áp dụng khuyến mãi – Tiết kiệm ${totalSavings.toLocaleString('vi-VN')}đ`
-              : 'Áp dụng khuyến mãi'
-            }
+            {totalSavings > 0
+              ? `Áp dụng khuyến mãi – Tiết kiệm ${totalSavings.toLocaleString(
+                  "vi-VN"
+                )}đ`
+              : "Áp dụng khuyến mãi"}
           </Button>
         </DialogFooter>
       </DialogContent>

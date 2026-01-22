@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { 
-  Plus, 
-  Download, 
-  Upload, 
-  RotateCcw, 
-  FileText, 
+import {
+  Plus,
+  Download,
+  Upload,
+  RotateCcw,
+  FileText,
   Calendar,
   User,
   Package,
@@ -24,13 +24,13 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '../ui/separator';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogTrigger,
-  DialogFooter 
+  DialogFooter
 } from '../ui/dialog';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
@@ -44,7 +44,7 @@ import {
   TableHeader,
   TableRow,
 } from '../ui/table';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { ImportExportExcelDialog } from '../ImportExportExcelDialog';
 
 interface ImportItem {
@@ -88,7 +88,7 @@ export function ImportExport() {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [importExcelDialogOpen, setImportExcelDialogOpen] = useState(false);
-  
+
   // Filters and expand state
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['import', 'export', 'return']);
@@ -176,7 +176,7 @@ export function ImportExport() {
     // Generate batch code based on current items length
     const batchNumber = String(importItems.length + 1).padStart(3, '0');
     const batchCode = `LO${batchNumber}`;
-    
+
     const newItem: ImportItem = {
       id: Date.now().toString(),
       batchCode: batchCode,
@@ -202,19 +202,19 @@ export function ImportExport() {
     setImportItems(importItems.map(item => {
       if (item.id === id) {
         const updatedItem = { ...item, [field]: value };
-        
+
         // Recalculate total price
         const subtotal = updatedItem.quantity * updatedItem.unitPrice;
         let discountAmount = 0;
-        
+
         if (updatedItem.discountType === 'percent') {
           discountAmount = subtotal * (updatedItem.discount / 100);
         } else {
           discountAmount = updatedItem.discount;
         }
-        
+
         updatedItem.totalPrice = subtotal - discountAmount;
-        
+
         return updatedItem;
       }
       return item;
@@ -271,10 +271,10 @@ export function ImportExport() {
     setExportItems(exportItems.map(item => {
       if (item.id === id) {
         const updatedItem = { ...item, [field]: value };
-        
+
         // Recalculate total price
         updatedItem.totalPrice = updatedItem.quantity * updatedItem.unitPrice;
-        
+
         return updatedItem;
       }
       return item;
@@ -334,10 +334,10 @@ export function ImportExport() {
     setReturnItems(returnItems.map(item => {
       if (item.id === id) {
         const updatedItem = { ...item, [field]: value };
-        
+
         // Recalculate total price
         updatedItem.totalPrice = updatedItem.quantity * updatedItem.unitPrice;
-        
+
         return updatedItem;
       }
       return item;
@@ -529,7 +529,7 @@ export function ImportExport() {
 
   // Toggle expand/collapse
   const toggleExpand = (id: string) => {
-    setExpandedRows(prev => 
+    setExpandedRows(prev =>
       prev.includes(id) ? prev.filter(rowId => rowId !== id) : [...prev, id]
     );
   };
@@ -556,25 +556,25 @@ export function ImportExport() {
   const filteredTransactions = transactions.filter(trans => {
     // Type filter
     if (selectedTypes.length > 0 && !selectedTypes.includes(trans.type)) return false;
-    
+
     // Status filter
     if (selectedStatuses.length > 0 && !selectedStatuses.includes(trans.status)) return false;
-    
+
     // Search filter
     if (searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase();
       const matchesCode = trans.id.toLowerCase().includes(query);
       const matchesSupplier = trans.supplier.toLowerCase().includes(query);
       const matchesCreator = trans.createdBy.toLowerCase().includes(query);
-      
+
       if (!matchesCode && !matchesSupplier && !matchesCreator) return false;
     }
-    
+
     // Date range filter
     if (dateRangeFilter !== 'all') {
       const today = new Date();
       const transDate = trans.date;
-      
+
       if (dateRangeFilter === 'today') {
         if (transDate.toDateString() !== today.toDateString()) return false;
       } else if (dateRangeFilter === 'week') {
@@ -584,7 +584,7 @@ export function ImportExport() {
         if (transDate.getMonth() !== today.getMonth() || transDate.getFullYear() !== today.getFullYear()) return false;
       }
     }
-    
+
     return true;
   });
 
@@ -605,8 +605,8 @@ export function ImportExport() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="type-import" 
+                  <Checkbox
+                    id="type-import"
                     checked={selectedTypes.includes('import')}
                     onCheckedChange={() => toggleType('import')}
                   />
@@ -619,8 +619,8 @@ export function ImportExport() {
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="type-export" 
+                  <Checkbox
+                    id="type-export"
                     checked={selectedTypes.includes('export')}
                     onCheckedChange={() => toggleType('export')}
                   />
@@ -633,8 +633,8 @@ export function ImportExport() {
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="type-return" 
+                  <Checkbox
+                    id="type-return"
                     checked={selectedTypes.includes('return')}
                     onCheckedChange={() => toggleType('return')}
                   />
@@ -655,7 +655,7 @@ export function ImportExport() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="status-completed"
                     checked={selectedStatuses.includes('completed')}
                     onCheckedChange={() => toggleStatus('completed')}
@@ -669,7 +669,7 @@ export function ImportExport() {
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="status-pending"
                     checked={selectedStatuses.includes('pending')}
                     onCheckedChange={() => toggleStatus('pending')}
@@ -689,27 +689,27 @@ export function ImportExport() {
           <div>
             <h3 className="text-sm text-slate-900 mb-3">Bộ lọc nhanh</h3>
             <div className="space-y-2">
-              <Button 
+              <Button
                 variant={dateRangeFilter === 'today' ? 'default' : 'outline'}
-                size="sm" 
+                size="sm"
                 className="w-full justify-start text-xs"
                 onClick={() => setDateRangeFilter(dateRangeFilter === 'today' ? 'all' : 'today')}
               >
                 <Calendar className="w-3 h-3 mr-2" />
                 Hôm nay
               </Button>
-              <Button 
+              <Button
                 variant={dateRangeFilter === 'week' ? 'default' : 'outline'}
-                size="sm" 
+                size="sm"
                 className="w-full justify-start text-xs"
                 onClick={() => setDateRangeFilter(dateRangeFilter === 'week' ? 'all' : 'week')}
               >
                 <Calendar className="w-3 h-3 mr-2" />
                 7 ngày qua
               </Button>
-              <Button 
+              <Button
                 variant={dateRangeFilter === 'month' ? 'default' : 'outline'}
-                size="sm" 
+                size="sm"
                 className="w-full justify-start text-xs"
                 onClick={() => setDateRangeFilter(dateRangeFilter === 'month' ? 'all' : 'month')}
               >
@@ -726,919 +726,919 @@ export function ImportExport() {
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h1 className="text-amber-950">Nhập/Xuất/Trả hàng</h1>
+            <h1 className="text-blue-900 text-2xl font-semibold">Nhập/Xuất/Trả hàng</h1>
             <p className="text-neutral-600 mt-1">Quản lý luồng hàng hóa</p>
           </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline"
-            onClick={() => setImportExcelDialogOpen(true)}
-            className="gap-2"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Import Excel
-          </Button>
-          <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-            <DialogTrigger asChild>
-              <Button 
-                className="bg-emerald-700 hover:bg-emerald-800"
-                onClick={handleOpenImportDialog}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Nhập kho
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="min-w-[1100px] max-w-[1400px] w-[95vw] max-h-[90vh] overflow-hidden flex flex-col" aria-describedby={undefined}>
-              <DialogHeader>
-                <DialogTitle>Phiếu nhập hàng vào kho</DialogTitle>
-              </DialogHeader>
-              
-              <div className="space-y-6 overflow-y-auto flex-1 px-1">
-                {/* Basic Information */}
-                <Card className="border-emerald-200">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-base">Thông tin phiếu nhập</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div>
-                        <Label>Mã nhập hàng *</Label>
-                        <Input 
-                          value={importCode} 
-                          disabled
-                          className="bg-neutral-50"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label>Ngày nhập *</Label>
-                        <Input 
-                          type="date" 
-                          value={importDate}
-                          onChange={(e) => setImportDate(e.target.value)}
-                        />
-                      </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setImportExcelDialogOpen(true)}
+              className="gap-2"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Nhập file
+            </Button>
+            <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  className="bg-emerald-700 hover:bg-emerald-800"
+                  onClick={handleOpenImportDialog}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Nhập kho
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="min-w-[1100px] max-w-[1400px] w-[95vw] max-h-[90vh] overflow-hidden flex flex-col" aria-describedby={undefined}>
+                <DialogHeader>
+                  <DialogTitle>Phiếu nhập hàng vào kho</DialogTitle>
+                </DialogHeader>
 
-                      <div>
-                        <Label>Nhà cung cấp *</Label>
-                        <Select value={supplier} onValueChange={setSupplier}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Chọn nhà cung cấp" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {suppliers.map(sup => (
-                              <SelectItem key={sup.id} value={sup.id}>
-                                {sup.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                <div className="space-y-6 overflow-y-auto flex-1 px-1">
+                  {/* Basic Information */}
+                  <Card className="border-emerald-200">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="text-base">Thông tin phiếu nhập</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                          <Label>Mã nhập hàng *</Label>
+                          <Input
+                            value={importCode}
+                            disabled
+                            className="bg-neutral-50"
+                          />
+                        </div>
 
-                      <div>
-                        <Label>Nhân viên nhập *</Label>
-                        <Select value={employee} onValueChange={setEmployee}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Chọn nhân viên" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {employees.map(emp => (
-                              <SelectItem key={emp.id} value={emp.id}>
-                                {emp.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                        <div>
+                          <Label>Ngày nhập *</Label>
+                          <Input
+                            type="date"
+                            value={importDate}
+                            onChange={(e) => setImportDate(e.target.value)}
+                          />
+                        </div>
 
-                {/* Items List */}
-                <Card className="border-emerald-200">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">Danh sách hàng hóa</CardTitle>
-                      <Button 
-                        onClick={handleAddItem}
-                        size="sm"
-                        variant="outline"
-                        className="border-emerald-600 text-emerald-600 hover:bg-emerald-50"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Thêm hàng hóa
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {importItems.length === 0 ? (
-                      <div className="text-center py-8 text-neutral-500">
-                        <Package className="w-12 h-12 mx-auto mb-2 text-neutral-300" />
-                        <p>Chưa có hàng hóa nào</p>
-                        <p className="text-sm">Click "Thêm hàng hóa" để bắt đầu</p>
+                        <div>
+                          <Label>Nhà cung cấp *</Label>
+                          <Select value={supplier} onValueChange={setSupplier}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Chọn nhà cung cấp" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {suppliers.map(sup => (
+                                <SelectItem key={sup.id} value={sup.id}>
+                                  {sup.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label>Nhân viên nhập *</Label>
+                          <Select value={employee} onValueChange={setEmployee}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Chọn nhân viên" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {employees.map(emp => (
+                                <SelectItem key={emp.id} value={emp.id}>
+                                  {emp.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                    ) : (
-                      <div className="max-h-[300px] overflow-y-auto border rounded-md">
-                        <Table>
-                          <TableHeader className="sticky top-0 bg-emerald-50 z-10">
-                            <TableRow className="bg-emerald-50">
-                              <TableHead className="w-[110px]">Mã lô</TableHead>
-                              <TableHead className="min-w-[220px]">Hàng hóa</TableHead>
-                              <TableHead className="w-[100px]">ĐVT</TableHead>
-                              <TableHead className="w-[120px]">SL nhập</TableHead>
-                              <TableHead className="w-[160px]">HSD</TableHead>
-                              <TableHead className="w-[150px]">Đơn giá</TableHead>
-                              <TableHead className="w-[160px]">Giảm giá</TableHead>
-                              <TableHead className="w-[150px]">Thành tiền</TableHead>
-                              <TableHead className="w-[60px]"></TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {importItems.map((item) => (
-                              <TableRow key={item.id}>
-                                <TableCell>
-                                  <Input
-                                    value={item.batchCode}
-                                    disabled
-                                    className="h-9 bg-neutral-50 text-neutral-600"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Select
-                                    value={item.itemName}
-                                    onValueChange={(value) => {
-                                      const product = products.find(p => p.name === value);
-                                      handleUpdateItem(item.id, 'itemName', value);
-                                      if (product) {
-                                        handleUpdateItem(item.id, 'unit', product.unit);
-                                      }
-                                    }}
-                                  >
-                                    <SelectTrigger className="h-9">
-                                      <SelectValue placeholder="Chọn hàng hóa" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {products.map(prod => (
-                                        <SelectItem key={prod.id} value={prod.name}>
-                                          {prod.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    value={item.unit}
-                                    disabled
-                                    className="h-9 bg-neutral-50 text-neutral-600"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="number"
-                                    value={item.quantity || ''}
-                                    onChange={(e) => handleUpdateItem(item.id, 'quantity', Number(e.target.value))}
-                                    placeholder="0"
-                                    className="h-9"
-                                    min="0"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="date"
-                                    value={item.expiryDate}
-                                    onChange={(e) => handleUpdateItem(item.id, 'expiryDate', e.target.value)}
-                                    className="h-9"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="number"
-                                    value={item.unitPrice || ''}
-                                    onChange={(e) => handleUpdateItem(item.id, 'unitPrice', Number(e.target.value))}
-                                    placeholder="0"
-                                    className="h-9"
-                                    min="0"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex gap-1">
+                    </CardContent>
+                  </Card>
+
+                  {/* Items List */}
+                  <Card className="border-emerald-200">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base">Danh sách hàng hóa</CardTitle>
+                        <Button
+                          onClick={handleAddItem}
+                          size="sm"
+                          variant="outline"
+                          className="border-emerald-600 text-emerald-600 hover:bg-emerald-50"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Thêm hàng hóa
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {importItems.length === 0 ? (
+                        <div className="text-center py-8 text-neutral-500">
+                          <Package className="w-12 h-12 mx-auto mb-2 text-neutral-300" />
+                          <p>Chưa có hàng hóa nào</p>
+                          <p className="text-sm">Click "Thêm hàng hóa" để bắt đầu</p>
+                        </div>
+                      ) : (
+                        <div className="max-h-[300px] overflow-y-auto border rounded-md">
+                          <Table>
+                            <TableHeader className="sticky top-0 bg-emerald-50 z-10">
+                              <TableRow className="bg-emerald-50">
+                                <TableHead className="w-[110px]">Mã lô</TableHead>
+                                <TableHead className="min-w-[220px]">Hàng hóa</TableHead>
+                                <TableHead className="w-[100px]">ĐVT</TableHead>
+                                <TableHead className="w-[120px]">SL nhập</TableHead>
+                                <TableHead className="w-[160px]">HSD</TableHead>
+                                <TableHead className="w-[150px]">Đơn giá</TableHead>
+                                <TableHead className="w-[160px]">Giảm giá</TableHead>
+                                <TableHead className="w-[150px]">Thành tiền</TableHead>
+                                <TableHead className="w-[60px]"></TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {importItems.map((item) => (
+                                <TableRow key={item.id}>
+                                  <TableCell>
                                     <Input
-                                      type="number"
-                                      value={item.discount || ''}
-                                      onChange={(e) => handleUpdateItem(item.id, 'discount', Number(e.target.value))}
-                                      placeholder="0"
-                                      className="h-9 w-[70px]"
-                                      min="0"
+                                      value={item.batchCode}
+                                      disabled
+                                      className="h-9 bg-neutral-50 text-neutral-600"
                                     />
+                                  </TableCell>
+                                  <TableCell>
                                     <Select
-                                      value={item.discountType}
-                                      onValueChange={(value: 'percent' | 'amount') => 
-                                        handleUpdateItem(item.id, 'discountType', value)
-                                      }
+                                      value={item.itemName}
+                                      onValueChange={(value) => {
+                                        const product = products.find(p => p.name === value);
+                                        handleUpdateItem(item.id, 'itemName', value);
+                                        if (product) {
+                                          handleUpdateItem(item.id, 'unit', product.unit);
+                                        }
+                                      }}
                                     >
-                                      <SelectTrigger className="h-9 w-[60px]">
-                                        <SelectValue />
+                                      <SelectTrigger className="h-9">
+                                        <SelectValue placeholder="Chọn hàng hóa" />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        <SelectItem value="percent">%</SelectItem>
-                                        <SelectItem value="amount">₫</SelectItem>
+                                        {products.map(prod => (
+                                          <SelectItem key={prod.id} value={prod.name}>
+                                            {prod.name}
+                                          </SelectItem>
+                                        ))}
                                       </SelectContent>
                                     </Select>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <span className="text-sm text-emerald-700">
-                                    {item.totalPrice.toLocaleString('vi-VN')}₫
-                                  </span>
-                                </TableCell>
-                                <TableCell>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    onClick={() => handleRemoveItem(item.id)}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-
-                    {/* Total */}
-                    {importItems.length > 0 && (
-                      <div className="mt-4 pt-4 border-t">
-                        <div className="flex justify-end">
-                          <div className="w-full md:w-1/3 space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-neutral-600">Tổng số lượng:</span>
-                              <span className="text-neutral-900">
-                                {importItems.reduce((sum, item) => sum + item.quantity, 0)} sản phẩm
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-neutral-600">Tổng giá trị:</span>
-                              <span className="text-emerald-700">
-                                {calculateGrandTotal().toLocaleString('vi-VN')}₫
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Notes */}
-                <div>
-                  <Label>Ghi chú</Label>
-                  <Textarea 
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Nhập ghi chú về phiếu nhập..." 
-                    rows={3} 
-                  />
-                </div>
-              </div>
-
-              <DialogFooter className="mt-4 border-t pt-4">
-                <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
-                  Hủy
-                </Button>
-                <Button 
-                  className="bg-emerald-700 hover:bg-emerald-800"
-                  onClick={handleSubmitImport}
-                >
-                  Tạo phiếu nhập
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
-            <DialogTrigger asChild>
-              <Button 
-                className="bg-blue-700 hover:bg-blue-800"
-                onClick={handleOpenExportDialog}
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Xuất kho
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="min-w-[1100px] max-w-[1400px] w-[95vw] max-h-[90vh] overflow-hidden flex flex-col" aria-describedby={undefined}>
-              <DialogHeader>
-                <DialogTitle>Phiếu xuất hàng khỏi kho</DialogTitle>
-              </DialogHeader>
-              
-              <div className="space-y-6 overflow-y-auto flex-1 px-1">
-                {/* Basic Information */}
-                <Card className="border-blue-200">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-base">Thông tin phiếu xuất</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div>
-                        <Label>Mã xuất hàng *</Label>
-                        <Input 
-                          value={exportCode} 
-                          disabled
-                          className="bg-neutral-50"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label>Ngày xuất *</Label>
-                        <Input 
-                          type="date" 
-                          value={exportDate}
-                          onChange={(e) => setExportDate(e.target.value)}
-                        />
-                      </div>
-
-                      <div>
-                        <Label>Nhân viên xuất *</Label>
-                        <Select value={exportEmployee} onValueChange={setExportEmployee}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Chọn nhân viên" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {employees.map(emp => (
-                              <SelectItem key={emp.id} value={emp.id}>
-                                {emp.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label>Lý do xuất *</Label>
-                        <Select value={exportReason} onValueChange={setExportReason}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Chọn lý do" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="production">Xuất sản xuất</SelectItem>
-                            <SelectItem value="sale">Xuất bán hàng</SelectItem>
-                            <SelectItem value="transfer">Chuyển kho</SelectItem>
-                            <SelectItem value="other">Khác</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Items List */}
-                <Card className="border-blue-200">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">Danh sách hàng hóa</CardTitle>
-                      <Button 
-                        onClick={handleAddExportItem}
-                        size="sm"
-                        variant="outline"
-                        className="border-blue-600 text-blue-600 hover:bg-blue-50"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Thêm hàng hóa
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {exportItems.length === 0 ? (
-                      <div className="text-center py-8 text-neutral-500">
-                        <Package className="w-12 h-12 mx-auto mb-2 text-neutral-300" />
-                        <p>Chưa có hàng hóa nào</p>
-                        <p className="text-sm">Click "Thêm hàng hóa" để bắt đầu</p>
-                      </div>
-                    ) : (
-                      <div className="max-h-[300px] overflow-y-auto border rounded-md">
-                        <Table>
-                          <TableHeader className="sticky top-0 bg-blue-50 z-10">
-                            <TableRow className="bg-blue-50">
-                              <TableHead className="w-[80px]">STT</TableHead>
-                              <TableHead className="min-w-[220px]">Hàng hóa</TableHead>
-                              <TableHead className="w-[120px]">Lô hàng</TableHead>
-                              <TableHead className="w-[100px]">ĐVT</TableHead>
-                              <TableHead className="w-[120px]">SL xuất</TableHead>
-                              <TableHead className="w-[150px]">Đơn giá</TableHead>
-                              <TableHead className="w-[150px]">Thành tiền</TableHead>
-                              <TableHead className="w-[60px]"></TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {exportItems.map((item, index) => (
-                              <TableRow key={item.id}>
-                                <TableCell>
-                                  <div className="text-center text-neutral-600">
-                                    {index + 1}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Select
-                                    value={item.batchCode}
-                                    onValueChange={(value) => {
-                                      const batch = batches.find(b => b.code === value);
-                                      handleUpdateExportItem(item.id, 'batchCode', value);
-                                      if (batch) {
-                                        handleUpdateExportItem(item.id, 'itemName', batch.product);
-                                        handleUpdateExportItem(item.id, 'unit', batch.unit);
-                                        handleUpdateExportItem(item.id, 'unitPrice', batch.unitPrice);
-                                      }
-                                    }}
-                                  >
-                                    <SelectTrigger className="h-9">
-                                      <SelectValue placeholder="Chọn lô hàng" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {batches.map(batch => (
-                                        <SelectItem key={batch.id} value={batch.code}>
-                                          {batch.product} - {batch.code}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    value={item.batchCode}
-                                    disabled
-                                    className="h-9 bg-neutral-50 text-neutral-600"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    value={item.unit}
-                                    disabled
-                                    className="h-9 bg-neutral-50 text-neutral-600"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="number"
-                                    value={item.quantity || ''}
-                                    onChange={(e) => handleUpdateExportItem(item.id, 'quantity', Number(e.target.value))}
-                                    placeholder="0"
-                                    className="h-9"
-                                    min="0"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="number"
-                                    value={item.unitPrice || ''}
-                                    disabled
-                                    className="h-9 bg-neutral-50 text-neutral-600"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <span className="text-sm text-blue-700">
-                                    {item.totalPrice.toLocaleString('vi-VN')}₫
-                                  </span>
-                                </TableCell>
-                                <TableCell>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    onClick={() => handleRemoveExportItem(item.id)}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-
-                    {/* Total */}
-                    {exportItems.length > 0 && (
-                      <div className="mt-4 pt-4 border-t">
-                        <div className="flex justify-end">
-                          <div className="w-full md:w-1/3 space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-neutral-600">Tổng số lượng:</span>
-                              <span className="text-neutral-900">
-                                {exportItems.reduce((sum, item) => sum + item.quantity, 0)} sản phẩm
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-neutral-600">Tổng giá trị:</span>
-                              <span className="text-blue-700">
-                                {calculateExportGrandTotal().toLocaleString('vi-VN')}₫
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Notes */}
-                <div>
-                  <Label>Ghi chú</Label>
-                  <Textarea 
-                    value={exportNotes}
-                    onChange={(e) => setExportNotes(e.target.value)}
-                    placeholder="Nhập ghi chú về phiếu xuất..." 
-                    rows={3} 
-                  />
-                </div>
-              </div>
-
-              <DialogFooter className="mt-4 border-t pt-4">
-                <Button variant="outline" onClick={() => setExportDialogOpen(false)}>
-                  Hủy
-                </Button>
-                <Button 
-                  className="bg-blue-700 hover:bg-blue-800"
-                  onClick={handleSubmitExport}
-                >
-                  Tạo phiếu xuất
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
-            <DialogTrigger asChild>
-              <Button 
-                className="bg-orange-700 hover:bg-orange-800"
-                onClick={handleOpenReturnDialog}
-              >
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Trả hàng
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="min-w-[1100px] max-w-[1400px] w-[95vw] max-h-[90vh] overflow-hidden flex flex-col" aria-describedby={undefined}>
-              <DialogHeader>
-                <DialogTitle>Phiếu trả hàng cho nhà cung cấp</DialogTitle>
-              </DialogHeader>
-              
-              <div className="space-y-6 overflow-y-auto flex-1 px-1">
-                {/* Basic Information */}
-                <Card className="border-orange-200">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-base">Thông tin phiếu trả</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div>
-                        <Label>Mã trả hàng *</Label>
-                        <Input 
-                          value={returnCode} 
-                          disabled
-                          className="bg-neutral-50"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label>Ngày trả *</Label>
-                        <Input 
-                          type="date" 
-                          value={returnDate}
-                          onChange={(e) => setReturnDate(e.target.value)}
-                        />
-                      </div>
-
-                      <div>
-                        <Label>Nhà cung cấp *</Label>
-                        <Select value={returnSupplier} onValueChange={setReturnSupplier}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Chọn nhà cung cấp" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {suppliers.map(sup => (
-                              <SelectItem key={sup.id} value={sup.id}>
-                                {sup.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label>Lý do trả *</Label>
-                        <Select value={returnReason} onValueChange={setReturnReason}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Chọn lý do" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="quality">Chất lượng không đạt yêu cầu</SelectItem>
-                            <SelectItem value="damage">Hỏng hóc</SelectItem>
-                            <SelectItem value="other">Khác</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Items List */}
-                <Card className="border-orange-200">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">Danh sách hàng hóa</CardTitle>
-                      <Button 
-                        onClick={handleAddReturnItem}
-                        size="sm"
-                        variant="outline"
-                        className="border-orange-600 text-orange-600 hover:bg-orange-50"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Thêm hàng hóa
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {returnItems.length === 0 ? (
-                      <div className="text-center py-8 text-neutral-500">
-                        <Package className="w-12 h-12 mx-auto mb-2 text-neutral-300" />
-                        <p>Chưa có hàng hóa nào</p>
-                        <p className="text-sm">Click "Thêm hàng hóa" để bắt đầu</p>
-                      </div>
-                    ) : (
-                      <div className="max-h-[300px] overflow-y-auto border rounded-md">
-                        <Table>
-                          <TableHeader className="sticky top-0 bg-orange-50 z-10">
-                            <TableRow className="bg-orange-50">
-                              <TableHead className="w-[50px]"></TableHead>
-                              <TableHead className="w-[50px]">STT</TableHead>
-                              <TableHead className="min-w-[180px]">Hàng hóa</TableHead>
-                              <TableHead className="w-[100px]">Lô hàng</TableHead>
-                              <TableHead className="w-[80px]">ĐVT</TableHead>
-                              <TableHead className="w-[100px]">SL trả</TableHead>
-                              <TableHead className="w-[120px]">Giá nhập</TableHead>
-                              <TableHead className="w-[130px]">Ngày nhập</TableHead>
-                              <TableHead className="w-[120px]">Thành tiền</TableHead>
-                              <TableHead className="min-w-[180px]">Lý do trả</TableHead>
-                              <TableHead className="w-[60px]"></TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {returnItems.map((item, index) => (
-                              <TableRow key={item.id}>
-                                <TableCell>
-                                  {item.quantity > item.currentStock && item.currentStock > 0 && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="flex items-center justify-center cursor-help">
-                                          <AlertCircle className="w-4 h-4 text-amber-600" />
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent className="max-w-[250px]">
-                                        <p>Chỉ được trả hàng từ các lô hàng còn tồn kho. Số lượng trả phải nhỏ hơn hoặc bằng tồn kho hiện tại của lô đó.</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="text-center text-neutral-600">
-                                    {index + 1}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Select
-                                    value={item.batchCode}
-                                    onValueChange={(value) => {
-                                      const batch = batches.find(b => b.code === value);
-                                      handleUpdateReturnItem(item.id, 'batchCode', value);
-                                      if (batch) {
-                                        handleUpdateReturnItem(item.id, 'itemName', batch.product);
-                                        handleUpdateReturnItem(item.id, 'unit', batch.unit);
-                                        handleUpdateReturnItem(item.id, 'unitPrice', batch.unitPrice);
-                                        handleUpdateReturnItem(item.id, 'entryDate', batch.entryDate);
-                                        handleUpdateReturnItem(item.id, 'currentStock', batch.currentStock);
-                                      }
-                                    }}
-                                  >
-                                    <SelectTrigger className="h-9">
-                                      <SelectValue placeholder="Chọn lô hàng" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {batches.map(batch => (
-                                        <SelectItem key={batch.id} value={batch.code}>
-                                          {batch.product} - {batch.code}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    value={item.batchCode}
-                                    disabled
-                                    className="h-9 bg-neutral-50 text-neutral-600"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    value={item.unit}
-                                    disabled
-                                    className="h-9 bg-neutral-50 text-neutral-600"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <div className="space-y-1">
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      value={item.unit}
+                                      disabled
+                                      className="h-9 bg-neutral-50 text-neutral-600"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
                                     <Input
                                       type="number"
                                       value={item.quantity || ''}
-                                      onChange={(e) => handleUpdateReturnItem(item.id, 'quantity', Number(e.target.value))}
+                                      onChange={(e) => handleUpdateItem(item.id, 'quantity', Number(e.target.value))}
                                       placeholder="0"
-                                      className={`h-9 ${item.quantity > item.currentStock && item.currentStock > 0 ? 'border-red-500' : ''}`}
+                                      className="h-9"
                                       min="0"
-                                      max={item.currentStock}
                                     />
-                                    {item.currentStock > 0 && (
-                                      <p className="text-xs text-neutral-500">Tồn: {item.currentStock}</p>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="number"
-                                    value={item.unitPrice || ''}
-                                    disabled
-                                    className="h-9 bg-neutral-50 text-neutral-600"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="date"
-                                    value={item.entryDate}
-                                    disabled
-                                    className="h-9 bg-neutral-50 text-neutral-600"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <span className="text-sm text-orange-700">
-                                    {item.totalPrice.toLocaleString('vi-VN')}₫
-                                  </span>
-                                </TableCell>
-                                <TableCell>
-                                  <Select
-                                    value={item.returnReason}
-                                    onValueChange={(value) => handleUpdateReturnItem(item.id, 'returnReason', value)}
-                                  >
-                                    <SelectTrigger className="h-9">
-                                      <SelectValue placeholder="Chọn lý do" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="quality">Chất lượng kém</SelectItem>
-                                      <SelectItem value="damage">Hỏng hóc</SelectItem>
-                                      <SelectItem value="expired">Hết hạn</SelectItem>
-                                      <SelectItem value="wrong">Giao nhầm</SelectItem>
-                                      <SelectItem value="other">Khác</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </TableCell>
-                                <TableCell>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    onClick={() => handleRemoveReturnItem(item.id)}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      type="date"
+                                      value={item.expiryDate}
+                                      onChange={(e) => handleUpdateItem(item.id, 'expiryDate', e.target.value)}
+                                      className="h-9"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      type="number"
+                                      value={item.unitPrice || ''}
+                                      onChange={(e) => handleUpdateItem(item.id, 'unitPrice', Number(e.target.value))}
+                                      placeholder="0"
+                                      className="h-9"
+                                      min="0"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex gap-1">
+                                      <Input
+                                        type="number"
+                                        value={item.discount || ''}
+                                        onChange={(e) => handleUpdateItem(item.id, 'discount', Number(e.target.value))}
+                                        placeholder="0"
+                                        className="h-9 w-[70px]"
+                                        min="0"
+                                      />
+                                      <Select
+                                        value={item.discountType}
+                                        onValueChange={(value: 'percent' | 'amount') =>
+                                          handleUpdateItem(item.id, 'discountType', value)
+                                        }
+                                      >
+                                        <SelectTrigger className="h-9 w-[60px]">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="percent">%</SelectItem>
+                                          <SelectItem value="amount">₫</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className="text-sm text-emerald-700">
+                                      {item.totalPrice.toLocaleString('vi-VN')}₫
+                                    </span>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      onClick={() => handleRemoveItem(item.id)}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
 
-                    {/* Total */}
-                    {returnItems.length > 0 && (
-                      <div className="mt-4 pt-4 border-t">
-                        <div className="flex justify-end">
-                          <div className="w-full md:w-1/3 space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-neutral-600">Tổng số lượng:</span>
-                              <span className="text-neutral-900">
-                                {returnItems.reduce((sum, item) => sum + item.quantity, 0)} sản phẩm
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-neutral-600">Tổng giá trị:</span>
-                              <span className="text-orange-700">
-                                {calculateReturnGrandTotal().toLocaleString('vi-VN')}₫
-                              </span>
+                      {/* Total */}
+                      {importItems.length > 0 && (
+                        <div className="mt-4 pt-4 border-t">
+                          <div className="flex justify-end">
+                            <div className="w-full md:w-1/3 space-y-2">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-neutral-600">Tổng số lượng:</span>
+                                <span className="text-neutral-900">
+                                  {importItems.reduce((sum, item) => sum + item.quantity, 0)} sản phẩm
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-neutral-600">Tổng giá trị:</span>
+                                <span className="text-emerald-700">
+                                  {calculateGrandTotal().toLocaleString('vi-VN')}₫
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                      )}
+                    </CardContent>
+                  </Card>
 
-                {/* Notes */}
-                <div>
-                  <Label>Ghi chú</Label>
-                  <Textarea 
-                    value={returnNotes}
-                    onChange={(e) => setReturnNotes(e.target.value)}
-                    placeholder="Nhập ghi chú về phiếu trả..." 
-                    rows={3} 
-                  />
+                  {/* Notes */}
+                  <div>
+                    <Label>Ghi chú</Label>
+                    <Textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Nhập ghi chú về phiếu nhập..."
+                      rows={3}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <DialogFooter className="mt-4 border-t pt-4">
-                <Button variant="outline" onClick={() => setReturnDialogOpen(false)}>
-                  Hủy
+                <DialogFooter className="mt-4 border-t pt-4">
+                  <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
+                    Hủy
+                  </Button>
+                  <Button
+                    className="bg-emerald-700 hover:bg-emerald-800"
+                    onClick={handleSubmitImport}
+                  >
+                    Tạo phiếu nhập
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  className="bg-blue-700 hover:bg-blue-800"
+                  onClick={handleOpenExportDialog}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Xuất kho
                 </Button>
-                <Button 
+              </DialogTrigger>
+              <DialogContent className="min-w-[1100px] max-w-[1400px] w-[95vw] max-h-[90vh] overflow-hidden flex flex-col" aria-describedby={undefined}>
+                <DialogHeader>
+                  <DialogTitle>Phiếu xuất hàng khỏi kho</DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-6 overflow-y-auto flex-1 px-1">
+                  {/* Basic Information */}
+                  <Card className="border-blue-200">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="text-base">Thông tin phiếu xuất</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                          <Label>Mã xuất hàng *</Label>
+                          <Input
+                            value={exportCode}
+                            disabled
+                            className="bg-neutral-50"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Ngày xuất *</Label>
+                          <Input
+                            type="date"
+                            value={exportDate}
+                            onChange={(e) => setExportDate(e.target.value)}
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Nhân viên xuất *</Label>
+                          <Select value={exportEmployee} onValueChange={setExportEmployee}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Chọn nhân viên" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {employees.map(emp => (
+                                <SelectItem key={emp.id} value={emp.id}>
+                                  {emp.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label>Lý do xuất *</Label>
+                          <Select value={exportReason} onValueChange={setExportReason}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Chọn lý do" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="production">Xuất sản xuất</SelectItem>
+                              <SelectItem value="sale">Xuất bán hàng</SelectItem>
+                              <SelectItem value="transfer">Chuyển kho</SelectItem>
+                              <SelectItem value="other">Khác</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Items List */}
+                  <Card className="border-blue-200">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base">Danh sách hàng hóa</CardTitle>
+                        <Button
+                          onClick={handleAddExportItem}
+                          size="sm"
+                          variant="outline"
+                          className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Thêm hàng hóa
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {exportItems.length === 0 ? (
+                        <div className="text-center py-8 text-neutral-500">
+                          <Package className="w-12 h-12 mx-auto mb-2 text-neutral-300" />
+                          <p>Chưa có hàng hóa nào</p>
+                          <p className="text-sm">Click "Thêm hàng hóa" để bắt đầu</p>
+                        </div>
+                      ) : (
+                        <div className="max-h-[300px] overflow-y-auto border rounded-md">
+                          <Table>
+                            <TableHeader className="sticky top-0 bg-blue-50 z-10">
+                              <TableRow className="bg-blue-50">
+                                <TableHead className="w-[80px]">STT</TableHead>
+                                <TableHead className="min-w-[220px]">Hàng hóa</TableHead>
+                                <TableHead className="w-[120px]">Lô hàng</TableHead>
+                                <TableHead className="w-[100px]">ĐVT</TableHead>
+                                <TableHead className="w-[120px]">SL xuất</TableHead>
+                                <TableHead className="w-[150px]">Đơn giá</TableHead>
+                                <TableHead className="w-[150px]">Thành tiền</TableHead>
+                                <TableHead className="w-[60px]"></TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {exportItems.map((item, index) => (
+                                <TableRow key={item.id}>
+                                  <TableCell>
+                                    <div className="text-center text-neutral-600">
+                                      {index + 1}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Select
+                                      value={item.batchCode}
+                                      onValueChange={(value) => {
+                                        const batch = batches.find(b => b.code === value);
+                                        handleUpdateExportItem(item.id, 'batchCode', value);
+                                        if (batch) {
+                                          handleUpdateExportItem(item.id, 'itemName', batch.product);
+                                          handleUpdateExportItem(item.id, 'unit', batch.unit);
+                                          handleUpdateExportItem(item.id, 'unitPrice', batch.unitPrice);
+                                        }
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-9">
+                                        <SelectValue placeholder="Chọn lô hàng" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {batches.map(batch => (
+                                          <SelectItem key={batch.id} value={batch.code}>
+                                            {batch.product} - {batch.code}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      value={item.batchCode}
+                                      disabled
+                                      className="h-9 bg-neutral-50 text-neutral-600"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      value={item.unit}
+                                      disabled
+                                      className="h-9 bg-neutral-50 text-neutral-600"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      type="number"
+                                      value={item.quantity || ''}
+                                      onChange={(e) => handleUpdateExportItem(item.id, 'quantity', Number(e.target.value))}
+                                      placeholder="0"
+                                      className="h-9"
+                                      min="0"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      type="number"
+                                      value={item.unitPrice || ''}
+                                      disabled
+                                      className="h-9 bg-neutral-50 text-neutral-600"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className="text-sm text-blue-700">
+                                      {item.totalPrice.toLocaleString('vi-VN')}₫
+                                    </span>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      onClick={() => handleRemoveExportItem(item.id)}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+
+                      {/* Total */}
+                      {exportItems.length > 0 && (
+                        <div className="mt-4 pt-4 border-t">
+                          <div className="flex justify-end">
+                            <div className="w-full md:w-1/3 space-y-2">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-neutral-600">Tổng số lượng:</span>
+                                <span className="text-neutral-900">
+                                  {exportItems.reduce((sum, item) => sum + item.quantity, 0)} sản phẩm
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-neutral-600">Tổng giá trị:</span>
+                                <span className="text-blue-700">
+                                  {calculateExportGrandTotal().toLocaleString('vi-VN')}₫
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Notes */}
+                  <div>
+                    <Label>Ghi chú</Label>
+                    <Textarea
+                      value={exportNotes}
+                      onChange={(e) => setExportNotes(e.target.value)}
+                      placeholder="Nhập ghi chú về phiếu xuất..."
+                      rows={3}
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter className="mt-4 border-t pt-4">
+                  <Button variant="outline" onClick={() => setExportDialogOpen(false)}>
+                    Hủy
+                  </Button>
+                  <Button
+                    className="bg-blue-700 hover:bg-blue-800"
+                    onClick={handleSubmitExport}
+                  >
+                    Tạo phiếu xuất
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
                   className="bg-orange-700 hover:bg-orange-800"
-                  onClick={handleSubmitReturn}
+                  onClick={handleOpenReturnDialog}
                 >
-                  Tạo phiếu trả
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Trả hàng
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+              </DialogTrigger>
+              <DialogContent className="min-w-[1100px] max-w-[1400px] w-[95vw] max-h-[90vh] overflow-hidden flex flex-col" aria-describedby={undefined}>
+                <DialogHeader>
+                  <DialogTitle>Phiếu trả hàng cho nhà cung cấp</DialogTitle>
+                </DialogHeader>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-neutral-700 flex items-center gap-2">
-              <Download className="w-4 h-4" />
-              Nhập kho tháng này
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl text-emerald-900">45.8M₫</p>
-            <p className="text-xs text-neutral-500 mt-1">12 phiếu nhập</p>
-          </CardContent>
-        </Card>
+                <div className="space-y-6 overflow-y-auto flex-1 px-1">
+                  {/* Basic Information */}
+                  <Card className="border-orange-200">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="text-base">Thông tin phiếu trả</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                          <Label>Mã trả hàng *</Label>
+                          <Input
+                            value={returnCode}
+                            disabled
+                            className="bg-neutral-50"
+                          />
+                        </div>
 
-        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-neutral-700 flex items-center gap-2">
-              <Upload className="w-4 h-4" />
-              Xuất kho tháng này
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl text-blue-900">38.2M₫</p>
-            <p className="text-xs text-neutral-500 mt-1">23 phiếu xuất</p>
-          </CardContent>
-        </Card>
+                        <div>
+                          <Label>Ngày trả *</Label>
+                          <Input
+                            type="date"
+                            value={returnDate}
+                            onChange={(e) => setReturnDate(e.target.value)}
+                          />
+                        </div>
 
-        <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-white">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-neutral-700 flex items-center gap-2">
-              <RotateCcw className="w-4 h-4" />
-              Trả hàng tháng này
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl text-orange-900">1.2M₫</p>
-            <p className="text-xs text-neutral-500 mt-1">3 phiếu trả</p>
-          </CardContent>
-        </Card>
-      </div>
+                        <div>
+                          <Label>Nhà cung cấp *</Label>
+                          <Select value={returnSupplier} onValueChange={setReturnSupplier}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Chọn nhà cung cấp" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {suppliers.map(sup => (
+                                <SelectItem key={sup.id} value={sup.id}>
+                                  {sup.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-      {/* Transactions Table */}
-      <Card className="border-amber-200">
-        <CardHeader>
-          <div className="flex items-center justify-between gap-4">
-            <CardTitle className="text-amber-950">Lịch sử giao dịch</CardTitle>
-            <div className="relative w-80">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-neutral-400" />
-              <Input
-                type="text"
-                placeholder="Tìm theo mã phiếu, đối tác, người tạo..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
-                >
-                  <XIcon className="w-4 h-4" />
-                </button>
-              )}
-            </div>
+                        <div>
+                          <Label>Lý do trả *</Label>
+                          <Select value={returnReason} onValueChange={setReturnReason}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Chọn lý do" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="quality">Chất lượng không đạt yêu cầu</SelectItem>
+                              <SelectItem value="damage">Hỏng hóc</SelectItem>
+                              <SelectItem value="other">Khác</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Items List */}
+                  <Card className="border-orange-200">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base">Danh sách hàng hóa</CardTitle>
+                        <Button
+                          onClick={handleAddReturnItem}
+                          size="sm"
+                          variant="outline"
+                          className="border-orange-600 text-orange-600 hover:bg-orange-50"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Thêm hàng hóa
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {returnItems.length === 0 ? (
+                        <div className="text-center py-8 text-neutral-500">
+                          <Package className="w-12 h-12 mx-auto mb-2 text-neutral-300" />
+                          <p>Chưa có hàng hóa nào</p>
+                          <p className="text-sm">Click "Thêm hàng hóa" để bắt đầu</p>
+                        </div>
+                      ) : (
+                        <div className="max-h-[300px] overflow-y-auto border rounded-md">
+                          <Table>
+                            <TableHeader className="sticky top-0 bg-orange-50 z-10">
+                              <TableRow className="bg-orange-50">
+                                <TableHead className="w-[50px]"></TableHead>
+                                <TableHead className="w-[50px]">STT</TableHead>
+                                <TableHead className="min-w-[180px]">Hàng hóa</TableHead>
+                                <TableHead className="w-[100px]">Lô hàng</TableHead>
+                                <TableHead className="w-[80px]">ĐVT</TableHead>
+                                <TableHead className="w-[100px]">SL trả</TableHead>
+                                <TableHead className="w-[120px]">Giá nhập</TableHead>
+                                <TableHead className="w-[130px]">Ngày nhập</TableHead>
+                                <TableHead className="w-[120px]">Thành tiền</TableHead>
+                                <TableHead className="min-w-[180px]">Lý do trả</TableHead>
+                                <TableHead className="w-[60px]"></TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {returnItems.map((item, index) => (
+                                <TableRow key={item.id}>
+                                  <TableCell>
+                                    {item.quantity > item.currentStock && item.currentStock > 0 && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <div className="flex items-center justify-center cursor-help">
+                                            <AlertCircle className="w-4 h-4 text-amber-600" />
+                                          </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="max-w-[250px]">
+                                          <p>Chỉ được trả hàng từ các lô hàng còn tồn kho. Số lượng trả phải nhỏ hơn hoặc bằng tồn kho hiện tại của lô đó.</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="text-center text-neutral-600">
+                                      {index + 1}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Select
+                                      value={item.batchCode}
+                                      onValueChange={(value) => {
+                                        const batch = batches.find(b => b.code === value);
+                                        handleUpdateReturnItem(item.id, 'batchCode', value);
+                                        if (batch) {
+                                          handleUpdateReturnItem(item.id, 'itemName', batch.product);
+                                          handleUpdateReturnItem(item.id, 'unit', batch.unit);
+                                          handleUpdateReturnItem(item.id, 'unitPrice', batch.unitPrice);
+                                          handleUpdateReturnItem(item.id, 'entryDate', batch.entryDate);
+                                          handleUpdateReturnItem(item.id, 'currentStock', batch.currentStock);
+                                        }
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-9">
+                                        <SelectValue placeholder="Chọn lô hàng" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {batches.map(batch => (
+                                          <SelectItem key={batch.id} value={batch.code}>
+                                            {batch.product} - {batch.code}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      value={item.batchCode}
+                                      disabled
+                                      className="h-9 bg-neutral-50 text-neutral-600"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      value={item.unit}
+                                      disabled
+                                      className="h-9 bg-neutral-50 text-neutral-600"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="space-y-1">
+                                      <Input
+                                        type="number"
+                                        value={item.quantity || ''}
+                                        onChange={(e) => handleUpdateReturnItem(item.id, 'quantity', Number(e.target.value))}
+                                        placeholder="0"
+                                        className={`h-9 ${item.quantity > item.currentStock && item.currentStock > 0 ? 'border-red-500' : ''}`}
+                                        min="0"
+                                        max={item.currentStock}
+                                      />
+                                      {item.currentStock > 0 && (
+                                        <p className="text-xs text-neutral-500">Tồn: {item.currentStock}</p>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      type="number"
+                                      value={item.unitPrice || ''}
+                                      disabled
+                                      className="h-9 bg-neutral-50 text-neutral-600"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      type="date"
+                                      value={item.entryDate}
+                                      disabled
+                                      className="h-9 bg-neutral-50 text-neutral-600"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className="text-sm text-orange-700">
+                                      {item.totalPrice.toLocaleString('vi-VN')}₫
+                                    </span>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Select
+                                      value={item.returnReason}
+                                      onValueChange={(value) => handleUpdateReturnItem(item.id, 'returnReason', value)}
+                                    >
+                                      <SelectTrigger className="h-9">
+                                        <SelectValue placeholder="Chọn lý do" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="quality">Chất lượng kém</SelectItem>
+                                        <SelectItem value="damage">Hỏng hóc</SelectItem>
+                                        <SelectItem value="expired">Hết hạn</SelectItem>
+                                        <SelectItem value="wrong">Giao nhầm</SelectItem>
+                                        <SelectItem value="other">Khác</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      onClick={() => handleRemoveReturnItem(item.id)}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+
+                      {/* Total */}
+                      {returnItems.length > 0 && (
+                        <div className="mt-4 pt-4 border-t">
+                          <div className="flex justify-end">
+                            <div className="w-full md:w-1/3 space-y-2">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-neutral-600">Tổng số lượng:</span>
+                                <span className="text-neutral-900">
+                                  {returnItems.reduce((sum, item) => sum + item.quantity, 0)} sản phẩm
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-neutral-600">Tổng giá trị:</span>
+                                <span className="text-orange-700">
+                                  {calculateReturnGrandTotal().toLocaleString('vi-VN')}₫
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Notes */}
+                  <div>
+                    <Label>Ghi chú</Label>
+                    <Textarea
+                      value={returnNotes}
+                      onChange={(e) => setReturnNotes(e.target.value)}
+                      placeholder="Nhập ghi chú về phiếu trả..."
+                      rows={3}
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter className="mt-4 border-t pt-4">
+                  <Button variant="outline" onClick={() => setReturnDialogOpen(false)}>
+                    Hủy
+                  </Button>
+                  <Button
+                    className="bg-orange-700 hover:bg-orange-800"
+                    onClick={handleSubmitReturn}
+                  >
+                    Tạo phiếu trả
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-neutral-700 flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                Nhập kho tháng này
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl text-emerald-900">45.8M₫</p>
+              <p className="text-xs text-neutral-500 mt-1">12 phiếu nhập</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-neutral-700 flex items-center gap-2">
+                <Upload className="w-4 h-4" />
+                Xuất kho tháng này
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl text-blue-900">38.2M₫</p>
+              <p className="text-xs text-neutral-500 mt-1">23 phiếu xuất</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-white">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-neutral-700 flex items-center gap-2">
+                <RotateCcw className="w-4 h-4" />
+                Trả hàng tháng này
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl text-orange-900">1.2M₫</p>
+              <p className="text-xs text-neutral-500 mt-1">3 phiếu trả</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Transactions Table */}
+        <Card className="border-amber-200">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-4">
+              <CardTitle className="text-amber-950">Lịch sử giao dịch</CardTitle>
+              <div className="relative w-80">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                <Input
+                  type="text"
+                  placeholder="Tìm theo mã phiếu, đối tác, người tạo..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-9"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-amber-50">
@@ -1669,8 +1669,8 @@ export function ImportExport() {
                       const isExpanded = expandedRows.includes(trans.id);
                       return (
                         <>
-                          <TableRow 
-                            key={trans.id} 
+                          <TableRow
+                            key={trans.id}
                             className="cursor-pointer hover:bg-amber-50/50"
                             onClick={() => toggleExpand(trans.id)}
                           >
@@ -1715,8 +1715,8 @@ export function ImportExport() {
                             </TableCell>
                             <TableCell>{getStatusBadge(trans.status)}</TableCell>
                             <TableCell className="text-right">
-                              <Button 
-                                variant="ghost" 
+                              <Button
+                                variant="ghost"
                                 size="sm"
                                 onClick={(e) => e.stopPropagation()}
                               >
@@ -1801,14 +1801,14 @@ export function ImportExport() {
                 </TableBody>
               </Table>
             </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Import Excel Dialog */}
-      <ImportExportExcelDialog 
-        open={importExcelDialogOpen}
-        onOpenChange={setImportExcelDialogOpen}
-      />
+        {/* Import Excel Dialog */}
+        <ImportExportExcelDialog
+          open={importExcelDialogOpen}
+          onOpenChange={setImportExcelDialogOpen}
+        />
       </div>
     </div>
   );

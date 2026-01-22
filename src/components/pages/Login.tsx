@@ -5,18 +5,13 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { useAuth } from '../../contexts/AuthContext';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { login as loginApi } from '../../api/authApi';
 
 export function Login() {
-  const { login } = useAuth();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleLogin = async () => {
+
     if (!username || !password) {
       toast.error('Vui lòng nhập đầy đủ thông tin');
       return;
@@ -24,19 +19,49 @@ export function Login() {
 
     setIsLoading(true);
 
-    // Simulate API call delay
-    setTimeout(() => {
-      const success = login(username, password);
-      
-      if (success) {
-        toast.success('Đăng nhập thành công!');
-      } else {
-        toast.error('Tên đăng nhập hoặc mật khẩu không đúng');
-      }
-      
+    try {
+      await login(username, password); // 👈 CHỈ DÒNG NÀY
+
+      toast.success('Đăng nhập thành công');
+    } catch (err) {
+      console.error(err);
+      toast.error('Đăng nhập thất bại');
+    }
+
+    finally {
       setIsLoading(false);
-    }, 500);
+    }
   };
+
+  const { login } = useAuth();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // const handleSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+
+  //   if (!username || !password) {
+  //     toast.error('Vui lòng nhập đầy đủ thông tin');
+  //     return;
+  //   }
+
+  //   setIsLoading(true);
+
+  //   // Simulate API call delay
+  //   setTimeout(() => {
+  //     const success = login(username, password);
+
+  //     if (success) {
+  //       toast.success('Đăng nhập thành công!');
+  //     } else {
+  //       toast.error('Tên đăng nhập hoặc mật khẩu không đúng');
+  //     }
+
+  //     setIsLoading(false);
+  //   }, 500);
+  // };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50 p-4">
@@ -53,7 +78,10 @@ export function Login() {
           </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            handleLogin();
+          }} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="username">Tên đăng nhập</Label>
               <Input
@@ -64,9 +92,10 @@ export function Login() {
                 onChange={(e) => setUsername(e.target.value)}
                 disabled={isLoading}
                 autoComplete="username"
+                className="bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="password">Mật khẩu</Label>
               <div className="relative">
@@ -78,7 +107,7 @@ export function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
                   autoComplete="current-password"
-                  className="pr-10"
+                  className="pr-10 bg-white border border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                 />
                 <button
                   type="button"
@@ -113,28 +142,6 @@ export function Login() {
               )}
             </Button>
           </form>
-
-          <div className="mt-6 pt-6 border-t border-slate-200">
-            <p className="text-sm text-slate-600 mb-3">Tài khoản demo:</p>
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between items-center p-2 bg-slate-50 rounded">
-                <span className="text-slate-600">Quản lý:</span>
-                <span className="font-mono">admin / admin123</span>
-              </div>
-              <div className="flex justify-between items-center p-2 bg-slate-50 rounded">
-                <span className="text-slate-600">Pha chế:</span>
-                <span className="font-mono">phache / phache123</span>
-              </div>
-              <div className="flex justify-between items-center p-2 bg-slate-50 rounded">
-                <span className="text-slate-600">Thu ngân:</span>
-                <span className="font-mono">thungan / thungan123</span>
-              </div>
-              <div className="flex justify-between items-center p-2 bg-slate-50 rounded">
-                <span className="text-slate-600">Phục vụ:</span>
-                <span className="font-mono">phucvu / phucvu123</span>
-              </div>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>

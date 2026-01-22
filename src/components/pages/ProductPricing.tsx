@@ -1,10 +1,13 @@
-import { useState } from 'react';
-import { Search, Edit, Package, TrendingDown, DollarSign, Plus, Minus } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Pencil, Filter, Plus, Minus, ArrowUp, ArrowDown, X } from 'lucide-react';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
-import { Separator } from '../ui/separator';
 import { Button } from '../ui/button';
-import { categories } from '../../data/categories';
+import { Badge } from '../ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { toast } from 'sonner';
+import { inventoryService } from '../../services/inventoryService';
+import { ProductPricingItem } from '../../types/inventory';
 import {
   Dialog,
   DialogContent,
@@ -19,12 +22,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../ui/table';
+import { Input } from '../ui/input';
 
 interface PriceEditDialogProps {
   open: boolean;
   onClose: () => void;
   product: any;
-  onSave: (productId: number, newPrice: number, applyToAll: boolean) => void;
+  onSave: (data: {
+    productId: number;
+    priceType: string;
+    adjustmentValue: number;
+    adjustmentType: 'amount' | 'percent';
+    applyToAll: boolean;
+  }) => void;
 }
 
 function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProps) {
@@ -33,9 +51,9 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
   const [adjustmentType, setAdjustmentType] = useState<'amount' | 'percent'>('amount');
   const [applyToAll, setApplyToAll] = useState(false);
 
-  const categoryLabel = categories.find(c => c.id === product?.category)?.name || product?.category;
+  const categoryLabel = product?.category?.name || "";
   const currentPrice = product?.sellingPrice || 0;
-  
+
   // Calculate new price based on selection and adjustment
   const getBasePrice = () => {
     switch (priceType) {
@@ -62,7 +80,13 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
   const newPrice = calculateNewPrice();
 
   const handleSave = () => {
-    onSave(product.id, newPrice, applyToAll);
+    onSave({
+      productId: product.id,
+      priceType,
+      adjustmentValue,
+      adjustmentType,
+      applyToAll
+    });
     onClose();
   };
 
@@ -76,21 +100,21 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-[900px]" aria-describedby={undefined}>
+      <DialogContent className="max-w-none w-[98vw] max-h-[98vh] overflow-y-auto" style={{ maxWidth: '1600px' }} aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Chỉnh sửa giá bán - {product?.name}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 px-2">
+        <div className="space-y-6 px-4">
           {/* Price Adjustment Row */}
-          <div className="flex items-center gap-3 justify-start">
+          <div className="flex items-center gap-3 justify-start flex-wrap">
             <span className="text-sm text-slate-700 whitespace-nowrap shrink-0">
-              Giá mới <span className="text-green-600">[{currentPrice.toLocaleString('vi-VN')}]</span> =
+              Giá mới <span className="text-blue-600">[{currentPrice.toLocaleString('vi-VN')}]</span> =
             </span>
-            
+
             {/* Base Price Selector */}
             <Select value={priceType} onValueChange={setPriceType}>
-              <SelectTrigger className="w-[180px] shrink-0">
+              <SelectTrigger className="w-[180px] shrink-0 bg-white border-slate-300 shadow-none">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -104,7 +128,7 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={increment}
-                className="w-10 h-10 flex items-center justify-center bg-green-500 hover:bg-green-600 text-white rounded transition-colors"
+                className="w-10 h-10 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -121,28 +145,26 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
               type="number"
               value={adjustmentValue}
               onChange={(e) => setAdjustmentValue(Number(e.target.value))}
-              className="w-28 shrink-0 px-3 py-2.5 border border-slate-200 rounded text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-28 shrink-0 px-3 py-2.5 bg-white border border-slate-300 rounded text-sm text-center shadow-none focus:outline-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
             />
 
             {/* Unit Toggle Buttons */}
             <div className="flex gap-2 shrink-0">
               <button
                 onClick={() => setAdjustmentType('amount')}
-                className={`px-4 py-2.5 text-sm font-medium rounded transition-colors ${
-                  adjustmentType === 'amount'
-                    ? 'bg-slate-600 text-white'
-                    : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                }`}
+                className={`px-4 py-2.5 text-sm font-medium rounded transition-colors ${adjustmentType === 'amount'
+                  ? 'bg-slate-600 text-white'
+                  : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                  }`}
               >
                 VNĐ
               </button>
               <button
                 onClick={() => setAdjustmentType('percent')}
-                className={`px-4 py-2.5 text-sm font-medium rounded transition-colors ${
-                  adjustmentType === 'percent'
-                    ? 'bg-green-500 text-white'
-                    : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                }`}
+                className={`px-4 py-2.5 text-sm font-medium rounded transition-colors ${adjustmentType === 'percent'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                  }`}
               >
                 %
               </button>
@@ -150,16 +172,16 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
           </div>
 
           {/* New Price Display */}
-          <div className="p-5 bg-green-50 border border-green-200 rounded-lg">
+          <div className="p-5 bg-white border border-slate-300 rounded-lg">
             <div className="flex justify-between items-center">
               <span className="text-base text-slate-700">Giá bán mới:</span>
-              <span className="text-2xl font-semibold text-green-600">
+              <span className="text-2xl font-semibold text-blue-600">
                 {newPrice.toLocaleString('vi-VN')}đ
               </span>
             </div>
             <div className="flex justify-between items-center mt-3 text-sm">
               <span className="text-slate-600">Lợi nhuận:</span>
-              <span className="text-green-600 font-medium">
+              <span className="text-blue-600 font-medium">
                 {product?.costPrice ? ((newPrice - product.costPrice) / newPrice * 100).toFixed(1) : 0}%
                 <span className="ml-2 text-slate-600">
                   ({product?.costPrice ? (newPrice - product.costPrice).toLocaleString('vi-VN') : 0}đ)
@@ -169,12 +191,12 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
           </div>
 
           {/* Apply to All Checkbox */}
-          <div className="flex items-start space-x-3 p-4 border border-slate-200 rounded-lg bg-slate-50">
-            <Checkbox 
+          <div className="flex items-start space-x-3 p-4 border border-slate-300 rounded-lg bg-white">
+            <Checkbox
               id="applyToAll"
               checked={applyToAll}
-              onCheckedChange={(checked) => setApplyToAll(checked as boolean)}
-              className="mt-0.5"
+              onCheckedChange={(checked: boolean) => setApplyToAll(checked)}
+              className="mt-0.5 border-slate-300"
             />
             <Label htmlFor="applyToAll" className="text-sm text-slate-700 cursor-pointer leading-relaxed">
               Áp dụng công thức cho tất cả sản phẩm trong danh mục <strong>{categoryLabel}</strong>
@@ -186,7 +208,7 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
           <Button variant="outline" onClick={onClose} className="min-w-24">
             Hủy
           </Button>
-          <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 min-w-24">
+          <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 min-w-24">
             OK
           </Button>
         </DialogFooter>
@@ -195,21 +217,66 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
   );
 }
 
+type SortField = "code" | "name" | "category" | "type" | "unit" | "costPrice" | "lastPurchasePrice" | "sellingPrice" | "margin";
+type SortOrder = "asc" | "desc" | "none";
+
 export function ProductPricing() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['all']);
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['ready-made', 'composite', 'ingredient']);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [selectedProduct, setSelectedProduct] = useState<ProductPricingItem | null>(null);
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("none");
+  const [showFilters, setShowFilters] = useState(false);
 
-  // Mock data
-  const [products, setProducts] = useState([
-    { id: 1, code: 'CF001', name: 'Cà phê đen đá', category: 'bottled-beverages', type: 'composite', costPrice: 8000, lastPurchasePrice: 7500, sellingPrice: 25000 },
-    { id: 2, code: 'CF002', name: 'Bạc xỉu', category: 'bottled-beverages', type: 'composite', costPrice: 10000, lastPurchasePrice: 9800, sellingPrice: 30000 },
-    { id: 3, code: 'TR001', name: 'Trà sữa trân châu', category: 'tea-coffee', type: 'composite', costPrice: 12000, lastPurchasePrice: 11500, sellingPrice: 35000 },
-    { id: 4, code: 'BK001', name: 'Bánh croissant', category: 'packaging', type: 'ready-made', costPrice: 7000, lastPurchasePrice: 6800, sellingPrice: 20000 },
-    { id: 5, code: 'NL001', name: 'Cà phê hạt Arabica', category: 'tea-coffee', type: 'ingredient', costPrice: 350000, lastPurchasePrice: 340000, sellingPrice: 380000 },
-  ]);
+  const [products, setProducts] = useState<ProductPricingItem[]>([]);
+  const [categoriesList, setCategoriesList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [itemsRes, categoriesRes] = await Promise.all([
+          inventoryService.getPricing(1, 1000),
+          inventoryService.getCategories()
+        ]);
+
+        // Handle items response
+        let items: ProductPricingItem[] = [];
+        const rawItems = itemsRes?.metaData?.items;
+
+        if (Array.isArray(rawItems)) {
+          items = rawItems.map((i): ProductPricingItem => ({
+            id: i.id,
+            name: i.name,
+            category: i.category,
+            itemType: i.itemType,
+            unit: i.unit,
+            costPrice: Number(i.costPrice),
+            lastPurchasePrice: Number(i.lastPurchasePrice),
+            sellingPrice: Number(i.sellingPrice),
+            margin: Number(i.margin),
+            lastPurchaseDate: i.lastPurchaseDate
+          }));
+        }
+
+        console.log('[ProductPricing] Mapped items:', items);
+        setProducts(items);
+
+        // Handle categories
+        setCategoriesList(categoriesRes?.metaData || categoriesRes?.items || categoriesRes || []);
+
+      } catch (error) {
+        console.error("Error fetching pricing data:", error);
+        toast.error("Không thể tải dữ liệu giá");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const toggleCategory = (categoryId: string) => {
     if (categoryId === 'all') {
@@ -235,21 +302,67 @@ export function ProductPricing() {
     setEditDialogOpen(true);
   };
 
-  const handleSavePrice = (productId: number, newPrice: number, applyToAll: boolean) => {
-    if (applyToAll && selectedProduct) {
-      // Apply to all products in the same category
-      setProducts(products.map(p => 
-        p.category === selectedProduct.category 
-          ? { ...p, sellingPrice: newPrice }
-          : p
-      ));
-    } else {
-      // Apply to single product
-      setProducts(products.map(p => 
-        p.id === productId 
-          ? { ...p, sellingPrice: newPrice }
-          : p
-      ));
+  const handleSavePrice = async (data: {
+    productId: number;
+    priceType: string;
+    adjustmentValue: number;
+    adjustmentType: 'amount' | 'percent';
+    applyToAll: boolean;
+  }) => {
+    if (!selectedProduct) return;
+
+    try {
+      // Map UI priceType to API baseType
+      const baseTypeMap: Record<string, "cost" | "current" | "lastPurchase"> = {
+        current: "current",
+        cost: "cost",
+        lastPurchase: "lastPurchase"
+      };
+
+      if (data.applyToAll) {
+        // Apply to all products in the same category
+        await inventoryService.updateCategoryPrice({
+          categoryId: selectedProduct.category.id,
+          baseType: baseTypeMap[data.priceType] || "current",
+          adjustmentValue: data.adjustmentValue,
+          adjustmentType: data.adjustmentType
+        });
+
+        toast.success(`Đã cập nhật giá cho danh mục ${selectedProduct.category.name}`);
+      } else {
+        // Apply to single product
+        await inventoryService.updateSinglePrice({
+          itemId: data.productId,
+          baseType: baseTypeMap[data.priceType] || "current",
+          adjustmentValue: data.adjustmentValue,
+          adjustmentType: data.adjustmentType
+        });
+
+        toast.success("Cập nhật giá thành công");
+      }
+
+      // Refresh data
+      setEditDialogOpen(false);
+      const itemsRes = await inventoryService.getPricing(1, 1000);
+      const rawItems = itemsRes?.metaData?.items;
+      if (Array.isArray(rawItems)) {
+        const items = rawItems.map((i): ProductPricingItem => ({
+          id: i.id,
+          name: i.name,
+          category: i.category,
+          itemType: i.itemType,
+          unit: i.unit,
+          costPrice: Number(i.costPrice),
+          lastPurchasePrice: Number(i.lastPurchasePrice),
+          sellingPrice: Number(i.sellingPrice),
+          margin: Number(i.margin),
+          lastPurchaseDate: i.lastPurchaseDate
+        }));
+        setProducts(items);
+      }
+    } catch (error) {
+      console.error("Error updating price:", error);
+      toast.error("Lỗi khi cập nhật giá");
     }
   };
 
@@ -266,169 +379,345 @@ export function ProductPricing() {
     }
   };
 
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         product.code.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategories.includes('all') || selectedCategories.includes(product.category);
-    const matchesType = selectedTypes.includes(product.type);
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Cycle through: asc -> desc -> none -> asc
+      if (sortOrder === "asc") {
+        setSortOrder("desc");
+      } else if (sortOrder === "desc") {
+        setSortOrder("none");
+        setSortField(null);
+      } else {
+        setSortField(field);
+        setSortOrder("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field || sortOrder === "none") {
+      return null;
+    }
+    if (sortOrder === "asc") {
+      return <ArrowUp className="w-4 h-4 ml-1 inline text-blue-600" />;
+    }
+    return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
+  };
+
+  let filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(product.id).includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategories.includes('all') || selectedCategories.includes(String(product.category.id));
+    const matchesType = selectedTypes.includes(product.itemType?.name.toLowerCase() === "ready_made" ? "ready-made" : product.itemType?.name.toLowerCase() || "");
     return matchesSearch && matchesCategory && matchesType;
   });
 
+  // Apply sorting
+  if (sortField && sortOrder !== "none") {
+    filteredProducts = [...filteredProducts].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      if (sortField === "code") {
+        aValue = a.id;
+        bValue = b.id;
+      } else if (sortField === "name") {
+        aValue = a.name;
+        bValue = b.name;
+      } else if (sortField === "category") {
+        aValue = a.category.name;
+        bValue = b.category.name;
+      } else if (sortField === "type") {
+        aValue = getTypeLabel(a.itemType.name);
+        bValue = getTypeLabel(b.itemType.name);
+      } else if (sortField === "unit") {
+        aValue = a.unit || "";
+        bValue = b.unit || "";
+      } else if (sortField === "costPrice") {
+        aValue = a.costPrice;
+        bValue = b.costPrice;
+      } else if (sortField === "lastPurchasePrice") {
+        aValue = a.lastPurchasePrice;
+        bValue = b.lastPurchasePrice;
+      } else if (sortField === "sellingPrice") {
+        aValue = a.sellingPrice;
+        bValue = b.sellingPrice;
+      } else if (sortField === "margin") {
+        const aMargin = ((a.sellingPrice - a.costPrice) / a.sellingPrice * 100);
+        const bMargin = ((b.sellingPrice - b.costPrice) / b.sellingPrice * 100);
+        aValue = aMargin;
+        bValue = bMargin;
+      }
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        const comparison = aValue.localeCompare(bValue, "vi");
+        return sortOrder === "asc" ? comparison : -comparison;
+      }
+
+      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
+
   return (
-    <div className="flex h-full bg-slate-50">
-      {/* Left Sidebar - Filters */}
-      <aside className="w-64 bg-white border-r border-slate-200 p-4 overflow-y-auto hidden lg:block">
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-sm text-slate-900 mb-3">Danh mục</h3>
-            <div className="space-y-2">
-              {categories.map((cat) => (
-                <div key={cat.id} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id={cat.id} 
-                      checked={selectedCategories.includes(cat.id)}
-                      onCheckedChange={() => toggleCategory(cat.id)}
-                    />
-                    <Label htmlFor={cat.id} className="text-sm text-slate-700 cursor-pointer">
-                      {cat.name}
-                    </Label>
-                  </div>
-                  <span className="text-xs text-slate-500">{cat.count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Separator />
-
-          <div>
-            <h3 className="text-sm text-slate-900 mb-3">Loại hàng hóa</h3>
-            <div className="space-y-2">
-              {[
-                { id: 'ready-made', label: 'Hàng hóa bán sẵn' },
-                { id: 'composite', label: 'Hàng hóa cấu thành' },
-                { id: 'ingredient', label: 'Nguyên liệu' },
-              ].map((type) => (
-                <div key={type.id} className="flex items-center space-x-2">
-                  <Checkbox 
-                    id={type.id}
-                    checked={selectedTypes.includes(type.id)}
-                    onCheckedChange={() => toggleType(type.id)}
-                  />
-                  <Label htmlFor={type.id} className="text-sm text-slate-700 cursor-pointer">
-                    {type.label}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Separator />
-
-          <div>
-            <h3 className="text-sm text-slate-900 mb-3">Bộ lọc nhanh</h3>
-            <div className="space-y-2">
-              <Button variant="outline" size="sm" className="w-full justify-start text-xs">
-                <DollarSign className="w-3 h-3 mr-2" />
-                Lợi nhuận thấp
-              </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start text-xs">
-                <TrendingDown className="w-3 h-3 mr-2" />
-                Giá cao nhất
-              </Button>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col p-6">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-slate-900 mb-2">Thiết lập giá</h1>
-          <p className="text-sm text-slate-600">Quản lý giá vốn và giá bán sản phẩm</p>
-        </div>
-
-        {/* Search Bar */}
-        <div className="mb-4">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Tìm theo tên hoặc mã hàng..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="bg-white rounded-lg border border-slate-200 flex-1 overflow-hidden flex flex-col">
-          <div className="overflow-x-auto flex-1">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">Mã hàng</th>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">Tên hàng hóa</th>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">Danh mục</th>
-                  <th className="px-4 py-3 text-left text-xs text-slate-600">Loại hàng hóa</th>
-                  <th className="px-4 py-3 text-right text-xs text-slate-600">Giá vốn</th>
-                  <th className="px-4 py-3 text-right text-xs text-slate-600">Giá nhập cuối</th>
-                  <th className="px-4 py-3 text-right text-xs text-slate-600">Giá bán</th>
-                  <th className="px-4 py-3 text-right text-xs text-slate-600">Lợi nhuận (%)</th>
-                  <th className="px-4 py-3 text-center text-xs text-slate-600">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredProducts.map((product) => {
-                  const margin = ((product.sellingPrice - product.costPrice) / product.sellingPrice * 100).toFixed(0);
-                  const categoryLabel = categories.find(c => c.id === product.category)?.name || product.category;
-                  
-                  return (
-                    <tr key={product.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 text-sm text-slate-600">{product.code}</td>
-                      <td className="px-4 py-3 text-sm text-slate-900">{product.name}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{categoryLabel}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {getTypeLabel(product.type)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-900 text-right">
-                        {product.costPrice.toLocaleString('vi-VN')}đ
-                      </td>
-                      <td className="px-4 py-3 text-sm text-blue-600 text-right">
-                        {product.lastPurchasePrice.toLocaleString('vi-VN')}đ
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-900 text-right">
-                        {product.sellingPrice.toLocaleString('vi-VN')}đ
-                      </td>
-                      <td className="px-4 py-3 text-sm text-green-600 text-right">
-                        {margin}%
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button 
-                          onClick={() => handleEditClick(product)}
-                          className="text-blue-600 hover:text-blue-700 p-1"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Footer */}
-          <div className="px-4 py-3 border-t border-slate-200 bg-slate-50">
-            <p className="text-sm text-slate-600">
-              Hiển thị {filteredProducts.length} sản phẩm
-            </p>
-          </div>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-blue-900 text-2xl font-semibold mb-2">Thiết lập giá</h1>
+          <p className="text-slate-600 text-sm">
+            Quản lý giá vốn và giá bán sản phẩm
+          </p>
         </div>
       </div>
+
+      {/* Search and Filter Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            {/* Search and Filter Toggle */}
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input
+                  placeholder="Tìm theo tên hoặc mã hàng..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className="gap-2"
+              >
+                <Filter className="w-4 h-4" />
+                Bộ lọc
+                {(!selectedCategories.includes('all') || selectedTypes.length < 3) && (
+                  <Badge className="ml-1 bg-blue-500 text-white px-1.5 py-0.5 text-xs">
+                    {(!selectedCategories.includes('all') ? selectedCategories.length : 0) + (selectedTypes.length < 3 ? (3 - selectedTypes.length) : 0)}
+                  </Badge>
+                )}
+              </Button>
+            </div>
+
+            {/* Collapsible Filter Panel */}
+            {showFilters && (
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Category Filters */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Danh mục</Label>
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2 max-h-60 overflow-y-auto">
+                      {categoriesList.map((cat) => (
+                        <div key={cat.id} className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={String(cat.id)}
+                              checked={selectedCategories.includes(String(cat.id))}
+                              onCheckedChange={() => toggleCategory(String(cat.id))}
+                              className="border-slate-300"
+                            />
+                            <Label htmlFor={String(cat.id)} className="text-sm text-slate-700 cursor-pointer font-normal">
+                              {cat.name}
+                            </Label>
+                          </div>
+                          {/* <span className="text-xs text-slate-500">{cat.count}</span> */}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Type Filters */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600">Loại hàng hóa</Label>
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                      {[
+                        { id: 'ready-made', label: 'Hàng hóa bán sẵn' },
+                        { id: 'composite', label: 'Hàng hóa cấu thành' },
+                        { id: 'ingredient', label: 'Nguyên liệu' },
+                      ].map((type) => (
+                        <div key={type.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={type.id}
+                            checked={selectedTypes.includes(type.id)}
+                            onCheckedChange={() => toggleType(type.id)}
+                            className="border-slate-300"
+                          />
+                          <Label htmlFor={type.id} className="text-sm text-slate-700 cursor-pointer font-normal">
+                            {type.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Clear Filters Button */}
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedCategories(['all']);
+                      setSelectedTypes(['ready-made', 'composite', 'ingredient']);
+                      setSearchTerm("");
+                    }}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Xóa bộ lọc
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            Danh sách sản phẩm ({filteredProducts.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto rounded-xl">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-blue-100">
+                  <TableHead className="w-16 text-sm text-center">STT</TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("code")}
+                  >
+                    <div className="flex items-center">
+                      Mã hàng
+                      {getSortIcon("code")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("name")}
+                  >
+                    <div className="flex items-center">
+                      Tên hàng hóa
+                      {getSortIcon("name")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("category")}
+                  >
+                    <div className="flex items-center">
+                      Danh mục
+                      {getSortIcon("category")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("type")}
+                  >
+                    <div className="flex items-center">
+                      Loại hàng hóa
+                      {getSortIcon("type")}
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-sm">Đơn vị</TableHead>
+                  <TableHead
+                    className="text-right cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("costPrice")}
+                  >
+                    <div className="flex items-center justify-end">
+                      Giá vốn
+                      {getSortIcon("costPrice")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-right cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("lastPurchasePrice")}
+                  >
+                    <div className="flex items-center justify-end">
+                      Giá nhập cuối
+                      {getSortIcon("lastPurchasePrice")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-right cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("sellingPrice")}
+                  >
+                    <div className="flex items-center justify-end">
+                      Giá bán
+                      {getSortIcon("sellingPrice")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-right cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => handleSort("margin")}
+                  >
+                    <div className="flex items-center justify-end">
+                      Lợi nhuận (%)
+                      {getSortIcon("margin")}
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-center">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredProducts.map((product, index) => {
+                  const categoryLabel = product.category.name;
+                  const isComposite = product.itemType.name === "composite";
+
+                  // Use API provided fields directly
+                  const costPrice = product.costPrice || 0;
+                  const lastPurchasePrice = product.lastPurchasePrice || 0;
+                  const margin = product.margin || 0;
+
+                  return (
+                    <TableRow key={product.id} className="hover:bg-slate-50">
+                      <TableCell className="text-sm text-slate-600 text-center">
+                        {index + 1}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700">{product.id}</TableCell>
+                      <TableCell className="text-sm text-slate-900">{product.name}</TableCell>
+                      <TableCell className="text-sm text-slate-700">{categoryLabel}</TableCell>
+                      <TableCell className="text-sm text-slate-700">
+                        {getTypeLabel(product.itemType.name === "ready_made" ? "ready-made" : product.itemType.name)}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700">
+                        {product.unit.symbol || product.unit.name}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-900 text-right">
+                        {Math.round(costPrice).toLocaleString('vi-VN')}đ
+                      </TableCell>
+                      <TableCell className="text-sm text-blue-600 text-right">
+                        {isComposite ? "-" : `${Math.round(lastPurchasePrice).toLocaleString('vi-VN')}đ`}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-900 text-right">
+                        {product.sellingPrice.toLocaleString('vi-VN')}đ
+                      </TableCell>
+                      <TableCell className={`text-sm text-right ${margin < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                        {margin.toFixed(0)}%
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Button variant="ghost" size="sm" onClick={() => handleEditClick(product)}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Price Edit Dialog */}
       <PriceEditDialog
@@ -437,6 +726,6 @@ export function ProductPricing() {
         product={selectedProduct}
         onSave={handleSavePrice}
       />
-    </div>
+    </div >
   );
 }

@@ -1,142 +1,419 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, ChevronDown } from 'lucide-react';
-import svgPaths from '../imports/svg-uemarp4dxh';
 import { Button } from './ui/button';
-import { Promotion, PromotionType } from './pages/Promotions';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from './ui/popover';
+import { PromotionTypes } from './pages/Promotions';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Label } from './ui/label';
+import { Input } from './ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Checkbox } from './ui/checkbox';
+import { getInventoryItemCategories, getInventoryItems } from '../api/inventoryItem';
+import { getActiveCombos } from '../api/combo';
+import { getCustomers } from '../api/customer';
+import { getCustomerGroups } from '../api/customerGroup';
+import { get } from 'http';
+import { getPromotionById } from '../api/promotions';
 
-interface MenuItem {
-  id: string;
+interface Item {
+  id: number;
   code: string;
   name: string;
   quantity?: number;
 }
 
 interface Category {
-  id: string;
+  id: number;
   name: string;
 }
 
 interface Combo {
-  id: string;
+  id: number;
   name: string;
 }
 
 interface CustomerGroup {
-  id: string;
+  id: number;
   name: string;
 }
 
 interface Customer {
-  id: string;
+  id: number;
   code: string;
   name: string;
 }
 
-interface PromotionFormDialogProps {
+interface PromotionEditFormDialogProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (formData: Omit<Promotion, 'id' | 'code'>) => void;
-  editingPromotion: Promotion | null;
+  onSubmit: (formData: EditPromotion) => void;
+  editingPromotion: EditPromotion;
+}
+interface PromotionAddFormDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (formData: AddPromotion) => void;
 }
 
-export function PromotionFormDialog({ 
-  open, 
-  onClose, 
-  onSubmit, 
-  editingPromotion 
-}: PromotionFormDialogProps) {
-  const [formData, setFormData] = useState<Omit<Promotion, 'id' | 'code'>>({
-    name: '',
-    type: 'percentage' as PromotionType,
+export interface EditPromotion {
+  id: number,
+  code: string
+  name: string,
+  description: string,
+  discountValue: number,
+  minOrderValue: number,
+  maxDiscount: number,
+  buyQuantity: number,
+  getQuantity: number,
+  requireSameItem: boolean,
+  startDateTime: string,
+  endDateTime: string,
+  maxTotalUsage: number,
+  maxUsagePerCustomer: number,
+  currentTotalUsage: number,
+  isActive: boolean,
+
+  applyToAllItems: boolean,
+  applyToAllCategories: boolean,
+  applyToAllCombos: boolean,
+  applyToAllCustomers: boolean,
+  applyToAllCustomerGroups: boolean,
+  applyToWalkIn: boolean,
+
+  applicableItemIds: number[],
+  applicableCategoryIds: number[],
+  applicableComboIds: number[],
+  applicableCustomerIds: number[],
+  applicableCustomerGroupIds: number[],
+  giftItemIds: number[],
+
+  typeId: number
+}
+
+export interface AddPromotion {
+  name: string,
+  description: string,
+  discountValue: number,
+  minOrderValue: number,
+  maxDiscount: number,
+  buyQuantity: number,
+  getQuantity: number,
+  requireSameItem: boolean,
+  startDateTime: string,
+  endDateTime: string,
+  maxTotalUsage: number,
+  maxUsagePerCustomer: number,
+  currentTotalUsage: number,
+  isActive: boolean,
+
+  applyToAllItems: boolean,
+  applyToAllCategories: boolean,
+  applyToAllCombos: boolean,
+  applyToAllCustomers: boolean,
+  applyToAllCustomerGroups: boolean,
+  applyToWalkIn: boolean,
+
+  applicableItemIds: number[],
+  applicableCategoryIds: number[],
+  applicableComboIds: number[],
+  applicableCustomerIds: number[],
+  applicableCustomerGroupIds: number[],
+  giftItemIds: number[],
+
+  typeId: number
+}
+
+export function PromotionEditFormDialog({
+  open,
+  onClose,
+  onSubmit,
+  editingPromotion
+}: PromotionEditFormDialogProps) {
+  const [formData, setFormData] = useState<EditPromotion>({
+    id: 0,
+    code: "",
+    name: "",
+    description: "",
+    discountValue: 0,
     minOrderValue: 0,
-    maxDiscountValue: undefined,
-    promotionValue: undefined,
-    startDate: '',
-    startTime: '',
-    endDate: '',
-    endTime: '',
-    freeItems: [],
-    applicableItems: [],
-    applicableCategories: [],
-    applicableCombos: [],
-    applicableCustomerGroups: [],
-    applicableCustomers: [],
-    status: 'active',
+    maxDiscount: 0,
+    buyQuantity: 0,
+    getQuantity: 0,
+    requireSameItem: false,
+    startDateTime: "2026-01-01T00:00:00Z",
+    endDateTime: "2026-01-01T00:00:00Z",
+    maxTotalUsage: 0,
+    maxUsagePerCustomer: 0,
+    currentTotalUsage: 0,
+    isActive: true,
+
+    applyToAllItems: false,
+    applyToAllCategories: false,
+    applyToAllCombos: false,
+    applyToAllCustomers: false,
+    applyToAllCustomerGroups: false,
+    applyToWalkIn: false,
+
+    applicableItemIds: [],
+    applicableCategoryIds: [],
+    applicableComboIds: [],
+    applicableCustomerIds: [],
+    applicableCustomerGroupIds: [],
+    giftItemIds: [],
+
+    typeId: 1
   });
+  const [applicableItemSearch, setApplicableItemSearch] = useState('');
+  const [giftItemSearch, setGiftItemSearch] = useState('');
+  const [categorySearch, setCategorySearch] = useState('');
+  const [comboSearch, setComboSearch] = useState('');
+  const [customerGroupSearch, setCustomerGroupSearch] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
 
-  // Mock data
-  const availableMenuItems: MenuItem[] = [
-    { id: '1', code: 'CF001', name: 'Cà phê sữa' },
-    { id: '2', code: 'CF002', name: 'Cà phê đen' },
-    { id: '3', code: 'CF003', name: 'Bạc xỉu' },
-  ];
+  const [applicableItemSelections, setApplicableItemSelections] = useState<Item[]>([]);
+  const [giftItemSelections, setGiftItemSelections] = useState<Item[]>([]);
+  const [applicableCategorySelections, setApplicableCategorySelections] = useState<Category[]>([]);
+  const [applicableComboSelections, setApplicableComboSelections] = useState<Combo[]>([]);
+  const [applicableCustomerGroupSelections, setApplicableCustomerGroupSelections] = useState<CustomerGroup[]>([]);
+  const [applicableCustomerSelections, setApplicableCustomerSelections] = useState<Customer[]>([]);
 
-  const availableCategories: Category[] = [
-    { id: '1', name: 'Cà phê' },
-    { id: '2', name: 'Trà sữa' },
-    { id: '3', name: 'Sinh tố' },
-  ];
+  const [allItems, setAllItems] = useState<Item[]>([]);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const [allCombos, setAllCombos] = useState<Combo[]>([]);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
+  const [allCustomerGroups, setAllCustomerGroups] = useState<CustomerGroup[]>([]);
 
-  const availableCombos: Combo[] = [
-    { id: '1', name: 'Combo 2 người' },
-    { id: '2', name: 'Combo gia đình' },
-  ];
+  const fetchAllData = async () => {
+    // Fetch items
+    const itemRes = await getInventoryItems();
+    if (itemRes) {
+      const { items } = itemRes.data.metaData;
+      if (items) {
+        setAllItems(items);
+      }
+    }
 
-  const availableCustomerGroups: CustomerGroup[] = [
-    { id: '1', name: 'Khách hàng VIP' },
-    { id: '2', name: 'Khách hàng thân thiết' },
-  ];
+    // Fetch categories
+    const categoryRes = await getInventoryItemCategories();
+    if (categoryRes) {
+      const { metaData } = categoryRes.data;
+      if (metaData) {
+        setAllCategories(metaData);
+      }
+    }
 
-  const availableCustomers: Customer[] = [
-    { id: '1', code: 'KH001', name: 'Nguyễn Văn A' },
-    { id: '2', code: 'KH002', name: 'Trần Thị B' },
-  ];
+    //Fetch combos
+    const comboRes = await getActiveCombos();
+    if (comboRes) {
+      const { metaData } = comboRes.data;
+      if (metaData) {
+        setAllCombos(metaData);
+      }
+    }
+
+    //Fetch customer
+    const customerRes = await getCustomers();
+    if (customerRes) {
+      const { customers } = customerRes.data.metaData;
+      if (customers) {
+        setAllCustomers(customers);
+      }
+    }
+
+    //Fetch customer groups
+    const customerGroupRes = await getCustomerGroups();
+    if (customerGroupRes) {
+      const { groups } = customerGroupRes.data.metaData;
+      if (groups) {
+        setAllCustomerGroups(groups);
+      }
+    }
+
+    //Fetch applicables
+    const promotionRes = await getPromotionById(editingPromotion.id);
+    if (promotionRes) {
+      const { promotion } = promotionRes.data.metaData;
+      if (promotion) {
+        const { applicableItems, applicableCategories, applicableCombos, applicableCustomers, applicableCustomerGroups, giftItems } = promotion;
+        let tempApplicableItemIds: number[] = [];
+        let tempApplicableCategoryIds: number[] = [];
+        let tempApplicableComboIds: number[] = [];
+        let tempApplicableCustomerIds: number[] = [];
+        let tempApplicableCustomerGroupIds: number[] = [];
+        let tempGiftItemIds: number[] = [];
+
+        if (applicableItems) {
+          applicableItems.map((item) => {
+            tempApplicableItemIds.push(item.id)
+          })
+        }
+        if (applicableCategories) {
+
+          applicableCategories.map((cat) => {
+            tempApplicableCategoryIds.push(cat.id)
+          })
+        }
+        if (applicableCombos) {
+
+          applicableCombos.map((combo) => {
+            tempApplicableComboIds.push(combo.id)
+          })
+        }
+        if (applicableCustomers) {
+
+          applicableCustomers.map((customer) => {
+            tempApplicableCustomerIds.push(customer.id)
+          })
+        }
+        if (applicableCustomerGroups) {
+
+          applicableCustomerGroups.map((customerGroup) => {
+            tempApplicableCustomerGroupIds.push(customerGroup.id)
+          })
+        }
+        if (giftItems) {
+
+          giftItems.map((item) => {
+            tempGiftItemIds.push(item.id)
+          })
+        }
+        let tempFormData: EditPromotion = {
+          id: editingPromotion.id,
+          code: editingPromotion.code,
+          name: editingPromotion.name,
+          description: editingPromotion.description,
+          discountValue: editingPromotion.discountValue,
+          minOrderValue: editingPromotion.minOrderValue,
+          maxDiscount: editingPromotion.maxDiscount,
+          buyQuantity: editingPromotion.buyQuantity,
+          getQuantity: editingPromotion.getQuantity,
+          requireSameItem: editingPromotion.requireSameItem,
+          startDateTime: editingPromotion.startDateTime,
+          endDateTime: editingPromotion.endDateTime,
+          maxTotalUsage: editingPromotion.maxTotalUsage,
+          maxUsagePerCustomer: editingPromotion.maxUsagePerCustomer,
+          currentTotalUsage: editingPromotion.currentTotalUsage,
+          isActive: editingPromotion.isActive,
+
+          applyToAllItems: editingPromotion.applyToAllItems,
+          applyToAllCategories: editingPromotion.applyToAllCategories,
+          applyToAllCombos: editingPromotion.applyToAllCombos,
+          applyToAllCustomers: editingPromotion.applyToAllCustomers,
+          applyToAllCustomerGroups: editingPromotion.applyToAllCustomerGroups,
+          applyToWalkIn: editingPromotion.applyToWalkIn,
+
+          applicableItemIds: tempApplicableItemIds,
+          applicableCategoryIds: tempApplicableCategoryIds,
+          applicableComboIds: tempApplicableComboIds,
+          applicableCustomerIds: tempApplicableCustomerIds,
+          applicableCustomerGroupIds: tempApplicableCustomerGroupIds,
+          giftItemIds: tempGiftItemIds,
+
+          typeId: editingPromotion.typeId
+        }
+        // console.log("Temp form data: ", tempFormData);
+        setFormData(tempFormData);
+
+        // console.log("items: ", tempApplicableItemIds);
+        // console.log("categories: ", tempApplicableCategoryIds);
+        // console.log("combos: ", tempApplicableComboIds);
+        // console.log("customers: ", tempApplicableCustomerIds);
+        // console.log("customer groups: ", tempApplicableCustomerGroupIds);
+        // console.log("gift items: ", tempGiftItemIds);
+      }
+    }
+  }
+
+  const getItemName = (id: Number) => {
+    let name: string = "";
+    allItems.map((item) => {
+      if (item.id === id) {
+        name = item.name;
+      }
+    })
+    return name;
+  }
+
+  const getCategoryName = (id: Number) => {
+    let name: string = "";
+    allCategories.map((category) => {
+      if (category.id === id) {
+        name = category.name;
+      }
+    })
+    return name;
+  }
+
+  const getComboName = (id: Number) => {
+    let name: string = "";
+    allCombos.map((combo) => {
+      if (combo.id === id) {
+        name = combo.name;
+      }
+    })
+    return name;
+  }
+
+  const getCustomerName = (id: Number) => {
+    let name: string = "";
+    allCustomers.map((customer) => {
+      if (customer.id === id) {
+        name = customer.name;
+      }
+    })
+    return name;
+  }
+
+  const getCustomerGroupName = (id: Number) => {
+    let name: string = "";
+    allCustomerGroups.map((customerGroup) => {
+      if (customerGroup.id === id) {
+        name = customerGroup.name;
+      }
+    })
+    return name;
+  }
+
+
 
   useEffect(() => {
-    if (editingPromotion) {
-      setFormData({
-        name: editingPromotion.name,
-        type: editingPromotion.type,
-        minOrderValue: editingPromotion.minOrderValue,
-        maxDiscountValue: editingPromotion.maxDiscountValue,
-        promotionValue: editingPromotion.promotionValue,
-        startDate: editingPromotion.startDate,
-        startTime: editingPromotion.startTime,
-        endDate: editingPromotion.endDate,
-        endTime: editingPromotion.endTime,
-        freeItems: editingPromotion.freeItems || [],
-        applicableItems: editingPromotion.applicableItems || [],
-        applicableCategories: editingPromotion.applicableCategories || [],
-        applicableCombos: editingPromotion.applicableCombos || [],
-        applicableCustomerGroups: editingPromotion.applicableCustomerGroups || [],
-        applicableCustomers: editingPromotion.applicableCustomers || [],
-        status: editingPromotion.status,
-      });
-    } else {
-      setFormData({
-        name: '',
-        type: 'percentage',
-        minOrderValue: 0,
-        maxDiscountValue: undefined,
-        promotionValue: undefined,
-        startDate: '',
-        startTime: '',
-        endDate: '',
-        endTime: '',
-        freeItems: [],
-        applicableItems: [],
-        applicableCategories: [],
-        applicableCombos: [],
-        applicableCustomerGroups: [],
-        applicableCustomers: [],
-        status: 'active',
-      });
+    // setFormData({
+    //   id: editingPromotion.id,
+    //   code: editingPromotion.code,
+    //   name: editingPromotion.name,
+    //   description: editingPromotion.description,
+    //   discountValue: editingPromotion.discountValue,
+    //   minOrderValue: editingPromotion.minOrderValue,
+    //   maxDiscount: editingPromotion.maxDiscount,
+    //   buyQuantity: editingPromotion.buyQuantity,
+    //   getQuantity: editingPromotion.getQuantity,
+    //   requireSameItem: editingPromotion.requireSameItem,
+    //   startDateTime: editingPromotion.startDateTime,
+    //   endDateTime: editingPromotion.endDateTime,
+    //   maxTotalUsage: editingPromotion.maxTotalUsage,
+    //   maxUsagePerCustomer: editingPromotion.maxUsagePerCustomer,
+    //   currentTotalUsage: editingPromotion.currentTotalUsage,
+    //   isActive: editingPromotion.isActive,
+
+    //   applyToAllItems: editingPromotion.applyToAllItems,
+    //   applyToAllCategories: editingPromotion.applyToAllCategories,
+    //   applyToAllCombos: editingPromotion.applyToAllCombos,
+    //   applyToAllCustomers: editingPromotion.applyToAllCustomers,
+    //   applyToAllCustomerGroups: editingPromotion.applyToAllCustomerGroups,
+    //   applyToWalkIn: editingPromotion.applyToWalkIn,
+
+    //   applicableItemIds: editingPromotion.applicableItemIds,
+    //   applicableCategoryIds: editingPromotion.applicableCategoryIds,
+    //   applicableComboIds: editingPromotion.applicableComboIds,
+    //   applicableCustomerIds: editingPromotion.applicableCustomerIds,
+    //   applicableCustomerGroupIds: editingPromotion.applicableCustomerGroupIds,
+    //   giftItemIds: editingPromotion.giftItemIds,
+
+    //   typeId: editingPromotion.typeId
+    // });
+
+    if (open && editingPromotion.id > 0) {
+      fetchAllData();
     }
   }, [editingPromotion, open]);
 
@@ -145,288 +422,692 @@ export function PromotionFormDialog({
     onSubmit(formData);
   };
 
-  if (!open) return null;
+  const showMaxDiscountValue = formData.typeId === 1;
+  const showPromotionValue = formData.typeId === 1 || formData.typeId === 2 || formData.typeId === 3;
+  const showFreeItems = formData.typeId === 4;
 
-  const showMaxDiscountValue = formData.type === 'percentage' || formData.type === 'amount';
-  const showPromotionValue = formData.type === 'percentage' || formData.type === 'amount' || formData.type === 'fixed-price';
-  const showFreeItems = formData.type === 'free-item';
+  const checkType = (value: number) => {
+    switch (value) {
+      case 1:
+        return formData.typeId === 4;
+      case 10:
+        return formData.typeId === 3;
+      case 11:
+        return formData.typeId === 4 || formData.typeId === 3;
+      case 100:
+        return formData.typeId === 2;
+      case 101:
+        return formData.typeId === 2 || formData.typeId === 4;
+      case 110:
+        return formData.typeId === 2 || formData.typeId === 3;
+      case 111:
+        return formData.typeId === 2 || formData.typeId === 3 || formData.typeId === 4;
+      case 1000:
+        return formData.typeId === 1;
+      case 1001:
+        return formData.typeId === 1 || formData.typeId === 4;
+      case 1010:
+        return formData.typeId === 1 || formData.typeId === 3;
+      case 1011:
+        return formData.typeId === 1 || formData.typeId === 3 || formData.typeId === 4;
+      case 1100:
+        return formData.typeId === 1 || formData.typeId === 2;
+      case 1101:
+        return formData.typeId === 1 || formData.typeId === 2 || formData.typeId === 4;
+      case 1110:
+        return formData.typeId === 1 || formData.typeId === 2 || formData.typeId === 3;
+      case 1111: return true;
+    }
+  }
+
+  const remainingItems = allItems.filter(
+    (item) => !formData.applicableItemIds?.some((ai) => ai === item.id)
+  );
+
+  const remainingItemsToGift = allItems.filter(
+    (item) => !formData.giftItemIds?.some((ai) => ai === item.id)
+  );
+
+  const remainingCategories = allCategories.filter(
+    (cat) => !formData.applicableCategoryIds?.some((ac) => ac === cat.id)
+  );
+
+  const remainingCombos = allCombos.filter(
+    (combo) => !formData.applicableComboIds?.some((ac) => ac === combo.id)
+  );
+
+  const remainingCustomerGroups = allCustomerGroups.filter(
+    (group) => !formData.applicableCustomerGroupIds?.some((acg) => acg === group.id)
+  );
+
+  const remainingCustomers = allCustomers.filter(
+    (customer) => !formData.applicableCustomerIds?.some((ac) => ac === customer.id)
+  );
+
+  const addSelectedApplicableItems = () => {
+    if (!applicableItemSelections.length) return;
+    const selectedItems = remainingItems.filter((item) =>
+      applicableItemSelections.includes(item)
+    );
+    let selectedItemIds: number[] = [];
+    selectedItems.map((item) => {
+      selectedItemIds.push(item.id);
+    })
+    if (selectedItems.length) {
+      setFormData((prev) => ({
+        ...prev,
+        applicableItemIds: [...(prev.applicableItemIds || []), ...selectedItemIds],
+      }));
+    }
+    setApplicableItemSelections([]);
+  };
+
+  const addSelectedGiftItems = () => {
+    if (!giftItemSelections.length) return;
+    const selectedItems = remainingItemsToGift.filter((item) =>
+      giftItemSelections.includes(item)
+    );
+    let selectedItemIds: number[] = [];
+    selectedItems.map((item) => {
+      selectedItemIds.push(item.id);
+    })
+    if (selectedItems.length) {
+      setFormData((prev) => ({
+        ...prev,
+        giftItemIds: [...(prev.giftItemIds || []), ...selectedItemIds],
+      }));
+    }
+    setGiftItemSelections([]);
+  };
+
+  const addSelectedCategories = () => {
+    if (!applicableCategorySelections.length) return;
+    const selectedCategories = remainingCategories.filter((cat) =>
+      applicableCategorySelections.includes(cat)
+    );
+    let selectedCategoryIds: number[] = []
+    selectedCategories.map((cat) => {
+      selectedCategoryIds.push(cat.id);
+    })
+    if (selectedCategoryIds.length) {
+      setFormData((prev) => ({
+        ...prev,
+        applicableCategoryIds: [...(prev.applicableCategoryIds || []), ...selectedCategoryIds],
+      }));
+    }
+    setApplicableCategorySelections([]);
+  };
+
+  const addSelectedCombos = () => {
+    if (!applicableComboSelections.length) return;
+    const selectedCombos = remainingCombos.filter((combo) =>
+      applicableComboSelections.includes(combo)
+    );
+    let selectedComboIds: number[] = []
+    selectedCombos.map((cat) => {
+      selectedComboIds.push(cat.id);
+    })
+    if (selectedCombos.length) {
+      setFormData((prev) => ({
+        ...prev,
+        applicableComboIds: [...(prev.applicableComboIds || []), ...selectedComboIds],
+      }));
+    }
+    setApplicableComboSelections([]);
+  };
+
+  const addSelectedCustomerGroups = () => {
+    if (!applicableCustomerGroupSelections.length) return;
+    const selectedGroups = remainingCustomerGroups.filter((group) =>
+      applicableCustomerGroupSelections.includes(group)
+    );
+    let selectedCustomerGroupIds: number[] = []
+    selectedGroups.map((cat) => {
+      selectedCustomerGroupIds.push(cat.id);
+    })
+    if (selectedGroups.length) {
+      setFormData((prev) => ({
+        ...prev,
+        applicableCustomerGroupIds: [
+          ...(prev.applicableCustomerGroupIds || []),
+          ...selectedCustomerGroupIds,
+        ],
+      }));
+    }
+    setApplicableCustomerGroupSelections([]);
+  };
+
+  const addSelectedCustomers = () => {
+    if (!applicableCustomerSelections.length) return;
+    const selectedCustomers = remainingCustomers.filter((customer) =>
+      applicableCustomerSelections.includes(customer)
+    );
+    let selectedCustomerIds: number[] = []
+    selectedCustomers.map((cat) => {
+      selectedCustomerIds.push(cat.id);
+    })
+    if (selectedCustomers.length) {
+      setFormData((prev) => ({
+        ...prev,
+        applicableCustomerIds: [...(prev.applicableCustomerIds || []), ...selectedCustomerIds],
+      }));
+    }
+    setApplicableCustomerSelections([]);
+  };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl text-slate-900">
-            {editingPromotion ? 'Chỉnh sửa khuyến mại' : 'Thêm khuyến mại mới'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="min-w-[1100px] max-w-[1300px] w-[100vw] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle className="text-lg font-semibold">
+            Chỉnh sửa khuyến mại
+          </DialogTitle>
+        </DialogHeader>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-6">
-            {/* Basic Information */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <label className="block text-sm text-slate-700 mb-1.5">
-                  Tên khuyến mại <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Basic Information */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Ma KM */}
+            <div className="col-span-2">
+              <Label>
+                Mã khuyến mại <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                type="text"
+                value={formData.code}
+                disabled={true}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                required
+              />
+            </div>
+            {/* Ten KM */}
+            <div className="col-span-2">
+              <Label>
+                Tên khuyến mại <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                required
+              />
+            </div>
+            {/* Mo ta */}
+            <div className="col-span-2">
+              <Label>
+                Mô tả
+              </Label>
+              <Input
+                type="text"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                required
+              />
+            </div>
+            {/* Loai KM */}
+            <div>
+              <Label>
+                Loại khuyến mại <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                disabled={true}
+                value={PromotionTypes[formData.typeId]}
+                onValueChange={(value: string) => {
+                  let type = 1;
+                  Object.entries(PromotionTypes).forEach(([key, val]) => {
+                    if (val === value) type = Number(key);
+                  })
+                  setFormData({ ...formData, typeId: type })
+                }}
+              >
+                <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Theo phần trăm">Theo phần trăm</SelectItem>
+                  <SelectItem value="Theo số tiền">Theo số tiền</SelectItem>
+                  <SelectItem value="Đồng giá">Đồng giá</SelectItem>
+                  <SelectItem value="Tặng món">Tặng món</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Hoa don toi thieu */}
+            {checkType(1110) && (
               <div>
-                <label className="block text-sm text-slate-700 mb-1.5">
-                  Loại khuyến mại <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as PromotionType })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                >
-                  <option value="percentage">Theo phần trăm</option>
-                  <option value="amount">Theo số tiền</option>
-                  <option value="fixed-price">Đồng giá</option>
-                  <option value="free-item">Tặng món</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm text-slate-700 mb-1.5">
-                  Giá trị hóa đơn tối thiểu <span className="text-red-500">*</span>
-                </label>
-                <input
+                <Label>
+                  Giá trị hóa đơn tối thiểu
+                </Label>
+                <Input
                   type="number"
                   value={formData.minOrderValue}
                   onChange={(e) => setFormData({ ...formData, minOrderValue: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   required
                   min="0"
                 />
               </div>
-
-              {showPromotionValue && (
-                <div>
-                  <label className="block text-sm text-slate-700 mb-1.5">
-                    Giá trị khuyến mại <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.promotionValue || ''}
-                    onChange={(e) => setFormData({ ...formData, promotionValue: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                    min="0"
-                    placeholder={formData.type === 'percentage' ? 'Phần trăm (%)' : 'Số tiền (VNĐ)'}
-                  />
-                </div>
-              )}
-
-              {showMaxDiscountValue && (
-                <div>
-                  <label className="block text-sm text-slate-700 mb-1.5">
-                    Giá trị giảm giá tối đa
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.maxDiscountValue || ''}
-                    onChange={(e) => setFormData({ ...formData, maxDiscountValue: e.target.value ? Number(e.target.value) : undefined })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    min="0"
-                    placeholder="Số tiền (VNĐ)"
-                  />
-                </div>
-              )}
-
+            )}
+            {/* Gia tri KM */}
+            {checkType(1110) && (
               <div>
-                <label className="block text-sm text-slate-700 mb-1.5">
-                  Ngày bắt đầu <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.startDate}
-                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="DD/MM/YYYY"
+                <Label>
+                  Giá trị khuyến mại
+                </Label>
+                <Input
+                  type="number"
+                  value={formData.discountValue || ''}
+                  onChange={(e) => setFormData({ ...formData, discountValue: Number(e.target.value) })}
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   required
+                  min="0"
+                  placeholder={formData.typeId === 1 ? 'Phần trăm (%)' : 'Số tiền (VNĐ)'}
                 />
               </div>
-
+            )}
+            {/* Giam toi da */}
+            {checkType(1100) && (
               <div>
-                <label className="block text-sm text-slate-700 mb-1.5">
-                  Thời gian bắt đầu <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.startTime}
-                  onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="HH:MM"
-                  required
+                <Label>Giá trị giảm giá tối đa</Label>
+                <Input
+                  type="number"
+                  value={formData.maxDiscount || ''}
+                  onChange={(e) => setFormData({ ...formData, maxDiscount: !Number.isNaN(Number(e.target.value)) ? Number(e.target.value) : formData.maxDiscount })}
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                  min="0"
+                  placeholder="Số tiền (VNĐ)"
                 />
               </div>
-
+            )}
+            {/* So luong mua */}
+            {checkType(1) && (
               <div>
-                <label className="block text-sm text-slate-700 mb-1.5">
-                  Ngày kết thúc <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.endDate}
-                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="DD/MM/YYYY"
-                  required
+                <Label>Số lượng mua</Label>
+                <Input
+                  type="number"
+                  value={formData.buyQuantity || ''}
+                  onChange={(e) => setFormData({ ...formData, buyQuantity: !Number.isNaN(Number(e.target.value)) ? Number(e.target.value) : formData.buyQuantity })}
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                  min="0"
+                  placeholder="Số lượng mua"
                 />
               </div>
-
+            )}
+            {/* So luong nhan */}
+            {checkType(1) && (
               <div>
-                <label className="block text-sm text-slate-700 mb-1.5">
-                  Thời gian kết thúc <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.endTime}
-                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="HH:MM"
-                  required
+                <Label>Số lượng nhận</Label>
+                <Input
+                  type="number"
+                  value={formData.getQuantity || ''}
+                  onChange={(e) => setFormData({ ...formData, getQuantity: !Number.isNaN(Number(e.target.value)) ? Number(e.target.value) : formData.getQuantity })}
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                  min="0"
+                  placeholder="Số lượng nhận"
                 />
               </div>
-
-              <div>
-                <label className="block text-sm text-slate-700 mb-1.5">
-                  Trạng thái <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' | 'inactive' })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                >
-                  <option value="active">Hoạt động</option>
-                  <option value="inactive">Không hoạt động</option>
-                </select>
-              </div>
+            )
+            }
+            {/* Thoi gian bat dau */}
+            <div>
+              <Label>
+                Thời gian bắt đầu <span className="text-red-500">*</span>
+              </Label>
+              <input
+                type="datetime-local"
+                value={formData.startDateTime ? formData.startDateTime : "2026-01-01T00:00:00.000Z"}
+                onChange={(e) => setFormData({ ...formData, startDateTime: e.target.value })}
+                className="mt-1.5 bg-white border-2 w-full rounded-sm p-1 border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              />
             </div>
+            {/* Thoi gian ket thuc */}
+            <div>
+              <Label>
+                Thời gian kết thúc <span className="text-red-500">*</span>
+              </Label>
+              <input
+                type="datetime-local"
+                value={formData.endDateTime ? formData.endDateTime : "2026-01-01T00:00:00.000Z"}
+                onChange={(e) => setFormData({ ...formData, endDateTime: e.target.value })}
+                className="mt-1.5 bg-white border-2 w-full rounded-sm p-1 border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              />
+            </div>
+            {/* So luot su dung toi da */}
+            <div>
+              <Label>
+                Số lượt sử dụng tối đa <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                type="number"
+                value={formData.maxTotalUsage || ''}
+                onChange={(e) => setFormData({ ...formData, maxTotalUsage: Number(e.target.value) })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                required
+                min="0"
+                placeholder='Số lượt sử dụng tối đa'
+              />
+            </div>
+            {/* So luot su dung toi da moi khach */}
+            <div>
+              <Label>
+                Số lượt sử dụng tối đa mỗi khách
+              </Label>
+              <Input
+                type="number"
+                value={formData.maxUsagePerCustomer || ''}
+                onChange={(e) => setFormData({ ...formData, maxUsagePerCustomer: Number(e.target.value) })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                required
+                min="0"
+                placeholder='Số lượt sử dụng tối đa'
+              />
+            </div>
+            {/* Trang thai */}
+            <div>
+              <Label>
+                Trạng thái <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.isActive ? 'Hoạt động' : 'Không hoạt động'}
+                onValueChange={(value: string) => setFormData({ ...formData, isActive: (value === 'Hoạt động' ? true : false) })}
+              >
+                <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Hoạt động">Hoạt động</SelectItem>
+                  <SelectItem value="Không hoạt động">Không hoạt động</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-            {/* Free Items - Only for free-item type */}
-            {showFreeItems && (
-              <div>
-                <label className="block text-sm text-slate-700 mb-2">
-                  Danh sách mặt hàng được tặng
-                </label>
-                <div className="space-y-2">
-                  {/* Selected Free Items List */}
-                  {formData.freeItems && formData.freeItems.length > 0 && (
-                    <div className="border border-slate-200 rounded-md p-2 space-y-1 max-h-48 overflow-y-auto">
-                      {formData.freeItems.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between gap-3 bg-slate-50 px-3 py-2 rounded text-sm">
-                          <span className="flex-1">{item.name}</span>
+          {/* Check Lists */}
+          <div className='grid grid-cols-4 gap-6'>
+            {/* Phai cung mon */}
+            {checkType(1) &&
+              <div className="flex flex-row gap-6 item-center">
+                <Label>Phải cùng món</Label>
+                <Checkbox
+                  checked={formData.requireSameItem}
+                  onCheckedChange={(value: boolean) => setFormData({ ...formData, requireSameItem: value })}
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                />
+              </div>
+            }
+            {/* Ap dung tat ca khach */}
+            <div className="flex flex-row gap-6 item-center">
+              <Label>Áp dụng tất cả khách</Label>
+              <Checkbox
+                checked={formData.applyToAllCustomers}
+                onCheckedChange={(value: boolean) => setFormData({ ...formData, applyToAllCustomers: value })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              />
+            </div>
+            {/* Ap dung tat ca mat hang */}
+            <div className="flex flex-row gap-6 item-center">
+              <Label>Áp dụng tất cả mặt hàng</Label>
+              <Checkbox
+                checked={formData.applyToAllItems}
+                onCheckedChange={(value: boolean) => setFormData({ ...formData, applyToAllItems: value })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              />
+            </div>
+            {/* Ap dung tat danh muc */}
+            <div className="flex flex-row gap-6 item-center">
+              <Label>Áp dụng tất cả danh mục</Label>
+              <Checkbox
+                checked={formData.applyToAllCategories}
+                onCheckedChange={(value: boolean) => setFormData({ ...formData, applyToAllCategories: value })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              />
+            </div>
+            {/* Ap dung tat ca combo */}
+            <div className="flex flex-row gap-6 item-center">
+              <Label>Áp dụng tất cả combo</Label>
+              <Checkbox
+                checked={formData.applyToAllCombos}
+                onCheckedChange={(value: boolean) => setFormData({ ...formData, applyToAllCombos: value })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              />
+            </div>
+            {/* Ap dung tat ca nhom KH */}
+            <div className="flex flex-row gap-6 item-center">
+              <Label>Áp dụng tất cả nhóm KH</Label>
+              <Checkbox
+                checked={formData.applyToAllCustomerGroups}
+                onCheckedChange={(value: boolean) => setFormData({ ...formData, applyToAllCustomerGroups: value })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              />
+            </div>
+            {/* Ap dung khach hang tu do */}
+            <div className="flex flex-row gap-6 item-center">
+              <Label>Áp dụng cho khách tự do</Label>
+              <Checkbox
+                checked={formData.applyToWalkIn}
+                onCheckedChange={(value: boolean) => setFormData({ ...formData, applyToWalkIn: value })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              />
+            </div>
+          </div>
+
+          {/* Free Items - Only for free-item type */}
+          {showFreeItems && (
+            <></>
+            // <div>
+            //   <Label className="mb-2 block">Danh sách mặt hàng được tặng</Label>
+            //   <div className="space-y-2">
+            //     {/* Selected Free Items List */}
+            //     {formData.freeItems && formData.freeItems.length > 0 && (
+            //       <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-48 overflow-y-auto">
+            //         {formData.freeItems.map((item) => (
+            //           <div key={item.id} className="flex items-center justify-between gap-3 bg-slate-50 px-3 py-2 rounded text-sm">
+            //             <span className="flex-1">{item.name}</span>
+            //             <div className="flex items-center gap-2">
+            //               <label className="text-xs text-slate-600">Số lượng:</label>
+            //               <Input
+            //                 type="number"
+            //                 value={item.quantity || 1}
+            //                 onChange={(e) => {
+            //                   const newQuantity = Math.max(1, parseInt(e.target.value) || 1);
+            //                   setFormData({
+            //                     ...formData,
+            //                     freeItems: formData.freeItems?.map(fi =>
+            //                       fi.id === item.id ? { ...fi, quantity: newQuantity } : fi
+            //                     )
+            //                   });
+            //                 }}
+            //                 className="w-16 h-8 px-2 py-1 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+            //                 min="1"
+            //               />
+            //             </div>
+            //             <button
+            //               type="button"
+            //               onClick={() => setFormData({
+            //                 ...formData,
+            //                 freeItems: formData.freeItems?.filter(fi => fi.id !== item.id)
+            //               })}
+            //               className="text-slate-400 hover:text-red-600"
+            //             >
+            //               <X className="w-4 h-4" />
+            //             </button>
+            //           </div>
+            //         ))}
+            //       </div>
+            //     )}
+
+            //     {/* Add Free Item Dropdown */}
+            //     <Popover>
+            //       <PopoverTrigger asChild>
+            //         <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
+            //           <Plus className="w-4 h-4 mr-2" />
+            //           Thêm mặt hàng tặng
+            //         </Button>
+            //       </PopoverTrigger>
+            //       <PopoverContent className="w-full p-2" align="start">
+            //         <div className="max-h-48 overflow-y-auto space-y-1">
+            //           {availableMenuItems
+            //             .filter(item => !formData.freeItems?.some(fi => fi.id === item.id))
+            //             .map((item) => (
+            //               <button
+            //                 key={item.id}
+            //                 type="button"
+            //                 onClick={() => {
+            //                   setFormData({
+            //                     ...formData,
+            //                     freeItems: [...(formData.freeItems || []), { ...item, quantity: 1 }]
+            //                   });
+            //                 }}
+            //                 className="w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
+            //               >
+            //                 {item.name}
+            //               </button>
+            //             ))}
+            //           {availableMenuItems.filter(item => !formData.freeItems?.some(fi => fi.id === item.id)).length === 0 && (
+            //             <div className="px-3 py-2 text-sm text-slate-500 text-center">
+            //               Không còn mặt hàng nào
+            //             </div>
+            //           )}
+            //         </div>
+            //       </PopoverContent>
+            //     </Popover>
+            //   </div>
+            // </div>
+          )}
+
+          {/* Applicable Scope */}
+          <div className="space-y-4 pt-4 border-t">
+            <h3 className="text-sm font-semibold text-slate-900">Phạm vi áp dụng</h3>
+
+            {/* Applicable Items */}
+            <div hidden={formData.applyToAllItems}>
+              <Label className="mb-2 block">Danh sách mặt hàng được áp dụng</Label>
+              <div className="space-y-2">
+                {/* Selected Items List */}
+                {formData.applicableItemIds && formData.applicableItemIds.length > 0 && (
+                  <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
+                    {formData.applicableItemIds.map((item) => (
+                      <div key={item} className="flex items-center justify-between gap-3 bg-slate-50 px-3 py-2 rounded text-sm">
+                        <span className="flex-1">{getItemName(item)}</span>
+                        {/* {formData.type === 'free-item' && (
                           <div className="flex items-center gap-2">
                             <label className="text-xs text-slate-600">Số lượng:</label>
-                            <input
+                            <Input
                               type="number"
                               value={item.quantity || 1}
                               onChange={(e) => {
                                 const newQuantity = Math.max(1, parseInt(e.target.value) || 1);
                                 setFormData({
                                   ...formData,
-                                  freeItems: formData.freeItems?.map(fi => 
-                                    fi.id === item.id ? { ...fi, quantity: newQuantity } : fi
+                                  applicableItems: formData.applicableItems?.map(ai =>
+                                    ai.id === item.id ? { ...ai, quantity: newQuantity } : ai
                                   )
                                 });
                               }}
-                              className="w-16 px-2 py-1 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              className="w-16 h-8 px-2 py-1 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                               min="1"
                             />
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => setFormData({
-                              ...formData,
-                              freeItems: formData.freeItems?.filter(fi => fi.id !== item.id)
-                            })}
-                            className="text-slate-400 hover:text-red-600"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {/* Add Free Item Dropdown */}
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button type="button" variant="outline" className="w-full justify-start text-slate-600">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Thêm mặt hàng tặng
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-2" align="start">
+                        )} */}
+                        <button
+                          type="button"
+                          onClick={() => setFormData({
+                            ...formData,
+                            applicableItemIds: formData.applicableItemIds?.filter(i => i !== item)
+                          })}
+                          className="text-slate-400 hover:text-red-600"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Item Dropdown */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Thêm mặt hàng
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-2" align="start">
+                    <div className="space-y-2">
+                      <Input
+                        value={applicableItemSearch}
+                        onChange={(e) => setApplicableItemSearch(e.target.value)}
+                        placeholder="Tìm theo mã hoặc tên"
+                        className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                      />
                       <div className="max-h-48 overflow-y-auto space-y-1">
-                        {availableMenuItems
-                          .filter(item => !formData.freeItems?.some(fi => fi.id === item.id))
-                          .map((item) => (
-                            <button
+                        {allItems.map((item) => {
+                          const isChecked = applicableItemSelections.includes(item);
+                          return (
+                            <label
                               key={item.id}
-                              type="button"
-                              onClick={() => {
-                                setFormData({
-                                  ...formData,
-                                  freeItems: [...(formData.freeItems || []), { ...item, quantity: 1 }]
-                                });
-                              }}
-                              className="w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
+                              className="flex items-center gap-3 px-3 py-2 text-sm rounded hover:bg-slate-100 cursor-pointer"
                             >
-                              {item.name}
-                            </button>
-                          ))}
-                        {availableMenuItems.filter(item => !formData.freeItems?.some(fi => fi.id === item.id)).length === 0 && (
+                              <Checkbox
+                                checked={isChecked}
+                                onCheckedChange={(checked: boolean) => {
+                                  setApplicableItemSelections((prev) => {
+                                    if (checked === true) {
+                                      if (prev.includes(item)) return prev;
+                                      return [...prev, item];
+                                    }
+                                    return prev.filter((selected) => selected !== item);
+                                  });
+                                }}
+                              />
+                              <span className="flex-1">
+                                {item.name}
+                                <span className="ml-2 text-xs text-slate-500">{item.code}</span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                        {allItems.length === 0 && (
                           <div className="px-3 py-2 text-sm text-slate-500 text-center">
-                            Không còn mặt hàng nào
+                            {remainingItems.length === 0
+                              ? 'Không còn mặt hàng nào'
+                              : 'Không tìm thấy kết quả'}
                           </div>
                         )}
                       </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
+                      <div className="flex justify-end">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={addSelectedApplicableItems}
+                          disabled={!applicableItemSelections.length}
+                          className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+                        >
+                          Thêm đã chọn
+                        </Button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
-            )}
+            </div>
 
-            {/* Applicable Scope */}
-            <div className="space-y-4 pt-4 border-t">
-              <h3 className="text-sm text-slate-900">Phạm vi áp dụng</h3>
-              
-              {/* Applicable Items */}
-              <div>
-                <label className="block text-sm text-slate-700 mb-2">
-                  Danh sách mặt hàng được áp dụng
-                </label>
+            <div className="grid grid-cols-2 gap-4">
+              {/* Applicable Categories */}
+              <div hidden={formData.applyToAllCategories}>
+                <Label className="mb-2 block">Danh sách danh mục được áp dụng</Label>
                 <div className="space-y-2">
-                  {/* Selected Items List */}
-                  {formData.applicableItems && formData.applicableItems.length > 0 && (
-                    <div className="border border-slate-200 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
-                      {formData.applicableItems.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
-                          <span>{item.name}</span>
+                  {formData.applicableCategoryIds && formData.applicableCategoryIds.length > 0 && (
+                    <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
+                      {formData.applicableCategoryIds.map((cat) => (
+                        <div key={cat} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
+                          <span>{getCategoryName(cat)}</span>
                           <button
                             type="button"
                             onClick={() => setFormData({
                               ...formData,
-                              applicableItems: formData.applicableItems?.filter(i => i.id !== item.id)
+                              applicableCategoryIds: formData.applicableCategoryIds?.filter(c => c !== cat)
                             })}
                             className="text-slate-400 hover:text-red-600"
                           >
@@ -436,320 +1117,1747 @@ export function PromotionFormDialog({
                       ))}
                     </div>
                   )}
-                  
-                  {/* Add Item Dropdown */}
+
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button type="button" variant="outline" className="w-full justify-start text-slate-600">
+                      <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
                         <Plus className="w-4 h-4 mr-2" />
-                        Thêm mặt hàng
+                        Thêm danh mục
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-full p-2" align="start">
-                      <div className="max-h-48 overflow-y-auto space-y-1">
-                        {availableMenuItems
-                          .filter(item => !formData.applicableItems?.some(ai => ai.id === item.id))
-                          .map((item) => (
-                            <button
-                              key={item.id}
-                              type="button"
-                              onClick={() => {
-                                setFormData({
-                                  ...formData,
-                                  applicableItems: [...(formData.applicableItems || []), item]
-                                });
-                              }}
-                              className="w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
-                            >
-                              {item.name}
-                            </button>
-                          ))}
-                        {availableMenuItems.filter(item => !formData.applicableItems?.some(ai => ai.id === item.id)).length === 0 && (
-                          <div className="px-3 py-2 text-sm text-slate-500 text-center">
-                            Không còn mặt hàng nào
-                          </div>
-                        )}
+                      <div className="space-y-2">
+                        <Input
+                          value={categorySearch}
+                          onChange={(e) => setCategorySearch(e.target.value)}
+                          placeholder="Tìm theo tên danh mục"
+                          className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                        />
+                        <div className="max-h-48 overflow-y-auto space-y-1">
+                          {allCategories.map((cat) => {
+                            const isChecked = applicableCategorySelections.includes(cat);
+                            return (
+                              <label
+                                key={cat.id}
+                                className="flex items-center gap-3 px-3 py-2 text-sm rounded hover:bg-slate-100 cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked: boolean) => {
+                                    setApplicableCategorySelections((prev) => {
+                                      if (checked === true) {
+                                        if (prev.includes(cat)) return prev;
+                                        return [...prev, cat];
+                                      }
+                                      return prev.filter((selected) => selected !== cat);
+                                    });
+                                  }}
+                                />
+                                <span className="flex-1">{cat.name}</span>
+                              </label>
+                            );
+                          })}
+                          {allCategories.length === 0 && (
+                            <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                              {remainingCategories.length === 0
+                                ? 'Không còn danh mục nào'
+                                : 'Không tìm thấy kết quả'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={addSelectedCategories}
+                            disabled={!applicableCategorySelections.length}
+                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+                          >
+                            Thêm đã chọn
+                          </Button>
+                        </div>
                       </div>
                     </PopoverContent>
                   </Popover>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                {/* Applicable Categories */}
-                <div>
-                  <label className="block text-sm text-slate-700 mb-2">
-                    Danh sách danh mục được áp dụng
-                  </label>
-                  <div className="space-y-2">
-                    {formData.applicableCategories && formData.applicableCategories.length > 0 && (
-                      <div className="border border-slate-200 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
-                        {formData.applicableCategories.map((cat) => (
-                          <div key={cat.id} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
-                            <span>{cat.name}</span>
-                            <button
-                              type="button"
-                              onClick={() => setFormData({
-                                ...formData,
-                                applicableCategories: formData.applicableCategories?.filter(c => c.id !== cat.id)
-                              })}
-                              className="text-slate-400 hover:text-red-600"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button type="button" variant="outline" className="w-full justify-start text-slate-600">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Thêm danh mục
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-full p-2" align="start">
-                        <div className="max-h-48 overflow-y-auto space-y-1">
-                          {availableCategories
-                            .filter(cat => !formData.applicableCategories?.some(ac => ac.id === cat.id))
-                            .map((cat) => (
-                              <button
-                                key={cat.id}
-                                type="button"
-                                onClick={() => {
-                                  setFormData({
-                                    ...formData,
-                                    applicableCategories: [...(formData.applicableCategories || []), cat]
-                                  });
-                                }}
-                                className="w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
-                              >
-                                {cat.name}
-                              </button>
-                            ))}
-                          {availableCategories.filter(cat => !formData.applicableCategories?.some(ac => ac.id === cat.id)).length === 0 && (
-                            <div className="px-3 py-2 text-sm text-slate-500 text-center">
-                              Không còn danh mục nào
-                            </div>
-                          )}
+              {/* Applicable Combos */}
+              <div hidden={formData.applyToAllCombos}>
+                <Label className="mb-2 block">Danh sách combo được áp dụng</Label>
+                <div className="space-y-2">
+                  {formData.applicableComboIds && formData.applicableComboIds.length > 0 && (
+                    <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
+                      {formData.applicableComboIds.map((combo) => (
+                        <div key={combo} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
+                          <span>{getComboName(combo)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({
+                              ...formData,
+                              applicableComboIds: formData.applicableComboIds?.filter(c => c !== combo)
+                            })}
+                            className="text-slate-400 hover:text-red-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
+                      ))}
+                    </div>
+                  )}
 
-                {/* Applicable Combos */}
-                <div>
-                  <label className="block text-sm text-slate-700 mb-2">
-                    Danh sách combo được áp dụng
-                  </label>
-                  <div className="space-y-2">
-                    {formData.applicableCombos && formData.applicableCombos.length > 0 && (
-                      <div className="border border-slate-200 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
-                        {formData.applicableCombos.map((combo) => (
-                          <div key={combo.id} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
-                            <span>{combo.name}</span>
-                            <button
-                              type="button"
-                              onClick={() => setFormData({
-                                ...formData,
-                                applicableCombos: formData.applicableCombos?.filter(c => c.id !== combo.id)
-                              })}
-                              className="text-slate-400 hover:text-red-600"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button type="button" variant="outline" className="w-full justify-start text-slate-600">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Thêm combo
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-full p-2" align="start">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Thêm combo
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-2" align="start">
+                      <div className="space-y-2">
+                        <Input
+                          value={comboSearch}
+                          onChange={(e) => setComboSearch(e.target.value)}
+                          placeholder="Tìm theo tên combo"
+                          className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                        />
                         <div className="max-h-48 overflow-y-auto space-y-1">
-                          {availableCombos
-                            .filter(combo => !formData.applicableCombos?.some(ac => ac.id === combo.id))
-                            .map((combo) => (
-                              <button
+                          {allCombos.map((combo) => {
+                            const isChecked = applicableComboSelections.includes(combo);
+                            return (
+                              <label
                                 key={combo.id}
-                                type="button"
-                                onClick={() => {
-                                  setFormData({
-                                    ...formData,
-                                    applicableCombos: [...(formData.applicableCombos || []), combo]
-                                  });
-                                }}
-                                className="w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
+                                className="flex items-center gap-3 px-3 py-2 text-sm rounded hover:bg-slate-100 cursor-pointer"
                               >
-                                {combo.name}
-                              </button>
-                            ))}
-                          {availableCombos.filter(combo => !formData.applicableCombos?.some(ac => ac.id === combo.id)).length === 0 && (
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked: boolean) => {
+                                    setApplicableComboSelections((prev) => {
+                                      if (checked === true) {
+                                        if (prev.includes(combo)) return prev;
+                                        return [...prev, combo];
+                                      }
+                                      return prev.filter((selected) => selected !== combo);
+                                    });
+                                  }}
+                                />
+                                <span className="flex-1">{combo.name}</span>
+                              </label>
+                            );
+                          })}
+                          {allCombos.length === 0 && (
                             <div className="px-3 py-2 text-sm text-slate-500 text-center">
-                              Không còn combo nào
+                              {remainingCombos.length === 0
+                                ? 'Không còn combo nào'
+                                : 'Không tìm thấy kết quả'}
                             </div>
                           )}
                         </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-
-                {/* Applicable Customer Groups */}
-                <div>
-                  <label className="block text-sm text-slate-700 mb-2">
-                    Danh sách nhóm khách hàng được áp dụng
-                  </label>
-                  <div className="space-y-2">
-                    {formData.applicableCustomerGroups && formData.applicableCustomerGroups.length > 0 && (
-                      <div className="border border-slate-200 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
-                        {formData.applicableCustomerGroups.map((group) => (
-                          <div key={group.id} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
-                            <span>{group.name}</span>
-                            <button
-                              type="button"
-                              onClick={() => setFormData({
-                                ...formData,
-                                applicableCustomerGroups: formData.applicableCustomerGroups?.filter(g => g.id !== group.id)
-                              })}
-                              className="text-slate-400 hover:text-red-600"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={addSelectedCombos}
+                            disabled={!applicableComboSelections.length}
+                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+                          >
+                            Thêm đã chọn
+                          </Button>
+                        </div>
                       </div>
-                    )}
-                    
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button type="button" variant="outline" className="w-full justify-start text-slate-600">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Thêm nhóm khách hàng
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-full p-2" align="start">
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              {/* Applicable Customer Groups */}
+              <div hidden={formData.applyToAllCustomerGroups}>
+                <Label className="mb-2 block">Danh sách nhóm khách hàng được áp dụng</Label>
+                <div className="space-y-2">
+                  {formData.applicableCustomerGroupIds && formData.applicableCustomerGroupIds.length > 0 && (
+                    <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
+                      {formData.applicableCustomerGroupIds.map((group) => (
+                        <div key={group} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
+                          <span>{getCustomerGroupName(group)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({
+                              ...formData,
+                              applicableCustomerGroupIds: formData.applicableCustomerGroupIds?.filter(g => g !== group)
+                            })}
+                            className="text-slate-400 hover:text-red-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Thêm nhóm khách hàng
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-2" align="start">
+                      <div className="space-y-2">
+                        <Input
+                          value={customerGroupSearch}
+                          onChange={(e) => setCustomerGroupSearch(e.target.value)}
+                          placeholder="Tìm theo tên nhóm"
+                          className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                        />
                         <div className="max-h-48 overflow-y-auto space-y-1">
-                          {availableCustomerGroups
-                            .filter(group => !formData.applicableCustomerGroups?.some(acg => acg.id === group.id))
-                            .map((group) => (
-                              <button
+                          {allCustomerGroups.map((group) => {
+                            const isChecked = applicableCustomerGroupSelections.includes(group);
+                            return (
+                              <label
                                 key={group.id}
-                                type="button"
-                                onClick={() => {
-                                  setFormData({
-                                    ...formData,
-                                    applicableCustomerGroups: [...(formData.applicableCustomerGroups || []), group]
-                                  });
-                                }}
-                                className="w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
+                                className="flex items-center gap-3 px-3 py-2 text-sm rounded hover:bg-slate-100 cursor-pointer"
                               >
-                                {group.name}
-                              </button>
-                            ))}
-                          {availableCustomerGroups.filter(group => !formData.applicableCustomerGroups?.some(acg => acg.id === group.id)).length === 0 && (
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked: boolean) => {
+                                    setApplicableCustomerGroupSelections((prev) => {
+                                      if (checked === true) {
+                                        if (prev.includes(group)) return prev;
+                                        return [...prev, group];
+                                      }
+                                      return prev.filter((selected) => selected !== group);
+                                    });
+                                  }}
+                                />
+                                <span className="flex-1">{group.name}</span>
+                              </label>
+                            );
+                          })}
+                          {allCustomerGroups.length === 0 && (
                             <div className="px-3 py-2 text-sm text-slate-500 text-center">
-                              Không còn nhóm nào
+                              {remainingCustomerGroups.length === 0
+                                ? 'Không còn nhóm nào'
+                                : 'Không tìm thấy kết quả'}
                             </div>
                           )}
                         </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-
-                {/* Applicable Customers */}
-                <div>
-                  <label className="block text-sm text-slate-700 mb-2">
-                    Danh sách khách hàng được áp dụng
-                  </label>
-                  <div className="space-y-2">
-                    {formData.applicableCustomers && formData.applicableCustomers.length > 0 && (
-                      <div className="border border-slate-200 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
-                        {formData.applicableCustomers.map((customer) => (
-                          <div key={customer.id} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
-                            <span>{customer.name}</span>
-                            <button
-                              type="button"
-                              onClick={() => setFormData({
-                                ...formData,
-                                applicableCustomers: formData.applicableCustomers?.filter(c => c.id !== customer.id)
-                              })}
-                              className="text-slate-400 hover:text-red-600"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={addSelectedCustomerGroups}
+                            disabled={!applicableCustomerGroupSelections.length}
+                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+                          >
+                            Thêm đã chọn
+                          </Button>
+                        </div>
                       </div>
-                    )}
-                    
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button type="button" variant="outline" className="w-full justify-start text-slate-600">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Thêm khách hàng
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-full p-2" align="start">
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              {/* Applicable Customers */}
+              <div hidden={formData.applyToAllCustomers}>
+                <Label className="mb-2 block">Danh sách khách hàng được áp dụng</Label>
+                <div className="space-y-2">
+                  {formData.applicableCustomerIds && formData.applicableCustomerIds.length > 0 && (
+                    <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
+                      {formData.applicableCustomerIds.map((customer) => (
+                        <div key={customer} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
+                          <span>{getCustomerName(customer)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({
+                              ...formData,
+                              applicableCustomerIds: formData.applicableCustomerIds?.filter(c => c !== customer)
+                            })}
+                            className="text-slate-400 hover:text-red-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Thêm khách hàng
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-2" align="start">
+                      <div className="space-y-2">
+                        <Input
+                          value={customerSearch}
+                          onChange={(e) => setCustomerSearch(e.target.value)}
+                          placeholder="Tìm theo mã hoặc tên"
+                          className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                        />
                         <div className="max-h-48 overflow-y-auto space-y-1">
-                          {availableCustomers
-                            .filter(customer => !formData.applicableCustomers?.some(ac => ac.id === customer.id))
-                            .map((customer) => (
-                              <button
+                          {allCustomers.map((customer) => {
+                            const isChecked = applicableCustomerSelections.includes(customer);
+                            return (
+                              <label
                                 key={customer.id}
-                                type="button"
-                                onClick={() => {
-                                  setFormData({
-                                    ...formData,
-                                    applicableCustomers: [...(formData.applicableCustomers || []), customer]
-                                  });
-                                }}
-                                className="w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
+                                className="flex items-center gap-3 px-3 py-2 text-sm rounded hover:bg-slate-100 cursor-pointer"
                               >
-                                {customer.name}
-                              </button>
-                            ))}
-                          {availableCustomers.filter(customer => !formData.applicableCustomers?.some(ac => ac.id === customer.id)).length === 0 && (
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked: boolean) => {
+                                    setApplicableCustomerSelections((prev) => {
+                                      if (checked === true) {
+                                        if (prev.includes(customer)) return prev;
+                                        return [...prev, customer];
+                                      }
+                                      return prev.filter((selected) => selected !== customer);
+                                    });
+                                  }}
+                                />
+                                <span className="flex-1">
+                                  {customer.name}
+                                  <span className="ml-2 text-xs text-slate-500">{customer.code}</span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                          {allCustomers.length === 0 && (
                             <div className="px-3 py-2 text-sm text-slate-500 text-center">
-                              Không còn khách hàng nào
+                              {remainingCustomers.length === 0
+                                ? 'Không còn khách hàng nào'
+                                : 'Không tìm thấy kết quả'}
                             </div>
                           )}
                         </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={addSelectedCustomers}
+                            disabled={!applicableCustomerSelections.length}
+                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+                          >
+                            Thêm đã chọn
+                          </Button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
             </div>
           </div>
+
+          {
+            (
+              <>
+                {/* Gift Items */}
+                <div>
+                  <Label className="mb-2 block">Danh sách mặt hàng được tặng</Label>
+                  <div className="space-y-2">
+                    {/* Selected Gift Items List */}
+                    {formData.giftItemIds && formData.giftItemIds.length > 0 && (
+                      <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
+                        {formData.giftItemIds.map((item) => (
+                          <div key={item} className="flex items-center justify-between gap-3 bg-slate-50 px-3 py-2 rounded text-sm">
+                            <span className="flex-1">{getItemName(item)}</span>
+                            <button
+                              type="button"
+                              onClick={() => setFormData({
+                                ...formData,
+                                giftItemIds: formData.giftItemIds?.filter(i => i !== item)
+                              })}
+                              className="text-slate-400 hover:text-red-600"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add Item Dropdown */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Thêm mặt hàng
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-2" align="start">
+                        <div className="space-y-2">
+                          <Input
+                            value={giftItemSearch}
+                            onChange={(e) => setGiftItemSearch(e.target.value)}
+                            placeholder="Tìm theo mã hoặc tên"
+                            className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                          />
+                          <div className="max-h-48 overflow-y-auto space-y-1">
+                            {allItems.map((item) => {
+                              const isChecked = giftItemSelections.includes(item);
+                              return (
+                                <label
+                                  key={item.id}
+                                  className="flex items-center gap-3 px-3 py-2 text-sm rounded hover:bg-slate-100 cursor-pointer"
+                                >
+                                  <Checkbox
+                                    checked={isChecked}
+                                    onCheckedChange={(checked: boolean) => {
+                                      setGiftItemSelections((prev) => {
+                                        if (checked === true) {
+                                          if (prev.includes(item)) return prev;
+                                          return [...prev, item];
+                                        }
+                                        return prev.filter((selected) => selected !== item);
+                                      });
+                                    }}
+                                  />
+                                  <span className="flex-1">
+                                    {item.name}
+                                    <span className="ml-2 text-xs text-slate-500">{item.code}</span>
+                                  </span>
+                                </label>
+                              );
+                            })}
+                            {allItems.length === 0 && (
+                              <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                                {remainingItemsToGift.length === 0
+                                  ? 'Không còn mặt hàng nào'
+                                  : 'Không tìm thấy kết quả'}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={addSelectedGiftItems}
+                              disabled={!giftItemSelections.length}
+                              className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+                            >
+                              Thêm đã chọn
+                            </Button>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+              </>
+
+            )
+          }
+
         </form>
 
-        {/* Footer */}
-        <div className="flex justify-end gap-3 p-6 border-t bg-slate-50">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-slate-700 hover:text-slate-900 transition-colors"
-          >
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
             Hủy
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
             onClick={handleSubmit}
-            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+            className="bg-blue-600 hover:bg-blue-700"
           >
             {editingPromotion ? 'Cập nhật' : 'Thêm khuyến mại'}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog >
+
+  );
+}
+
+export function PromotionAddFormDialog({
+  open,
+  onClose,
+  onSubmit
+}: PromotionAddFormDialogProps) {
+  const [formData, setFormData] = useState<AddPromotion>({
+    name: "",
+    description: "",
+    discountValue: 0,
+    minOrderValue: 0,
+    maxDiscount: 0,
+    buyQuantity: 0,
+    getQuantity: 0,
+    requireSameItem: false,
+    startDateTime: "2026-01-01T00:00:00Z",
+    endDateTime: "2026-01-01T00:00:00Z",
+    maxTotalUsage: 0,
+    maxUsagePerCustomer: 0,
+    currentTotalUsage: 0,
+    isActive: true,
+
+    applyToAllItems: false,
+    applyToAllCategories: false,
+    applyToAllCombos: false,
+    applyToAllCustomers: false,
+    applyToAllCustomerGroups: false,
+    applyToWalkIn: false,
+
+    applicableItemIds: [],
+    applicableCategoryIds: [],
+    applicableComboIds: [],
+    applicableCustomerIds: [],
+    applicableCustomerGroupIds: [],
+    giftItemIds: [],
+
+    typeId: 1
+  });
+  const [applicableItemSearch, setApplicableItemSearch] = useState('');
+  const [giftItemSearch, setGiftItemSearch] = useState('');
+  const [categorySearch, setCategorySearch] = useState('');
+  const [comboSearch, setComboSearch] = useState('');
+  const [customerGroupSearch, setCustomerGroupSearch] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
+
+  const [applicableItemSelections, setApplicableItemSelections] = useState<Item[]>([]);
+  const [giftItemSelections, setGiftItemSelections] = useState<Item[]>([]);
+  const [applicableCategorySelections, setApplicableCategorySelections] = useState<Category[]>([]);
+  const [applicableComboSelections, setApplicableComboSelections] = useState<Combo[]>([]);
+  const [applicableCustomerGroupSelections, setApplicableCustomerGroupSelections] = useState<CustomerGroup[]>([]);
+  const [applicableCustomerSelections, setApplicableCustomerSelections] = useState<Customer[]>([]);
+
+  const [allItems, setAllItems] = useState<Item[]>([]);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const [allCombos, setAllCombos] = useState<Combo[]>([]);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
+  const [allCustomerGroups, setAllCustomerGroups] = useState<CustomerGroup[]>([]);
+
+  const fetchAllData = async () => {
+    // Fetch items
+    const itemRes = await getInventoryItems();
+    if (itemRes) {
+      const { items } = itemRes.data.metaData;
+      if (items) {
+        setAllItems(items);
+      }
+    }
+
+    // Fetch categories
+    const categoryRes = await getInventoryItemCategories();
+    if (categoryRes) {
+      const { metaData } = categoryRes.data;
+      if (metaData) {
+        setAllCategories(metaData);
+      }
+    }
+
+    //Fetch combos
+    const comboRes = await getActiveCombos();
+    if (comboRes) {
+      const { metaData } = comboRes.data;
+      if (metaData) {
+        setAllCombos(metaData);
+      }
+    }
+
+    //Fetch customer
+    const customerRes = await getCustomers();
+    if (customerRes) {
+      const { customers } = customerRes.data.metaData;
+      if (customers) {
+        setAllCustomers(customers);
+      }
+    }
+
+    //Fetch customer groups
+    const customerGroupRes = await getCustomerGroups();
+    if (customerGroupRes) {
+      const { groups } = customerGroupRes.data.metaData;
+      if (groups) {
+        setAllCustomerGroups(groups);
+      }
+    }
+
+    //Fetch applicables
+    // const promotionRes = await getPromotionById(editingPromotion.id);
+    // if (promotionRes) {
+    //   const { promotion } = promotionRes.data.metaData;
+    //   if (promotion) {
+    //     const { applicableItems, applicableCategories, applicableCombos, applicableCustomers, applicableCustomerGroups, giftItems } = promotion;
+    //     let tempApplicableItemIds: number[] = [];
+    //     let tempApplicableCategoryIds: number[] = [];
+    //     let tempApplicableComboIds: number[] = [];
+    //     let tempApplicableCustomerIds: number[] = [];
+    //     let tempApplicableCustomerGroupIds: number[] = [];
+    //     let tempGiftItemIds: number[] = [];
+
+    //     if (applicableItems) {
+    //       applicableItems.map((item) => {
+    //         tempApplicableItemIds.push(item.id)
+    //       })
+    //     }
+    //     if (applicableCategories) {
+
+    //       applicableCategories.map((cat) => {
+    //         tempApplicableCategoryIds.push(cat.id)
+    //       })
+    //     }
+    //     if (applicableCombos) {
+
+    //       applicableCombos.map((combo) => {
+    //         tempApplicableComboIds.push(combo.id)
+    //       })
+    //     }
+    //     if (applicableCustomers) {
+
+    //       applicableCustomers.map((customer) => {
+    //         tempApplicableCustomerIds.push(customer.id)
+    //       })
+    //     }
+    //     if (applicableCustomerGroups) {
+
+    //       applicableCustomerGroups.map((customerGroup) => {
+    //         tempApplicableCustomerGroupIds.push(customerGroup.id)
+    //       })
+    //     }
+    //     if (giftItems) {
+
+    //       giftItems.map((item) => {
+    //         tempGiftItemIds.push(item.id)
+    //       })
+    //     }
+    //     let tempFormData: EditPromotion = {
+    //       id: editingPromotion.id,
+    //       code: editingPromotion.code,
+    //       name: editingPromotion.name,
+    //       description: editingPromotion.description,
+    //       discountValue: editingPromotion.discountValue,
+    //       minOrderValue: editingPromotion.minOrderValue,
+    //       maxDiscount: editingPromotion.maxDiscount,
+    //       buyQuantity: editingPromotion.buyQuantity,
+    //       getQuantity: editingPromotion.getQuantity,
+    //       requireSameItem: editingPromotion.requireSameItem,
+    //       startDateTime: editingPromotion.startDateTime,
+    //       endDateTime: editingPromotion.endDateTime,
+    //       maxTotalUsage: editingPromotion.maxTotalUsage,
+    //       maxUsagePerCustomer: editingPromotion.maxUsagePerCustomer,
+    //       currentTotalUsage: editingPromotion.currentTotalUsage,
+    //       isActive: editingPromotion.isActive,
+
+    //       applyToAllItems: editingPromotion.applyToAllItems,
+    //       applyToAllCategories: editingPromotion.applyToAllCategories,
+    //       applyToAllCombos: editingPromotion.applyToAllCombos,
+    //       applyToAllCustomers: editingPromotion.applyToAllCustomers,
+    //       applyToAllCustomerGroups: editingPromotion.applyToAllCustomerGroups,
+    //       applyToWalkIn: editingPromotion.applyToWalkIn,
+
+    //       applicableItemIds: tempApplicableItemIds,
+    //       applicableCategoryIds: tempApplicableCategoryIds,
+    //       applicableComboIds: tempApplicableComboIds,
+    //       applicableCustomerIds: tempApplicableCustomerIds,
+    //       applicableCustomerGroupIds: tempApplicableCustomerGroupIds,
+    //       giftItemIds: tempGiftItemIds,
+
+    //       typeId: editingPromotion.typeId
+    //     }
+    //     // console.log("Temp form data: ", tempFormData);
+    //     setFormData(tempFormData);
+
+    //     // console.log("items: ", tempApplicableItemIds);
+    //     // console.log("categories: ", tempApplicableCategoryIds);
+    //     // console.log("combos: ", tempApplicableComboIds);
+    //     // console.log("customers: ", tempApplicableCustomerIds);
+    //     // console.log("customer groups: ", tempApplicableCustomerGroupIds);
+    //     // console.log("gift items: ", tempGiftItemIds);
+    //   }
+    // }
+  }
+
+  const getItemName = (id: Number) => {
+    let name: string = "";
+    allItems.map((item) => {
+      if (item.id === id) {
+        name = item.name;
+      }
+    })
+    return name;
+  }
+
+  const getCategoryName = (id: Number) => {
+    let name: string = "";
+    allCategories.map((category) => {
+      if (category.id === id) {
+        name = category.name;
+      }
+    })
+    return name;
+  }
+
+  const getComboName = (id: Number) => {
+    let name: string = "";
+    allCombos.map((combo) => {
+      if (combo.id === id) {
+        name = combo.name;
+      }
+    })
+    return name;
+  }
+
+  const getCustomerName = (id: Number) => {
+    let name: string = "";
+    allCustomers.map((customer) => {
+      if (customer.id === id) {
+        name = customer.name;
+      }
+    })
+    return name;
+  }
+
+  const getCustomerGroupName = (id: Number) => {
+    let name: string = "";
+    allCustomerGroups.map((customerGroup) => {
+      if (customerGroup.id === id) {
+        name = customerGroup.name;
+      }
+    })
+    return name;
+  }
+
+
+
+  useEffect(() => {
+    fetchAllData();
+
+  }, [open]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(formData);
+  };
+
+  const showMaxDiscountValue = formData.typeId === 1;
+  const showPromotionValue = formData.typeId === 1 || formData.typeId === 2 || formData.typeId === 3;
+  const showFreeItems = formData.typeId === 4;
+
+  const checkType = (value: number) => {
+    switch (value) {
+      case 1:
+        return formData.typeId === 4;
+      case 10:
+        return formData.typeId === 3;
+      case 11:
+        return formData.typeId === 4 || formData.typeId === 3;
+      case 100:
+        return formData.typeId === 2;
+      case 101:
+        return formData.typeId === 2 || formData.typeId === 4;
+      case 110:
+        return formData.typeId === 2 || formData.typeId === 3;
+      case 111:
+        return formData.typeId === 2 || formData.typeId === 3 || formData.typeId === 4;
+      case 1000:
+        return formData.typeId === 1;
+      case 1001:
+        return formData.typeId === 1 || formData.typeId === 4;
+      case 1010:
+        return formData.typeId === 1 || formData.typeId === 3;
+      case 1011:
+        return formData.typeId === 1 || formData.typeId === 3 || formData.typeId === 4;
+      case 1100:
+        return formData.typeId === 1 || formData.typeId === 2;
+      case 1101:
+        return formData.typeId === 1 || formData.typeId === 2 || formData.typeId === 4;
+      case 1110:
+        return formData.typeId === 1 || formData.typeId === 2 || formData.typeId === 3;
+      case 1111: return true;
+    }
+  }
+
+  const remainingItems = allItems.filter(
+    (item) => !formData.applicableItemIds?.some((ai) => ai === item.id)
+  );
+
+  const remainingItemsToGift = allItems.filter(
+    (item) => !formData.giftItemIds?.some((ai) => ai === item.id)
+  );
+
+  const remainingCategories = allCategories.filter(
+    (cat) => !formData.applicableCategoryIds?.some((ac) => ac === cat.id)
+  );
+
+  const remainingCombos = allCombos.filter(
+    (combo) => !formData.applicableComboIds?.some((ac) => ac === combo.id)
+  );
+
+  const remainingCustomerGroups = allCustomerGroups.filter(
+    (group) => !formData.applicableCustomerGroupIds?.some((acg) => acg === group.id)
+  );
+
+  const remainingCustomers = allCustomers.filter(
+    (customer) => !formData.applicableCustomerIds?.some((ac) => ac === customer.id)
+  );
+
+  const addSelectedApplicableItems = () => {
+    if (!applicableItemSelections.length) return;
+    const selectedItems = remainingItems.filter((item) =>
+      applicableItemSelections.includes(item)
+    );
+    let selectedItemIds: number[] = [];
+    selectedItems.map((item) => {
+      selectedItemIds.push(item.id);
+    })
+    if (selectedItems.length) {
+      setFormData((prev) => ({
+        ...prev,
+        applicableItemIds: [...(prev.applicableItemIds || []), ...selectedItemIds],
+      }));
+    }
+    setApplicableItemSelections([]);
+  };
+
+  const addSelectedGiftItems = () => {
+    if (!giftItemSelections.length) return;
+    const selectedItems = remainingItemsToGift.filter((item) =>
+      giftItemSelections.includes(item)
+    );
+    let selectedItemIds: number[] = [];
+    selectedItems.map((item) => {
+      selectedItemIds.push(item.id);
+    })
+    if (selectedItems.length) {
+      setFormData((prev) => ({
+        ...prev,
+        giftItemIds: [...(prev.giftItemIds || []), ...selectedItemIds],
+      }));
+    }
+    setGiftItemSelections([]);
+  };
+
+  const addSelectedCategories = () => {
+    if (!applicableCategorySelections.length) return;
+    const selectedCategories = remainingCategories.filter((cat) =>
+      applicableCategorySelections.includes(cat)
+    );
+    let selectedCategoryIds: number[] = []
+    selectedCategories.map((cat) => {
+      selectedCategoryIds.push(cat.id);
+    })
+    if (selectedCategoryIds.length) {
+      setFormData((prev) => ({
+        ...prev,
+        applicableCategoryIds: [...(prev.applicableCategoryIds || []), ...selectedCategoryIds],
+      }));
+    }
+    setApplicableCategorySelections([]);
+  };
+
+  const addSelectedCombos = () => {
+    if (!applicableComboSelections.length) return;
+    const selectedCombos = remainingCombos.filter((combo) =>
+      applicableComboSelections.includes(combo)
+    );
+    let selectedComboIds: number[] = []
+    selectedCombos.map((cat) => {
+      selectedComboIds.push(cat.id);
+    })
+    if (selectedCombos.length) {
+      setFormData((prev) => ({
+        ...prev,
+        applicableComboIds: [...(prev.applicableComboIds || []), ...selectedComboIds],
+      }));
+    }
+    setApplicableComboSelections([]);
+  };
+
+  const addSelectedCustomerGroups = () => {
+    if (!applicableCustomerGroupSelections.length) return;
+    const selectedGroups = remainingCustomerGroups.filter((group) =>
+      applicableCustomerGroupSelections.includes(group)
+    );
+    let selectedCustomerGroupIds: number[] = []
+    selectedGroups.map((cat) => {
+      selectedCustomerGroupIds.push(cat.id);
+    })
+    if (selectedGroups.length) {
+      setFormData((prev) => ({
+        ...prev,
+        applicableCustomerGroupIds: [
+          ...(prev.applicableCustomerGroupIds || []),
+          ...selectedCustomerGroupIds,
+        ],
+      }));
+    }
+    setApplicableCustomerGroupSelections([]);
+  };
+
+  const addSelectedCustomers = () => {
+    if (!applicableCustomerSelections.length) return;
+    const selectedCustomers = remainingCustomers.filter((customer) =>
+      applicableCustomerSelections.includes(customer)
+    );
+    let selectedCustomerIds: number[] = []
+    selectedCustomers.map((cat) => {
+      selectedCustomerIds.push(cat.id);
+    })
+    if (selectedCustomers.length) {
+      setFormData((prev) => ({
+        ...prev,
+        applicableCustomerIds: [...(prev.applicableCustomerIds || []), ...selectedCustomerIds],
+      }));
+    }
+    setApplicableCustomerSelections([]);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="min-w-[1100px] max-w-[1300px] w-[100vw] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle className="text-lg font-semibold">
+            Thêm khuyến mại mới
+          </DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Basic Information */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Ten KM */}
+            <div className="col-span-2">
+              <Label>
+                Tên khuyến mại <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                required
+              />
+            </div>
+            {/* Mo ta */}
+            <div className="col-span-2">
+              <Label>
+                Mô tả
+              </Label>
+              <Input
+                type="text"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                required
+              />
+            </div>
+            {/* Loai KM */}
+            <div>
+              <Label>
+                Loại khuyến mại <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={PromotionTypes[formData.typeId]}
+                onValueChange={(value: string) => {
+                  let type = 1;
+                  Object.entries(PromotionTypes).forEach(([key, val]) => {
+                    if (val === value) type = Number(key);
+                  })
+                  setFormData({ ...formData, typeId: type })
+                }}
+              >
+                <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Theo phần trăm">Theo phần trăm</SelectItem>
+                  <SelectItem value="Theo số tiền">Theo số tiền</SelectItem>
+                  <SelectItem value="Đồng giá">Đồng giá</SelectItem>
+                  <SelectItem value="Tặng món">Tặng món</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Hoa don toi thieu */}
+            {checkType(1110) && (
+              <div>
+                <Label>
+                  Giá trị hóa đơn tối thiểu
+                </Label>
+                <Input
+                  type="number"
+                  value={formData.minOrderValue}
+                  onChange={(e) => setFormData({ ...formData, minOrderValue: Number(e.target.value) })}
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                  required
+                  min="0"
+                />
+              </div>
+            )}
+            {/* Gia tri KM */}
+            {checkType(1110) && (
+              <div>
+                <Label>
+                  Giá trị khuyến mại
+                </Label>
+                <Input
+                  type="number"
+                  value={formData.discountValue || ''}
+                  onChange={(e) => setFormData({ ...formData, discountValue: Number(e.target.value) })}
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                  required
+                  min="0"
+                  placeholder={formData.typeId === 1 ? 'Phần trăm (%)' : 'Số tiền (VNĐ)'}
+                />
+              </div>
+            )}
+            {/* Giam toi da */}
+            {checkType(1100) && (
+              <div>
+                <Label>Giá trị giảm giá tối đa</Label>
+                <Input
+                  type="number"
+                  value={formData.maxDiscount || ''}
+                  onChange={(e) => setFormData({ ...formData, maxDiscount: !Number.isNaN(Number(e.target.value)) ? Number(e.target.value) : formData.maxDiscount })}
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                  min="0"
+                  placeholder="Số tiền (VNĐ)"
+                />
+              </div>
+            )}
+            {/* So luong mua */}
+            {checkType(1) && (
+              <div>
+                <Label>Số lượng mua</Label>
+                <Input
+                  type="number"
+                  value={formData.buyQuantity || ''}
+                  onChange={(e) => setFormData({ ...formData, buyQuantity: !Number.isNaN(Number(e.target.value)) ? Number(e.target.value) : formData.buyQuantity })}
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                  min="0"
+                  placeholder="Số lượng mua"
+                />
+              </div>
+            )}
+            {/* So luong nhan */}
+            {checkType(1) && (
+              <div>
+                <Label>Số lượng nhận</Label>
+                <Input
+                  type="number"
+                  value={formData.getQuantity || ''}
+                  onChange={(e) => setFormData({ ...formData, getQuantity: !Number.isNaN(Number(e.target.value)) ? Number(e.target.value) : formData.getQuantity })}
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                  min="0"
+                  placeholder="Số lượng nhận"
+                />
+              </div>
+            )
+            }
+            {/* Thoi gian bat dau */}
+            <div>
+              <Label>
+                Thời gian bắt đầu <span className="text-red-500">*</span>
+              </Label>
+              <input
+                type="datetime-local"
+                value={formData.startDateTime ? formData.startDateTime : "2026-01-01T00:00:00.000Z"}
+                onChange={(e) => setFormData({ ...formData, startDateTime: e.target.value })}
+                className="mt-1.5 bg-white border-2 w-full rounded-sm p-1 border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              />
+            </div>
+            {/* Thoi gian ket thuc */}
+            <div>
+              <Label>
+                Thời gian kết thúc <span className="text-red-500">*</span>
+              </Label>
+              <input
+                type="datetime-local"
+                value={formData.endDateTime ? formData.endDateTime : "2026-01-01T00:00:00.000Z"}
+                onChange={(e) => setFormData({ ...formData, endDateTime: e.target.value })}
+                className="mt-1.5 bg-white border-2 w-full rounded-sm p-1 border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              />
+            </div>
+            {/* So luot su dung toi da */}
+            <div>
+              <Label>
+                Số lượt sử dụng tối đa <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                type="number"
+                value={formData.maxTotalUsage || ''}
+                onChange={(e) => setFormData({ ...formData, maxTotalUsage: Number(e.target.value) })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                required
+                min="0"
+                placeholder='Số lượt sử dụng tối đa'
+              />
+            </div>
+            {/* So luot su dung toi da moi khach */}
+            <div>
+              <Label>
+                Số lượt sử dụng tối đa mỗi khách
+              </Label>
+              <Input
+                type="number"
+                value={formData.maxUsagePerCustomer || ''}
+                onChange={(e) => setFormData({ ...formData, maxUsagePerCustomer: Number(e.target.value) })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                required
+                min="0"
+                placeholder='Số lượt sử dụng tối đa'
+              />
+            </div>
+            {/* Trang thai */}
+            <div>
+              <Label>
+                Trạng thái <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.isActive ? 'Hoạt động' : 'Không hoạt động'}
+                onValueChange={(value: string) => setFormData({ ...formData, isActive: (value === 'Hoạt động' ? true : false) })}
+              >
+                <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Hoạt động">Hoạt động</SelectItem>
+                  <SelectItem value="Không hoạt động">Không hoạt động</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Check Lists */}
+          <div className='grid grid-cols-4 gap-6'>
+            {/* Phai cung mon */}
+            {checkType(1) &&
+              <div className="flex flex-row gap-6 item-center">
+                <Label>Phải cùng món</Label>
+                <Checkbox
+                  checked={formData.requireSameItem}
+                  onCheckedChange={(value: boolean) => setFormData({ ...formData, requireSameItem: value })}
+                  className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                />
+              </div>
+            }
+            {/* Ap dung tat ca khach */}
+            <div className="flex flex-row gap-6 item-center">
+              <Label>Áp dụng tất cả khách</Label>
+              <Checkbox
+                checked={formData.applyToAllCustomers}
+                onCheckedChange={(value: boolean) => setFormData({ ...formData, applyToAllCustomers: value })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              />
+            </div>
+            {/* Ap dung tat ca mat hang */}
+            <div className="flex flex-row gap-6 item-center">
+              <Label>Áp dụng tất cả mặt hàng</Label>
+              <Checkbox
+                checked={formData.applyToAllItems}
+                onCheckedChange={(value: boolean) => setFormData({ ...formData, applyToAllItems: value })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              />
+            </div>
+            {/* Ap dung tat danh muc */}
+            <div className="flex flex-row gap-6 item-center">
+              <Label>Áp dụng tất cả danh mục</Label>
+              <Checkbox
+                checked={formData.applyToAllCategories}
+                onCheckedChange={(value: boolean) => setFormData({ ...formData, applyToAllCategories: value })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              />
+            </div>
+            {/* Ap dung tat ca combo */}
+            <div className="flex flex-row gap-6 item-center">
+              <Label>Áp dụng tất cả combo</Label>
+              <Checkbox
+                checked={formData.applyToAllCombos}
+                onCheckedChange={(value: boolean) => setFormData({ ...formData, applyToAllCombos: value })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              />
+            </div>
+            {/* Ap dung tat ca nhom KH */}
+            <div className="flex flex-row gap-6 item-center">
+              <Label>Áp dụng tất cả nhóm KH</Label>
+              <Checkbox
+                checked={formData.applyToAllCustomerGroups}
+                onCheckedChange={(value: boolean) => setFormData({ ...formData, applyToAllCustomerGroups: value })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              />
+            </div>
+            {/* Ap dung khach hang tu do */}
+            <div className="flex flex-row gap-6 item-center">
+              <Label>Áp dụng cho khách tự do</Label>
+              <Checkbox
+                checked={formData.applyToWalkIn}
+                onCheckedChange={(value: boolean) => setFormData({ ...formData, applyToWalkIn: value })}
+                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+              />
+            </div>
+          </div>
+
+          {/* Applicable Scope */}
+          <div className="space-y-4 pt-4 border-t">
+            <h3 className="text-sm font-semibold text-slate-900">Phạm vi áp dụng</h3>
+
+            {/* Applicable Items */}
+            <div hidden={formData.applyToAllItems}>
+              <Label className="mb-2 block">Danh sách mặt hàng được áp dụng</Label>
+              <div className="space-y-2">
+                {/* Selected Items List */}
+                {formData.applicableItemIds && formData.applicableItemIds.length > 0 && (
+                  <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
+                    {formData.applicableItemIds.map((item) => (
+                      <div key={item} className="flex items-center justify-between gap-3 bg-slate-50 px-3 py-2 rounded text-sm">
+                        <span className="flex-1">{getItemName(item)}</span>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({
+                            ...formData,
+                            applicableItemIds: formData.applicableItemIds?.filter(i => i !== item)
+                          })}
+                          className="text-slate-400 hover:text-red-600"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Item Dropdown */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Thêm mặt hàng
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-2" align="start">
+                    <div className="space-y-2">
+                      <Input
+                        value={applicableItemSearch}
+                        onChange={(e) => setApplicableItemSearch(e.target.value)}
+                        placeholder="Tìm theo mã hoặc tên"
+                        className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                      />
+                      <div className="max-h-48 overflow-y-auto space-y-1">
+                        {allItems.map((item) => {
+                          const isChecked = applicableItemSelections.includes(item);
+                          return (
+                            <label
+                              key={item.id}
+                              className="flex items-center gap-3 px-3 py-2 text-sm rounded hover:bg-slate-100 cursor-pointer"
+                            >
+                              <Checkbox
+                                checked={isChecked}
+                                onCheckedChange={(checked: boolean) => {
+                                  setApplicableItemSelections((prev) => {
+                                    if (checked === true) {
+                                      if (prev.includes(item)) return prev;
+                                      return [...prev, item];
+                                    }
+                                    return prev.filter((selected) => selected !== item);
+                                  });
+                                }}
+                              />
+                              <span className="flex-1">
+                                {item.name}
+                                <span className="ml-2 text-xs text-slate-500">{item.code}</span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                        {allItems.length === 0 && (
+                          <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                            {remainingItems.length === 0
+                              ? 'Không còn mặt hàng nào'
+                              : 'Không tìm thấy kết quả'}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex justify-end">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={addSelectedApplicableItems}
+                          disabled={!applicableItemSelections.length}
+                          className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+                        >
+                          Thêm đã chọn
+                        </Button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Applicable Categories */}
+              <div hidden={formData.applyToAllCategories}>
+                <Label className="mb-2 block">Danh sách danh mục được áp dụng</Label>
+                <div className="space-y-2">
+                  {formData.applicableCategoryIds && formData.applicableCategoryIds.length > 0 && (
+                    <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
+                      {formData.applicableCategoryIds.map((cat) => (
+                        <div key={cat} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
+                          <span>{getCategoryName(cat)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({
+                              ...formData,
+                              applicableCategoryIds: formData.applicableCategoryIds?.filter(c => c !== cat)
+                            })}
+                            className="text-slate-400 hover:text-red-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Thêm danh mục
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-2" align="start">
+                      <div className="space-y-2">
+                        <Input
+                          value={categorySearch}
+                          onChange={(e) => setCategorySearch(e.target.value)}
+                          placeholder="Tìm theo tên danh mục"
+                          className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                        />
+                        <div className="max-h-48 overflow-y-auto space-y-1">
+                          {allCategories.map((cat) => {
+                            const isChecked = applicableCategorySelections.includes(cat);
+                            return (
+                              <label
+                                key={cat.id}
+                                className="flex items-center gap-3 px-3 py-2 text-sm rounded hover:bg-slate-100 cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked: boolean) => {
+                                    setApplicableCategorySelections((prev) => {
+                                      if (checked === true) {
+                                        if (prev.includes(cat)) return prev;
+                                        return [...prev, cat];
+                                      }
+                                      return prev.filter((selected) => selected !== cat);
+                                    });
+                                  }}
+                                />
+                                <span className="flex-1">{cat.name}</span>
+                              </label>
+                            );
+                          })}
+                          {allCategories.length === 0 && (
+                            <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                              {remainingCategories.length === 0
+                                ? 'Không còn danh mục nào'
+                                : 'Không tìm thấy kết quả'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={addSelectedCategories}
+                            disabled={!applicableCategorySelections.length}
+                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+                          >
+                            Thêm đã chọn
+                          </Button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              {/* Applicable Combos */}
+              <div hidden={formData.applyToAllCombos}>
+                <Label className="mb-2 block">Danh sách combo được áp dụng</Label>
+                <div className="space-y-2">
+                  {formData.applicableComboIds && formData.applicableComboIds.length > 0 && (
+                    <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
+                      {formData.applicableComboIds.map((combo) => (
+                        <div key={combo} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
+                          <span>{getComboName(combo)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({
+                              ...formData,
+                              applicableComboIds: formData.applicableComboIds?.filter(c => c !== combo)
+                            })}
+                            className="text-slate-400 hover:text-red-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Thêm combo
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-2" align="start">
+                      <div className="space-y-2">
+                        <Input
+                          value={comboSearch}
+                          onChange={(e) => setComboSearch(e.target.value)}
+                          placeholder="Tìm theo tên combo"
+                          className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                        />
+                        <div className="max-h-48 overflow-y-auto space-y-1">
+                          {allCombos.map((combo) => {
+                            const isChecked = applicableComboSelections.includes(combo);
+                            return (
+                              <label
+                                key={combo.id}
+                                className="flex items-center gap-3 px-3 py-2 text-sm rounded hover:bg-slate-100 cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked: boolean) => {
+                                    setApplicableComboSelections((prev) => {
+                                      if (checked === true) {
+                                        if (prev.includes(combo)) return prev;
+                                        return [...prev, combo];
+                                      }
+                                      return prev.filter((selected) => selected !== combo);
+                                    });
+                                  }}
+                                />
+                                <span className="flex-1">{combo.name}</span>
+                              </label>
+                            );
+                          })}
+                          {allCombos.length === 0 && (
+                            <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                              {remainingCombos.length === 0
+                                ? 'Không còn combo nào'
+                                : 'Không tìm thấy kết quả'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={addSelectedCombos}
+                            disabled={!applicableComboSelections.length}
+                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+                          >
+                            Thêm đã chọn
+                          </Button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              {/* Applicable Customer Groups */}
+              <div hidden={formData.applyToAllCustomerGroups}>
+                <Label className="mb-2 block">Danh sách nhóm khách hàng được áp dụng</Label>
+                <div className="space-y-2">
+                  {formData.applicableCustomerGroupIds && formData.applicableCustomerGroupIds.length > 0 && (
+                    <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
+                      {formData.applicableCustomerGroupIds.map((group) => (
+                        <div key={group} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
+                          <span>{getCustomerGroupName(group)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({
+                              ...formData,
+                              applicableCustomerGroupIds: formData.applicableCustomerGroupIds?.filter(g => g !== group)
+                            })}
+                            className="text-slate-400 hover:text-red-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Thêm nhóm khách hàng
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-2" align="start">
+                      <div className="space-y-2">
+                        <Input
+                          value={customerGroupSearch}
+                          onChange={(e) => setCustomerGroupSearch(e.target.value)}
+                          placeholder="Tìm theo tên nhóm"
+                          className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                        />
+                        <div className="max-h-48 overflow-y-auto space-y-1">
+                          {allCustomerGroups.map((group) => {
+                            const isChecked = applicableCustomerGroupSelections.includes(group);
+                            return (
+                              <label
+                                key={group.id}
+                                className="flex items-center gap-3 px-3 py-2 text-sm rounded hover:bg-slate-100 cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked: boolean) => {
+                                    setApplicableCustomerGroupSelections((prev) => {
+                                      if (checked === true) {
+                                        if (prev.includes(group)) return prev;
+                                        return [...prev, group];
+                                      }
+                                      return prev.filter((selected) => selected !== group);
+                                    });
+                                  }}
+                                />
+                                <span className="flex-1">{group.name}</span>
+                              </label>
+                            );
+                          })}
+                          {allCustomerGroups.length === 0 && (
+                            <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                              {remainingCustomerGroups.length === 0
+                                ? 'Không còn nhóm nào'
+                                : 'Không tìm thấy kết quả'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={addSelectedCustomerGroups}
+                            disabled={!applicableCustomerGroupSelections.length}
+                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+                          >
+                            Thêm đã chọn
+                          </Button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              {/* Applicable Customers */}
+              <div hidden={formData.applyToAllCustomers}>
+                <Label className="mb-2 block">Danh sách khách hàng được áp dụng</Label>
+                <div className="space-y-2">
+                  {formData.applicableCustomerIds && formData.applicableCustomerIds.length > 0 && (
+                    <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
+                      {formData.applicableCustomerIds.map((customer) => (
+                        <div key={customer} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded text-sm">
+                          <span>{getCustomerName(customer)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({
+                              ...formData,
+                              applicableCustomerIds: formData.applicableCustomerIds?.filter(c => c !== customer)
+                            })}
+                            className="text-slate-400 hover:text-red-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Thêm khách hàng
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-2" align="start">
+                      <div className="space-y-2">
+                        <Input
+                          value={customerSearch}
+                          onChange={(e) => setCustomerSearch(e.target.value)}
+                          placeholder="Tìm theo mã hoặc tên"
+                          className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                        />
+                        <div className="max-h-48 overflow-y-auto space-y-1">
+                          {allCustomers.map((customer) => {
+                            const isChecked = applicableCustomerSelections.includes(customer);
+                            return (
+                              <label
+                                key={customer.id}
+                                className="flex items-center gap-3 px-3 py-2 text-sm rounded hover:bg-slate-100 cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked: boolean) => {
+                                    setApplicableCustomerSelections((prev) => {
+                                      if (checked === true) {
+                                        if (prev.includes(customer)) return prev;
+                                        return [...prev, customer];
+                                      }
+                                      return prev.filter((selected) => selected !== customer);
+                                    });
+                                  }}
+                                />
+                                <span className="flex-1">
+                                  {customer.name}
+                                  <span className="ml-2 text-xs text-slate-500">{customer.code}</span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                          {allCustomers.length === 0 && (
+                            <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                              {remainingCustomers.length === 0
+                                ? 'Không còn khách hàng nào'
+                                : 'Không tìm thấy kết quả'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={addSelectedCustomers}
+                            disabled={!applicableCustomerSelections.length}
+                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+                          >
+                            Thêm đã chọn
+                          </Button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {
+            (
+              <>
+                {/* Gift Items */}
+                <div>
+                  <Label className="mb-2 block">Danh sách mặt hàng được tặng</Label>
+                  <div className="space-y-2">
+                    {/* Selected Gift Items List */}
+                    {formData.giftItemIds && formData.giftItemIds.length > 0 && (
+                      <div className="border border-slate-300 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto">
+                        {formData.giftItemIds.map((item) => (
+                          <div key={item} className="flex items-center justify-between gap-3 bg-slate-50 px-3 py-2 rounded text-sm">
+                            <span className="flex-1">{getItemName(item)}</span>
+                            <button
+                              type="button"
+                              onClick={() => setFormData({
+                                ...formData,
+                                giftItemIds: formData.giftItemIds?.filter(i => i !== item)
+                              })}
+                              className="text-slate-400 hover:text-red-600"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add Item Dropdown */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button type="button" variant="outline" className="w-full justify-start bg-white border-slate-300">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Thêm mặt hàng
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-2" align="start">
+                        <div className="space-y-2">
+                          <Input
+                            value={giftItemSearch}
+                            onChange={(e) => setGiftItemSearch(e.target.value)}
+                            placeholder="Tìm theo mã hoặc tên"
+                            className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                          />
+                          <div className="max-h-48 overflow-y-auto space-y-1">
+                            {allItems.map((item) => {
+                              const isChecked = giftItemSelections.includes(item);
+                              return (
+                                <label
+                                  key={item.id}
+                                  className="flex items-center gap-3 px-3 py-2 text-sm rounded hover:bg-slate-100 cursor-pointer"
+                                >
+                                  <Checkbox
+                                    checked={isChecked}
+                                    onCheckedChange={(checked: boolean) => {
+                                      setGiftItemSelections((prev) => {
+                                        if (checked === true) {
+                                          if (prev.includes(item)) return prev;
+                                          return [...prev, item];
+                                        }
+                                        return prev.filter((selected) => selected !== item);
+                                      });
+                                    }}
+                                  />
+                                  <span className="flex-1">
+                                    {item.name}
+                                    <span className="ml-2 text-xs text-slate-500">{item.code}</span>
+                                  </span>
+                                </label>
+                              );
+                            })}
+                            {allItems.length === 0 && (
+                              <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                                {remainingItemsToGift.length === 0
+                                  ? 'Không còn mặt hàng nào'
+                                  : 'Không tìm thấy kết quả'}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={addSelectedGiftItems}
+                              disabled={!giftItemSelections.length}
+                              className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+                            >
+                              Thêm đã chọn
+                            </Button>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+              </>
+
+            )
+          }
+
+        </form>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Hủy
+          </Button>
+          <Button
+            type="submit"
+            onClick={handleSubmit}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Thêm khuyến mại
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog >
+
   );
 }
