@@ -71,7 +71,7 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
     logout();
   };
 
-  
+
 
   // Check permission for a specific page
   const hasAccess = (page: PageType) => {
@@ -100,6 +100,7 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
       'reports-finance': 'reports:view',
       'reports-products': 'reports:view',
       'reports-sales': 'reports:view',
+      'reports-staff': 'reports:view',
       'reports-customers': 'reports:view',
       'reports-suppliers': 'reports:view',
       'reports-employees': 'reports:view',
@@ -192,7 +193,7 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
       { id: 'reports-sales', label: 'Bán hàng', icon: ShoppingCart },
       { id: 'reports-finance', label: 'Tài chính', icon: DollarSign },
       { id: 'reports-products', label: 'Hàng hóa', icon: Package },
-      { id: 'reports-employees', label: 'Nhân viên', icon: Users },
+      { id: 'reports-staff', label: 'Nhân viên', icon: BarChart3 },
       { id: 'reports-customers', label: 'Khách hàng', icon: UserCircle },
       { id: 'reports-suppliers', label: 'Nhà cung cấp', icon: Handshake },
     ]
@@ -334,7 +335,7 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
                   Tài khoản
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                
+
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
                   <LogOut className="w-4 h-4 mr-2" />
@@ -442,7 +443,7 @@ export function Sidebar({ currentPage, onNavigate, isFullscreen }: SidebarProps)
                 Tài khoản
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              
+
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
                 <LogOut className="w-4 h-4 mr-2" />
