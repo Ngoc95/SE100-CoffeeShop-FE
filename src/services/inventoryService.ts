@@ -1,21 +1,5 @@
+import axiosClient from "../api/axiosClient";
 import { InventoryItem } from "../types/inventory";
-
-const API_BASE_URL = "http://localhost:4000/api";
-
-/* ======================
-   AUTH TOKEN
-====================== */
-const getAuthToken = (): string | null => {
-  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInRva2VuVHlwZSI6ImFjY2Vzc190b2tlbiIsImlhdCI6MTc2OTA2NTI0MSwiZXhwIjoxNzY5MDY2MTQxfQ.Hj_CYkfcAVvJDHeG-mf2x97zq8ojH-QsQjTTT3quPxw";
-}
-
-const getHeaders = (): HeadersInit => {
-  const token = getAuthToken();
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-};
 
 /* ======================
    INVENTORY SERVICE
@@ -35,296 +19,102 @@ export const inventoryService = {
       sort?: string;
     }
   ) {
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-    });
+    const params: any = {
+        page,
+        limit,
+        ...filters
+    };
 
-    if (filters?.search) params.append("search", filters.search);
-    if (filters?.categoryId) params.append("categoryId", filters.categoryId);
-    if (filters?.itemTypeId) params.append("itemTypeId", filters.itemTypeId);
-    if (filters?.stockStatus) params.append("stockStatus", filters.stockStatus);
-    if (filters?.productStatus) params.append("productStatus", filters.productStatus);
-    if (filters?.sort) params.append("sort", filters.sort);
-
-    const response = await fetch(
-      `${API_BASE_URL}/inventory-items?${params.toString()}`,
-      {
-        method: "GET",
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`GET inventory-items failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.get('/inventory-items', { params });
+    return response.data;
   },
 
   async getItemById(id: number | string): Promise<InventoryItem> {
-    const response = await fetch(
-      `${API_BASE_URL}/inventory-items/${id}`,
-      {
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`GET inventory-item ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.get(`/inventory-items/${id}`);
+    return response.data;
   },
 
   async createItem(item: Partial<InventoryItem>): Promise<InventoryItem> {
-    const response = await fetch(
-      `${API_BASE_URL}/inventory-items`,
-      {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify(item),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`CREATE inventory-item failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.post('/inventory-items', item);
+    return response.data;
   },
 
   async updateItem(
     id: number | string,
     updates: Partial<InventoryItem>
   ): Promise<InventoryItem> {
-    const response = await fetch(
-      `${API_BASE_URL}/inventory-items/${id}`,
-      {
-        method: "PATCH",
-        headers: getHeaders(),
-        body: JSON.stringify(updates),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`UPDATE inventory-item ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.patch(`/inventory-items/${id}`, updates);
+    return response.data;
   },
 
   async deleteItem(id: number | string): Promise<void> {
-    const response = await fetch(
-      `${API_BASE_URL}/inventory-items/${id}`,
-      {
-        method: "DELETE",
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`DELETE inventory-item ${id} failed: ${response.status}`);
-    }
-
-    // API thường trả 204 No Content
-    return;
+    await axiosClient.delete(`/inventory-items/${id}`);
   },
 
   /* ---------- Categories ---------- */
 
   async getCategories() {
-    const response = await fetch(
-      `${API_BASE_URL}/categories`,
-      {
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`GET categories failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.get('/categories');
+    return response.data;
   },
 
   async getCategoryById(id: number | string) {
-    const response = await fetch(
-      `${API_BASE_URL}/categories/${id}`,
-      {
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`GET category ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.get(`/categories/${id}`);
+    return response.data;
   },
 
   async createCategory(data: { name: string }) {
-    const response = await fetch(
-      `${API_BASE_URL}/categories`,
-      {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify(data),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`CREATE category failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.post('/categories', data);
+    return response.data;
   },
 
   /* ---------- Units ---------- */
 
   async getUnits() {
-    const response = await fetch(
-      `${API_BASE_URL}/units`,
-      {
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`GET units failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.get('/units');
+    return response.data;
   },
 
   async getUnitById(id: number | string) {
-    const response = await fetch(
-      `${API_BASE_URL}/units/${id}`,
-      {
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`GET unit ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.get(`/units/${id}`);
+    return response.data;
   },
 
   async createUnit(data: { name: string; symbol: string }) {
-    const response = await fetch(
-      `${API_BASE_URL}/units`,
-      {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify(data),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`CREATE unit failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.post('/units', data);
+    return response.data;
   },
 
   /* ---------- Stock Checks ---------- */
 
   async getStockChecks() {
-    const response = await fetch(
-      `${API_BASE_URL}/stock-checks`,
-      {
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`GET stock-checks failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.get('/stock-checks');
+    return response.data;
   },
 
   async getStockCheckById(id: number | string) {
-    const response = await fetch(
-      `${API_BASE_URL}/stock-checks/${id}`,
-      {
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`GET stock-check ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.get(`/stock-checks/${id}`);
+    return response.data;
   },
 
   async createStockCheck(data: any) {
-    const response = await fetch(
-      `${API_BASE_URL}/stock-checks`,
-      {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify(data),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`CREATE stock-check failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.post('/stock-checks', data);
+    return response.data;
   },
 
   async updateStockCheck(id: number | string, data: any) {
-    const response = await fetch(
-      `${API_BASE_URL}/stock-checks/${id}`,
-      {
-        method: "PATCH",
-        headers: getHeaders(),
-        body: JSON.stringify(data),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`UPDATE stock-check ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.patch(`/stock-checks/${id}`, data);
+    return response.data;
   },
 
   async completeStockCheck(id: number | string) {
-    const response = await fetch(
-      `${API_BASE_URL}/stock-checks/${id}/complete`,
-      {
-        method: "PATCH",
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`COMPLETE stock-check ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.patch(`/stock-checks/${id}/complete`);
+    return response.data;
   },
 
   async cancelStockCheck(id: number | string) {
-    const response = await fetch(
-      `${API_BASE_URL}/stock-checks/${id}/cancel`,
-      {
-        method: "PATCH",
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`CANCEL stock-check ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.patch(`/stock-checks/${id}/cancel`);
+    return response.data;
   },
 
   /* ---------- Purchase Orders ---------- */
@@ -339,142 +129,48 @@ export const inventoryService = {
       dateTo?: string;
     }
   ) {
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-    });
-
-    if (filters?.status) params.append("status", filters.status);
-    if (filters?.supplierId) params.append("supplierId", filters.supplierId);
-    if (filters?.dateFrom) params.append("dateFrom", filters.dateFrom);
-    if (filters?.dateTo) params.append("dateTo", filters.dateTo);
-
-    const response = await fetch(
-      `${API_BASE_URL}/purchase-orders?${params.toString()}`,
-      {
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`GET purchase-orders failed: ${response.status}`);
-    }
-
-    return response.json();
+    const params: any = {
+        page,
+        limit,
+        ...filters
+    };
+    const response = await axiosClient.get('/purchase-orders', { params });
+    return response.data;
   },
 
   async getPurchaseOrderById(id: number | string) {
-    const response = await fetch(
-      `${API_BASE_URL}/purchase-orders/${id}`,
-      {
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`GET purchase-order ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.get(`/purchase-orders/${id}`);
+    return response.data;
   },
 
   async createPurchaseOrder(data: any) {
-    const response = await fetch(
-      `${API_BASE_URL}/purchase-orders`,
-      {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify(data),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`CREATE purchase-order failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.post('/purchase-orders', data);
+    return response.data;
   },
 
   async updatePurchaseOrder(id: number | string, data: any) {
-    const response = await fetch(
-      `${API_BASE_URL}/purchase-orders/${id}`,
-      {
-        method: "PATCH",
-        headers: getHeaders(),
-        body: JSON.stringify(data),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`UPDATE purchase-order ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.patch(`/purchase-orders/${id}`, data);
+    return response.data;
   },
 
   async completePurchaseOrder(id: number | string) {
-    const response = await fetch(
-      `${API_BASE_URL}/purchase-orders/${id}/complete`,
-      {
-        method: "PATCH",
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`COMPLETE purchase-order ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.patch(`/purchase-orders/${id}/complete`);
+    return response.data;
   },
 
   async cancelPurchaseOrder(id: number | string) {
-    const response = await fetch(
-      `${API_BASE_URL}/purchase-orders/${id}/cancel`,
-      {
-        method: "PATCH",
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`CANCEL purchase-order ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.patch(`/purchase-orders/${id}/cancel`);
+    return response.data;
   },
 
   async addPurchaseOrderPayment(id: number | string, data: { amount: number; paymentMethod: string; bankAccountId?: number }) {
-    const response = await fetch(
-      `${API_BASE_URL}/purchase-orders/${id}/payment`,
-      {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify(data),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`ADD payment to purchase-order ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.post(`/purchase-orders/${id}/payment`, data);
+    return response.data;
   },
 
   async deletePurchaseOrder(id: number | string) {
-    const response = await fetch(
-      `${API_BASE_URL}/purchase-orders/${id}`,
-      {
-        method: "DELETE",
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`DELETE purchase-order ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.delete(`/purchase-orders/${id}`);
+    return response.data;
   },
 
   /* ---------- Write-offs ---------- */
@@ -487,141 +183,53 @@ export const inventoryService = {
       sort?: string;
     }
   ) {
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-    });
+    const params: any = {
+        page,
+        limit,
+        ...filters
+    };
 
-    if (filters?.status) params.append("status", filters.status);
-    if (filters?.sort) params.append("sort", filters.sort);
-
-    const response = await fetch(
-      `${API_BASE_URL}/write-offs?${params.toString()}`,
-      {
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`GET write-offs failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.get('/write-offs', { params });
+    return response.data;
   },
 
   async getWriteOffById(id: number | string) {
-    const response = await fetch(
-      `${API_BASE_URL}/write-offs/${id}`,
-      {
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`GET write-off ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.get(`/write-offs/${id}`);
+    return response.data;
   },
 
   async createWriteOff(data: any) {
-    const response = await fetch(
-      `${API_BASE_URL}/write-offs`,
-      {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify(data),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`CREATE write-off failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.post('/write-offs', data);
+    return response.data;
   },
 
   async updateWriteOff(id: number | string, data: any) {
-    const response = await fetch(
-      `${API_BASE_URL}/write-offs/${id}`,
-      {
-        method: "PATCH",
-        headers: getHeaders(),
-        body: JSON.stringify(data),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`UPDATE write-off ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.patch(`/write-offs/${id}`, data);
+    return response.data;
   },
 
   async completeWriteOff(id: number | string) {
-    const response = await fetch(
-      `${API_BASE_URL}/write-offs/${id}/complete`,
-      {
-        method: "PATCH",
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`COMPLETE write-off ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.patch(`/write-offs/${id}/complete`);
+    return response.data;
   },
 
   async cancelWriteOff(id: number | string) {
-    const response = await fetch(
-      `${API_BASE_URL}/write-offs/${id}/cancel`,
-      {
-        method: "PATCH",
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`CANCEL write-off ${id} failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.patch(`/write-offs/${id}/cancel`);
+    return response.data;
   },
 
   /* ---------- Suppliers ---------- */
 
   async getSuppliers() {
-    const response = await fetch(
-      `${API_BASE_URL}/suppliers`,
-      {
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`GET suppliers failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.get('/suppliers');
+    return response.data;
   },
 
   /* ---------- Bank Accounts ---------- */
 
   async getBankAccounts() {
-    const response = await fetch(
-      `${API_BASE_URL}/finance/bank-accounts`,
-      {
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`GET bank-accounts failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.get('/finance/bank-accounts');
+    return response.data;
   },
 
   async createBankAccount(data: {
@@ -631,20 +239,8 @@ export const inventoryService = {
     ownerName: string;
     notes?: string;
   }) {
-    const response = await fetch(
-      `${API_BASE_URL}/finance/bank-accounts`,
-      {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify(data),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`CREATE bank-account failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.post('/finance/bank-accounts', data);
+    return response.data;
   },
 
   /* ---------- Pricing ---------- */
@@ -659,29 +255,14 @@ export const inventoryService = {
       sort?: string;
     }
   ) {
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-    });
+    const params: any = {
+      page,
+      limit,
+      ...filters
+    };
 
-    if (filters?.search) params.append("search", filters.search);
-    if (filters?.categoryId) params.append("categoryId", filters.categoryId);
-    if (filters?.itemTypeId) params.append("itemTypeId", filters.itemTypeId);
-    if (filters?.sort) params.append("sort", filters.sort);
-
-    const response = await fetch(
-      `${API_BASE_URL}/pricing?${params.toString()}`,
-      {
-        method: "GET",
-        headers: getHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`GET pricing failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.get('/pricing', { params });
+    return response.data;
   },
 
   async updateSinglePrice(data: {
@@ -690,20 +271,8 @@ export const inventoryService = {
     adjustmentValue: number;
     adjustmentType: "percent" | "amount";
   }) {
-    const response = await fetch(
-      `${API_BASE_URL}/pricing/single`,
-      {
-        method: "PATCH",
-        headers: getHeaders(),
-        body: JSON.stringify(data),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`UPDATE single price failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.patch('/pricing/single', data);
+    return response.data;
   },
 
   async updateCategoryPrice(data: {
@@ -712,38 +281,14 @@ export const inventoryService = {
     adjustmentValue: number;
     adjustmentType: "percent" | "amount";
   }) {
-    const response = await fetch(
-      `${API_BASE_URL}/pricing/category`,
-      {
-        method: "PATCH",
-        headers: getHeaders(),
-        body: JSON.stringify(data),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`UPDATE category price failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.patch('/pricing/category', data);
+    return response.data;
   },
 
   async updateBatchPrice(data: {
     items: { id: number; sellingPrice: number }[];
   }) {
-    const response = await fetch(
-      `${API_BASE_URL}/pricing/batch`,
-      {
-        method: "PATCH",
-        headers: getHeaders(),
-        body: JSON.stringify(data),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`UPDATE batch price failed: ${response.status}`);
-    }
-
-    return response.json();
+    const response = await axiosClient.patch('/pricing/batch', data);
+    return response.data;
   },
 };

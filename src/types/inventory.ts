@@ -49,7 +49,7 @@ export interface InventoryItem {
   minStock: number;
   maxStock: number;
   status: "good" | "low" | "expiring" | "expired" | "critical";
-  productStatus?: "selling" | "paused" | "not_running" | "hot";
+  productStatus?: "selling" | "paused" | "slow" | "hot";
   imageUrl?: string; // Image URL for the item
 
   // For ready-made & ingredients

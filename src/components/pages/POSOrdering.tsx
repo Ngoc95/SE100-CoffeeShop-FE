@@ -3731,10 +3731,20 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
                           }}
                     >
                       <CardContent className="p-2">
-                        <div className="text-3xl mb-1 text-center">
-                          {product.image}
+                        <div className="aspect-square w-full mb-2 bg-slate-100 rounded-md overflow-hidden relative">
+                          {product.image ? (
+                             <img 
+                                src={product.image} 
+                                alt={product.name}
+                                className="absolute inset-0 h-full w-full object-cover"
+                             />
+                          ) : (
+                             <div className="h-full w-full flex items-center justify-center">
+                                <span className="text-3xl">{product.image || "☕"}</span>
+                             </div>
+                          )}
                         </div>
-                        <h3 className="text-xs text-slate-900 mb-0.5 line-clamp-2">
+                        <h3 className="text-sm font-medium text-slate-900 mb-0.5 line-clamp-2 min-h-[2.5em]">
                           {product.name}
                         </h3>
                         <p

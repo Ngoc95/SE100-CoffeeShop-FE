@@ -122,6 +122,8 @@ interface PurchaseOrder {
     date: string;
     amount: number;
     note?: string;
+    paymentMethod?: string;
+    staff?: string;
   }>;
 }
 
@@ -577,7 +579,14 @@ export function PurchaseOrders() {
             expiryDate: it.expiryDate || undefined
           }))
         },
-        paymentHistory: []
+        paymentHistory: (order.paymentHistory || []).map((ph: any) => ({
+          id: ph.id, // Code
+          date: ph.date ? format(new Date(ph.date), "yyyy-MM-dd HH:mm") : "",
+          amount: ph.amount || 0,
+          note: ph.note || "",
+          paymentMethod: ph.paymentMethod,
+          staff: ph.staff
+        }))
       }));
 
       setPurchaseOrders(formattedOrders);
@@ -1672,7 +1681,7 @@ export function PurchaseOrders() {
                   {/* Expanded Row */}
                   {expandedRow === order.id && order.details && (
                     <TableRow>
-                      <TableCell colSpan={8} className="bg-slate-50 px-4 py-4">
+                      <TableCell colSpan={10} className="bg-slate-50 px-4 py-4">
                         <Tabs defaultValue="info" className="w-full">
                           <TabsList>
                             <TabsTrigger value="info">Thông tin</TabsTrigger>

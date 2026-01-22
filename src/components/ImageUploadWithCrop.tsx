@@ -1,17 +1,27 @@
 import { useState, useRef, useCallback } from 'react';
-import { Upload, X, Crop, Check } from 'lucide-react';
+import { Upload, X, Crop, Check, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import ReactCrop, { Crop as CropType, PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
+import { uploadService } from '../services/uploadService';
+import { toast } from 'sonner';
 
 interface ImageUploadWithCropProps {
   value?: string;
   onChange?: (imageUrl: string) => void;
   label?: string;
+  manualUpload?: boolean;
+  onFileChange?: (file: File) => void;
 }
 
-export function ImageUploadWithCrop({ value, onChange, label = 'Hình ảnh' }: ImageUploadWithCropProps) {
+export function ImageUploadWithCrop({ 
+  value, 
+  onChange, 
+  label = 'Hình ảnh',
+  manualUpload = false,
+  onFileChange
+}: ImageUploadWithCropProps) {
   const [previewUrl, setPreviewUrl] = useState<string>(value || '');
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [originalImage, setOriginalImage] = useState<string>('');
@@ -23,6 +33,7 @@ export function ImageUploadWithCrop({ value, onChange, label = 'Hình ảnh' }: 
     y: 10
   });
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+  const [isUploading, setIsUploading] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -39,7 +50,7 @@ export function ImageUploadWithCrop({ value, onChange, label = 'Hình ảnh' }: 
     }
   };
 
-  const getCroppedImage = useCallback(() => {
+  const getCroppedImage = useCallback(async () => {
     if (!completedCrop || !imageRef.current) {
       return;
     }
@@ -71,16 +82,55 @@ export function ImageUploadWithCrop({ value, onChange, label = 'Hình ảnh' }: 
       completedCrop.height * scaleY
     );
 
-    // Convert to base64
-    const base64Image = canvas.toDataURL('image/jpeg', 0.9);
-    setPreviewUrl(base64Image);
-    onChange?.(base64Image);
-    setCropDialogOpen(false);
-  }, [completedCrop, onChange]);
+    // Convert to blob for upload
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+         console.error('Canvas is empty');
+         return;
+      }
+
+      if (manualUpload) {
+        const file = new File([blob], 'product-image.jpg', { type: 'image/jpeg' });
+        const url = URL.createObjectURL(blob);
+        setPreviewUrl(url);
+        onChange?.(url);
+        onFileChange?.(file);
+        setCropDialogOpen(false);
+        return;
+      }
+      
+      // Upload to backend
+      setIsUploading(true);
+      try {
+        const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
+        const res = await uploadService.uploadImage(file);
+        
+        const url = res.metaData?.url || res.url; 
+        
+        if (url) {
+            setPreviewUrl(url);
+            onChange?.(url);
+            setCropDialogOpen(false);
+            toast.success('Tải ảnh thành công');
+        } else {
+            throw new Error('Invalid response from server');
+        }
+
+      } catch (error) {
+        console.error('Upload failed', error);
+        toast.error('Tải ảnh thất bại');
+      } finally {
+        setIsUploading(false);
+      }
+
+    }, 'image/jpeg', 0.9);
+
+  }, [completedCrop, onChange, manualUpload, onFileChange]);
 
   const handleRemoveImage = () => {
     setPreviewUrl('');
     onChange?.('');
+    onFileChange?.(null as any); // Clear file
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -167,15 +217,16 @@ export function ImageUploadWithCrop({ value, onChange, label = 'Hình ảnh' }: 
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCropDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setCropDialogOpen(false)} disabled={isUploading}>
               Hủy
             </Button>
             <Button 
               className="bg-blue-600 hover:bg-blue-700"
               onClick={getCroppedImage}
+              disabled={isUploading}
             >
-              <Check className="w-4 h-4 mr-2" />
-              Áp dụng
+              {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+              {isUploading ? 'Đang tải...' : 'Áp dụng'}
             </Button>
           </DialogFooter>
         </DialogContent>

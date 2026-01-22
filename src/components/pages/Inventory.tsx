@@ -22,9 +22,14 @@ import {
   Filter,
   Loader2,
   AlertCircle,
+  Printer,
+  ImageIcon,
 } from "lucide-react";
 import { inventoryService } from "../../services/inventoryService";
+import { uploadService } from "../../services/uploadService";
 import { toast } from "sonner";
+import { excelService } from "../../services/excelService";
+import { ImportExcelDialog } from "../../components/ImportExcelDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
 
@@ -60,8 +65,7 @@ import {
   TableRow,
 } from "../ui/table";
 import { ImageUploadWithCrop } from "../ImageUploadWithCrop";
-import { ImportExcelDialog } from "../ImportExcelDialog";
-import { ExportExcelDialog } from "../ExportExcelDialog";
+import { PrintMenuDialog } from "../print/PrintMenuDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {
   InventoryItem,
@@ -108,53 +112,12 @@ export function Inventory() {
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [loadingUnits, setLoadingUnits] = useState(false);
 
-  // Load categories from API
-  useEffect(() => {
-    setLoadingCategories(true);
-    inventoryService.getCategories()
-      .then((res) => {
-        // API có thể trả { metaData: [...] } hoặc { metaData: { items: [...] } } hoặc { items: [...] } hoặc [...]
-        let arr: any[] = [];
-        if (Array.isArray(res?.metaData)) arr = res.metaData;
-        else if (res?.metaData?.items && Array.isArray(res.metaData.items)) arr = res.metaData.items;
-        else if (res?.items && Array.isArray(res.items)) arr = res.items;
-        else if (Array.isArray(res)) arr = res;
-        // Đảm bảo id là string cho Select
-        setCategoryOptions(arr.map((c) => ({ ...c, id: String(c.id) })));
-      })
-      .catch(() => setCategoryOptions([]))
-      .finally(() => setLoadingCategories(false));
-  }, []);
+  // Load categories and units will be handled in loadInitialData
 
-  // Load units from API
-  useEffect(() => {
-    setLoadingUnits(true);
-    inventoryService
-      .getUnits()
-      .then((res) => {
-        const units = Array.isArray(res?.metaData)
-          ? res.metaData
-          : Array.isArray(res)
-            ? res
-            : [];
-
-        setUnitOptions(units.map((unit: any) => ({
-          ...unit,
-          id: String(unit.id),
-        })));
-      })
-      .catch(() => setUnitOptions([]))
-      .finally(() => setLoadingUnits(false));
-  }, []);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([
     "all",
-  ]);
-  const [selectedTypes, setSelectedTypes] = useState<ItemType[]>([
-    "ready-made",
-    "composite",
-    "ingredient",
   ]);
   const [selectedStockStatuses, setSelectedStockStatuses] = useState<string[]>([
     "good",
@@ -166,7 +129,7 @@ export function Inventory() {
   const [selectedProductStatuses, setSelectedProductStatuses] = useState<string[]>([
     "selling",
     "paused",
-    "not_running",
+    "slow",
     "hot",
   ]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -176,6 +139,7 @@ export function Inventory() {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("none");
   const [activeTab, setActiveTab] = useState<ItemType>("ready-made");
+  const [selectedTypes, setSelectedTypes] = useState<string[]>(['ready-made', 'composite', 'ingredient']);
   const [addCategoryDialogOpen, setAddCategoryDialogOpen] = useState(false);
   const [addIngredientDialogOpen, setAddIngredientDialogOpen] = useState(false);
   const [addUnitDialogOpen, setAddUnitDialogOpen] = useState(false);
@@ -185,10 +149,79 @@ export function Inventory() {
   >([]);
   const [ingredientSearchQuery, setIngredientSearchQuery] = useState("");
   const [newItemImage, setNewItemImage] = useState<string>("");
+  const [newItemFile, setNewItemFile] = useState<File | null>(null);
   const [ingredientsToAdd, setIngredientsToAdd] = useState<string[]>([]);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
 
-  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  /* Print Menu State */
+  const [printMenuDialogOpen, setPrintMenuDialogOpen] = useState(false);
+  const [menuItems, setMenuItems] = useState<InventoryItem[]>([]);
+
+  useEffect(() => {
+    if (printMenuDialogOpen) {
+      const fetchMenuItems = async () => {
+        try {
+          // Fetch a large number of items to ensure we have the full menu
+          const data = await inventoryService.getItems(1, 1000, {});
+          
+          // Handle API response structure (Same logic as fetchInventoryItems)
+          let itemsArray: any[] = [];
+          if (data?.metaData) {
+             if (Array.isArray(data.metaData.items)) itemsArray = data.metaData.items;
+             else if (Array.isArray(data.metaData)) itemsArray = data.metaData;
+          } else if (data?.items && Array.isArray(data.items)) {
+             itemsArray = data.items;
+          } else if (Array.isArray(data)) {
+            itemsArray = data;
+          }
+
+          const mappedItems: InventoryItem[] = itemsArray.map((item: any) => {
+            let type: ItemType = "ingredient";
+            if (item.itemType?.name) {
+              const t = item.itemType.name.toLowerCase();
+              if (t === "ready-made" || t === "ready_made") type = "ready-made";
+              else if (t === "composite") type = "composite";
+              else if (t === "ingredient") type = "ingredient";
+            } else if (item.itemTypeId || item.item_type_id) {
+              const typeId = Number(item.itemTypeId || item.item_type_id);
+              if (typeId === 1) type = "ready-made";
+              else if (typeId === 2) type = "composite";
+              else if (typeId === 3) type = "ingredient";
+            }
+
+            return {
+              id: String(item.id),
+              name: item.name || "",
+              type,
+              category: item.category?.name ||
+                (typeof item.category === "string" ? item.category : "") ||
+                (item.categoryId ? categoryOptions.find(c => String(c.id) === String(item.categoryId))?.name : "") ||
+                "",
+              categoryId: item.category?.id ? Number(item.category.id) : (item.categoryId ? Number(item.categoryId) : undefined),
+              currentStock: Number(item.currentStock) || 0,
+              unit: item.unit?.name || (typeof item.unit === "string" ? item.unit : "") || "",
+              minStock: item.minStock ? Number(item.minStock) : 0,
+              maxStock: item.maxStock ? Number(item.maxStock) : 0,
+              status: (item.stockStatus || item.status || "good") as any,
+              productStatus: item.productStatus || item.product_status || "selling",
+              imageUrl: item.imageUrl || undefined,
+              sellingPrice: item.sellingPrice ? Number(item.sellingPrice) : undefined,
+              totalValue: 0,
+              avgUnitCost: 0,
+            };
+          });
+
+          setMenuItems(mappedItems);
+        } catch (error) {
+          console.error("Failed to fetch menu items", error);
+          toast.error("Không thể tải dữ liệu menu");
+        }
+      };
+      fetchMenuItems();
+    }
+  }, [printMenuDialogOpen]);
+  
+
 
   // Topping states
   const [isTopping, setIsTopping] = useState(false);
@@ -213,48 +246,134 @@ export function Inventory() {
     productIds: [] as number[],
     imageUrl: "",
   });
+  const [editItemFile, setEditItemFile] = useState<File | null>(null);
+
 
   // API states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<InventoryItem[]>([]);
+  
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(30);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   // Fetch inventory items from API
   useEffect(() => {
-    fetchInventoryItems();
+    const loadInitialData = async () => {
+      setLoading(true);
+      setLoadingCategories(true);
+      setLoadingUnits(true);
+      try {
+        // 1. Load Categories and Units in parallel
+        const [catsData, unitsData] = await Promise.all([
+          inventoryService.getCategories(),
+          inventoryService.getUnits()
+        ]);
+
+        // Process Categories
+        let catsArr: any[] = [];
+        if (Array.isArray(catsData?.metaData)) catsArr = catsData.metaData;
+        else if (catsData?.metaData?.items && Array.isArray(catsData.metaData.items)) catsArr = catsData.metaData.items;
+        else if (catsData?.items && Array.isArray(catsData.items)) catsArr = catsData.items;
+        else if (Array.isArray(catsData)) catsArr = catsData;
+        const processedCats = catsArr.map((c: any) => ({ ...c, id: String(c.id) }));
+        setCategoryOptions(processedCats);
+
+        // Process Units
+        const unitsRaw = Array.isArray(unitsData?.metaData)
+          ? unitsData.metaData
+          : (Array.isArray(unitsData) ? unitsData : []);
+        const processedUnits = unitsRaw.map((unit: any) => ({ ...unit, id: String(unit.id) }));
+        setUnitOptions(processedUnits);
+
+        // 2. Load Items using the fresh categories and units
+        await fetchInventoryItems(processedCats, processedUnits);
+
+      } catch (err) {
+        console.error("Error loading initial data:", err);
+        setError("Lỗi khi tải dữ liệu khởi tạo");
+      } finally {
+        setLoading(false);
+        setLoadingCategories(false);
+        setLoadingUnits(false);
+      }
+    };
+
+    loadInitialData();
   }, []);
 
-  const fetchInventoryItems = async () => {
+  // Effect to refetch when filters/pagination change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+       fetchInventoryItems();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [sortField, sortOrder, selectedCategories, selectedStockStatuses, selectedProductStatuses, searchQuery]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [
+    activeTab,
+    selectedCategories,
+    selectedStockStatuses,
+    selectedProductStatuses,
+    searchQuery,
+    selectedTypes
+  ]);
+
+  const fetchInventoryItems = async (providedCats?: any[], providedUnits?: any[]) => {
     try {
       setLoading(true);
       setError(null);
-      console.log("[Inventory] Fetching items...");
+      console.log("[Inventory] Fetching items with params...");
 
       // Check if user is authenticated
       if (!user) {
-        console.warn("[Inventory] User not authenticated, loading mock data...");
-        throw new Error("Not authenticated");
+        console.warn("[Inventory] User not authenticated");
+        // throw new Error("Not authenticated");
       }
 
-      const data = await inventoryService.getItems();
+      let stockStatusParam = selectedStockStatuses.join(",");
+      let productStatusParam = selectedProductStatuses.join(",");
+
+      const filters = {
+        search: searchQuery,
+        categoryId: selectedCategories.includes("all") ? undefined : selectedCategories.join(","),
+        // Removed itemTypeId to fetch all types for client-side filtering
+        stockStatus: stockStatusParam,
+        productStatus: productStatusParam,
+        sort: sortField ? `${sortField}:${sortOrder}` : undefined,
+      };
+
+      // Fetch all items (limit 1000) for client-side filtering
+      const data = await inventoryService.getItems(1, 1000, filters);
       console.log("[Inventory] API Response:", data);
 
-      // Handle API response structure: { metaData: { items: [...] } }
+      // Handle API response structure
       let itemsArray: any[] = [];
-
-      if (data?.metaData?.items && Array.isArray(data.metaData.items)) {
-        itemsArray = data.metaData.items;
+      
+      if (data?.metaData) {
+         if (Array.isArray(data.metaData.items)) itemsArray = data.metaData.items;
+         else if (Array.isArray(data.metaData)) itemsArray = data.metaData;
+         
+         if (data.metaData.totalItems) setTotalItems(data.metaData.totalItems);
+         if (data.metaData.totalPages) setTotalPages(data.metaData.totalPages);
       } else if (data?.items && Array.isArray(data.items)) {
-        itemsArray = data.items;
+         itemsArray = data.items;
+         if (data.totalItems) setTotalItems(data.totalItems);
+         if (data.totalPages) setTotalPages(data.totalPages);
       } else if (Array.isArray(data)) {
         itemsArray = data;
       }
 
+      const currentCats = providedCats || categoryOptions;
+      const currentUnits = providedUnits || unitOptions;
 
-      // Map API response to InventoryItem type, ensuring 'type' and 'status' are set for filtering
-      console.log("[Inventory] Sample raw item:", itemsArray[0]);
       const mappedItems: InventoryItem[] = itemsArray.map((item: any) => {
-        // Determine type
         let type: ItemType = "ingredient";
         if (item.itemType?.name) {
           const t = item.itemType.name.toLowerCase();
@@ -268,13 +387,16 @@ export function Inventory() {
           else if (typeId === 3) type = "ingredient";
         }
 
-        // Calculate status based on stock
         let status: InventoryItem["status"] = "good";
-        const stock = Number(item.currentStock) || 0;
-        const minStock = item.minStock ? Number(item.minStock) : 0;
-        if (stock <= 0) status = "critical";
-        else if (stock <= minStock) status = "low";
-        // TODO: Add expiring/expired logic if expiry info available
+        const serverStatus = item.stockStatus || item.status;
+        if (serverStatus && ["good", "low", "critical", "expired", "expiring"].includes(serverStatus)) {
+             status = serverStatus as InventoryItem["status"];
+        } else {
+            const stock = Number(item.currentStock) || 0;
+            const minStock = item.minStock ? Number(item.minStock) : 0;
+            if (stock <= 0) status = "critical";
+            else if (stock <= minStock) status = "low";
+        }
 
         return {
           id: String(item.id),
@@ -282,19 +404,19 @@ export function Inventory() {
           type,
           category: item.category?.name ||
             (typeof item.category === "string" ? item.category : "") ||
-            (item.categoryId ? categoryOptions.find(c => String(c.id) === String(item.categoryId))?.name : "") ||
+            (item.categoryId ? currentCats.find(c => String(c.id) === String(item.categoryId))?.name : "") ||
             "",
           categoryId: item.category?.id ? Number(item.category.id) : (item.categoryId ? Number(item.categoryId) : undefined),
-          currentStock: stock,
+          currentStock: Number(item.currentStock) || 0,
           unit: item.unit?.name ||
             (typeof item.unit === "string" ? item.unit : "") ||
-            (item.unitId ? unitOptions.find(u => String(u.id) === String(item.unitId))?.name : "") ||
+            (item.unitId ? currentUnits.find(u => String(u.id) === String(item.unitId))?.name : "") ||
             "",
           unitId: item.unit?.id ? Number(item.unit.id) : (item.unitId ? Number(item.unitId) : undefined),
-          minStock,
+          minStock: item.minStock ? Number(item.minStock) : 0,
           maxStock: item.maxStock ? Number(item.maxStock) : 0,
           status,
-          productStatus: item.productStatus || "selling",
+          productStatus: item.productStatus || item.product_status || "selling",
           imageUrl: item.imageUrl || undefined,
           batches: (item.inventoryBatches && Array.isArray(item.inventoryBatches))
             ? item.inventoryBatches.map((b: any) => ({
@@ -315,7 +437,7 @@ export function Inventory() {
               unitCost: Number(io.ingredientItem?.avgUnitCost) || 0,
             }))
             : (item.ingredients || undefined),
-          totalValue: stock * (Number(item.avgUnitCost) || 0),
+          totalValue: (Number(item.currentStock) || 0) * (Number(item.avgUnitCost) || 0),
           avgUnitCost: Number(item.avgUnitCost) || 0,
           sellingPrice: item.sellingPrice ? Number(item.sellingPrice) : undefined,
           isTopping: item.isTopping || false,
@@ -332,14 +454,7 @@ export function Inventory() {
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Lỗi khi tải dữ liệu";
       console.error("Error fetching inventory:", err);
-
-      // Load mock data as fallback
-      console.log("[Inventory] Loading fallback mock data...");
-      const mockItems: InventoryItem[] = [
-
-      ];
-      setItems(mockItems);
-      setError(null); // Don't show error if we have mock data
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -373,6 +488,14 @@ export function Inventory() {
     return <ArrowDown className="w-4 h-4 ml-1 inline text-blue-600" />;
   };
 
+  const toggleType = (type: string) => {
+    setSelectedTypes((prev) =>
+      prev.includes(type)
+        ? prev.filter((t) => t !== type)
+        : [...prev, type]
+    );
+  };
+
   const toggleCategory = (categoryId: string) => {
     if (categoryId === "all") {
       setSelectedCategories(["all"]);
@@ -384,12 +507,6 @@ export function Inventory() {
         newCategories.length === 0 ? ["all"] : newCategories
       );
     }
-  };
-
-  const toggleType = (type: ItemType) => {
-    setSelectedTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-    );
   };
 
   const toggleStockStatus = (status: string) => {
@@ -436,6 +553,25 @@ export function Inventory() {
         "ingredient": 3
       };
 
+      // Upload Image if selected
+      let finalImageUrl = newItemImage;
+      if (newItemFile) {
+        try {
+          const uploadRes = await uploadService.uploadImage(newItemFile);
+          finalImageUrl = uploadRes.metaData?.url || uploadRes.url;
+        } catch (err) {
+          console.error("Image upload failed", err);
+          toast.error("Không thể tải ảnh lên. Vui lòng thử lại.");
+          return;
+        }
+      } else if (newItemImage && newItemImage.startsWith('blob:')) {
+          // Verify if we have a blob url but no file (shouldn't happen with correct usage, but safety check)
+          // If it's a blob url and we don't have the file, we can't upload it easily unless we fetch it.
+          // But with manualUpload={true}, onFileChange should have set the file.
+          toast.error("Lỗi dữ liệu hình ảnh. Vui lòng chọn lại ảnh.");
+          return;
+      }
+
       const payload = {
         name: addDialogValues.name,
         itemTypeId: itemTypeIdMap[addItemType],
@@ -447,11 +583,11 @@ export function Inventory() {
         productStatus: "selling", // Default as per requirement
         isTopping: addItemType === 'composite' ? isTopping : false,
         // Optional fields
-        imageUrl: newItemImage || null,
+        imageUrl: finalImageUrl || null,
         ingredients: addItemType === 'composite'
           ? selectedIngredients.map(i => ({
             ingredientItemId: Number(i.ingredientId),
-            quantity: i.quantity,
+            quantity: Number(i.quantity),
             unit: i.unit
           }))
           : [],
@@ -509,6 +645,7 @@ export function Inventory() {
         sellingPrice: 0,
       });
       setNewItemImage("");
+      setNewItemFile(null);
       setSelectedIngredients([]);
       setIsTopping(false);
       setAssociatedProducts([]);
@@ -526,7 +663,25 @@ export function Inventory() {
   // Handle Update Item
   const handleUpdateItem = async (itemId: string, updatedData: any) => {
     try {
-      const response = await inventoryService.updateItem(itemId, updatedData) as any;
+      // Upload Image if selected (deferred upload)
+      let finalImageUrl = editValues.imageUrl;
+      if (editItemFile) {
+        try {
+          const uploadRes = await uploadService.uploadImage(editItemFile);
+          finalImageUrl = uploadRes.metaData?.url || uploadRes.url;
+        } catch (err) {
+          console.error("Image upload failed", err);
+          toast.error("Không thể tải ảnh lên. Vui lòng thử lại.");
+          return;
+        }
+      } else if (finalImageUrl && finalImageUrl.startsWith('blob:')) {
+          // Safety check for blob urls without file backing
+          toast.error("Lỗi dữ liệu hình ảnh. Vui lòng chọn lại ảnh.");
+          return;
+      }
+      
+      const payload = { ...updatedData, imageUrl: finalImageUrl || null };
+      const response = await inventoryService.updateItem(itemId, payload) as any;
       const updatedItemRaw = response.metaData || response;
 
       // Map the updated item
@@ -543,7 +698,7 @@ export function Inventory() {
         minStock: Number(updatedItemRaw.minStock) || 0,
         maxStock: Number(updatedItemRaw.maxStock) || 0,
         status: Number(updatedItemRaw.currentStock) <= 0 ? "critical" : (Number(updatedItemRaw.currentStock) <= (updatedItemRaw.minStock || 0) ? "low" : "good"),
-        productStatus: updatedItemRaw.productStatus || "selling",
+        productStatus: updatedItemRaw.productStatus || updatedItemRaw.product_status || "selling",
         imageUrl: updatedItemRaw.imageUrl,
         batches: updatedItemRaw.batches || [],
         ingredients: (updatedItemRaw.ingredientOf && Array.isArray(updatedItemRaw.ingredientOf))
@@ -632,17 +787,21 @@ export function Inventory() {
     }
   };
 
-  const getProductStatusBadge = (status?: InventoryItem["productStatus"]) => {
-    const s = status || "selling";
+  const getProductStatusBadge = (status?: InventoryItem["productStatus"] | string) => {
+    const s = (status || "selling").trim().toLowerCase() || "selling";
     switch (s) {
       case "selling":
         return <Badge className="bg-blue-600">Đang bán</Badge>;
       case "paused":
         return <Badge className="bg-slate-400">Tạm ngưng</Badge>;
-      case "not_running":
-        return <Badge className="bg-slate-600">Không chạy</Badge>;
+      case "slow":
+        return <Badge className="bg-slate-600">Bán chậm</Badge>;
       case "hot":
-        return <Badge className="bg-indigo-600">Bán chạy</Badge>;
+        return <Badge className="bg-orange-500">Bán chạy</Badge>;
+      case "not_running":
+        return <Badge className="bg-slate-300 text-slate-700 border-slate-400">Không chạy</Badge>;
+      default:
+        return <Badge variant="outline" className="text-slate-600 border-slate-300">{s}</Badge>;
     }
   };
 
@@ -775,6 +934,9 @@ export function Inventory() {
         setAssociatedProducts([]);
       }
 
+
+      setEditItemFile(null);
+
       setEditDialogOpen(true);
     } catch (error) {
       console.error("Error fetching item details for edit:", error);
@@ -791,91 +953,24 @@ export function Inventory() {
       case "ingredient":
         return "Thêm nguyên liệu";
     }
+
   };
 
-  let filteredItems = items.filter((item) => {
-    const matchesCategory =
-      selectedCategories.includes("all") ||
-      selectedCategories.includes(item.category);
-    const matchesSearch = item.name
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesStockStatus = selectedStockStatuses.includes(item.status);
-    const matchesProductStatus = selectedProductStatuses.includes(
-      item.productStatus || "selling"
-    );
-    const matchesType = selectedTypes.includes(item.type);
-    return (
-      matchesCategory &&
-      matchesSearch &&
-      matchesStockStatus &&
-      matchesProductStatus &&
-      matchesType
-    );
-  });
+  const handleExport = async () => {
+    try {
+        toast.info("Đang xuất file...");
+        await excelService.exportData('inventory');
+        toast.success("Xuất file thành công", { description: "File đã được tải xuống" });
+    } catch (err) {
+        toast.error("Xuất file thất bại");
+    }
+  };
 
-  // Apply sorting
-  if (sortField && sortOrder !== "none") {
-    filteredItems = [...filteredItems].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
+  // Server-side filtering is now used, so we use items directly
+  const filteredItems = items;
 
-      if (sortField === "expiryDate") {
-        const aExpiry = getEarliestExpiryFromBatches(a.batches);
-        const bExpiry = getEarliestExpiryFromBatches(b.batches);
-        aValue = aExpiry ? new Date(aExpiry).getTime() : Infinity;
-        bValue = bExpiry ? new Date(bExpiry).getTime() : Infinity;
-      } else if (sortField === "category") {
-        const aCategory = categories.find((c) => c.id === a.category)?.name || "";
-        const bCategory = categories.find((c) => c.id === b.category)?.name || "";
-        aValue = aCategory;
-        bValue = bCategory;
-      } else if (sortField === "batches") {
-        aValue = a.batches?.length || 0;
-        bValue = b.batches?.length || 0;
-      } else if (sortField === "status") {
-        const statusOrder: Record<InventoryItem["status"], number> = {
-          good: 0,
-          low: 1,
-          expiring: 2,
-          expired: 3,
-          critical: 4,
-        };
-        aValue = statusOrder[a.status] ?? 0;
-        bValue = statusOrder[b.status] ?? 0;
-      } else if (sortField === "productStatus") {
-        const pOrder = { selling: 0, paused: 1, not_running: 2, hot: 3 } as Record<string, number>;
-        aValue = pOrder[a.productStatus || "selling"] ?? 0;
-        bValue = pOrder[b.productStatus || "selling"] ?? 0;
-      } else if (sortField === "ingredients") {
-        aValue = a.ingredients?.length || 0;
-        bValue = b.ingredients?.length || 0;
-      } else if (sortField === "avgUnitCost") {
-        aValue = a.avgUnitCost || 0;
-        bValue = b.avgUnitCost || 0;
-      } else if (sortField === "supplier") {
-        const aSupplier = a.batches?.[0]?.supplier || "";
-        const bSupplier = b.batches?.[0]?.supplier || "";
-        aValue = aSupplier;
-        bValue = bSupplier;
-      } else if (sortField === "sellingPrice") {
-        aValue = a.sellingPrice || 0;
-        bValue = b.sellingPrice || 0;
-      } else {
-        aValue = a[sortField as keyof InventoryItem];
-        bValue = b[sortField as keyof InventoryItem];
-      }
-
-      if (typeof aValue === "string" && typeof bValue === "string") {
-        const comparison = aValue.localeCompare(bValue, "vi");
-        return sortOrder === "asc" ? comparison : -comparison;
-      }
-
-      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
-      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
-  }
+  // Sorting is handled by the server
+  // ...
 
   const totalValue = items.reduce(
     (sum, item) => sum + item.totalValue,
@@ -888,10 +983,16 @@ export function Inventory() {
     (item) => item.status === "expiring"
   ).length;
 
-  // Filter by active tab
-  const tabFilteredItems = filteredItems.filter(
-    (item) => item.type === activeTab
-  );
+  // Filter by activeTab on Client Side
+  const tabFilteredItems = items.filter(item => {
+    if (item.type !== activeTab) return false;
+    if (selectedTypes.length > 0 && !selectedTypes.includes(item.type)) return false;
+    return true;
+  });
+
+  const paginatedItems = tabFilteredItems.slice((page - 1) * pageSize, page * pageSize);
+  const clientTotalItems = tabFilteredItems.length;
+  const clientTotalPages = Math.ceil(clientTotalItems / pageSize);
 
   // Show loading state
   if (loading && items.length === 0) {
@@ -937,7 +1038,7 @@ export function Inventory() {
         </div>
       )}
       {/* Main Content */}
-      <div className="flex-1 p-4 lg:p-8 space-y-6 overflow-y-auto">
+      <div className="flex-1 p-2 lg:p-4 space-y-4 overflow-y-auto">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
@@ -958,10 +1059,18 @@ export function Inventory() {
             )}
             <Button
               variant="outline"
-              onClick={() => setExportDialogOpen(true)}
+              onClick={handleExport}
             >
               <Download className="w-4 h-4 mr-2" />
               Xuất file
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setPrintMenuDialogOpen(true)}
+              className="gap-2 text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:text-blue-800"
+            >
+              <Printer className="w-4 h-4 mr-1" />
+              In Menu
             </Button>
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
               <DialogTrigger asChild>
@@ -1019,7 +1128,7 @@ export function Inventory() {
 
                   {/* Dynamic Form Fields */}
                   <div className="grid grid-cols-3 gap-4 items-start">
-                    <div>
+                    {/* <div>
                       <Label className="text-sm font-normal leading-5">
                         Mã hàng hóa <span className="text-red-500">*</span>
                       </Label>
@@ -1036,7 +1145,7 @@ export function Inventory() {
                           className="bg-slate-50 border-slate-300"
                         />
                       </div>
-                    </div>
+                    </div> */}
                     <div className="col-span-2">
                       <Label>
                         Tên{" "}
@@ -1127,28 +1236,47 @@ export function Inventory() {
                         </SelectContent>
                       </Select>
                     </div>
+                  <div className="space-y-2">
+                      <Label>Giá bán <span className="text-red-500">*</span></Label>
+                      <div className="relative">
+                        <Input
+                          type="text"
+                          value={addDialogValues.sellingPrice.toLocaleString('vi-VN')}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value.replace(/\./g, ''), 10) || 0;
+                            setAddDialogValues({...addDialogValues, sellingPrice: val});
+                          }}
+                          className="pl-3 pr-8 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                          placeholder="0"
+                        />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500 text-sm">
+                          ₫
+                        </div>
+                      </div>
                   </div>
+                  </div>
+
+
+
 
                   {addItemType !== "composite" && (
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
+                    <div className="space-y-2">
                         <Label>Tồn kho tối thiểu</Label>
                         <Input
-                          type="number"
-                          value={addDialogValues.minStock}
-                          onChange={(e) => setAddDialogValues(prev => ({ ...prev, minStock: Number(e.target.value) }))}
-                          className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                          placeholder="0"
+                        type="number"
+                        min="0"
+                        value={addDialogValues.minStock.toString()}
+                        onChange={(e) => setAddDialogValues({...addDialogValues, minStock: Number(e.target.value)})}
                         />
-                      </div>
-                      <div>
+                    </div>
+                    <div className="space-y-2">
                         <Label>Tồn kho tối đa</Label>
                         <Input
-                          type="number"
-                          value={addDialogValues.maxStock}
-                          onChange={(e) => setAddDialogValues(prev => ({ ...prev, maxStock: Number(e.target.value) }))}
-                          className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                          placeholder="0"
+                        type="number"
+                        min="0"
+                        value={addDialogValues.maxStock.toString()}
+                        onChange={(e) => setAddDialogValues({...addDialogValues, maxStock: Number(e.target.value)})}
                         />
                       </div>
                     </div>
@@ -1160,6 +1288,8 @@ export function Inventory() {
                       value={newItemImage}
                       onChange={setNewItemImage}
                       label="Hình ảnh sản phẩm"
+                      manualUpload={true}
+                      onFileChange={setNewItemFile}
                     />
                     <p className="text-xs text-slate-500 mt-1.5">
                       Tải lên hình ảnh cho{" "}
@@ -1292,13 +1422,18 @@ export function Inventory() {
                                       <Input
                                         type="number"
                                         min="0"
+                                        step="any"
                                         value={ing.quantity}
                                         onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                                          const val = Number(e.target.value);
+                                          let val = e.target.value;
+                                          // Remove leading zeros unless it's just "0" or "0."
+                                          if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                                             val = val.replace(/^0+/, '');
+                                          }
                                           setSelectedIngredients((prev: CompositeIngredient[]) =>
                                             prev.map((item: CompositeIngredient, idx: number) =>
                                               idx === index
-                                                ? { ...item, quantity: val }
+                                                ? { ...item, quantity: val as any }
                                                 : item
                                             )
                                           );
@@ -1973,6 +2108,27 @@ export function Inventory() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                      <Label>Giá bán <span className="text-red-500">*</span></Label>
+                      <div className="relative">
+                        <Input
+                          type="text"
+                          value={editValues.sellingPrice ? editValues.sellingPrice.toLocaleString('vi-VN') : '0'}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value.replace(/\./g, ''), 10) || 0;
+                            setEditValues({...editValues, sellingPrice: val});
+                          }}
+                          className="pl-3 pr-8 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
+                          placeholder="0"
+                        />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500 text-sm">
+                          ₫
+                        </div>
+                      </div>
+                  </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Tồn kho tối thiểu</Label>
                   <Input
@@ -1992,11 +2148,12 @@ export function Inventory() {
                   <Label>Tồn kho tối đa</Label>
                   <Input
                     type="number"
-                    value={editValues.maxStock}
+                    min="0"
+                    value={editValues.maxStock.toString()}
                     onChange={(e) =>
                       setEditValues((v) => ({
                         ...v,
-                        maxStock: Number(e.target.value || 0),
+                        maxStock: Number(e.target.value),
                       }))
                     }
                     placeholder="0"
@@ -2125,15 +2282,20 @@ export function Inventory() {
                                   <Input
                                     type="number"
                                     min="0"
+                                    step="any"
                                     value={ing.quantity}
                                     onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                                      const val = Number(e.target.value);
+                                      let val = e.target.value; // Store as string to allow decimals
+                                      // Remove leading zeros unless it's just "0" or "0."
+                                      if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                                          val = val.replace(/^0+/, '');
+                                      }
                                       setEditValues((prev: any) => ({
                                         ...prev,
                                         ingredients: prev.ingredients.map(
                                           (item: CompositeIngredient, idx: number) =>
                                             idx === index
-                                              ? { ...item, quantity: val }
+                                              ? { ...item, quantity: val as any }
                                               : item
                                         ),
                                       }));
@@ -2168,13 +2330,19 @@ export function Inventory() {
                 </div>
               )}
 
-              <div className="flex justify-left">
+              <div className="flex justify-left flex-col gap-1">
                 <ImageUploadWithCrop
                   value={editValues.imageUrl as string}
                   onChange={(url: string) =>
                     setEditValues((prev) => ({ ...prev, imageUrl: url }))
                   }
+                  label="Hình ảnh sản phẩm"
+                  manualUpload={true}
+                  onFileChange={setEditItemFile}
                 />
+                 <p className="text-xs text-slate-500">
+                    Cập nhật hình ảnh cho sản phẩm (tùy chọn)
+                  </p>
               </div>
 
               <div className="bg-slate-50 p-3 rounded-lg">
@@ -2334,10 +2502,10 @@ export function Inventory() {
                 >
                   <Filter className="w-4 h-4" />
                   Bộ lọc
-                  {(!selectedCategories.includes('all') || selectedTypes.length < 3 || selectedStockStatuses.length < 5 || selectedProductStatuses.length < 4) && (
+                  {(selectedTypes.length < 3 || !selectedCategories.includes('all') || selectedStockStatuses.length < 5 || selectedProductStatuses.length < 4) && (
                     <Badge className="ml-1 bg-blue-500 text-white px-1.5 py-0.5 text-xs">
-                      {(!selectedCategories.includes('all') ? selectedCategories.length : 0) +
-                        (selectedTypes.length < 3 ? (3 - selectedTypes.length) : 0) +
+                      {(selectedTypes.length < 3 ? (3 - selectedTypes.length) : 0) +
+                        (!selectedCategories.includes('all') ? selectedCategories.length : 0) +
                         (selectedStockStatuses.length < 5 ? (5 - selectedStockStatuses.length) : 0) +
                         (selectedProductStatuses.length < 4 ? (4 - selectedProductStatuses.length) : 0)}
                     </Badge>
@@ -2348,51 +2516,53 @@ export function Inventory() {
               {/* Collapsible Filter Panel */}
               {showFilters && (
                 <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Category Filters */}
-                    <div className="space-y-2">
-                      <Label className="text-xs text-slate-600">Danh mục</Label>
-                      <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2 max-h-60 overflow-y-auto">
-                        {categories.map((cat) => (
-                          <div key={cat.id} className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id={cat.id}
-                                checked={selectedCategories.includes(cat.id)}
-                                onCheckedChange={() => toggleCategory(cat.id)}
-                                className="border-slate-300"
-                              />
-                              <Label htmlFor={cat.id} className="text-sm text-slate-700 cursor-pointer font-normal">
-                                {cat.name}
-                              </Label>
-                            </div>
-                            <span className="text-xs text-slate-500">{cat.count}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     {/* Type Filters */}
                     <div className="space-y-2">
                       <Label className="text-xs text-slate-600">Loại hàng hóa</Label>
                       <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
                         {[
-                          { id: 'ready-made', label: 'Hàng hóa bán sẵn' },
-                          { id: 'composite', label: 'Hàng hóa cấu thành' },
-                          { id: 'ingredient', label: 'Nguyên liệu' },
+                          { id: "ready-made", label: "Hàng bán sẵn" },
+                          { id: "composite", label: "Hàng cấu thành" },
+                          { id: "ingredient", label: "Nguyên liệu" },
                         ].map((type) => (
                           <div key={type.id} className="flex items-center space-x-2">
                             <Checkbox
-                              id={type.id}
-                              checked={selectedTypes.includes(type.id as ItemType)}
-                              onCheckedChange={() => toggleType(type.id as ItemType)}
+                              id={`type-${type.id}`}
+                              checked={selectedTypes.includes(type.id)}
+                              onCheckedChange={() => toggleType(type.id)}
                               className="border-slate-300"
                             />
-                            <Label htmlFor={type.id} className="text-sm text-slate-700 cursor-pointer font-normal">
+                            <Label htmlFor={`type-${type.id}`} className="text-sm text-slate-700 cursor-pointer font-normal">
                               {type.label}
                             </Label>
                           </div>
                         ))}
+                      </div>
+                    </div>
+
+                    {/* Category Filters */}
+                    <div className="space-y-2">
+                      <Label className="text-xs text-slate-600">Danh mục</Label>
+                      <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2 max-h-60 overflow-y-auto">
+                        {categoryOptions.map((cat) => {
+                          const count = items.filter(i => String(i.categoryId) === String(cat.id)).length;
+                          return (
+                          <div key={cat.id} className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`cat-${cat.id}`}
+                                checked={selectedCategories.includes(String(cat.id))}
+                                onCheckedChange={() => toggleCategory(String(cat.id))}
+                                className="border-slate-300"
+                              />
+                              <Label htmlFor={`cat-${cat.id}`} className="text-sm text-slate-700 cursor-pointer font-normal">
+                                {cat.name}
+                              </Label>
+                            </div>
+                            <span className="text-xs text-slate-500">{count}</span>
+                          </div>
+                        )})}
                       </div>
                     </div>
 
@@ -2429,7 +2599,7 @@ export function Inventory() {
                         {[
                           { id: "selling", label: "Đang bán" },
                           { id: "hot", label: "Bán chạy" },
-                          { id: "not_running", label: "Không chạy" },
+                          { id: "slow", label: "Bán chậm" },
                           { id: "paused", label: "Tạm ngưng" },
                         ].map((status) => (
                           <div key={status.id} className="flex items-center space-x-2">
@@ -2454,10 +2624,10 @@ export function Inventory() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setSelectedCategories(['all']);
                         setSelectedTypes(['ready-made', 'composite', 'ingredient']);
+                        setSelectedCategories(['all']);
                         setSelectedStockStatuses(['good', 'low', 'critical', 'expiring', 'expired']);
-                        setSelectedProductStatuses(['selling', 'hot', 'not_running', 'paused']);
+                        setSelectedProductStatuses(['selling', 'hot', 'slow', 'paused']);
                         setSearchQuery("");
                       }}
                     >
@@ -2502,6 +2672,7 @@ export function Inventory() {
                       <TableRow className="bg-blue-100">
                         <TableHead className="w-10"></TableHead>
                         <TableHead className="w-16">STT</TableHead>
+                        <TableHead className="w-16">Hình ảnh</TableHead>
                         <TableHead
                           className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("name")}
@@ -2579,7 +2750,7 @@ export function Inventory() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {tabFilteredItems.map((item, index) => {
+                      {paginatedItems.map((item, index) => {
                         const earliestExpiry = getEarliestExpiryFromBatches(
                           item.batches
                         );
@@ -2600,7 +2771,22 @@ export function Inventory() {
                                 )}
                               </TableCell>
                               <TableCell className="text-sm text-slate-600">
-                                {index + 1}
+                                {(page - 1) * pageSize + index + 1}
+                              </TableCell>
+                              <TableCell className="font-medium text-slate-900">
+                                {item.imageUrl ? (
+                                  <div className="h-10 w-10 rounded-md overflow-hidden bg-slate-100 border border-slate-200">
+                                    <img 
+                                      src={item.imageUrl} 
+                                      alt={item.name} 
+                                      className="h-full w-full object-cover"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="h-10 w-10 rounded-md bg-slate-100 flex items-center justify-center text-slate-400">
+                                    <ImageIcon className="w-5 h-5" />
+                                  </div>
+                                )}
                               </TableCell>
                               <TableCell>
                                 <div>
@@ -2856,6 +3042,7 @@ export function Inventory() {
                       <TableRow className="bg-blue-100">
                         <TableHead className="w-10"></TableHead>
                         <TableHead className="w-16">STT</TableHead>
+                        <TableHead className="w-16">Hình ảnh</TableHead>
                         <TableHead
                           className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("name")}
@@ -2932,7 +3119,7 @@ export function Inventory() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {tabFilteredItems.map((item, index) => {
+                      {paginatedItems.map((item, index) => {
                         const isExpanded = expandedItemId === item.id;
 
                         return (
@@ -2950,7 +3137,22 @@ export function Inventory() {
                                 )}
                               </TableCell>
                               <TableCell className="text-sm text-slate-600">
-                                {index + 1}
+                                {(page - 1) * pageSize + index + 1}
+                              </TableCell>
+                              <TableCell className="font-medium text-slate-900">
+                                {item.imageUrl ? (
+                                  <div className="h-10 w-10 rounded-md overflow-hidden bg-slate-100 border border-slate-200">
+                                    <img 
+                                      src={item.imageUrl} 
+                                      alt={item.name} 
+                                      className="h-full w-full object-cover"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="h-10 w-10 rounded-md bg-slate-100 flex items-center justify-center text-slate-400">
+                                    <ImageIcon className="w-5 h-5" />
+                                  </div>
+                                )}
                               </TableCell>
                               <TableCell className="text-sm">
                                 <div>
@@ -3252,6 +3454,7 @@ export function Inventory() {
                       <TableRow className="bg-blue-100">
                         <TableHead className="w-10"></TableHead>
                         <TableHead className="w-16">STT</TableHead>
+                        <TableHead className="w-16">Hình ảnh</TableHead>
                         <TableHead
                           className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("name")}
@@ -3329,7 +3532,7 @@ export function Inventory() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {tabFilteredItems.map((item, index) => {
+                      {paginatedItems.map((item, index) => {
                         const earliestExpiry = getEarliestExpiryFromBatches(
                           item.batches
                         );
@@ -3352,7 +3555,22 @@ export function Inventory() {
                                 )}
                               </TableCell>
                               <TableCell className="text-sm text-slate-600">
-                                {index + 1}
+                                {(page - 1) * pageSize + index + 1}
+                              </TableCell>
+                              <TableCell className="font-medium text-slate-900">
+                                {item.imageUrl ? (
+                                  <div className="h-10 w-10 rounded-md overflow-hidden bg-slate-100 border border-slate-200">
+                                    <img 
+                                      src={item.imageUrl} 
+                                      alt={item.name} 
+                                      className="h-full w-full object-cover"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="h-10 w-10 rounded-md bg-slate-100 flex items-center justify-center text-slate-400">
+                                    <ImageIcon className="w-5 h-5" />
+                                  </div>
+                                )}
                               </TableCell>
                               <TableCell>
                                 <div>
@@ -3608,43 +3826,51 @@ export function Inventory() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Pagination Controls */}
+        <div className="flex items-center justify-between py-4 border-t mt-4">
+            <div className="text-sm text-slate-500">
+              Hiển thị {clientTotalItems === 0 ? 0 : ((page - 1) * pageSize) + 1} - {Math.min(page * pageSize, clientTotalItems)} trong số {clientTotalItems} hàng hóa
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                Trước
+              </Button>
+              <div className="flex items-center gap-1">
+                 <span className="text-sm font-medium">Trang {page} / {Math.max(1, clientTotalPages)}</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.min(clientTotalPages, p + 1))}
+                disabled={page === clientTotalPages}
+              >
+                Sau
+              </Button>
+            </div>
+          </div>
       </div>
 
       {/* Import Excel Dialog */}
       <ImportExcelDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
+        module="inventory"
+        title="Import Hàng hóa & Nguyên liệu"
+        onSuccess={fetchInventoryItems}
       />
 
-      <ExportExcelDialog
-        open={exportDialogOpen}
-        onOpenChange={setExportDialogOpen}
-        data={filteredItems}
-        columns={[
-          { header: 'Mã hàng', accessor: (row: any) => row.id },
-          { header: 'Tên hàng', accessor: (row: any) => row.name },
-          { header: 'Loại', accessor: (row: any) => row.type === 'ready-made' ? 'Hàng bán sẵn' : row.type === 'ingredient' ? 'Nguyên liệu' : 'Hàng cấu thành' },
-          { header: 'Danh mục', accessor: (row: any) => row.category },
-          { header: 'Đơn vị', accessor: (row: any) => row.unit },
-          { header: 'Tồn kho', accessor: (row: any) => row.currentStock },
-          { header: 'Tồn tối thiểu', accessor: (row: any) => row.minStock },
-          { header: 'Tồn tối đa', accessor: (row: any) => row.maxStock },
-          { header: 'Giá trị tồn', accessor: (row: any) => row.totalValue },
-          {
-            header: 'Trạng thái', accessor: (row: any) => {
-              switch (row.status) {
-                case 'good': return 'Đủ hàng';
-                case 'low': return 'Sắp hết hàng';
-                case 'critical': return 'Hết hàng';
-                case 'expiring': return 'Gần hết hạn';
-                case 'expired': return 'Hết hạn';
-                default: return row.status;
-              }
-            }
-          },
-        ]}
-        fileName="danh-sach-hang-hoa"
-        title="Xuất danh sách hàng hóa"
+      <PrintMenuDialog
+        open={printMenuDialogOpen}
+        onOpenChange={setPrintMenuDialogOpen}
+        items={menuItems}
+        categories={categoryOptions}
+        initialSelectedTypes={selectedTypes}
       />
     </div>
   );
