@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useAuth } from "../../contexts/AuthContext";
 import { getCombos, createCombo, updateCombo, deleteCombo, toggleComboActive, getActiveCombos, getComboById } from "../../api/combo";
 import { ExportExcelDialog } from "../ExportExcelDialog";
+import { ComboImportDialog } from "../ComboImportDialog";
 import { Checkbox } from "@radix-ui/react-checkbox";
 import { getInventoryItems } from "../../api/inventoryItem";
 
@@ -1444,6 +1445,17 @@ export function Combos() {
         ]}
         fileName="combos.csv"
         title="Xuất danh sách combo"
+      />
+
+      {/* Import Dialog */}
+      <ComboImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onCompleted={() => {
+          // Refresh list after successful import and close dialog
+          setImportDialogOpen(false);
+          loadData();
+        }}
       />
     </div>
   );

@@ -2720,8 +2720,14 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
   }, 0);
 
   // Decide display totals: prefer backend values when available
-  const displaySubtotal = orderSubtotal > 0 ? orderSubtotal : localTotalAmount;
-  const displayTotalAmount = orderTotalAmount > 0 ? orderTotalAmount : localTotalAmount;
+  // Guard: if there are no (non-topping) items, show 0 regardless of backend subtotals
+  const hasCartItems = totalItems > 0;
+  const displaySubtotal = hasCartItems
+    ? (orderSubtotal > 0 ? orderSubtotal : localTotalAmount)
+    : 0;
+  const displayTotalAmount = hasCartItems
+    ? (orderTotalAmount > 0 ? orderTotalAmount : localTotalAmount)
+    : 0;
 
   const getTableStatusColor = (status: Table["status"]) => {
     switch (status) {
