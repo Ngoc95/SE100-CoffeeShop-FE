@@ -1301,10 +1301,10 @@ export function Promotions() {
                               : "-"}
                           </TableCell>
                           <TableCell className="text-sm text-slate-700">
-                            {promo.startDateTime.toString().split('T')[0]}
+                            {promo.startDateTime ? promo.startDateTime.toString().split('T')[0] : "-"}
                           </TableCell>
                           <TableCell className="text-sm text-slate-700">
-                            {promo.endDateTime.toString().split('T')[0]}
+                            {promo.endDateTime ? promo.endDateTime.toString().split('T')[0] : "-"}
                           </TableCell>
                           <TableCell className="text-sm">{getStatusBadge(promo.isActive)}</TableCell>
                           <TableCell className="text-sm text-right">
