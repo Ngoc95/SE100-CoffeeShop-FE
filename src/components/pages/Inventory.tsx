@@ -1,4 +1,4 @@
-import { useState, Fragment, ChangeEvent } from "react";
+import { useState, Fragment, ChangeEvent, useEffect } from "react";
 import {
   Search,
   Plus,
@@ -20,10 +20,14 @@ import {
   Upload,
   Download,
   Filter,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
+import { inventoryService } from "../../services/inventoryService";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
-import { exportToCSV } from "../utils/export";
+
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Checkbox } from "../ui/checkbox";
@@ -59,63 +63,89 @@ import { ImageUploadWithCrop } from "../ImageUploadWithCrop";
 import { ImportExcelDialog } from "../ImportExcelDialog";
 import { ExportExcelDialog } from "../ExportExcelDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-
-// Type definitions
-type ItemType = "ready-made" | "composite" | "ingredient";
-type SortField = "name" | "currentStock" | "totalValue" | "expiryDate" | "category" | "unit" | "batches" | "status" | "productStatus" | "ingredients" | "avgUnitCost" | "supplier" | "sellingPrice";
-type SortOrder = "asc" | "desc" | "none";
-
-interface BatchInfo {
-  batchCode: string;
-  quantity: number;
-  unitCost: number;
-  entryDate: string;
-  expiryDate?: string;
-  supplier: string;
-}
-
-interface CompositeIngredient {
-  ingredientId: string;
-  ingredientName: string;
-  unit: string;
-  quantity: number;
-  unitCost: number;
-}
-
-interface InventoryItem {
-  id: string;
-  name: string;
-  type: ItemType;
-  category: string;
-  currentStock: number;
-  unit: string;
-  minStock: number;
-  maxStock: number;
-  status: "good" | "low" | "expiring" | "expired" | "critical";
-  productStatus?: "selling" | "paused" | "not_running" | "hot";
-  imageUrl?: string; // Image URL for the item
-
-  // For ready-made & ingredients
-  batches?: BatchInfo[];
-
-  // For composite items
-  ingredients?: CompositeIngredient[];
-
-  // Calculated fields
-  totalValue: number;
-  avgUnitCost: number;
-  sellingPrice?: number;
-  isTopping?: boolean;
-  associatedProductIds?: string[];
-}
+import {
+  InventoryItem,
+  ItemType,
+  SortField,
+  SortOrder,
+  BatchInfo,
+  CompositeIngredient,
+} from "../../types/inventory"
 
 import { useAuth } from "../../contexts/AuthContext";
 
+type AddFailureEntry = {
+  id: string;
+  name: string;
+  reason: string;
+  timestamp: string;
+  itemType?: ItemType;
+};
+
 export function Inventory() {
-  const { hasPermission } = useAuth();
+
+  const { hasPermission, user } = useAuth();
   const canCreate = hasPermission('goods_inventory:create');
   const canUpdate = hasPermission('goods_inventory:update');
   const canDelete = hasPermission('goods_inventory:delete');
+
+  const [addDialogValues, setAddDialogValues] = useState({
+    name: "",
+    categoryId: "",
+    unitId: "",
+    minStock: 0,
+    maxStock: 0,
+    sellingPrice: 0,
+  });
+
+  // State for new Category/Unit creation
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newUnitValues, setNewUnitValues] = useState({ name: "", symbol: "" });
+
+  // Categories/Units from API
+  const [categoryOptions, setCategoryOptions] = useState<any[]>([]);
+  const [unitOptions, setUnitOptions] = useState<any[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [loadingUnits, setLoadingUnits] = useState(false);
+
+  // Load categories from API
+  useEffect(() => {
+    setLoadingCategories(true);
+    inventoryService.getCategories()
+      .then((res) => {
+        // API có thể trả { metaData: [...] } hoặc { metaData: { items: [...] } } hoặc { items: [...] } hoặc [...]
+        let arr: any[] = [];
+        if (Array.isArray(res?.metaData)) arr = res.metaData;
+        else if (res?.metaData?.items && Array.isArray(res.metaData.items)) arr = res.metaData.items;
+        else if (res?.items && Array.isArray(res.items)) arr = res.items;
+        else if (Array.isArray(res)) arr = res;
+        // Đảm bảo id là string cho Select
+        setCategoryOptions(arr.map((c) => ({ ...c, id: String(c.id) })));
+      })
+      .catch(() => setCategoryOptions([]))
+      .finally(() => setLoadingCategories(false));
+  }, []);
+
+  // Load units from API
+  useEffect(() => {
+    setLoadingUnits(true);
+    inventoryService
+      .getUnits()
+      .then((res) => {
+        const units = Array.isArray(res?.metaData)
+          ? res.metaData
+          : Array.isArray(res)
+            ? res
+            : [];
+
+        setUnitOptions(units.map((unit: any) => ({
+          ...unit,
+          id: String(unit.id),
+        })));
+      })
+      .catch(() => setUnitOptions([]))
+      .finally(() => setLoadingUnits(false));
+  }, []);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([
@@ -140,6 +170,7 @@ export function Inventory() {
     "hot",
   ]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addFailureEntries, setAddFailureEntries] = useState<AddFailureEntry[]>([]);
   const [addItemType, setAddItemType] = useState<ItemType>("ready-made");
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -176,346 +207,136 @@ export function Inventory() {
     minStock: 0,
     maxStock: 0,
     sellingPrice: undefined as number | undefined,
-    productStatus: undefined as string | undefined, // Add productStatus
-    ingredients: [] as CompositeIngredient[], // Add ingredients
+    productStatus: undefined as string | undefined,
+    ingredients: [] as CompositeIngredient[],
     isTopping: false,
-    associatedProductIds: [] as string[],
+    productIds: [] as number[],
     imageUrl: "",
   });
 
-  // Mock data
-  const inventoryItems: InventoryItem[] = [
-    // Ready-made items
-    {
-      id: "rm1",
-      name: "Coca Cola",
-      type: "ready-made",
-      category: "bottled-beverages",
-      currentStock: 48,
-      unit: "chai",
-      minStock: 20,
-      maxStock: 100,
-      status: "good",
-      imageUrl:
-        "https://images.unsplash.com/photo-1648569883125-d01072540b4c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb2NhJTIwY29sYSUyMGJvdHRsZXxlbnwxfHx8fDE3NjM5OTI5MTR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      batches: [
-        {
-          batchCode: "LO001",
-          quantity: 30,
-          unitCost: 12000,
-          entryDate: "2025-01-10",
-          expiryDate: "2025-06-15",
-          supplier: "Coca Cola Việt Nam",
-        },
-        {
-          batchCode: "LO002",
-          quantity: 18,
-          unitCost: 11500,
-          entryDate: "2025-01-18",
-          expiryDate: "2025-07-20",
-          supplier: "Coca Cola Việt Nam",
-        },
-      ],
-      totalValue: 567000,
-      avgUnitCost: 11813,
-      sellingPrice: 15000,
-    },
-    {
-      id: "rm2",
-      name: "Bánh Croissant",
-      type: "ready-made",
-      category: "packaging",
-      currentStock: 8,
-      unit: "cái",
-      minStock: 15,
-      maxStock: 50,
-      status: "low",
-      imageUrl:
-        "https://images.unsplash.com/photo-1712723246766-3eaea22e52ff?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjcm9pc3NhbnQlMjBwYXN0cnl8ZW58MXx8fHwxNzY0MDA2MzEyfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      batches: [
-        {
-          batchCode: "LO003",
-          quantity: 8,
-          unitCost: 25000,
-          entryDate: "2025-01-22",
-          expiryDate: "2025-01-26",
-          supplier: "Tiệm bánh ABC",
-        },
-      ],
-      totalValue: 200000,
-      avgUnitCost: 25000,
-      sellingPrice: 20000,
-    },
+  // API states
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [items, setItems] = useState<InventoryItem[]>([]);
 
-    // Composite items
-    {
-      id: "cp1",
-      name: "Cà phê Latte",
-      type: "composite",
-      category: "bottled-beverages",
-      currentStock: 0,
-      unit: "ly",
-      minStock: 0,
-      maxStock: 0,
-      status: "good",
-      imageUrl:
-        "https://images.unsplash.com/photo-1585494156145-1c60a4fe952b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb2ZmZWUlMjBsYXR0ZXxlbnwxfHx8fDE3NjM5MzQ4NTN8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      ingredients: [
-        {
-          ingredientId: "ing1",
-          ingredientName: "Cà phê hạt Arabica",
-          unit: "g",
-          quantity: 18,
-          unitCost: 350,
-        },
-        {
-          ingredientId: "ing2",
-          ingredientName: "Sữa tươi",
-          unit: "ml",
-          quantity: 200,
-          unitCost: 28,
-        },
-        {
-          ingredientId: "ing3",
-          ingredientName: "Đường trắng",
-          unit: "g",
-          quantity: 10,
-          unitCost: 22,
-        },
-      ],
-      totalValue: 0,
-      avgUnitCost: 12120,
-      sellingPrice: 35000,
-    },
-    {
-      id: "cp2",
-      name: "Trà sữa Ô Long",
-      type: "composite",
-      category: "bottled-beverages",
-      currentStock: 0,
-      unit: "ly",
-      minStock: 0,
-      maxStock: 0,
-      status: "good",
-      imageUrl:
-        "https://images.unsplash.com/photo-1597215753169-e717ab0acbe5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtaWxrJTIwdGVhJTIwb29sb25nfGVufDF8fHx8MTc2NDAzNDc5NXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      ingredients: [
-        {
-          ingredientId: "ing5",
-          ingredientName: "Trà Ô Long",
-          unit: "g",
-          quantity: 10,
-          unitCost: 280,
-        },
-        {
-          ingredientId: "ing2",
-          ingredientName: "Sữa tươi",
-          unit: "ml",
-          quantity: 150,
-          unitCost: 28,
-        },
-        {
-          ingredientId: "ing3",
-          ingredientName: "Đường trắng",
-          unit: "g",
-          quantity: 15,
-          unitCost: 22,
-        },
-        {
-          ingredientId: "ing4",
-          ingredientName: "Kem tươi",
-          unit: "ml",
-          quantity: 30,
-          unitCost: 85,
-        },
-      ],
-      totalValue: 0,
-      avgUnitCost: 10280,
-      sellingPrice: 30000,
-    },
+  // Fetch inventory items from API
+  useEffect(() => {
+    fetchInventoryItems();
+  }, []);
 
-    // Ingredients
-    {
-      id: "ing1",
-      name: "Cà phê hạt Arabica",
-      type: "ingredient",
-      category: "coffee",
-      currentStock: 15,
-      unit: "kg",
-      minStock: 20,
-      maxStock: 50,
-      status: "low",
-      imageUrl:
-        "https://images.unsplash.com/photo-1627060063885-e1a30ab40551?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb2ZmZWUlMjBiZWFucyUyMGFyYWJpY2F8ZW58MXx8fHwxNzY0MDM1MDMwfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      batches: [
-        {
-          batchCode: "LO101",
-          quantity: 10,
-          unitCost: 350000,
-          entryDate: "2025-01-05",
-          expiryDate: "2025-06-15",
-          supplier: "Trung Nguyên",
-        },
-        {
-          batchCode: "LO102",
-          quantity: 5,
-          unitCost: 360000,
-          entryDate: "2025-01-15",
-          expiryDate: "2025-06-20",
-          supplier: "Trung Nguyên",
-        },
-      ],
-      totalValue: 5300000,
-      avgUnitCost: 353333,
-      sellingPrice: 420000,
-    },
-    {
-      id: "ing2",
-      name: "Sữa tươi",
-      type: "ingredient",
-      category: "dairy",
-      currentStock: 12,
-      unit: "L",
-      minStock: 10,
-      maxStock: 30,
-      status: "expiring",
-      imageUrl:
-        "https://images.unsplash.com/photo-1523473827533-2a64d0d36748?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmcmVzaCUyMG1pbGt8ZW58MXx8fHwxNzYzOTUwMzcyfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      batches: [
-        {
-          batchCode: "LO201",
-          quantity: 7,
-          unitCost: 28000,
-          entryDate: "2025-01-20",
-          expiryDate: "2025-01-27",
-          supplier: "Vinamilk",
-        },
-        {
-          batchCode: "LO202",
-          quantity: 5,
-          unitCost: 27500,
-          entryDate: "2025-01-22",
-          expiryDate: "2025-01-29",
-          supplier: "Vinamilk",
-        },
-      ],
-      totalValue: 333500,
-      avgUnitCost: 27792,
-      sellingPrice: 35000,
-    },
-    {
-      id: "ing3",
-      name: "Đường trắng",
-      type: "ingredient",
-      category: "syrup",
-      currentStock: 3,
-      unit: "kg",
-      minStock: 10,
-      maxStock: 30,
-      status: "critical",
-      imageUrl:
-        "https://images.unsplash.com/photo-1641679103706-fc8542e2a97a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3aGl0ZSUyMHN1Z2FyfGVufDF8fHx8MTc2Mzk5NTQ0Mnww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      batches: [
-        {
-          batchCode: "LO301",
-          quantity: 3,
-          unitCost: 22000,
-          entryDate: "2025-01-10",
-          expiryDate: "2025-12-31",
-          supplier: "Biên Hòa",
-        },
-      ],
-      totalValue: 66000,
-      avgUnitCost: 22000,
-      sellingPrice: 30000,
-    },
-    {
-      id: "ing4",
-      name: "Kem tươi",
-      type: "ingredient",
-      category: "dairy",
-      currentStock: 8,
-      unit: "hộp",
-      minStock: 5,
-      maxStock: 20,
-      status: "expiring",
-      imageUrl:
-        "https://images.unsplash.com/photo-1622737338437-39a24c37f0de?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3aGlwcGVkJTIwY3JlYW18ZW58MXx8fHwxNzY0MDM1MDMxfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      batches: [
-        {
-          batchCode: "LO401",
-          quantity: 8,
-          unitCost: 85000,
-          entryDate: "2025-01-19",
-          expiryDate: "2025-01-29",
-          supplier: "Anchor",
-        },
-      ],
-      totalValue: 680000,
-      avgUnitCost: 85000,
-      sellingPrice: 110000,
-    },
-    {
-      id: "ing5",
-      name: "Trà Ô Long",
-      type: "ingredient",
-      category: "tea",
-      currentStock: 25,
-      unit: "kg",
-      minStock: 10,
-      maxStock: 40,
-      status: "good",
-      imageUrl:
-        "https://images.unsplash.com/photo-1760074057726-e94ee8ff1eb4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxvb2xvbmclMjB0ZWElMjBsZWF2ZXN8ZW58MXx8fHwxNzYzOTY1ODc2fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      batches: [
-        {
-          batchCode: "LO501",
-          quantity: 15,
-          unitCost: 280000,
-          entryDate: "2025-01-08",
-          expiryDate: "2025-06-30",
-          supplier: "Phúc Long",
-        },
-        {
-          batchCode: "LO502",
-          quantity: 10,
-          unitCost: 275000,
-          entryDate: "2025-01-16",
-          expiryDate: "2025-07-15",
-          supplier: "Phúc Long",
-        },
-      ],
-      totalValue: 6950000,
-      avgUnitCost: 278000,
-      sellingPrice: 350000,
-    },
-    {
-      id: "ing6",
-      name: "Ly nhựa size L",
-      type: "ingredient",
-      category: "packaging",
-      currentStock: 150,
-      unit: "cái",
-      minStock: 500,
-      maxStock: 2000,
-      status: "critical",
-      imageUrl:
-        "https://images.unsplash.com/photo-1561050933-2482aca2dd64?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwbGFzdGljJTIwY3VwfGVufDF8fHx8MTc2NDAzNTAzMnww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      batches: [
-        {
-          batchCode: "LO601",
-          quantity: 150,
-          unitCost: 1200,
-          entryDate: "2025-01-12",
-          expiryDate: "2025-12-31",
-          supplier: "Bao bì Minh Anh",
-        },
-      ],
-      totalValue: 180000,
-      avgUnitCost: 1200,
-      sellingPrice: 2500,
-    },
-  ];
+  const fetchInventoryItems = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      console.log("[Inventory] Fetching items...");
+
+      // Check if user is authenticated
+      if (!user) {
+        console.warn("[Inventory] User not authenticated, loading mock data...");
+        throw new Error("Not authenticated");
+      }
+
+      const data = await inventoryService.getItems();
+      console.log("[Inventory] API Response:", data);
+
+      // Handle API response structure: { metaData: { items: [...] } }
+      let itemsArray: any[] = [];
+
+      if (data?.metaData?.items && Array.isArray(data.metaData.items)) {
+        itemsArray = data.metaData.items;
+      } else if (data?.items && Array.isArray(data.items)) {
+        itemsArray = data.items;
+      } else if (Array.isArray(data)) {
+        itemsArray = data;
+      }
+
+
+      // Map API response to InventoryItem type, ensuring 'type' and 'status' are set for filtering
+      const mappedItems: InventoryItem[] = itemsArray.map((item: any) => {
+        // Determine type
+        let type: ItemType = "ingredient";
+        if (item.itemType?.name) {
+          const t = item.itemType.name.toLowerCase();
+          if (t === "ready-made" || t === "ready_made") type = "ready-made";
+          else if (t === "composite") type = "composite";
+          else if (t === "ingredient") type = "ingredient";
+        } else if (item.itemTypeId || item.item_type_id) {
+          const typeId = Number(item.itemTypeId || item.item_type_id);
+          if (typeId === 1) type = "ready-made";
+          else if (typeId === 2) type = "composite";
+          else if (typeId === 3) type = "ingredient";
+        }
+
+        // Calculate status based on stock
+        let status: InventoryItem["status"] = "good";
+        const stock = Number(item.currentStock) || 0;
+        const minStock = item.minStock ? Number(item.minStock) : 0;
+        if (stock <= 0) status = "critical";
+        else if (stock <= minStock) status = "low";
+        // TODO: Add expiring/expired logic if expiry info available
+
+        return {
+          id: String(item.id),
+          name: item.name || "",
+          type,
+          category: item.category?.name || (typeof item.category === "string" ? item.category : ""),
+          categoryId: item.category?.id ? Number(item.category.id) : (item.categoryId ? Number(item.categoryId) : undefined),
+          currentStock: stock,
+          unit: item.unit?.name || (typeof item.unit === "string" ? item.unit : ""),
+          unitId: item.unit?.id ? Number(item.unit.id) : (item.unitId ? Number(item.unitId) : undefined),
+          minStock,
+          maxStock: item.maxStock ? Number(item.maxStock) : 0,
+          status,
+          productStatus: item.productStatus || "selling",
+          imageUrl: item.imageUrl || undefined,
+          batches: (item.inventoryBatches && Array.isArray(item.inventoryBatches))
+            ? item.inventoryBatches.map((b: any) => ({
+              batchCode: b.batchCode || "",
+              entryDate: b.entryDate || "",
+              expiryDate: b.expiryDate || "",
+              quantity: Number(b.remainingQty ?? b.quantity) || 0,
+              unitCost: Number(b.unitCost) || 0,
+              supplier: b.supplier?.name || (typeof b.supplier === 'string' ? b.supplier : "")
+            }))
+            : (item.batches || undefined),
+          ingredients: (item.ingredientOf && Array.isArray(item.ingredientOf))
+            ? item.ingredientOf.map((io: any) => ({
+              ingredientId: String(io.ingredientItemId),
+              ingredientName: io.ingredientItem?.name || "",
+              unit: io.unit || io.ingredientItem?.unit?.name || "",
+              quantity: Number(io.quantity) || 0,
+              unitCost: Number(io.ingredientItem?.avgUnitCost) || 0,
+            }))
+            : (item.ingredients || undefined),
+          totalValue: stock * (Number(item.avgUnitCost) || 0),
+          avgUnitCost: Number(item.avgUnitCost) || 0,
+          sellingPrice: item.sellingPrice ? Number(item.sellingPrice) : undefined,
+          isTopping: item.isTopping || false,
+          productIds: item.productIds || undefined,
+        };
+      });
+
+      console.log("[Inventory] Mapped items:", mappedItems);
+      setItems(mappedItems);
+
+      if (mappedItems.length === 0) {
+        console.warn("[Inventory] No items returned from API");
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Lỗi khi tải dữ liệu";
+      console.error("Error fetching inventory:", err);
+
+      // Load mock data as fallback
+      console.log("[Inventory] Loading fallback mock data...");
+      const mockItems: InventoryItem[] = [
+
+      ];
+      setItems(mockItems);
+      setError(null); // Don't show error if we have mock data
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -580,6 +401,215 @@ export function Inventory() {
     );
   };
 
+  const getItemTypeLabel = (type?: ItemType) => {
+    switch (type) {
+      case "ready-made":
+        return "Hàng bán sẵn";
+      case "composite":
+        return "Hàng cấu thành";
+      case "ingredient":
+        return "Nguyên liệu";
+      default:
+        return "Không xác định";
+    }
+  };
+
+  // Handle Add New Item (API Integration)
+  const handleAddNewItem = async () => {
+    try {
+      // Validate
+      if (!addDialogValues.name || !addDialogValues.categoryId || !addDialogValues.unitId) {
+        toast.error("Vui lòng điền đầy đủ thông tin bắt buộc (Tên, Danh mục, Đơn vị)");
+        return;
+      }
+
+      const itemTypeIdMap: Record<string, number> = {
+        "ready-made": 1,
+        "composite": 2,
+        "ingredient": 3
+      };
+
+      const payload = {
+        name: addDialogValues.name,
+        itemTypeId: itemTypeIdMap[addItemType],
+        categoryId: Number(addDialogValues.categoryId),
+        unitId: Number(addDialogValues.unitId),
+        minStock: Number(addDialogValues.minStock),
+        maxStock: Number(addDialogValues.maxStock),
+        sellingPrice: Number(addDialogValues.sellingPrice),
+        productStatus: "selling", // Default as per requirement
+        isTopping: addItemType === 'composite' ? isTopping : false,
+        // Optional fields
+        imageUrl: newItemImage || null,
+        ingredients: addItemType === 'composite'
+          ? selectedIngredients.map(i => ({
+            ingredientItemId: Number(i.ingredientId),
+            quantity: i.quantity,
+            unit: i.unit
+          }))
+          : [],
+        // For toppings/extra logic if needed
+        productIds: (addItemType === 'composite' && isTopping) ? associatedProducts.map(p => Number(p.id)) : [],
+      };
+
+      console.log("[Inventory] Creating item with payload:", payload);
+
+      const response = await inventoryService.createItem(payload as any) as any;
+      const created = response.metaData || response;
+
+      // Map response to UI model
+      const getName = (val: any) => (typeof val === "object" && val && typeof val.name === "string") ? val.name : (typeof val === "string" ? val : "");
+
+      const mapped: InventoryItem = {
+        id: String(created.id),
+        name: created.name,
+        type: addItemType,
+        category: getName(created.category) || (categories.find(c => String(c.id) === String(created.categoryId))?.name || ""),
+        currentStock: Number(created.currentStock) || 0,
+        unit: getName(created.unit) || (unitOptions.find(u => String(u.id) === String(created.unitId))?.name || ""),
+        minStock: Number(created.minStock) || 0,
+        maxStock: Number(created.maxStock) || 0,
+        status: "good",
+        productStatus: (created.productStatus as any) || "selling",
+        imageUrl: created.imageUrl,
+        batches: created.batches || [],
+        ingredients: (created.ingredientOf && Array.isArray(created.ingredientOf))
+          ? created.ingredientOf.map((io: any) => ({
+            ingredientId: String(io.ingredientItemId),
+            ingredientName: io.ingredientItem?.name || "",
+            unit: io.unit || io.ingredientItem?.unit?.name || "",
+            quantity: Number(io.quantity) || 0,
+            unitCost: Number(io.ingredientItem?.avgUnitCost) || 0,
+          }))
+          : (created.ingredients || []),
+        totalValue: (Number(created.currentStock) || 0) * (Number(created.avgUnitCost) || 0),
+        avgUnitCost: Number(created.avgUnitCost) || 0,
+        sellingPrice: created.sellingPrice ? Number(created.sellingPrice) : undefined,
+        isTopping: created.isTopping || false,
+        productIds: created.productIds,
+      };
+
+      setItems((prev) => [mapped, ...prev]);
+      setAddDialogOpen(false);
+
+      // Reset form
+      setAddDialogValues({
+        name: "",
+        categoryId: "",
+        unitId: "",
+        minStock: 0,
+        maxStock: 0,
+        sellingPrice: 0,
+      });
+      setNewItemImage("");
+      setSelectedIngredients([]);
+      setIsTopping(false);
+      setAssociatedProducts([]);
+
+      toast.success("Tạo sản phẩm thành công");
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Lỗi khi thêm mặt hàng";
+      console.error("Error creating item:", err);
+      toast.error(errorMsg);
+
+      // Add check for failure entry creation if needed, or keeping simple
+    }
+  };
+
+  // Handle Update Item
+  const handleUpdateItem = async (itemId: string, updatedData: any) => {
+    try {
+      const response = await inventoryService.updateItem(itemId, updatedData) as any;
+      const updatedItemRaw = response.metaData || response;
+
+      // Map the updated item
+      const typeMap: Record<number, ItemType> = { 1: "ready-made", 2: "composite", 3: "ingredient" };
+      const updatedItem: InventoryItem = {
+        id: String(updatedItemRaw.id),
+        name: updatedItemRaw.name,
+        type: typeMap[Number(updatedItemRaw.itemTypeId)] || "ingredient",
+        category: updatedItemRaw.category?.name || String(updatedItemRaw.categoryId || ""),
+        categoryId: Number(updatedItemRaw.categoryId || updatedItemRaw.category?.id || 0),
+        currentStock: Number(updatedItemRaw.currentStock) || 0,
+        unit: updatedItemRaw.unit?.name || (typeof updatedItemRaw.unit === "string" ? updatedItemRaw.unit : ""),
+        unitId: Number(updatedItemRaw.unitId || updatedItemRaw.unit?.id || 0),
+        minStock: Number(updatedItemRaw.minStock) || 0,
+        maxStock: Number(updatedItemRaw.maxStock) || 0,
+        status: Number(updatedItemRaw.currentStock) <= 0 ? "critical" : (Number(updatedItemRaw.currentStock) <= (updatedItemRaw.minStock || 0) ? "low" : "good"),
+        productStatus: updatedItemRaw.productStatus || "selling",
+        imageUrl: updatedItemRaw.imageUrl,
+        batches: updatedItemRaw.batches || [],
+        ingredients: (updatedItemRaw.ingredientOf && Array.isArray(updatedItemRaw.ingredientOf))
+          ? updatedItemRaw.ingredientOf.map((io: any) => ({
+            ingredientId: String(io.ingredientItemId),
+            ingredientName: io.ingredientItem?.name || "",
+            unit: io.unit || io.ingredientItem?.unit?.name || "",
+            quantity: Number(io.quantity) || 0,
+            unitCost: Number(io.ingredientItem?.avgUnitCost) || 0,
+          }))
+          : (updatedItemRaw.ingredients || []),
+        totalValue: (Number(updatedItemRaw.currentStock) || 0) * (Number(updatedItemRaw.avgUnitCost) || 0),
+        avgUnitCost: Number(updatedItemRaw.avgUnitCost) || 0,
+        sellingPrice: updatedItemRaw.sellingPrice ? Number(updatedItemRaw.sellingPrice) : undefined,
+        isTopping: updatedItemRaw.isTopping || false,
+        productIds: updatedItemRaw.productIds || updatedItemRaw.associatedProductIds,
+      };
+
+      setItems(items.map(item => item.id === itemId ? updatedItem : item));
+      setEditDialogOpen(false);
+      setEditingItem(null);
+      toast.success("Cập nhật thành công");
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Lỗi khi cập nhật";
+      toast.error(errorMsg);
+      console.error("Error updating item:", err);
+    }
+  };
+
+  // Handle Delete Item
+  const handleDeleteItem = async (itemId: string) => {
+    try {
+      await inventoryService.deleteItem(itemId);
+      setItems(items.filter(item => item.id !== itemId));
+      toast.success("Xóa thành công");
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Lỗi khi xóa";
+      toast.error(errorMsg);
+      console.error("Error deleting item:", err);
+    }
+  };
+
+  // Handle Create Category
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    try {
+      const newCat = await inventoryService.createCategory({ name: newCategoryName });
+      setCategoryOptions([...categoryOptions, { ...newCat, id: String(newCat.id) }]);
+      setAddCategoryDialogOpen(false);
+      setNewCategoryName("");
+      toast.success("Thêm danh mục thành công");
+      // Auto select logic could be added here if this was triggered from a select
+    } catch (error) {
+      console.error(error);
+      toast.error("Lỗi khi tạo danh mục");
+    }
+  };
+
+  // Handle Create Unit
+  const handleCreateUnit = async () => {
+    if (!newUnitValues.name.trim() || !newUnitValues.symbol.trim()) return;
+    try {
+      const newUnit = await inventoryService.createUnit(newUnitValues);
+      setUnitOptions([...unitOptions, { ...newUnit, id: String(newUnit.id) }]);
+      setAddUnitDialogOpen(false);
+      setNewUnitValues({ name: "", symbol: "" });
+      toast.success("Thêm đơn vị thành công");
+    } catch (error) {
+      console.error(error);
+      toast.error("Lỗi khi tạo đơn vị");
+    }
+  };
+
   const getStatusBadge = (status: InventoryItem["status"]) => {
     switch (status) {
       case "good":
@@ -636,8 +666,113 @@ export function Inventory() {
     return datesWithExpiry.sort()[0];
   };
 
-  const toggleExpand = (itemId: string) => {
-    setExpandedItemId(expandedItemId === itemId ? null : itemId);
+  const toggleExpand = async (itemId: string) => {
+    const isExpanding = expandedItemId !== itemId;
+    setExpandedItemId(isExpanding ? itemId : null);
+
+    if (isExpanding) {
+      try {
+        const res = await inventoryService.getItemById(itemId) as any;
+        const meta = res.metaData || res;
+
+        setItems((prev) =>
+          prev.map((i) =>
+            i.id === itemId
+              ? {
+                ...i,
+                availableToppings: meta.availableToppings || [],
+                applicableProducts: meta.applicableProducts || [],
+                // Update batches from inventoryBatches
+                batches: (meta.inventoryBatches && Array.isArray(meta.inventoryBatches))
+                  ? meta.inventoryBatches.map((b: any) => ({
+                    batchCode: b.batchCode || "",
+                    entryDate: b.entryDate || "",
+                    expiryDate: b.expiryDate || "",
+                    quantity: Number(b.remainingQty ?? b.quantity) || 0,
+                    unitCost: Number(b.unitCost) || 0,
+                    supplier: b.supplier?.name || (typeof b.supplier === 'string' ? b.supplier : "")
+                  }))
+                  : (i.batches || []),
+                // Also update ingredients just in case
+                ingredients: (meta.ingredientOf && Array.isArray(meta.ingredientOf))
+                  ? meta.ingredientOf.map((io: any) => ({
+                    ingredientId: String(io.ingredientItemId),
+                    ingredientName: io.ingredientItem?.name || "",
+                    unit: io.unit || io.ingredientItem?.unit?.name || "",
+                    quantity: Number(io.quantity) || 0,
+                    unitCost: Number(io.ingredientItem?.avgUnitCost) || 0,
+                  }))
+                  : (i.ingredients || []),
+              }
+              : i
+          )
+        );
+      } catch (error) {
+        console.error("Error fetching item details on expand:", error);
+      }
+    }
+  };
+
+  const handleStartEdit = async (item: InventoryItem) => {
+    try {
+      // Fetch full details to ensure we have the latest IDs and relations
+      const res = await inventoryService.getItemById(item.id) as any;
+      const meta = res.metaData || res;
+
+      let productIds = meta.productIds || meta.associatedProductIds || [];
+      // If productIds is empty but applicableProducts is present (for toppings)
+      if (productIds.length === 0 && meta.applicableProducts && Array.isArray(meta.applicableProducts)) {
+        productIds = meta.applicableProducts.map((p: any) => p.productId);
+      }
+
+      const fullItem: InventoryItem = {
+        ...item,
+        categoryId: meta.category?.id ? Number(meta.category.id) : (meta.categoryId ? Number(meta.categoryId) : item.categoryId),
+        unitId: meta.unit?.id ? Number(meta.unit.id) : (meta.unitId ? Number(meta.unitId) : item.unitId),
+        isTopping: meta.isTopping || false,
+        productIds: productIds,
+        ingredients: (meta.ingredientOf && Array.isArray(meta.ingredientOf))
+          ? meta.ingredientOf.map((io: any) => ({
+            ingredientId: String(io.ingredientItemId),
+            ingredientName: io.ingredientItem?.name || "",
+            unit: io.unit || io.ingredientItem?.unit?.name || "",
+            quantity: Number(io.quantity) || 0,
+            unitCost: Number(io.ingredientItem?.avgUnitCost) || 0,
+          }))
+          : (meta.ingredients || item.ingredients || []),
+      };
+
+      setEditingItem(fullItem);
+      setEditValues({
+        name: fullItem.name,
+        category: fullItem.categoryId ? String(fullItem.categoryId) : "",
+        unit: fullItem.unitId ? String(fullItem.unitId) : "",
+        minStock: fullItem.minStock,
+        maxStock: fullItem.maxStock,
+        sellingPrice: fullItem.sellingPrice,
+        productStatus: fullItem.productStatus,
+        ingredients: fullItem.ingredients || [],
+        isTopping: fullItem.isTopping || false,
+        productIds: fullItem.productIds || [],
+        imageUrl: fullItem.imageUrl || "",
+      });
+
+      setIsTopping(fullItem.isTopping || false);
+
+      // Map associated products from the items list based on productIds
+      if (fullItem.productIds && fullItem.productIds.length > 0) {
+        setAssociatedProducts(
+          items.filter((i) => fullItem.productIds?.includes(Number(i.id)))
+        );
+      } else {
+        setAssociatedProducts([]);
+      }
+
+      setEditDialogOpen(true);
+    } catch (error) {
+      console.error("Error fetching item details for edit:", error);
+      toast.error("Không thể tải thông tin chi tiết mặt hàng");
+    }
   };
 
   const getAddDialogTitle = () => {
@@ -650,8 +785,6 @@ export function Inventory() {
         return "Thêm nguyên liệu";
     }
   };
-
-  const [items, setItems] = useState<InventoryItem[]>(inventoryItems);
 
   let filteredItems = items.filter((item) => {
     const matchesCategory =
@@ -694,7 +827,13 @@ export function Inventory() {
         aValue = a.batches?.length || 0;
         bValue = b.batches?.length || 0;
       } else if (sortField === "status") {
-        const statusOrder = { good: 0, low: 1, expiring: 2, critical: 3 };
+        const statusOrder: Record<InventoryItem["status"], number> = {
+          good: 0,
+          low: 1,
+          expiring: 2,
+          expired: 3,
+          critical: 4,
+        };
         aValue = statusOrder[a.status] ?? 0;
         bValue = statusOrder[b.status] ?? 0;
       } else if (sortField === "productStatus") {
@@ -747,8 +886,49 @@ export function Inventory() {
     (item) => item.type === activeTab
   );
 
+  // Show loading state
+  if (loading && items.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-3" />
+          <p className="text-slate-600">Đang tải dữ liệu kho hàng...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error && items.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center p-4">
+        <Card className="max-w-md border-red-200 bg-red-50">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center gap-3">
+              <AlertCircle className="w-8 h-8 text-red-600" />
+              <p className="text-red-700 text-center font-medium">Lỗi khi tải dữ liệu</p>
+              <p className="text-red-600 text-sm text-center">{error}</p>
+              <Button
+                onClick={fetchInventoryItems}
+                className="mt-4 w-full bg-red-600 hover:bg-red-700"
+              >
+                Thử lại
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full flex flex-col">
+      {/* Loading Overlay */}
+      {loading && items.length > 0 && (
+        <div className="absolute inset-0 bg-white/50 flex items-center justify-center rounded-lg z-50">
+          <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+        </div>
+      )}
       {/* Main Content */}
       <div className="flex-1 p-4 lg:p-8 space-y-6 overflow-y-auto">
         {/* Header */}
@@ -761,13 +941,13 @@ export function Inventory() {
           </div>
           <div className="flex items-center gap-2">
             {canCreate && (
-            <Button
-              variant="outline"
-              onClick={() => setImportDialogOpen(true)}
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Nhập file
-            </Button>
+              <Button
+                variant="outline"
+                onClick={() => setImportDialogOpen(true)}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Nhập file
+              </Button>
             )}
             <Button
               variant="outline"
@@ -779,10 +959,10 @@ export function Inventory() {
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
               <DialogTrigger asChild>
                 {canCreate && (
-                <Button className="bg-blue-600 hover:bg-blue-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Thêm hàng hóa
-                </Button>
+                  <Button className="bg-blue-600 hover:bg-blue-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Thêm hàng hóa
+                  </Button>
                 )}
               </DialogTrigger>
               <DialogContent className="min-w-[1100px] max-w-[1300px] w-[100vw] max-h-[90vh] flex flex-col" aria-describedby={undefined}>
@@ -798,7 +978,7 @@ export function Inventory() {
                     </Label>
                     <Select
                       value={addItemType}
-                      onValueChange={(value) =>
+                      onValueChange={(value: string) =>
                         setAddItemType(value as ItemType)
                       }
                     >
@@ -831,9 +1011,9 @@ export function Inventory() {
                   <Separator />
 
                   {/* Dynamic Form Fields */}
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-3 gap-4 items-start">
                     <div>
-                      <Label>
+                      <Label className="text-sm font-normal leading-5">
                         Mã hàng hóa <span className="text-red-500">*</span>
                       </Label>
                       <div className="flex gap-2 mt-1.5">
@@ -861,6 +1041,8 @@ export function Inventory() {
                         <span className="text-red-500">*</span>
                       </Label>
                       <Input
+                        value={addDialogValues.name}
+                        onChange={(e) => setAddDialogValues(prev => ({ ...prev, name: e.target.value }))}
                         className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                         placeholder={`VD: ${addItemType === "composite"
                           ? "Cà phê Latte"
@@ -888,18 +1070,20 @@ export function Inventory() {
                           Thêm danh mục
                         </Button>
                       </div>
-                      <Select>
+                      <Select
+                        value={addDialogValues.categoryId}
+                        onValueChange={(value: string) => setAddDialogValues((v: any) => ({ ...v, categoryId: value }))}
+                        disabled={loadingCategories || categoryOptions.length === 0}
+                      >
                         <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
-                          <SelectValue placeholder="Chọn danh mục" />
+                          <SelectValue placeholder={loadingCategories ? "Đang tải..." : "Chọn danh mục"} />
                         </SelectTrigger>
                         <SelectContent>
-                          {categories
-                            .filter((c) => c.id !== "all")
-                            .map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>
-                                {cat.name}
-                              </SelectItem>
-                            ))}
+                          {categoryOptions.map((cat: any) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -919,19 +1103,20 @@ export function Inventory() {
                           Thêm đơn vị
                         </Button>
                       </div>
-                      <Select>
+                      <Select
+                        value={addDialogValues.unitId}
+                        onValueChange={(value: string) => setAddDialogValues((v: any) => ({ ...v, unitId: value }))}
+                        disabled={loadingUnits || unitOptions.length === 0}
+                      >
                         <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
-                          <SelectValue placeholder="Chọn" />
+                          <SelectValue placeholder={loadingUnits ? "Đang tải..." : "Chọn đơn vị"} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="kg">Kilogram (kg)</SelectItem>
-                          <SelectItem value="g">Gram (g)</SelectItem>
-                          <SelectItem value="l">Lít (L)</SelectItem>
-                          <SelectItem value="ml">Mililit (ml)</SelectItem>
-                          <SelectItem value="box">Hộp</SelectItem>
-                          <SelectItem value="bottle">Chai</SelectItem>
-                          <SelectItem value="piece">Cái</SelectItem>
-                          <SelectItem value="cup">Ly</SelectItem>
+                          {unitOptions.map((unit: any) => (
+                            <SelectItem key={unit.id} value={unit.id}>
+                              {unit.name} {unit.symbol ? `(${unit.symbol})` : ""}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -943,6 +1128,8 @@ export function Inventory() {
                         <Label>Tồn kho tối thiểu</Label>
                         <Input
                           type="number"
+                          value={addDialogValues.minStock}
+                          onChange={(e) => setAddDialogValues(prev => ({ ...prev, minStock: Number(e.target.value) }))}
                           className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                           placeholder="0"
                         />
@@ -951,6 +1138,8 @@ export function Inventory() {
                         <Label>Tồn kho tối đa</Label>
                         <Input
                           type="number"
+                          value={addDialogValues.maxStock}
+                          onChange={(e) => setAddDialogValues(prev => ({ ...prev, maxStock: Number(e.target.value) }))}
                           className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                           placeholder="0"
                         />
@@ -1016,33 +1205,33 @@ export function Inventory() {
                             <div className="space-y-2">
                               <Table>
                                 <TableHeader>
-                                  <TableRow className="bg-blue-100 hover:bg-blue-100">
-                                    <TableHead className="w-12 text-blue-900">STT</TableHead>
-                                    <TableHead className="text-blue-900 text-2xl font-semibold">Mã hàng</TableHead>
-                                    <TableHead className="text-blue-900 text-2xl font-semibold">Tên hàng hóa</TableHead>
-                                    <TableHead className="text-blue-900 text-2xl font-semibold">Đơn vị</TableHead>
-                                    <TableHead className="w-12"></TableHead>
+                                  <TableRow className="bg-blue-100 hover:bg-blue-100 h-9">
+                                    <TableHead className="w-12 text-blue-900 text-xs font-medium">STT</TableHead>
+                                    <TableHead className="text-blue-900 text-xs font-medium">Mã hàng</TableHead>
+                                    <TableHead className="text-blue-900 text-xs font-medium">Tên hàng hóa</TableHead>
+                                    <TableHead className="text-blue-900 text-xs font-medium">Đơn vị</TableHead>
+                                    <TableHead className="w-10"></TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                   {associatedProducts.map((prod, index) => (
-                                    <TableRow key={prod.id} className="bg-white">
-                                      <TableCell>{index + 1}</TableCell>
-                                      <TableCell>{prod.id}</TableCell>
-                                      <TableCell>{prod.name}</TableCell>
-                                      <TableCell>{prod.unit}</TableCell>
+                                    <TableRow key={prod.id} className="bg-white hover:bg-slate-50 border-b border-slate-100 h-11">
+                                      <TableCell className="text-sm text-slate-600">{index + 1}</TableCell>
+                                      <TableCell className="text-sm text-slate-700 font-mono">{prod.id}</TableCell>
+                                      <TableCell className="text-sm text-slate-900 font-medium">{prod.name}</TableCell>
+                                      <TableCell className="text-sm text-slate-600">{prod.unit}</TableCell>
                                       <TableCell>
                                         <Button
                                           variant="ghost"
                                           size="sm"
-                                          className="h-6 w-6 p-0 hover:text-red-600"
+                                          className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
                                           onClick={() => {
                                             setAssociatedProducts((prev) =>
                                               prev.filter((p) => p.id !== prod.id)
                                             );
                                           }}
                                         >
-                                          <X className="w-3 h-3" />
+                                          <X className="w-4 h-4" />
                                         </Button>
                                       </TableCell>
                                     </TableRow>
@@ -1076,22 +1265,22 @@ export function Inventory() {
                           <div className="space-y-2">
                             <Table>
                               <TableHeader>
-                                <TableRow className="bg-purple-100">
-                                  <TableHead className="w-12">STT</TableHead>
-                                  <TableHead>Mã</TableHead>
-                                  <TableHead>Tên nguyên liệu</TableHead>
-                                  <TableHead>Đơn vị</TableHead>
-                                  <TableHead>Số lượng</TableHead>
-                                  <TableHead className="w-12"></TableHead>
+                                <TableRow className="bg-purple-100 h-9">
+                                  <TableHead className="w-12 text-purple-900 text-xs font-medium">STT</TableHead>
+                                  <TableHead className="text-purple-900 text-xs font-medium">Mã</TableHead>
+                                  <TableHead className="text-purple-900 text-xs font-medium">Tên nguyên liệu</TableHead>
+                                  <TableHead className="text-purple-900 text-xs font-medium">Đơn vị</TableHead>
+                                  <TableHead className="text-purple-900 text-xs font-medium">Số lượng</TableHead>
+                                  <TableHead className="w-10"></TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
                                 {selectedIngredients.map((ing: CompositeIngredient, index: number) => (
-                                  <TableRow key={index}>
-                                    <TableCell>{index + 1}</TableCell>
-                                    <TableCell>{ing.ingredientId}</TableCell>
-                                    <TableCell>{ing.ingredientName}</TableCell>
-                                    <TableCell>{ing.unit}</TableCell>
+                                  <TableRow key={index} className="bg-white hover:bg-slate-50 border-b border-purple-50 h-11">
+                                    <TableCell className="text-sm text-slate-600">{index + 1}</TableCell>
+                                    <TableCell className="text-sm text-slate-700 font-mono">{ing.ingredientId}</TableCell>
+                                    <TableCell className="text-sm text-slate-900 font-medium">{ing.ingredientName}</TableCell>
+                                    <TableCell className="text-sm text-slate-600">{ing.unit}</TableCell>
                                     <TableCell>
                                       <Input
                                         type="number"
@@ -1107,21 +1296,21 @@ export function Inventory() {
                                             )
                                           );
                                         }}
-                                        className="h-8 w-24 bg-white border-slate-300"
+                                        className="h-8 w-24 bg-white border-slate-300 text-sm"
                                       />
                                     </TableCell>
                                     <TableCell>
                                       <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="h-6 w-6 p-0"
+                                        className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
                                         onClick={() => {
                                           setSelectedIngredients((prev: CompositeIngredient[]) =>
                                             prev.filter((_, i) => i !== index)
                                           );
                                         }}
                                       >
-                                        <X className="w-3 h-3" />
+                                        <X className="w-4 h-4" />
                                       </Button>
                                     </TableCell>
                                   </TableRow>
@@ -1149,14 +1338,17 @@ export function Inventory() {
                     Hủy
                   </Button>
                   {canCreate && (
-                  <Button className="bg-blue-600 hover:bg-blue-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    {addItemType === "composite"
-                      ? "Thêm hàng hóa"
-                      : addItemType === "ready-made"
+                    <Button
+                      className="bg-blue-600 hover:bg-blue-700"
+                      onClick={handleAddNewItem}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      {addItemType === "composite"
                         ? "Thêm hàng hóa"
-                        : "Thêm nguyên liệu"}
-                  </Button>
+                        : addItemType === "ready-made"
+                          ? "Thêm hàng hóa"
+                          : "Thêm nguyên liệu"}
+                    </Button>
                   )}
                 </DialogFooter>
               </DialogContent>
@@ -1180,6 +1372,8 @@ export function Inventory() {
                   Tên danh mục <span className="text-red-500">*</span>
                 </Label>
                 <Input
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
                   className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   placeholder="VD: Đồ ăn nhanh"
                 />
@@ -1201,7 +1395,8 @@ export function Inventory() {
               </Button>
               <Button
                 className="bg-blue-600 hover:bg-blue-700"
-                onClick={() => setAddCategoryDialogOpen(false)}
+                onClick={handleCreateCategory}
+                disabled={!newCategoryName.trim()}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Thêm danh mục
@@ -1419,6 +1614,8 @@ export function Inventory() {
                   Tên đơn vị <span className="text-red-500">*</span>
                 </Label>
                 <Input
+                  value={newUnitValues.name}
+                  onChange={(e) => setNewUnitValues(prev => ({ ...prev, name: e.target.value }))}
                   className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   placeholder="VD: Kilogram, Lít, Hộp..."
                 />
@@ -1429,6 +1626,8 @@ export function Inventory() {
                   Ký hiệu <span className="text-red-500">*</span>
                 </Label>
                 <Input
+                  value={newUnitValues.symbol}
+                  onChange={(e) => setNewUnitValues(prev => ({ ...prev, symbol: e.target.value }))}
                   className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
                   placeholder="VD: kg, L, hộp..."
                 />
@@ -1450,7 +1649,8 @@ export function Inventory() {
               </Button>
               <Button
                 className="bg-blue-600 hover:bg-blue-700"
-                onClick={() => setAddUnitDialogOpen(false)}
+                onClick={handleCreateUnit}
+                disabled={!newUnitValues.name.trim() || !newUnitValues.symbol.trim()}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Thêm đơn vị
@@ -1462,7 +1662,7 @@ export function Inventory() {
         {/* Add Associated Product Dialog */}
         <Dialog
           open={addAssociatedProductDialogOpen}
-          onOpenChange={(open) => {
+          onOpenChange={(open: boolean) => {
             setAddAssociatedProductDialogOpen(open);
             if (open) setAssociatedProductsToAdd([]);
           }}
@@ -1534,7 +1734,7 @@ export function Inventory() {
                               )
                               .every((item) => associatedProductsToAdd.includes(item.id))
                           }
-                          onCheckedChange={(checked) => {
+                          onCheckedChange={(checked: boolean) => {
                             const filteredItems = items.filter(
                               (item) =>
                                 (item.type === "ready-made" || item.type === "composite") &&
@@ -1655,7 +1855,7 @@ export function Inventory() {
 
         <Dialog
           open={editDialogOpen}
-          onOpenChange={(open) => {
+          onOpenChange={(open: boolean) => {
             setEditDialogOpen(open);
             if (!open) setEditingItem(null);
           }}
@@ -1664,6 +1864,8 @@ export function Inventory() {
             <DialogHeader>
               <DialogTitle>Chỉnh sửa mặt hàng</DialogTitle>
             </DialogHeader>
+
+            {/* Removed problematic auto-reset block that used names instead of IDs */}
 
             <div className="space-y-6 overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
@@ -1682,7 +1884,7 @@ export function Inventory() {
                   <Label>Trạng thái</Label>
                   <Select
                     value={editValues.productStatus || "selling"}
-                    onValueChange={(val) =>
+                    onValueChange={(val: string) =>
                       setEditValues((v) => ({ ...v, productStatus: val }))
                     }
                   >
@@ -1712,21 +1914,20 @@ export function Inventory() {
                   </div>
                   <Select
                     value={editValues.category}
-                    onValueChange={(val) =>
+                    onValueChange={(val: string) =>
                       setEditValues((v) => ({ ...v, category: val }))
                     }
+                    disabled={loadingCategories || categoryOptions.length === 0}
                   >
                     <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
-                      <SelectValue />
+                      <SelectValue placeholder={loadingCategories ? "Đang tải..." : "Chọn danh mục"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories
-                        .filter((c) => c.id !== "all")
-                        .map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id}>
-                            {cat.name}
-                          </SelectItem>
-                        ))}
+                      {categoryOptions.map((cat: any) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1745,22 +1946,20 @@ export function Inventory() {
                   </div>
                   <Select
                     value={editValues.unit}
-                    onValueChange={(val) =>
+                    onValueChange={(val: string) =>
                       setEditValues((v) => ({ ...v, unit: val }))
                     }
+                    disabled={loadingUnits || unitOptions.length === 0}
                   >
                     <SelectTrigger className="mt-1.5 bg-white border-slate-300 shadow-none">
-                      <SelectValue />
+                      <SelectValue placeholder={loadingUnits ? "Đang tải..." : "Chọn đơn vị"} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="kg">Kilogram (kg)</SelectItem>
-                      <SelectItem value="g">Gram (g)</SelectItem>
-                      <SelectItem value="l">Lít (L)</SelectItem>
-                      <SelectItem value="ml">Mililit (ml)</SelectItem>
-                      <SelectItem value="box">Hộp</SelectItem>
-                      <SelectItem value="bottle">Chai</SelectItem>
-                      <SelectItem value="piece">Cái</SelectItem>
-                      <SelectItem value="cup">Ly</SelectItem>
+                      {unitOptions.map((unit: any) => (
+                        <SelectItem key={unit.id} value={unit.id}>
+                          {unit.name} {unit.symbol ? `(${unit.symbol})` : ""}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1840,33 +2039,33 @@ export function Inventory() {
                         <div className="space-y-2">
                           <Table>
                             <TableHeader>
-                              <TableRow className="bg-blue-100 hover:bg-blue-100">
-                                <TableHead className="w-12 text-blue-900">STT</TableHead>
-                                <TableHead className="text-blue-900 text-2xl font-semibold">Mã hàng</TableHead>
-                                <TableHead className="text-blue-900 text-2xl font-semibold">Tên hàng hóa</TableHead>
-                                <TableHead className="text-blue-900 text-2xl font-semibold">Đơn vị</TableHead>
-                                <TableHead className="w-12"></TableHead>
+                              <TableRow className="bg-blue-100 hover:bg-blue-100 h-9">
+                                <TableHead className="w-12 text-blue-900 text-xs font-medium">STT</TableHead>
+                                <TableHead className="text-blue-900 text-xs font-medium">Mã hàng</TableHead>
+                                <TableHead className="text-blue-900 text-xs font-medium">Tên hàng hóa</TableHead>
+                                <TableHead className="text-blue-900 text-xs font-medium">Đơn vị</TableHead>
+                                <TableHead className="w-10"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {associatedProducts.map((prod, index) => (
-                                <TableRow key={prod.id} className="bg-white">
-                                  <TableCell>{index + 1}</TableCell>
-                                  <TableCell>{prod.id}</TableCell>
-                                  <TableCell>{prod.name}</TableCell>
-                                  <TableCell>{prod.unit}</TableCell>
+                                <TableRow key={prod.id} className="bg-white hover:bg-slate-50 border-b border-slate-100 h-11">
+                                  <TableCell className="text-sm text-slate-600">{index + 1}</TableCell>
+                                  <TableCell className="text-sm text-slate-700 font-mono">{prod.id}</TableCell>
+                                  <TableCell className="text-sm text-slate-900 font-medium">{prod.name}</TableCell>
+                                  <TableCell className="text-sm text-slate-600">{prod.unit}</TableCell>
                                   <TableCell>
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="h-6 w-6 p-0 hover:text-red-600"
+                                      className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
                                       onClick={() => {
                                         setAssociatedProducts((prev) =>
                                           prev.filter((p) => p.id !== prod.id)
                                         );
                                       }}
                                     >
-                                      <X className="w-3 h-3" />
+                                      <X className="w-4 h-4" />
                                     </Button>
                                   </TableCell>
                                 </TableRow>
@@ -1899,22 +2098,22 @@ export function Inventory() {
                       <div className="space-y-2">
                         <Table>
                           <TableHeader>
-                            <TableRow className="bg-purple-100">
-                              <TableHead className="w-12">STT</TableHead>
-                              <TableHead>Mã</TableHead>
-                              <TableHead>Tên nguyên liệu</TableHead>
-                              <TableHead>Đơn vị</TableHead>
-                              <TableHead>Số lượng</TableHead>
-                              <TableHead className="w-12"></TableHead>
+                            <TableRow className="bg-purple-100 h-9">
+                              <TableHead className="w-12 text-purple-900 text-xs font-medium">STT</TableHead>
+                              <TableHead className="text-purple-900 text-xs font-medium">Mã</TableHead>
+                              <TableHead className="text-purple-900 text-xs font-medium">Tên nguyên liệu</TableHead>
+                              <TableHead className="text-purple-900 text-xs font-medium">Đơn vị</TableHead>
+                              <TableHead className="text-purple-900 text-xs font-medium">Số lượng</TableHead>
+                              <TableHead className="w-10"></TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {editValues.ingredients.map((ing: CompositeIngredient, index: number) => (
-                              <TableRow key={index}>
-                                <TableCell>{index + 1}</TableCell>
-                                <TableCell>{ing.ingredientId}</TableCell>
-                                <TableCell>{ing.ingredientName}</TableCell>
-                                <TableCell>{ing.unit}</TableCell>
+                              <TableRow key={index} className="bg-white hover:bg-slate-50 border-b border-purple-50 h-11">
+                                <TableCell className="text-sm text-slate-600">{index + 1}</TableCell>
+                                <TableCell className="text-sm text-slate-700 font-mono">{ing.ingredientId}</TableCell>
+                                <TableCell className="text-sm text-slate-900 font-medium">{ing.ingredientName}</TableCell>
+                                <TableCell className="text-sm text-slate-600">{ing.unit}</TableCell>
                                 <TableCell>
                                   <Input
                                     type="number"
@@ -1932,14 +2131,14 @@ export function Inventory() {
                                         ),
                                       }));
                                     }}
-                                    className="h-8 w-24 bg-white border-slate-300"
+                                    className="h-8 w-24 bg-white border-slate-300 text-sm"
                                   />
                                 </TableCell>
                                 <TableCell>
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-6 w-6 p-0"
+                                    className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
                                     onClick={() => {
                                       setEditValues((prev: any) => ({
                                         ...prev,
@@ -1949,7 +2148,7 @@ export function Inventory() {
                                       }));
                                     }}
                                   >
-                                    <X className="w-3 h-3" />
+                                    <X className="w-4 h-4" />
                                   </Button>
                                 </TableCell>
                               </TableRow>
@@ -1964,8 +2163,8 @@ export function Inventory() {
 
               <div className="flex justify-left">
                 <ImageUploadWithCrop
-                  currentImage={editValues.imageUrl}
-                  onImageChange={(url) =>
+                  value={editValues.imageUrl as string}
+                  onChange={(url: string) =>
                     setEditValues((prev) => ({ ...prev, imageUrl: url }))
                   }
                 />
@@ -1989,28 +2188,58 @@ export function Inventory() {
                 className="bg-blue-600 hover:bg-blue-700"
                 onClick={() => {
                   if (!editingItem) return;
-                  setItems((prev) =>
-                    prev.map((it) =>
-                      it.id === editingItem.id
-                        ? {
-                          ...it,
-                          name: editValues.name,
-                          category: editValues.category,
-                          unit: editValues.unit,
-                          minStock: editValues.minStock,
-                          maxStock: editValues.maxStock,
-                          sellingPrice: editValues.sellingPrice,
-                          productStatus: editValues.productStatus as any,
 
-                          ingredients: editValues.ingredients,
-                          imageUrl: editValues.imageUrl,
-                          isTopping: isTopping,
-                          associatedProductIds: associatedProducts.map(p => p.id),
-                        }
-                        : it
-                    )
-                  );
-                  setEditDialogOpen(false);
+                  const payload: any = {};
+
+                  if (editValues.name !== editingItem.name) {
+                    payload.name = editValues.name;
+                  }
+                  // Use updated IDs from item state
+                  if (Number(editValues.category) !== Number(editingItem.categoryId)) {
+                    payload.categoryId = Number(editValues.category);
+                  }
+                  if (Number(editValues.unit) !== Number(editingItem.unitId)) {
+                    payload.unitId = Number(editValues.unit);
+                  }
+                  if (Number(editValues.minStock) !== editingItem.minStock) {
+                    payload.minStock = Number(editValues.minStock);
+                  }
+                  if (Number(editValues.maxStock) !== editingItem.maxStock) {
+                    payload.maxStock = Number(editValues.maxStock);
+                  }
+                  if (editValues.productStatus !== editingItem.productStatus) {
+                    payload.productStatus = editValues.productStatus;
+                  }
+                  if (isTopping !== (editingItem.isTopping || false)) {
+                    payload.isTopping = isTopping;
+                  }
+                  if ((editValues.imageUrl || "") !== (editingItem.imageUrl || "")) {
+                    payload.imageUrl = editValues.imageUrl || null;
+                  }
+
+                  // Always include complex structures if relevant, to ensure consistency
+                  // or implement deep comparison if strictly minimizing payload is required.
+                  if (editingItem.type === 'composite') {
+                    payload.ingredients = editValues.ingredients.map(i => ({
+                      ingredientItemId: Number(i.ingredientId),
+                      quantity: i.quantity,
+                      unit: i.unit
+                    }));
+                  }
+
+                  if (isTopping) {
+                    payload.productIds = associatedProducts.map(p => Number(p.id));
+                  } else if (editingItem.isTopping && !isTopping) {
+                    // If it was a topping and now is not, clear associations
+                    payload.productIds = [];
+                  }
+
+                  if (Object.keys(payload).length > 0) {
+                    console.log("PATCH payload:", payload);
+                    handleUpdateItem(editingItem.id, payload);
+                  } else {
+                    setEditDialogOpen(false);
+                  }
                 }}
               >
                 Lưu
@@ -2100,10 +2329,10 @@ export function Inventory() {
                   Bộ lọc
                   {(!selectedCategories.includes('all') || selectedTypes.length < 3 || selectedStockStatuses.length < 5 || selectedProductStatuses.length < 4) && (
                     <Badge className="ml-1 bg-blue-500 text-white px-1.5 py-0.5 text-xs">
-                      {(!selectedCategories.includes('all') ? selectedCategories.length : 0) + 
-                       (selectedTypes.length < 3 ? (3 - selectedTypes.length) : 0) +
-                       (selectedStockStatuses.length < 5 ? (5 - selectedStockStatuses.length) : 0) +
-                       (selectedProductStatuses.length < 4 ? (4 - selectedProductStatuses.length) : 0)}
+                      {(!selectedCategories.includes('all') ? selectedCategories.length : 0) +
+                        (selectedTypes.length < 3 ? (3 - selectedTypes.length) : 0) +
+                        (selectedStockStatuses.length < 5 ? (5 - selectedStockStatuses.length) : 0) +
+                        (selectedProductStatuses.length < 4 ? (4 - selectedProductStatuses.length) : 0)}
                     </Badge>
                   )}
                 </Button>
@@ -2120,8 +2349,8 @@ export function Inventory() {
                         {categories.map((cat) => (
                           <div key={cat.id} className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
-                              <Checkbox 
-                                id={cat.id} 
+                              <Checkbox
+                                id={cat.id}
                                 checked={selectedCategories.includes(cat.id)}
                                 onCheckedChange={() => toggleCategory(cat.id)}
                                 className="border-slate-300"
@@ -2146,7 +2375,7 @@ export function Inventory() {
                           { id: 'ingredient', label: 'Nguyên liệu' },
                         ].map((type) => (
                           <div key={type.id} className="flex items-center space-x-2">
-                            <Checkbox 
+                            <Checkbox
                               id={type.id}
                               checked={selectedTypes.includes(type.id as ItemType)}
                               onCheckedChange={() => toggleType(type.id as ItemType)}
@@ -2172,7 +2401,7 @@ export function Inventory() {
                           { id: "expired", label: "Hết hạn" },
                         ].map((status) => (
                           <div key={status.id} className="flex items-center space-x-2">
-                            <Checkbox 
+                            <Checkbox
                               id={`stock-${status.id}`}
                               checked={selectedStockStatuses.includes(status.id)}
                               onCheckedChange={() => toggleStockStatus(status.id)}
@@ -2197,7 +2426,7 @@ export function Inventory() {
                           { id: "paused", label: "Tạm ngưng" },
                         ].map((status) => (
                           <div key={status.id} className="flex items-center space-x-2">
-                            <Checkbox 
+                            <Checkbox
                               id={`prod-${status.id}`}
                               checked={selectedProductStatuses.includes(status.id)}
                               onCheckedChange={() => toggleProductStatus(status.id)}
@@ -2238,7 +2467,7 @@ export function Inventory() {
         {/* Tabs */}
         <Tabs
           value={activeTab}
-          onValueChange={(value) => setActiveTab(value as ItemType)}
+          onValueChange={(value: string) => setActiveTab(value as ItemType)}
           className="w-full"
         >
           <TabsList className="grid w-full grid-cols-3 mb-6">
@@ -2450,31 +2679,7 @@ export function Inventory() {
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => {
-                                        setEditingItem(item);
-                                        setEditValues({
-                                          name: item.name,
-                                          category: item.category,
-                                          unit: item.unit,
-                                          minStock: item.minStock,
-                                          maxStock: item.maxStock,
-                                          sellingPrice: item.sellingPrice,
-                                          productStatus: item.productStatus,
-                                          ingredients: item.ingredients || [],
-                                          isTopping: item.isTopping || false,
-                                          associatedProductIds: item.associatedProductIds || [],
-                                          imageUrl: item.imageUrl || "",
-                                        });
-                                        setIsTopping(item.isTopping || false);
-                                        setAssociatedProducts(
-                                          item.associatedProductIds
-                                            ? items.filter((i) =>
-                                              item.associatedProductIds?.includes(i.id)
-                                            )
-                                            : []
-                                        );
-                                        setEditDialogOpen(true);
-                                      }}
+                                      onClick={() => handleStartEdit(item)}
                                     >
                                       <Pencil className="w-4 h-4" />
                                     </Button>
@@ -2485,7 +2690,7 @@ export function Inventory() {
                                       size="sm"
                                       onClick={() => {
                                         if (confirm(`Bạn có chắc muốn xóa ${item.name}?`)) {
-                                          setItems(items.filter((i) => i.id !== item.id));
+                                          handleDeleteItem(item.id);
                                         }
                                       }}
                                     >
@@ -2795,29 +3000,23 @@ export function Inventory() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => {
-                                      setEditingItem(item);
-                                      setEditValues({
-                                        name: item.name,
-                                        category: item.category,
-                                        unit: item.unit,
-                                        minStock: item.minStock,
-                                        maxStock: item.maxStock,
-                                        sellingPrice: item.sellingPrice,
-                                        productStatus: item.productStatus,
-                                        ingredients: item.ingredients || [],
-                                        isTopping: item.isTopping || false,
-                                        associatedProductIds: item.associatedProductIds || [],
-                                        imageUrl: item.imageUrl || "",
-                                      });
-                                      setEditDialogOpen(true);
-                                    }}
+                                    onClick={() => handleStartEdit(item)}
                                   >
                                     <Pencil className="w-4 h-4" />
                                   </Button>
-                                  <Button variant="ghost" size="sm">
-                                    <Trash2 className="w-4 h-4 text-red-600" />
-                                  </Button>
+                                  {canDelete && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        if (confirm(`Bạn có chắc muốn xóa ${item.name}?`)) {
+                                          handleDeleteItem(item.id);
+                                        }
+                                      }}
+                                    >
+                                      <Trash2 className="w-4 h-4 text-red-600" />
+                                    </Button>
+                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -2942,6 +3141,104 @@ export function Inventory() {
                                         </TableBody>
                                       </Table>
                                     </div>
+
+                                    {/* Available Toppings (for Products) */}
+                                    {!item.isTopping && (
+                                      <>
+                                        <Separator className="my-4" />
+                                        <h4 className="text-sm text-slate-900 mb-3">
+                                          Danh sách topping đi kèm
+                                        </h4>
+                                        <div className="border rounded-lg overflow-hidden bg-white">
+                                          <Table>
+                                            <TableHeader>
+                                              <TableRow className="bg-orange-100">
+                                                <TableHead>Mã Topping</TableHead>
+                                                <TableHead>Tên Topping</TableHead>
+                                                <TableHead>Giá bán thêm</TableHead>
+                                              </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                              {item.availableToppings?.length ? (
+                                                item.availableToppings.map((t) => (
+                                                  <TableRow key={t.toppingId}>
+                                                    <TableCell className="text-sm text-slate-600">
+                                                      {t.toppingId}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm text-slate-900">
+                                                      {t.topping?.name}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm text-slate-900">
+                                                      {t.topping?.sellingPrice
+                                                        ? `${Number(t.topping.sellingPrice).toLocaleString()}₫`
+                                                        : "—"}
+                                                    </TableCell>
+                                                  </TableRow>
+                                                ))
+                                              ) : (
+                                                <TableRow>
+                                                  <TableCell
+                                                    colSpan={3}
+                                                    className="text-center text-sm text-slate-500 py-4"
+                                                  >
+                                                    Không có topping đi kèm
+                                                  </TableCell>
+                                                </TableRow>
+                                              )}
+                                            </TableBody>
+                                          </Table>
+                                        </div>
+                                      </>
+                                    )}
+
+                                    {/* Applicable Products (for Toppings) */}
+                                    {item.isTopping && (
+                                      <>
+                                        <Separator className="my-4" />
+                                        <h4 className="text-sm text-slate-900 mb-3">
+                                          Danh sách món đi kèm
+                                        </h4>
+                                        <div className="border rounded-lg overflow-hidden bg-white">
+                                          <Table>
+                                            <TableHeader>
+                                              <TableRow className="bg-green-100">
+                                                <TableHead>Mã Món</TableHead>
+                                                <TableHead>Tên Món</TableHead>
+                                                <TableHead>Giá bán món</TableHead>
+                                              </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                              {item.applicableProducts?.length ? (
+                                                item.applicableProducts.map((p) => (
+                                                  <TableRow key={p.productId}>
+                                                    <TableCell className="text-sm text-slate-600">
+                                                      {p.productId}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm text-slate-900">
+                                                      {p.product?.name}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm text-slate-900">
+                                                      {p.product?.sellingPrice
+                                                        ? `${Number(p.product.sellingPrice).toLocaleString()}₫`
+                                                        : "—"}
+                                                    </TableCell>
+                                                  </TableRow>
+                                                ))
+                                              ) : (
+                                                <TableRow>
+                                                  <TableCell
+                                                    colSpan={3}
+                                                    className="text-center text-sm text-slate-500 py-4"
+                                                  >
+                                                    Không có món đi kèm
+                                                  </TableCell>
+                                                </TableRow>
+                                              )}
+                                            </TableBody>
+                                          </Table>
+                                        </div>
+                                      </>
+                                    )}
                                   </div>
                                 </TableCell>
                               </TableRow>
@@ -3163,29 +3460,23 @@ export function Inventory() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => {
-                                      setEditingItem(item);
-                                      setEditValues({
-                                        name: item.name,
-                                        category: item.category,
-                                        unit: item.unit,
-                                        minStock: item.minStock,
-                                        maxStock: item.maxStock,
-                                        sellingPrice: item.sellingPrice,
-                                        productStatus: item.productStatus,
-                                        ingredients: item.ingredients || [],
-                                        isTopping: item.isTopping || false,
-                                        associatedProductIds: item.associatedProductIds || [],
-                                        imageUrl: item.imageUrl || "",
-                                      });
-                                      setEditDialogOpen(true);
-                                    }}
+                                    onClick={() => handleStartEdit(item)}
                                   >
                                     <Pencil className="w-4 h-4" />
                                   </Button>
-                                  <Button variant="ghost" size="sm">
-                                    <Trash2 className="w-4 h-4 text-red-600" />
-                                  </Button>
+                                  {canDelete && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        if (confirm(`Bạn có chắc muốn xóa ${item.name}?`)) {
+                                          handleDeleteItem(item.id);
+                                        }
+                                      }}
+                                    >
+                                      <Trash2 className="w-4 h-4 text-red-600" />
+                                    </Button>
+                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>

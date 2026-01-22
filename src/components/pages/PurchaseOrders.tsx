@@ -87,9 +87,10 @@ import { useAuth } from "../../contexts/AuthContext";
 import { categories } from "../../data/categories";
 import { Card, CardContent } from "../ui/card";
 import { CustomerTimeFilter } from "../reports/CustomerTimeFilter";
+import { inventoryService } from "../../services/inventoryService";
 
 interface PurchaseOrderItem {
-
+  itemId?: number;
   name: string;
   batchCode: string;
   quantity: number;
@@ -256,6 +257,10 @@ export function PurchaseOrders() {
     useState<string>("all");
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [bankSearchOpen, setBankSearchOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [availableItems, setAvailableItems] = useState<any[]>([]);
+  const [categoriesList, setCategoriesList] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
 
   // Danh sách ngân hàng Việt Nam
   const vietnameseBanks = [
@@ -279,10 +284,7 @@ export function PurchaseOrders() {
   ];
 
   // Tài khoản ngân hàng của quán (bank_accounts trong database)
-  const [allBankAccounts, setAllBankAccounts] = useState([
-    { id: '1', name: 'TK Vietcombank', accountNumber: '1234567890', bank: 'VCB', bankFull: 'VCB - Ngân hàng TMCP Ngoại thương Việt Nam', owner: 'Công ty Café ABC' },
-    { id: '2', name: 'TK Techcombank', accountNumber: '0987654321', bank: 'TCB', bankFull: 'TCB - Ngân hàng TMCP Kỹ Thương Việt Nam', owner: 'Công ty Café ABC' },
-  ]);
+  const [allBankAccounts, setAllBankAccounts] = useState<any[]>([]);
 
   // Add bank account dialog states
   const [addBankAccountDialogOpen, setAddBankAccountDialogOpen] = useState(false);
@@ -300,24 +302,55 @@ export function PurchaseOrders() {
     setAddBankAccountDialogOpen(true);
   };
 
-  const handleSaveBankAccount = () => {
+  const handleSaveBankAccount = async () => {
     if (!newBankAccountName || !newBankAccountNumber || !newBankAccountBank) {
       toast.error("Vui lòng điền đầy đủ thông tin");
       return;
     }
-    const bankInfo = vietnameseBanks.find(b => b.id === newBankAccountBank);
-    const newAccount = {
-      id: `bank-${Date.now()}`,
-      name: newBankAccountName,
-      accountNumber: newBankAccountNumber,
-      bank: newBankAccountBank,
-      bankFull: bankInfo?.name || "",
-      owner: newBankAccountOwner,
-    };
-    setAllBankAccounts([...allBankAccounts, newAccount]);
-    setSelectedPaymentBankId(newAccount.id);
-    setAddBankAccountDialogOpen(false);
-    toast.success("Đã thêm tài khoản ngân hàng mới");
+
+    try {
+      const payload = {
+        accountName: newBankAccountName,
+        accountNumber: newBankAccountNumber,
+        bankName: newBankAccountBank,
+        ownerName: newBankAccountOwner || "",
+        notes: ""
+      };
+
+      const result = await inventoryService.createBankAccount(payload);
+      const newAccountId = result.metaData?.id || result.id;
+
+      // Refresh bank accounts list
+      const bankAccountsRes = await inventoryService.getBankAccounts();
+      const bankAccountsList = bankAccountsRes.metaData || [];
+      const formattedBankAccounts = bankAccountsList
+        .filter((acc: any) => acc.isActive)
+        .map((acc: any) => ({
+          id: acc.id?.toString() || '',
+          name: acc.accountName || '',
+          accountNumber: acc.accountNumber || '',
+          bank: acc.bankName || '',
+          owner: acc.ownerName || ''
+        }));
+
+      setAllBankAccounts(formattedBankAccounts);
+
+      // Auto-select the newly created account
+      if (newAccountId) {
+        setFormData({
+          ...formData,
+          bankId: newAccountId.toString(),
+          bankName: newBankAccountBank,
+          bankAccount: newBankAccountNumber,
+        });
+      }
+
+      setAddBankAccountDialogOpen(false);
+      toast.success("Đã thêm tài khoản ngân hàng mới");
+    } catch (error) {
+      console.error("Error creating bank account:", error);
+      toast.error("Không thể thêm tài khoản ngân hàng");
+    }
   };
 
   // Form state for creating purchase order
@@ -505,18 +538,125 @@ export function PurchaseOrders() {
     ];
   };
 
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(() =>
-    loadPurchaseOrders()
-  );
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // Save purchase orders to localStorage whenever they change
-  useEffect(() => {
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      localStorage.setItem("purchaseOrders", JSON.stringify(purchaseOrders));
+      // Fetch orders
+      const orderFilters = {
+        dateFrom: dateFrom ? format(dateFrom, "yyyy-MM-dd") : undefined,
+        dateTo: dateTo ? format(dateTo, "yyyy-MM-dd") : undefined,
+      };
+      const response = await inventoryService.getPurchaseOrders(1, 100, orderFilters);
+      const ordersData = response.metaData?.orders || [];
+
+      const formattedOrders: PurchaseOrder[] = ordersData.map((order: any) => ({
+        id: order.id,
+        code: order.code,
+        date: format(new Date(order.orderDate || order.createdAt), "yyyy-MM-dd HH:mm"),
+        supplier: order.supplier?.name || "N/A",
+        supplierId: order.supplier?.id?.toString(),
+        items: order.itemCount || order.items?.length || 0,
+        totalAmount: order.totalAmount || 0,
+        paidAmount: order.paidAmount || 0,
+        debtAmount: order.debtAmount || 0,
+        status: order.status === "in_progress" ? "draft" : (order.status || "draft"),
+        staff: order.staff?.fullName || "N/A",
+        note: order.notes || "",
+        details: {
+          items: (order.items || []).map((it: any) => ({
+            name: it.itemName || "N/A",
+            batchCode: it.batchCode || "",
+            quantity: it.quantity || 0,
+            unit: it.unit || "",
+            unitPrice: it.unitPrice || 0,
+            discount: 0,
+            total: it.totalPrice || 0,
+            expiryDate: it.expiryDate || undefined
+          }))
+        },
+        paymentHistory: []
+      }));
+
+      setPurchaseOrders(formattedOrders);
+
+      // Fetch suppliers
+      const suppliersRes = await inventoryService.getSuppliers();
+      const suppliersData = suppliersRes.metaData?.suppliers || suppliersRes.metaData || [];
+      setSuppliers(Array.isArray(suppliersData) ? suppliersData : []);
+
+      // Fetch items for selection
+      const itemsRes = await inventoryService.getItems(1, 1000);
+      const itemsList = itemsRes.metaData?.items || itemsRes.items || itemsRes || [];
+
+      // Format items to match expected structure
+      const formattedItems = itemsList.map((item: any) => {
+        let derivedType = item.type || '';
+        if (!derivedType && item.itemTypeId) {
+          const tid = String(item.itemTypeId).toUpperCase();
+          if (tid === '1' || tid === 'PRODUCT' || tid === 'READY_MADE') derivedType = 'ready-made';
+          else if (tid === '3' || tid === 'INGREDIENT') derivedType = 'ingredient';
+          else if (tid === '2' || tid === 'COMPOSITE') derivedType = 'composite';
+        }
+
+        return {
+          id: (item.id || item._id)?.toString() || '',
+          code: item.code || item.id?.toString() || '',
+          name: item.name || '',
+          category: item.category?.id?.toString() || item.categoryId?.toString() || '',
+          unit: item.unit?.name || item.unit || '',
+          type: derivedType,
+          currentStock: item.currentStock || item.stock || 0
+        };
+      });
+
+      setAvailableItems(formattedItems);
+
+      // Fetch categories
+      const categoriesRes = await inventoryService.getCategories();
+      const categoriesList = categoriesRes.metaData?.categories || categoriesRes.metaData || [];
+
+      // Format categories with 'all' option
+      const formattedCategories = [
+        { id: "all", name: "Tất cả" },
+        ...categoriesList.map((cat: any) => ({
+          id: cat.id?.toString() || '',
+          name: cat.name || ''
+        }))
+      ];
+
+      setCategoriesList(formattedCategories);
+
+      // Fetch bank accounts
+      const bankAccountsRes = await inventoryService.getBankAccounts();
+      const bankAccountsList = bankAccountsRes.metaData || [];
+
+      // Format bank accounts
+      const formattedBankAccounts = bankAccountsList
+        .filter((acc: any) => acc.isActive) // Only show active accounts
+        .map((acc: any) => ({
+          id: acc.id?.toString() || '',
+          name: acc.accountName || '',
+          accountNumber: acc.accountNumber || '',
+          bank: acc.bankName || '',
+          owner: acc.ownerName || ''
+        }));
+
+      setAllBankAccounts(formattedBankAccounts);
+
     } catch (error) {
-      console.error("Error saving purchase orders to localStorage:", error);
+      console.error("Error fetching purchase orders:", error);
+      toast.error("Không thể tải dữ liệu");
+    } finally {
+      setLoading(false);
     }
-  }, [purchaseOrders]);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const toggleStatus = (status: string) => {
     setSelectedStatuses((prev) =>
@@ -755,6 +895,7 @@ export function PurchaseOrders() {
     const total = quantity * unitPrice - discountAmount;
 
     const item: PurchaseOrderItem = {
+      itemId: parseInt(newItem.productId),
       name: newItem.productName,
       batchCode: newItem.batchCode,
       quantity,
@@ -894,6 +1035,7 @@ export function PurchaseOrders() {
       paymentMethod: "cash",
       bankAccount: "",
       bankName: "",
+      bankId: "",
     });
     setAddedItems([]);
   };
@@ -1079,7 +1221,7 @@ export function PurchaseOrders() {
     setPaymentDialogOpen(true);
   };
 
-  const handlePaymentSubmit = () => {
+  const handlePaymentSubmit = async () => {
     if (!selectedOrderToPay) return;
 
     const amount = parseFormattedNumber(paymentAmount);
@@ -1088,151 +1230,28 @@ export function PurchaseOrders() {
       return;
     }
 
-    const remaining = selectedOrderToPay.totalAmount - selectedOrderToPay.paidAmount;
-    if (amount > remaining) {
-      toast.error(`Số tiền thanh toán không được vượt quá số nợ còn lại (${formatNumberWithCommas(remaining)}đ)`);
-      return;
+    if (!selectedOrderToPay) return;
+    try {
+      await inventoryService.addPurchaseOrderPayment(selectedOrderToPay.id, {
+        amount,
+        paymentMethod: paymentMethod === "transfer" ? "bank" : "cash",
+        bankAccountId: paymentMethod === 'transfer' ? parseInt(selectedPaymentBankId) : undefined
+      });
+      toast.success("Đã lưu thông tin thanh toán");
+      setPaymentDialogOpen(false);
+      fetchData();
+    } catch (error) {
+      console.error("Error submitting payment:", error);
+      toast.error("Không thể lưu thông tin thanh toán");
     }
-
-    // Validate bank account if transfer method selected
-    if (paymentMethod === "transfer" && !selectedPaymentBankId) {
-      toast.error("Vui lòng chọn tài khoản ngân hàng");
-      return;
-    }
-
-    // Get bank info if transfer
-    const selectedBankAccount = paymentMethod === "transfer" 
-      ? allBankAccounts.find(b => b.id === selectedPaymentBankId)
-      : null;
-
-    // Create finance transaction entry (phiếu chi)
-    const transactionCode = `PC${selectedOrderToPay.code.replace("PN", "")}-${Date.now().toString().slice(-4)}`;
-    const financeTransaction = {
-      id: `FT-${Date.now()}`,
-      code: transactionCode,
-      transaction_date: new Date().toISOString(),
-      category_id: "pay-supplier", // Thanh toán nhà cung cấp
-      amount: amount,
-      payment_method: paymentMethod,
-      bank_account_id: selectedPaymentBankId || null,
-      bank_name: selectedBankAccount?.bankFull || null,
-      person_type: "supplier",
-      person_id: selectedOrderToPay.supplierId || null,
-      person_name: selectedOrderToPay.supplier,
-      description: paymentNote || `Thanh toán nợ - Phiếu nhập ${selectedOrderToPay.code}`,
-      reference_type: "purchase_order",
-      reference_id: selectedOrderToPay.id,
-      created_by: user?.fullName || "Staff",
-      status: "completed"
-    };
-
-    saveCashflowEntry(financeTransaction);
-
-    // Update order
-    setPurchaseOrders(
-      purchaseOrders.map((o) =>
-        o.id === selectedOrderToPay.id
-          ? {
-            ...o,
-            paidAmount: o.paidAmount + amount,
-            paymentHistory: [
-              ...(o.paymentHistory || []),
-              {
-                id: transactionCode,
-                date: formatDateTime(new Date()),
-                amount: amount,
-                note: paymentNote || "Thanh toán nợ",
-                paymentMethod: paymentMethod,
-                bankName: selectedBankAccount?.bankFull
-              }
-            ]
-          }
-          : o
-      )
-    );
-
-    toast.success(`Đã tạo phiếu chi ${formatNumberWithCommas(amount)}đ`);
-    setPaymentDialogOpen(false);
-    setSelectedOrderToPay(null);
-    setPaymentAmount("");
-    setPaymentNote("");
-    setPaymentMethod("cash");
-    setSelectedPaymentBankId("");
   };
 
-  // Mock inventory items (ingredients and ready-made only, no composite)
-  const inventoryItems = [
-    // Ingredients
-    {
-      id: "ing1",
-      name: "Cà phê hạt Arabica",
-      type: "ingredient",
-      category: "coffee",
-      unit: "kg",
-      currentStock: 15,
-    },
-    {
-      id: "ing2",
-      name: "Sữa tươi",
-      type: "ingredient",
-      category: "dairy",
-      unit: "L",
-      currentStock: 12,
-    },
-    {
-      id: "ing3",
-      name: "Đường trắng",
-      type: "ingredient",
-      category: "syrup",
-      unit: "kg",
-      currentStock: 3,
-    },
-    {
-      id: "ing4",
-      name: "Kem tươi",
-      type: "ingredient",
-      category: "dairy",
-      unit: "hộp",
-      currentStock: 8,
-    },
-    {
-      id: "ing5",
-      name: "Trà Ô Long",
-      type: "ingredient",
-      category: "tea",
-      unit: "kg",
-      currentStock: 25,
-    },
-    {
-      id: "ing6",
-      name: "Ly nhựa size L",
-      type: "ingredient",
-      category: "packaging",
-      unit: "cái",
-      currentStock: 150,
-    },
-    // Ready-made items
-    {
-      id: "rm1",
-      name: "Coca Cola",
-      type: "ready-made",
-      category: "bottled-beverages",
-      unit: "chai",
-      currentStock: 48,
-    },
-    {
-      id: "rm2",
-      name: "Bánh Croissant",
-      type: "ready-made",
-      category: "pastries",
-      unit: "cái",
-      currentStock: 8,
-    },
-  ];
 
-  // Filter items for add item dialog (only ingredients and ready-made)
-  const availableItemsForPurchase = inventoryItems.filter(
-    (item) => item.type === "ingredient" || item.type === "ready-made"
+
+
+  // Filter items for add item dialog (only allow ready-made and ingredients)
+  const availableItemsForPurchase = availableItems.filter(
+    (item) => item.type === "ready-made" || item.type === "ingredient"
   );
 
   // Get filtered items based on search and category
@@ -1296,35 +1315,52 @@ export function PurchaseOrders() {
   };
 
   const handleAddSelectedItems = () => {
+    // 1. Remove items that were unchecked
+    // Convert all to string for comparison to match selectedItemIds
+    const currentAddedIds = addedItems.map(item => String(item.itemId));
+
+    // Items to keep: existed in addedItems AND still currently selected
+    const keptItems = addedItems.filter(item =>
+      selectedItemIds.includes(String(item.itemId))
+    );
+
+    // 2. Find new items to add
+    // Items selected but not present in the current added list
+    const newItemIds = selectedItemIds.filter(id =>
+      !currentAddedIds.includes(id)
+    );
+
     const itemsToAdd = availableItemsForPurchase.filter((item) =>
-      selectedItemIds.includes(item.id)
+      newItemIds.includes(item.id)
     );
 
     // Generate batch code for each item (each item gets its own batch)
     const newItems: PurchaseOrderItem[] = itemsToAdd.map((item, index) => {
-      const batchNumber = String(addedItems.length + index + 1).padStart(
+      // Calculate batch logic based on existing count
+      const batchNumber = String(keptItems.length + index + 1).padStart(
         3,
         "0"
       );
       const batchCode = `LO-${new Date().getFullYear()}-${batchNumber}`;
 
       return {
+        // Use the ID as is from the item (string or number), do not force parseInt causing NaN
+        itemId: item.id as any,
         name: item.name,
         batchCode: batchCode,
-        quantity: 0, // Will be filled by user
+        quantity: 1, // Default to 1
         unit: item.unit,
-        unitPrice: 0, // Will be filled by user
+        unitPrice: 0,
         discount: 0,
         total: 0,
       };
     });
 
-    setAddedItems((prev) => [...prev, ...newItems]);
+    setAddedItems((prev) => [...keptItems, ...newItems]);
     setShowAddItemDialog(false);
     setSelectedItemIds([]);
     setItemSearchQuery("");
     setSelectedCategoryFilter("all");
-    toast.success(`Đã thêm ${newItems.length} hàng hóa vào phiếu nhập`);
   };
 
   const [showFilters, setShowFilters] = useState(false);
@@ -1877,7 +1913,7 @@ export function PurchaseOrders() {
                                   </Button>
                                   <Button
                                     className="bg-green-600 hover:bg-green-700 gap-2"
-                                    onClick={(e) => {
+                                    onClick={async (e) => {
                                       e.stopPropagation();
                                       if (
                                         !order.details?.items ||
@@ -1889,68 +1925,14 @@ export function PurchaseOrders() {
                                         return;
                                       }
 
-                                      updateInventoryItems(
-                                        order.details.items
-                                      );
-
-                                      let paymentHistoryEntry = null;
-                                      if (order.paidAmount > 0) {
-                                        const cashflowCode = `PCPN${order.code.replace(
-                                          "PN",
-                                          ""
-                                        )}`;
-                                        const cashflowEntry = {
-                                          id: `CF-${Date.now()}`,
-                                          code: cashflowCode,
-                                          date: order.date,
-                                          type: "expense",
-                                          category: "pay-supplier",
-                                          amount: order.paidAmount,
-                                          paymentMethod: "cash",
-                                          description: `Chi tiền trả NCC - Phiếu nhập ${order.code}`,
-                                          staff: order.staff,
-                                          supplier: order.supplier,
-                                          status: "completed",
-                                        };
-
-                                        saveCashflowEntry(cashflowEntry);
-
-                                        paymentHistoryEntry = {
-                                          id: cashflowCode,
-                                          date: order.date,
-                                          amount: order.paidAmount,
-                                          note: `Thanh toán tiền mặt`,
-                                        } as any;
-
-                                        toast.success(
-                                          `Đã thêm phiếu chi ${order.paidAmount.toLocaleString(
-                                            "vi-VN"
-                                          )}đ vào sổ quỹ`
-                                        );
+                                      try {
+                                        await inventoryService.completePurchaseOrder(order.id);
+                                        toast.success("Đã hoàn thành phiếu nhập hàng");
+                                        fetchData();
+                                      } catch (error) {
+                                        console.error("Error completing order:", error);
+                                        toast.error("Không thể hoàn thành phiếu nhập hàng");
                                       }
-
-                                      setPurchaseOrders(
-                                        purchaseOrders.map((o) =>
-                                          o.id === order.id
-                                            ? {
-                                              ...o,
-                                              status: "completed" as const,
-                                              paymentHistory:
-                                                paymentHistoryEntry
-                                                  ? [
-                                                    ...(o.paymentHistory ||
-                                                      []),
-                                                    paymentHistoryEntry,
-                                                  ]
-                                                  : o.paymentHistory || [],
-                                            }
-                                            : o
-                                        )
-                                      );
-
-                                      toast.success(
-                                        "Đã hoàn thành phiếu nhập hàng"
-                                      );
                                     }}
                                   >
                                     <Check className="w-4 h-4" />
@@ -1959,27 +1941,21 @@ export function PurchaseOrders() {
                                   <Button
                                     variant="outline"
                                     className="text-red-600 hover:text-red-700 gap-2"
-                                    onClick={(e) => {
+                                    onClick={async (e) => {
                                       e.stopPropagation();
                                       if (
                                         confirm(
                                           "Bạn có chắc chắn muốn huỷ phiếu nhập này?"
                                         )
                                       ) {
-                                        setPurchaseOrders(
-                                          purchaseOrders.filter(
-                                            (o) => o.id !== order.id
-                                          )
-                                        );
-                                        if (expandedRow === order.id) {
-                                          setExpandedRow(null);
+                                        try {
+                                          await inventoryService.cancelPurchaseOrder(order.id);
+                                          toast.success("Đã huỷ phiếu nhập");
+                                          fetchData();
+                                        } catch (error) {
+                                          console.error("Error cancelling order:", error);
+                                          toast.error("Không thể huỷ phiếu nhập");
                                         }
-                                        const newEditingDates = {
-                                          ...editingDates,
-                                        };
-                                        delete newEditingDates[order.id];
-                                        setEditingDates(newEditingDates);
-                                        toast.success("Đã huỷ phiếu nhập");
                                       }
                                     }}
                                   >
@@ -1989,19 +1965,6 @@ export function PurchaseOrders() {
                                 </>
                               ) : (
                                 <>
-                                  <Button
-                                    variant="outline"
-                                    className="gap-2"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toast.info(
-                                        "Tính năng trả hàng đang được phát triển"
-                                      );
-                                    }}
-                                  >
-                                    <RotateCcw className="w-4 h-4" />
-                                    Trả hàng
-                                  </Button>
                                   <Button
                                     variant="outline"
                                     className="gap-2"
@@ -2219,9 +2182,11 @@ export function PurchaseOrders() {
                     <SelectValue placeholder="Chọn nhà cung cấp" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="trung-nguyen">Trung Nguyên</SelectItem>
-                    <SelectItem value="vinamilk">Vinamilk</SelectItem>
-                    <SelectItem value="thai-milk">Thai Milk</SelectItem>
+                    {Array.isArray(suppliers) && suppliers.map((s) => (
+                      <SelectItem key={s.id} value={s.id.toString()}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -2257,7 +2222,12 @@ export function PurchaseOrders() {
                   type="button"
                   size="sm"
                   className="bg-blue-600 hover:bg-blue-700 gap-1"
-                  onClick={() => setShowAddItemDialog(true)}
+                  onClick={() => {
+                    // Pre-select items that are already added
+                    const currentIds = addedItems.map(item => String(item.itemId));
+                    setSelectedItemIds(currentIds);
+                    setShowAddItemDialog(true);
+                  }}
                 >
                   <Plus className="w-4 h-4" />
                   Thêm hàng hóa
@@ -2348,17 +2318,11 @@ export function PurchaseOrders() {
 
                           return (
                             <tr key={idx}>
-                              <td className="px-2 py-2">
-                                <Input
-                                  value={item.batchCode}
-                                  onChange={(e) =>
-                                    handleChangeItem(
-                                      "batchCode",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="text-sm h-8 w-full bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                                />
+                              <td
+                                className="px-2 py-2 text-sm text-slate-900 truncate"
+                                title={item.batchCode}
+                              >
+                                {item.batchCode}
                               </td>
                               <td
                                 className="px-2 py-2 text-sm text-slate-900 truncate"
@@ -2561,69 +2525,43 @@ export function PurchaseOrders() {
                 </RadioGroup>
               </div>
               {formData.paymentMethod === "transfer" && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Ngân hàng *</Label>
-                    <Popover
-                      open={bankSearchOpen}
-                      onOpenChange={setBankSearchOpen}
+                <div className="space-y-2">
+                  <Label>Tài khoản ngân hàng *</Label>
+                  <div className="flex gap-2">
+                    <Select
+                      value={formData.bankId}
+                      onValueChange={(value) => {
+                        const account = allBankAccounts.find((acc) => acc.id === value);
+                        if (account) {
+                          setFormData({
+                            ...formData,
+                            bankId: account.id,
+                            bankName: account.bank,
+                            bankAccount: account.accountNumber,
+                          });
+                        }
+                      }}
                     >
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className="w-full justify-between bg-white border-slate-300"
-                        >
-                          {formData.bankName || "Chọn ngân hàng"}
-                          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Tìm ngân hàng..." />
-                          <CommandList
-                            style={{ height: "300px", overflowY: "scroll" }}
-                          >
-                            <CommandEmpty>
-                              Không tìm thấy ngân hàng
-                            </CommandEmpty>
-                            <CommandGroup>
-                              {vietnameseBanks.map((bank) => (
-                                <CommandItem
-                                  key={bank.id}
-                                  value={bank.name}
-                                  onSelect={() => {
-                                    setFormData({
-                                      ...formData,
-                                      bankId: bank.id,
-                                      bankName: bank.name,
-                                    });
-                                    setBankSearchOpen(false);
-                                  }}
-                                >
-                                  {bank.name}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Số tài khoản *</Label>
-                    <Input
-                      value={formData.bankAccount}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          bankAccount: e.target.value,
-                        })
-                      }
-                      placeholder="Nhập số tài khoản"
-                      disabled={!formData.bankId}
-                      className="bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                    />
+                      <SelectTrigger className="flex-1 bg-white border-slate-300">
+                        <SelectValue placeholder="Chọn tài khoản ngân hàng" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allBankAccounts.map((acc) => (
+                          <SelectItem key={acc.id} value={acc.id}>
+                            {acc.name} - {acc.bank} - {acc.accountNumber}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleOpenAddBankAccount}
+                      className="gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Thêm TK
+                    </Button>
                   </div>
                 </div>
               )}
@@ -2653,225 +2591,157 @@ export function PurchaseOrders() {
             <div className="flex gap-2">
               <Button
                 className="bg-blue-600 hover:bg-blue-700"
-                disabled={addedItems.length === 0}
-                onClick={() => {
-                  // Lưu nháp
+                disabled={addedItems.length === 0 || isSaving}
+                onClick={async () => {
                   if (addedItems.length === 0) {
                     toast.error("Vui lòng thêm ít nhất một hàng hóa");
                     return;
                   }
 
                   const paidAmount = parseFloat(formData.paidAmount || "0");
-                  const debtAmount = totalValue - paidAmount;
-
-                  const draftDate = formData.date || formatDateTime(new Date());
-
-                  if (editingOrderId !== null) {
-                    // Update existing draft order
-                    setPurchaseOrders((prev) =>
-                      prev.map((order) =>
-                        order.id === editingOrderId
-                          ? {
-                            ...order,
-                            code: formData.code,
-                            date: draftDate,
-                            supplier: formData.supplier,
-                            supplierId: formData.supplier,
-                            items: addedItems.length,
-                            items: addedItems.length,
-                            totalAmount: totalValue,
-                            // Force paidAmount to 0 for drafts
-                            paidAmount: 0,
-                            debtAmount: totalValue,
-                            staff: formData.staff,
-                            note: formData.note,
-                            details: {
-                              items: addedItems,
-                            },
-                          }
-                          : order
-                      )
-                    );
-                    toast.success("Đã cập nhật phiếu nhập hàng");
-                  } else {
-                    // Create new draft order
-                    const draftOrder: PurchaseOrder = {
-                      id: Date.now(),
-                      code: formData.code,
-                      date: draftDate,
-                      supplier: formData.supplier,
-                      supplierId: formData.supplier,
-                      items: addedItems.length,
-                      totalAmount: totalValue,
-                      // Force paidAmount to 0 for drafts as requested
-                      paidAmount: 0,
-                      debtAmount: totalValue,
-                      status: "draft",
-                      staff: formData.staff,
-                      note: formData.note,
-                      details: {
-                        items: addedItems,
-                      },
-                      paymentHistory: [],
-                    };
-
-                    setPurchaseOrders([draftOrder, ...purchaseOrders]);
-                    toast.success("Đã lưu nháp phiếu nhập hàng");
+                  if (paidAmount > 0 && formData.paymentMethod === "transfer" && !formData.bankId) {
+                    toast.error("Vui lòng chọn tài khoản ngân hàng");
+                    return;
                   }
 
-                  handleCreateOrder();
+                  setIsSaving(true);
+                  try {
+                    // Build payload according to API spec
+                    const payload: any = {
+                      supplierId: parseInt(formData.supplier),
+                      status: "draft",
+                      items: addedItems.map(item => {
+                        const itemPayload: any = {
+                          itemId: typeof item.itemId === 'string' ? parseInt(item.itemId) : item.itemId,
+                          quantity: item.quantity,
+                          unitPrice: item.unitPrice,
+                          unit: item.unit,
+                        };
+                        // Only add batchCode if it exists
+                        if (item.batchCode) {
+                          itemPayload.batchCode = item.batchCode;
+                        }
+                        // Only add expiryDate if it exists
+                        if (item.expiryDate) {
+                          itemPayload.expiryDate = item.expiryDate;
+                        }
+                        return itemPayload;
+                      })
+                    };
+
+                    // Only add payment fields if there's a payment
+                    if (paidAmount > 0) {
+                      payload.paidAmount = paidAmount;
+                      payload.paymentMethod = formData.paymentMethod === "transfer" ? "bank" : "cash";
+                      if (formData.paymentMethod === "transfer") {
+                        payload.bankAccountId = parseInt(formData.bankId);
+                      }
+                    }
+
+                    // Only add notes if exists
+                    if (formData.note) {
+                      payload.notes = formData.note;
+                    }
+
+                    console.log("Saving draft with payload:", payload);
+
+                    if (editingOrderId) {
+                      await inventoryService.updatePurchaseOrder(editingOrderId, payload);
+                      toast.success("Đã cập nhật phiếu tạm");
+                    } else {
+                      await inventoryService.createPurchaseOrder(payload);
+                      toast.success("Đã lưu nháp phiếu nhập hàng");
+                    }
+                    setShowCreateDialog(false);
+                    fetchData();
+                  } catch (error) {
+                    console.error("Error saving draft:", error);
+                    toast.error("Không thể lưu phiếu tạm");
+                  } finally {
+                    setIsSaving(false);
+                  }
                 }}
               >
                 Lưu nháp
               </Button>
               <Button
                 className="bg-blue-600 hover:bg-blue-700"
-                disabled={addedItems.length === 0}
-                onClick={() => {
-                  // Validate payment method if transfer
-                  if (
-                    formData.paymentMethod === "transfer" &&
-                    (!formData.bankAccount || !formData.bankId)
-                  ) {
-                    toast.error("Vui lòng chọn ngân hàng và nhập số tài khoản");
+                disabled={addedItems.length === 0 || isSaving}
+                onClick={async () => {
+                  if (addedItems.length === 0) {
+                    toast.error("Vui lòng thêm ít nhất một hàng hóa");
                     return;
                   }
 
-                  // Hoàn thành
                   const paidAmount = parseFloat(formData.paidAmount || "0");
-                  const debtAmount = totalValue - paidAmount;
+                  if (paidAmount > 0 && formData.paymentMethod === "transfer" && !formData.bankId) {
+                    toast.error("Vui lòng chọn tài khoản ngân hàng");
+                    return;
+                  }
 
-                  // 1. Cập nhật số lượng hàng hóa trong inventory
-                  updateInventoryItems(addedItems);
-
-                  // 2. Thêm vào sổ quỹ nếu có số tiền phải trả
-                  let paymentHistoryEntry: any = null;
-                  if (paidAmount > 0) {
-                    // Tạo phiếu chi "Chi tiền trả NCC"
-                    const orderDate =
-                      formData.date || formatDateTime(new Date());
-                    const cashflowCode = `PCPN${formData.code.replace(
-                      "PN",
-                      ""
-                    )}`;
-                    const cashflowEntry = {
-                      id: `CF-${Date.now()}`,
-                      code: cashflowCode,
-                      date: orderDate,
-                      type: "expense",
-                      category: "pay-supplier", // Chi tiền NCC
-                      amount: paidAmount,
-                      paymentMethod: formData.paymentMethod,
-                      description: `Chi tiền trả NCC - Phiếu nhập ${formData.code}`,
-                      staff: formData.staff,
-                      supplier: formData.supplier,
-                      bankAccount:
-                        formData.paymentMethod === "transfer"
-                          ? formData.bankAccount
-                          : undefined,
-                      bankName:
-                        formData.paymentMethod === "transfer"
-                          ? formData.bankName
-                          : undefined,
+                  setIsSaving(true);
+                  try {
+                    // Build payload according to API spec
+                    const payload: any = {
+                      supplierId: parseInt(formData.supplier),
                       status: "completed",
+                      items: addedItems.map(item => {
+                        const itemPayload: any = {
+                          itemId: typeof item.itemId === 'string' ? parseInt(item.itemId) : item.itemId,
+                          quantity: item.quantity,
+                          unitPrice: item.unitPrice,
+                          unit: item.unit,
+                        };
+                        // Only add batchCode if it exists
+                        if (item.batchCode) {
+                          itemPayload.batchCode = item.batchCode;
+                        }
+                        // Only add expiryDate if it exists
+                        if (item.expiryDate) {
+                          itemPayload.expiryDate = item.expiryDate;
+                        }
+                        return itemPayload;
+                      })
                     };
 
-                    // Lưu vào localStorage để Finance có thể đọc
-                    saveCashflowEntry(cashflowEntry);
+                    // Only add payment fields if there's a payment
+                    if (paidAmount > 0) {
+                      payload.paidAmount = paidAmount;
+                      payload.paymentMethod = formData.paymentMethod === "transfer" ? "bank" : "cash";
+                      if (formData.paymentMethod === "transfer") {
+                        payload.bankAccountId = parseInt(formData.bankId);
+                      }
+                    }
 
-                    // Create payment history entry
-                    paymentHistoryEntry = {
-                      id: cashflowCode,
-                      date: orderDate,
-                      amount: paidAmount,
-                      note: `Thanh toán ${formData.paymentMethod === "cash"
-                        ? "tiền mặt"
-                        : "chuyển khoản"
-                        }`,
-                    };
+                    // Only add notes if exists
+                    if (formData.note) {
+                      payload.notes = formData.note;
+                    }
 
-                    toast.success(
-                      `Đã hoàn thành phiếu nhập và thêm phiếu chi ${paidAmount.toLocaleString(
-                        "vi-VN"
-                      )}đ vào sổ quỹ`
-                    );
-                  }
-
-                  if (debtAmount > 0 && formData.supplier) {
-                    // Cập nhật công nợ NCC
-                    toast.success(
-                      `Công nợ NCC: ${debtAmount.toLocaleString("vi-VN")}đ`
-                    );
-                  }
-
-                  // 3. Tạo hoặc cập nhật phiếu nhập
-                  const orderDate = formData.date || formatDateTime(new Date());
-
-                  if (editingOrderId !== null) {
-                    // Update existing draft order to completed
-                    setPurchaseOrders((prev) =>
-                      prev.map((order) =>
-                        order.id === editingOrderId
-                          ? {
-                            ...order,
-                            code: formData.code,
-                            date: orderDate,
-                            supplier: formData.supplier,
-                            supplierId: formData.supplier,
-                            items: addedItems.length,
-                            totalAmount: totalValue,
-                            paidAmount: paidAmount,
-                            debtAmount: debtAmount,
-                            status: "completed",
-                            staff: formData.staff,
-                            note: formData.note,
-                            details: {
-                              items: addedItems,
-                            },
-                            paymentHistory: paymentHistoryEntry
-                              ? [paymentHistoryEntry]
-                              : [],
-                          }
-                          : order
-                      )
-                    );
+                    if (editingOrderId) {
+                      await inventoryService.updatePurchaseOrder(editingOrderId, payload);
+                    } else {
+                      await inventoryService.createPurchaseOrder(payload);
+                    }
                     toast.success("Đã hoàn thành phiếu nhập hàng");
-                  } else {
-                    // Create new completed order
-                    const newOrder: PurchaseOrder = {
-                      id: Date.now(),
-                      code: formData.code,
-                      date: orderDate,
-                      supplier: formData.supplier,
-                      supplierId: formData.supplier,
-                      items: addedItems.length,
-                      totalAmount: totalValue,
-                      paidAmount: paidAmount,
-                      debtAmount: debtAmount,
-                      status: "completed",
-                      staff: formData.staff,
-                      note: formData.note,
-                      details: {
-                        items: addedItems,
-                      },
-                      paymentHistory: paymentHistoryEntry
-                        ? [paymentHistoryEntry]
-                        : [],
-                    };
-
-                    setPurchaseOrders([newOrder, ...purchaseOrders]);
-                    toast.success("Đã hoàn thành phiếu nhập hàng");
+                    setShowCreateDialog(false);
+                    fetchData();
+                  } catch (error) {
+                    console.error("Error completing order:", error);
+                    toast.error("Không thể hoàn thành phiếu nhập hàng");
+                  } finally {
+                    setIsSaving(false);
                   }
-
-                  handleCreateOrder();
                 }}
               >
                 Hoàn thành
               </Button>
             </div>
+
+
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Import Excel Dialog */}
       <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
@@ -2919,10 +2789,10 @@ export function PurchaseOrders() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Add Item Dialog - Similar to StockCheck modal */}
-      <Dialog open={showAddItemDialog} onOpenChange={setShowAddItemDialog}>
+      < Dialog open={showAddItemDialog} onOpenChange={setShowAddItemDialog} >
         <DialogContent
           className="!min-w-[1100px] !max-w-[1400px] !w-[95vw] !h-[90vh] overflow-hidden flex flex-col p-0 sm:!max-w-[1400px] [&>button]:!hidden"
           style={{
@@ -2996,7 +2866,7 @@ export function PurchaseOrders() {
 
             {/* Category Tabs */}
             <div className="mb-4 flex gap-2 flex-wrap">
-              {categories.map((cat) => {
+              {categoriesList.map((cat) => {
                 const isActive = selectedCategoryFilter === cat.id;
                 return (
                   <button
@@ -3069,7 +2939,7 @@ export function PurchaseOrders() {
                               handleSelectCategoryItems(item.category)
                             }
                           >
-                            {categories.find((c) => c.id === item.category)
+                            {categoriesList.find((c) => c.id === item.category)
                               ?.name ?? "-"}
                           </td>
                           <td className="px-4 py-3 text-sm text-slate-600 text-center whitespace-nowrap border-r border-slate-100">
@@ -3126,7 +2996,7 @@ export function PurchaseOrders() {
             </div>
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       <ExportExcelDialog
         open={showExportDialog}
@@ -3354,7 +3224,7 @@ export function PurchaseOrders() {
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
                   {vietnameseBanks.map((bank) => (
-                    <SelectItem key={bank.id} value={bank.id}>
+                    <SelectItem key={bank.id} value={bank.name}>
                       {bank.name}
                     </SelectItem>
                   ))}
@@ -3381,6 +3251,6 @@ export function PurchaseOrders() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 }
