@@ -2261,10 +2261,33 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
   const [currentAvailableToppings, setCurrentAvailableToppings] = useState<any[]>(toppings);
 
   const handleOpenCustomizationModal = async (item: CartItem) => {
-    // Determine if we should fetch specific toppings
-    // itemId might be "productID-timestamp"
-    const productId = item.id.split('-')[0];
+    // 1. Hydrate toppings first so UI is correct immediately
+    // Hydrate toppings from attachedToppings if customization.toppings is missing (e.g. from backend)
+    let validCustomization = item.customization || { sugarLevel: '', iceLevel: '', toppings: [], note: '' };
     
+    // Check if we need to hydrate (missing toppings in customization but present in attachedToppings)
+    if ((!validCustomization.toppings || validCustomization.toppings.length === 0) && item.attachedToppings && item.attachedToppings.length > 0) {
+        validCustomization = {
+            ...validCustomization,
+            toppings: item.attachedToppings.map(t => ({
+                id: t.inventoryItemId ? String(t.inventoryItemId) : t.id.split('-')[0],
+                name: t.name,
+                price: t.price,
+                quantity: t.quantity
+            }))
+        };
+    }
+
+    // Determine if we should fetch specific toppings
+    // Use inventoryItemId if available (for backend items), otherwise parse from ID
+    const productId = item.inventoryItemId ? String(item.inventoryItemId) : item.id.split('-')[0];
+    
+    // Default isComposite assumption (will update if API succeeds)
+    let isComposite = (item as any).isComposite ?? true; 
+
+    // Prepare item with hydrated customization
+    const hydratedItem = { ...item, customization: validCustomization };
+
     // Try to fetch item details for toppings
     try {
         const res = await getItemById(productId);
@@ -2278,33 +2301,25 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
             }));
             setCurrentAvailableToppings(specificToppings);
         } else {
-            // Fallback to global toppings if none specific (or maybe empty?)
-            // User requested: "response nó có availableToppings á, thì dùng các toppings đó thôi"
-            // So default to empty if specific provided but empty? Or fallback to all?
-            // Let's fallback to global if fetching failed or empty, OR just empty?
-            // Based on user request "thì dùng các toppings đó thôi", implies STRICT subset.
-            // If itemData exists but no toppings, then NO toppings.
-            if (itemData) {
-                 setCurrentAvailableToppings([]);
-            } else {
-                 setCurrentAvailableToppings(toppings);
-            }
+             if (itemData) {
+                  setCurrentAvailableToppings([]);
+             } else {
+                  setCurrentAvailableToppings(toppings);
+             }
         }
         
         // Determine isComposite from itemData
         // itemTypeId: 1=ready_made, 2=composite, 3=ingredient
-        const isComposite = itemData?.itemTypeId === 2 || itemData?.itemType?.id === 2;
+        isComposite = itemData?.itemTypeId === 2 || itemData?.itemType?.id === 2;
         
-        // Update item with isComposite flag before setting state
-        // We need to cast or ensure CartItem has this prop. 
-        // We will extend the object locally.
-        const itemWithFlag = { ...item, isComposite };
-        setSelectedItemForCustomization(itemWithFlag);
+        // Update item with isComposite flag
+        const finalItem = { ...hydratedItem, isComposite };
+        setSelectedItemForCustomization(finalItem);
 
     } catch (err) {
         console.error("Failed to fetch item details", err);
         setCurrentAvailableToppings(toppings); // Fallback on error
-        setSelectedItemForCustomization(item);
+        setSelectedItemForCustomization(hydratedItem);
     }
 
     setCustomizationModalOpen(true);
@@ -2323,10 +2338,13 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
       if (!c1 && !c2) return true;
       if (!c1 || !c2) return false;
 
+      const t1s = c1.toppings || [];
+      const t2s = c2.toppings || [];
+
       const toppingsEqual =
-        c1.toppings.length === c2.toppings.length &&
-        c1.toppings.every((t1) =>
-          c2.toppings.some((t2) => t2.name === t1.name && t2.price === t1.price)
+        t1s.length === t2s.length &&
+        t1s.every((t1) =>
+          t2s.some((t2) => t2.name === t1.name && t2.price === t1.price)
         );
 
       return (
