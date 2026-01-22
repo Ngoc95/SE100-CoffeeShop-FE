@@ -275,7 +275,7 @@ export function SalesStatistics() {
                             <ChevronRight className="w-4 h-4 text-slate-600" />
                           )
                         ) : null}
-                        <span className="text-blue-600">{item.date}</span>
+                        <span className="text-blue-600">{format(new Date(item.date), 'dd/MM/yyyy')}</span>
                       </div>
                     </td>
                     <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-900">{formatNumber(item.totalRevenue)}</td>
@@ -350,7 +350,7 @@ export function SalesStatistics() {
             </tr>
             {data.days.map((item: any, idx: number) => (
               <tr key={idx} className="hover:bg-slate-50">
-                <td className="border border-slate-300 px-4 py-2 text-sm text-blue-600">{item.date}</td>
+                <td className="border border-slate-300 px-4 py-2 text-sm text-blue-600">{format(new Date(item.date), 'dd/MM/yyyy')}</td>
                 <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatNumber(item.totalSubtotal)}</td>
                 <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatNumber(item.totalDiscount)}</td>
                 <td className="border border-slate-300 px-4 py-2 text-right text-sm text-slate-700">{formatNumber(item.totalRevenue)}</td>

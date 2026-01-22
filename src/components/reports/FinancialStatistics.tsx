@@ -636,7 +636,7 @@ export function FinancialStatistics() {
                                         <TableBody>
                                             {reportData.days.map((item, index) => (
                                                 <TableRow key={index}>
-                                                    <TableCell className="text-sm text-slate-900">{item.date}</TableCell>
+                                                    <TableCell className="text-sm text-slate-900">{format(new Date(item.date), 'dd/MM/yyyy')}</TableCell>
                                                     <TableCell className="text-sm text-slate-700 text-right">{item.orderCount}</TableCell>
                                                     <TableCell className="text-sm text-emerald-700 text-right">
                                                         {formatCurrency(item.revenue)}

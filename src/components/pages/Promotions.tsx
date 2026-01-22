@@ -100,6 +100,16 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return "-";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
 // const PromotionDetails = ({ promotion }: { promotion: Promotion }) => {
 //   const DetailItem = ({
 //     label,
@@ -417,7 +427,7 @@ export function Promotions() {
       if (res && res.data && res.data.metaData) {
         const { promotions } = res.data.metaData;
         if (promotions) {
-           setPromotions(promotions);
+          setPromotions(promotions);
         }
       }
     } catch (error) {
@@ -650,8 +660,8 @@ export function Promotions() {
             maxDiscount: formData.maxDiscount,
             startDateTime: formData.startDateTime,
             endDateTime: formData.endDateTime,
-            maxTotalUsage: formData.maxTotalUsage,
-            maxUsagePerCustomer: formData.maxUsagePerCustomer,
+            maxTotalUsage: formData.maxTotalUsage ?? 0,
+            maxUsagePerCustomer: formData.maxUsagePerCustomer ?? 0,
             isActive: formData.isActive,
             applyToAllItems: formData.applyToAllItems,
             applyToAllCategories: formData.applyToAllCategories,
@@ -676,8 +686,8 @@ export function Promotions() {
             minOrderValue: formData.minOrderValue,
             startDateTime: formData.startDateTime,
             endDateTime: formData.endDateTime,
-            maxTotalUsage: formData.maxTotalUsage,
-            maxUsagePerCustomer: formData.maxUsagePerCustomer,
+            maxTotalUsage: formData.maxTotalUsage ?? 0,
+            maxUsagePerCustomer: formData.maxUsagePerCustomer ?? 0,
             isActive: formData.isActive,
             applyToAllItems: formData.applyToAllItems,
             applyToAllCategories: formData.applyToAllCategories,
@@ -702,8 +712,8 @@ export function Promotions() {
             minOrderValue: formData.minOrderValue,
             startDateTime: formData.startDateTime,
             endDateTime: formData.endDateTime,
-            maxTotalUsage: formData.maxTotalUsage,
-            maxUsagePerCustomer: formData.maxUsagePerCustomer,
+            maxTotalUsage: formData.maxTotalUsage ?? 0,
+            maxUsagePerCustomer: formData.maxUsagePerCustomer ?? 0,
             isActive: formData.isActive,
             applyToAllItems: formData.applyToAllItems,
             applyToAllCategories: formData.applyToAllCategories,
@@ -730,8 +740,8 @@ export function Promotions() {
             requireSameItem: formData.requireSameItem, //nếu true thì phải là 2 ly phải là cùng 1 item trong danh sách sản phẩm áp dụng
             startDateTime: formData.startDateTime,
             endDateTime: formData.endDateTime,
-            maxTotalUsage: formData.maxTotalUsage,
-            maxUsagePerCustomer: formData.maxUsagePerCustomer,
+            maxTotalUsage: formData.maxTotalUsage ?? 0,
+            maxUsagePerCustomer: formData.maxUsagePerCustomer ?? 0,
             isActive: formData.isActive,
             applyToAllItems: formData.applyToAllItems,
             applyToAllCategories: formData.applyToAllCategories,
@@ -753,8 +763,8 @@ export function Promotions() {
       await fetchPromotionData()
       setEditDialogOpen(false);
     }
-    catch (error) {
-      toast.error("Cập nhật khuyến mại thất bại. Lỗi: " + error.response.data.message);
+    catch (error: any) {
+      toast.error("Cập nhật khuyến mại thất bại. Lỗi: " + error.response?.data?.message);
     }
   };
 
@@ -777,8 +787,8 @@ export function Promotions() {
             maxDiscount: formData.maxDiscount,
             startDateTime: formData.startDateTime,
             endDateTime: formData.endDateTime,
-            maxTotalUsage: formData.maxTotalUsage,
-            maxUsagePerCustomer: formData.maxUsagePerCustomer,
+            maxTotalUsage: formData.maxTotalUsage ?? 0,
+            maxUsagePerCustomer: formData.maxUsagePerCustomer ?? 0,
             isActive: formData.isActive,
             applyToAllItems: formData.applyToAllItems,
             applyToAllCategories: formData.applyToAllCategories,
@@ -803,8 +813,8 @@ export function Promotions() {
             minOrderValue: formData.minOrderValue,
             startDateTime: formData.startDateTime,
             endDateTime: formData.endDateTime,
-            maxTotalUsage: formData.maxTotalUsage,
-            maxUsagePerCustomer: formData.maxUsagePerCustomer,
+            maxTotalUsage: formData.maxTotalUsage ?? 0,
+            maxUsagePerCustomer: formData.maxUsagePerCustomer ?? 0,
             isActive: formData.isActive,
             applyToAllItems: formData.applyToAllItems,
             applyToAllCategories: formData.applyToAllCategories,
@@ -829,8 +839,8 @@ export function Promotions() {
             minOrderValue: formData.minOrderValue,
             startDateTime: formData.startDateTime,
             endDateTime: formData.endDateTime,
-            maxTotalUsage: formData.maxTotalUsage,
-            maxUsagePerCustomer: formData.maxUsagePerCustomer,
+            maxTotalUsage: formData.maxTotalUsage ?? 0,
+            maxUsagePerCustomer: formData.maxUsagePerCustomer ?? 0,
             isActive: formData.isActive,
             applyToAllItems: formData.applyToAllItems,
             applyToAllCategories: formData.applyToAllCategories,
@@ -857,8 +867,8 @@ export function Promotions() {
             requireSameItem: formData.requireSameItem, //nếu true thì phải là 2 ly phải là cùng 1 item trong danh sách sản phẩm áp dụng
             startDateTime: formData.startDateTime,
             endDateTime: formData.endDateTime,
-            maxTotalUsage: formData.maxTotalUsage,
-            maxUsagePerCustomer: formData.maxUsagePerCustomer,
+            maxTotalUsage: formData.maxTotalUsage ?? 0,
+            maxUsagePerCustomer: formData.maxUsagePerCustomer ?? 0,
             isActive: formData.isActive,
             applyToAllItems: formData.applyToAllItems,
             applyToAllCategories: formData.applyToAllCategories,
@@ -880,8 +890,8 @@ export function Promotions() {
       await fetchPromotionData()
       setAddDialogOpen(false);
     }
-    catch (error) {
-      toast.error("Thêm khuyến mại thất bại. Lỗi: " + error.response.data.message);
+    catch (error: any) {
+      toast.error("Thêm khuyến mại thất bại. Lỗi: " + error.response?.data?.message);
     }
   };
 
@@ -1278,10 +1288,10 @@ export function Promotions() {
                               : "-"}
                           </TableCell>
                           <TableCell className="text-sm text-slate-700">
-                            {promo.startDateTime ? promo.startDateTime.toString().split('T')[0] : "-"}
+                            {formatDate(promo.startDateTime)}
                           </TableCell>
                           <TableCell className="text-sm text-slate-700">
-                            {promo.endDateTime ? promo.endDateTime.toString().split('T')[0] : "-"}
+                            {formatDate(promo.endDateTime)}
                           </TableCell>
                           <TableCell className="text-sm">{getStatusBadge(promo.isActive)}</TableCell>
                           <TableCell className="text-sm text-right">
@@ -1374,10 +1384,10 @@ export function Promotions() {
                                         <span className="font-semibold">Yêu cầu cùng mặc hàng:</span> {promo.requireSameItem != null ? (promo.requireSameItem ? "Có" : "Không") : "-"}
                                       </div>
                                       <div className="text-sm">
-                                        <span className="font-semibold">Ngày bắt đầu:</span> {promo.startDateTime ? promo.startDateTime.toString().split('T')[0] : "-"}
+                                        <span className="font-semibold">Ngày bắt đầu:</span> {formatDate(promo.startDateTime)}
                                       </div>
                                       <div className="text-sm">
-                                        <span className="font-semibold">Ngày kết thúc:</span> {promo.endDateTime ? promo.endDateTime.toString().split('T')[0] : "-"}
+                                        <span className="font-semibold">Ngày kết thúc:</span> {formatDate(promo.endDateTime)}
                                       </div>
                                       <div className="text-sm">
                                         <span className="font-semibold">Tổng số lượng tối đa:</span> {promo.maxTotalUsage != null ? promo.maxTotalUsage.toLocaleString() : "-"}

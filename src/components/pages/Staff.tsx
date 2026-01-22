@@ -15,7 +15,7 @@ import {
   ArrowDown,
   Eye,
   EyeOff,
-  Calendar,
+  Calendar as CalendarIcon,
   Download,
   Upload
 } from "lucide-react";
@@ -63,6 +63,10 @@ import { SimpleSearchSelect } from "../SimpleSearchSelect";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { excelService } from "../../services/excelService";
 import { ImportExcelDialog } from "../ImportExcelDialog";
+import { Calendar } from "../ui/calendar";
+import { format } from "date-fns";
+import { vi } from "date-fns/locale";
+import { cn } from "../ui/utils";
 
 import { StaffMember, staffMembers as initialStaffMembers } from "../../data/staffData";
 import { initialAccounts } from "../../data/accountData";
@@ -1052,21 +1056,44 @@ export function Staff({
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div>
+                            <div className="flex flex-col gap-1.5">
                               <Label>
                                 Ngày sinh <span className="text-red-500">*</span>
                               </Label>
-                              <Input
-                                type="date"
-                                value={formData.birthDate}
-                                onChange={(e) =>
-                                  setFormData({
-                                    ...formData,
-                                    birthDate: e.target.value,
-                                  })
-                                }
-                                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                              />
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                      "w-full justify-start text-left font-normal bg-white border-slate-300 shadow-none focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2",
+                                      !formData.birthDate && "text-muted-foreground"
+                                    )}
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {formData.birthDate ? (
+                                      format(new Date(formData.birthDate), "dd/MM/yyyy")
+                                    ) : (
+                                      <span>Chọn ngày sinh</span>
+                                    )}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={formData.birthDate ? new Date(formData.birthDate) : undefined}
+                                    onSelect={(date: Date | undefined) => {
+                                      if (date) {
+                                        setFormData({
+                                          ...formData,
+                                          birthDate: format(date, "yyyy-MM-dd"),
+                                        });
+                                      }
+                                    }}
+                                    initialFocus
+                                    locale={vi}
+                                  />
+                                </PopoverContent>
+                              </Popover>
                             </div>
                           </div>
                         </div>
@@ -1099,22 +1126,45 @@ export function Staff({
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div>
+                            <div className="flex flex-col gap-1.5">
                               <Label>
                                 Ngày vào làm{" "}
                                 <span className="text-red-500">*</span>
                               </Label>
-                              <Input
-                                type="date"
-                                value={formData.joinDate}
-                                onChange={(e) =>
-                                  setFormData({
-                                    ...formData,
-                                    joinDate: e.target.value,
-                                  })
-                                }
-                                className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                              />
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                      "w-full justify-start text-left font-normal bg-white border-slate-300 shadow-none focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2",
+                                      !formData.joinDate && "text-muted-foreground"
+                                    )}
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {formData.joinDate ? (
+                                      format(new Date(formData.joinDate), "dd/MM/yyyy")
+                                    ) : (
+                                      <span>Chọn ngày vào làm</span>
+                                    )}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={formData.joinDate ? new Date(formData.joinDate) : undefined}
+                                    onSelect={(date: Date | undefined) => {
+                                      if (date) {
+                                        setFormData({
+                                          ...formData,
+                                          joinDate: format(date, "yyyy-MM-dd"),
+                                        });
+                                      }
+                                    }}
+                                    initialFocus
+                                    locale={vi}
+                                  />
+                                </PopoverContent>
+                              </Popover>
                             </div>
                           </div>
                         </div>
@@ -1674,21 +1724,44 @@ export function Staff({
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
+                    <div className="flex flex-col gap-1.5">
                       <Label>
                         Ngày sinh <span className="text-red-500">*</span>
                       </Label>
-                      <Input
-                        type="date"
-                        value={formData.birthDate}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            birthDate: e.target.value,
-                          })
-                        }
-                        className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                      />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal bg-white border-slate-300 shadow-none focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2",
+                              !formData.birthDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formData.birthDate ? (
+                              format(new Date(formData.birthDate), "dd/MM/yyyy")
+                            ) : (
+                              <span>Chọn ngày sinh</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={formData.birthDate ? new Date(formData.birthDate) : undefined}
+                            onSelect={(date: Date | undefined) => {
+                              if (date) {
+                                setFormData({
+                                  ...formData,
+                                  birthDate: format(date, "yyyy-MM-dd"),
+                                });
+                              }
+                            }}
+                            initialFocus
+                            locale={vi}
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
                 </div>
@@ -1721,18 +1794,41 @@ export function Staff({
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
+                    <div className="flex flex-col gap-1.5">
                       <Label>
                         Ngày vào làm <span className="text-red-500">*</span>
                       </Label>
-                      <Input
-                        type="date"
-                        value={formData.joinDate}
-                        onChange={(e) =>
-                          setFormData({ ...formData, joinDate: e.target.value })
-                        }
-                        className="mt-1.5 bg-white border-slate-300 shadow-none focus:border-blue-500 focus:ring-blue-500 focus:ring-2 focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2"
-                      />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal bg-white border-slate-300 shadow-none focus-visible:border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-2",
+                              !formData.joinDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formData.joinDate ? (
+                              format(new Date(formData.joinDate), "dd/MM/yyyy")
+                            ) : (
+                              <span>Chọn ngày vào làm</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={formData.joinDate ? new Date(formData.joinDate) : undefined}
+                            onSelect={(date: Date | undefined) => {
+                              if (date) {
+                                setFormData({ ...formData, joinDate: format(date, "yyyy-MM-dd") });
+                              }
+                            }}
+                            initialFocus
+                            locale={vi}
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
                 </div>
               </div>
