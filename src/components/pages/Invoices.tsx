@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { formatDate } from '../../utils/format';
 import {
   Table,
   TableBody,
@@ -58,7 +59,7 @@ export function Invoices() {
   const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<string[]>(['cash', 'transfer', 'momo']);
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<number | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  
+
   // Sort states
   type SortField = "code" | "date" | "customer" | "items" | "total" | "paymentMethod" | "status" | null;
   type SortOrder = "asc" | "desc" | "none";
@@ -67,19 +68,19 @@ export function Invoices() {
 
   // Mock data
   const invoices: Invoice[] = [
-    { 
-      id: 1, 
-      code: 'HD001', 
-      date: '2024-12-04 10:30', 
-      customer: 'Khách lẻ', 
+    {
+      id: 1,
+      code: 'HD001',
+      date: '2024-12-04 10:30',
+      customer: 'Khách lẻ',
       customerId: 'KL001',
       staffId: 'NV001',
       staffName: 'Nguyễn Văn A',
       tableId: 'B05',
       orderCode: 'DM001',
-      items: 3, 
-      total: 125000, 
-      paymentMethod: 'cash', 
+      items: 3,
+      total: 125000,
+      paymentMethod: 'cash',
       status: 'completed',
       promotionCode: 'KM001',
       rewardPoints: 12,
@@ -89,18 +90,18 @@ export function Invoices() {
         { id: 3, name: 'Bánh croissant', unit: 'cái', quantity: 1, price: 45000, total: 45000 },
       ]
     },
-    { 
-      id: 2, 
-      code: 'HD002', 
-      date: '2024-12-04 11:15', 
-      customer: 'Nguyễn Văn B', 
+    {
+      id: 2,
+      code: 'HD002',
+      date: '2024-12-04 11:15',
+      customer: 'Nguyễn Văn B',
       customerId: 'KH002',
       staffId: 'NV002',
       staffName: 'Trần Thị C',
       tableId: 'B03',
-      items: 5, 
-      total: 250000, 
-      paymentMethod: 'transfer', 
+      items: 5,
+      total: 250000,
+      paymentMethod: 'transfer',
       status: 'completed',
       rewardPoints: 25,
       itemDetails: [
@@ -111,17 +112,17 @@ export function Invoices() {
         { id: 5, name: 'Sữa chua', unit: 'hộp', quantity: 1, price: 15000, total: 15000 },
       ]
     },
-    { 
-      id: 3, 
-      code: 'HD003', 
-      date: '2024-12-04 12:00', 
-      customer: 'Khách lẻ', 
+    {
+      id: 3,
+      code: 'HD003',
+      date: '2024-12-04 12:00',
+      customer: 'Khách lẻ',
       customerId: 'KL002',
       staffId: 'NV001',
       staffName: 'Nguyễn Văn A',
-      items: 2, 
-      total: 75000, 
-      paymentMethod: 'cash', 
+      items: 2,
+      total: 75000,
+      paymentMethod: 'cash',
       status: 'completed',
       rewardPoints: 7,
       itemDetails: [
@@ -129,19 +130,19 @@ export function Invoices() {
         { id: 2, name: 'Trà đào', unit: 'ly', quantity: 1, price: 50000, total: 50000 },
       ]
     },
-    { 
-      id: 4, 
-      code: 'HD004', 
-      date: '2024-12-04 14:45', 
-      customer: 'Trần Thị D', 
+    {
+      id: 4,
+      code: 'HD004',
+      date: '2024-12-04 14:45',
+      customer: 'Trần Thị D',
       customerId: 'KH003',
       staffId: 'NV003',
       staffName: 'Lê Văn E',
       tableId: 'B07',
       orderCode: 'DM002',
-      items: 4, 
-      total: 180000, 
-      paymentMethod: 'momo', 
+      items: 4,
+      total: 180000,
+      paymentMethod: 'momo',
       status: 'completed',
       promotionCode: 'KM002',
       rewardPoints: 18,
@@ -210,8 +211,8 @@ export function Invoices() {
   };
 
   let filteredInvoices = invoices.filter(invoice => {
-    const matchesSearch = invoice.code.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         invoice.customer.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = invoice.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      invoice.customer.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(invoice.status);
     const matchesPayment = selectedPaymentMethods.length === 0 || selectedPaymentMethods.includes(invoice.paymentMethod);
     return matchesSearch && matchesStatus && matchesPayment;
@@ -339,7 +340,7 @@ export function Invoices() {
                             { id: 'cancelled', label: 'Đã hủy' },
                           ].map((status) => (
                             <div key={status.id} className="flex items-center space-x-2">
-                              <Checkbox 
+                              <Checkbox
                                 id={status.id}
                                 checked={selectedStatuses.includes(status.id)}
                                 onCheckedChange={() => toggleStatus(status.id)}
@@ -361,7 +362,7 @@ export function Invoices() {
                             { id: 'momo', label: 'Ví MoMo' },
                           ].map((method) => (
                             <div key={method.id} className="flex items-center space-x-2">
-                              <Checkbox 
+                              <Checkbox
                                 id={method.id}
                                 checked={selectedPaymentMethods.includes(method.id)}
                                 onCheckedChange={() => togglePaymentMethod(method.id)}
@@ -509,8 +510,8 @@ export function Invoices() {
               <TableBody>
                 {filteredInvoices.map((invoice, index) => (
                   <>
-                    <TableRow 
-                      key={invoice.id} 
+                    <TableRow
+                      key={invoice.id}
                       className="hover:bg-blue-100/50 cursor-pointer"
                       onClick={() => toggleExpand(invoice.id)}
                     >
@@ -525,7 +526,7 @@ export function Invoices() {
                         {index + 1}
                       </TableCell>
                       <TableCell className="text-sm text-blue-600">{invoice.code}</TableCell>
-                      <TableCell className="text-sm text-slate-700">{invoice.date}</TableCell>
+                      <TableCell className="text-sm text-slate-700">{formatDate(invoice.date)}</TableCell>
                       <TableCell className="text-sm text-slate-900">{invoice.customer}</TableCell>
                       <TableCell className="text-sm text-slate-700 text-center">{invoice.items}</TableCell>
                       <TableCell className="text-sm text-slate-900 text-right">
@@ -533,11 +534,10 @@ export function Invoices() {
                       </TableCell>
                       <TableCell className="text-sm text-slate-700">{getPaymentMethodLabel(invoice.paymentMethod)}</TableCell>
                       <TableCell className="text-sm text-center">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
-                          invoice.status === 'completed' 
-                            ? 'bg-green-50 text-green-700' 
-                            : 'bg-red-50 text-red-700'
-                        }`}>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${invoice.status === 'completed'
+                          ? 'bg-green-50 text-green-700'
+                          : 'bg-red-50 text-red-700'
+                          }`}>
                           {invoice.status === 'completed' ? 'Hoàn thành' : 'Đã hủy'}
                         </span>
                       </TableCell>
@@ -552,7 +552,7 @@ export function Invoices() {
                         </div>
                       </TableCell>
                     </TableRow>
-                    
+
                     {/* Expanded Detail Row */}
                     {expandedInvoiceId === invoice.id && (
                       <TableRow>
@@ -568,16 +568,16 @@ export function Invoices() {
                                 <span className="text-sm text-slate-600 w-40">Mã NV:</span>
                                 <span className="text-sm text-slate-900">{invoice.staffId} - {invoice.staffName}</span>
                               </div>
-                              
+
                               <div className="flex gap-2">
                                 <span className="text-sm text-slate-600 w-40">Mã KH:</span>
                                 <span className="text-sm text-slate-900">{invoice.customerId}</span>
                               </div>
                               <div className="flex gap-2">
                                 <span className="text-sm text-slate-600 w-40">Ngày lập:</span>
-                                <span className="text-sm text-slate-900">{invoice.date}</span>
+                                <span className="text-sm text-slate-900">{formatDate(invoice.date)}</span>
                               </div>
-                              
+
                               <div className="flex gap-2">
                                 <span className="text-sm text-slate-600 w-40">Mã bàn:</span>
                                 <span className="text-sm text-slate-900">{invoice.tableId || '-'}</span>
@@ -586,7 +586,7 @@ export function Invoices() {
                                 <span className="text-sm text-slate-600 w-40">Mã phiếu đặt món:</span>
                                 <span className="text-sm text-slate-900">{invoice.orderCode || '-'}</span>
                               </div>
-                              
+
                               <div className="flex gap-2">
                                 <span className="text-sm text-slate-600 w-40">Phương thức thanh toán:</span>
                                 <span className="text-sm text-slate-900">{getPaymentMethodLabel(invoice.paymentMethod)}</span>
@@ -595,7 +595,7 @@ export function Invoices() {
                                 <span className="text-sm text-slate-600 w-40"></span>
                                 <span className="text-sm text-slate-900"></span>
                               </div>
-                              
+
                               <div className="flex gap-2">
                                 <span className="text-sm text-slate-600 w-40">Mã khuyến mãi:</span>
                                 <span className="text-sm text-slate-900">{invoice.promotionCode || '-'}</span>
