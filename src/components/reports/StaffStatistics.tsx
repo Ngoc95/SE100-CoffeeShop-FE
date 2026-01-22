@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Filter, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
+import { Filter, ChevronDown, ChevronUp, ChevronRight, Download } from 'lucide-react';
 import { CustomerTimeFilter } from './CustomerTimeFilter';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
@@ -10,6 +10,7 @@ import { vi } from 'date-fns/locale';
 import { toast } from 'sonner';
 import {
     getStaffStatistics,
+    exportStaffReport,
     StaffStatisticsResponse,
     ProfitReportResponse,
     ProfitChartResponse,
@@ -19,6 +20,7 @@ import {
     DisplayType
 } from '../../api/statistics/staffStatistics';
 import { convertPresetToDateRange } from '../../utils/timePresets';
+import { useReport } from '../../context/ReportContext';
 
 export function StaffStatistics() {
     // Filter panel state
@@ -61,6 +63,43 @@ export function StaffStatistics() {
         }
     }, [dateRangeType, timePreset]);
 
+    const { setExportHandler } = useReport();
+
+    const handleExport = useCallback(async () => {
+        if (!dateFrom || !dateTo) return;
+
+        try {
+            const startDate = format(dateFrom, 'yyyy-MM-dd');
+            const endDate = format(dateTo, 'yyyy-MM-dd');
+
+            const params = {
+                displayType: 'report' as DisplayType,
+                concern,
+                startDate,
+                endDate
+            };
+
+            const blob = await exportStaffReport(params);
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `BaoCaoNhanVien_${concern}_${startDate}_${endDate}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            toast.success('Xuất báo cáo thành công');
+        } catch (error) {
+            console.error('Error exporting staff report:', error);
+            toast.error('Lỗi khi xuất báo cáo');
+        }
+    }, [dateFrom, dateTo, concern]);
+
+    // Register export handler
+    useEffect(() => {
+        setExportHandler(handleExport);
+        return () => setExportHandler(null as any);
+    }, [handleExport, setExportHandler]);
+
     // Fetch data when filters change
     useEffect(() => {
         fetchData();
@@ -89,6 +128,8 @@ export function StaffStatistics() {
             setLoading(false);
         }
     };
+
+
 
 
 

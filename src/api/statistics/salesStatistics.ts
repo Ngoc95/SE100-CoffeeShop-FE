@@ -12,3 +12,10 @@ export interface SalesStatisticsParams {
 export const getSalesStatistics = (params: SalesStatisticsParams) => {
     return axiosClient.post('/reports/sales', params);
 };
+
+export const exportSalesStatistics = async (params: SalesStatisticsParams) => {
+    const response = await axiosClient.post('/reports/export/sales', params, {
+        responseType: 'blob'
+    });
+    return response.data;
+};

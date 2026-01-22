@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -21,6 +21,8 @@ import { MultiSelectFilter } from '../MultiSelectFilter';
 import { getCustomerGroups } from '../../api/customerGroup';
 import { convertPresetToDateRange } from '../../utils/timePresets';
 import { toast } from 'sonner';
+import { useReport } from '../../context/ReportContext';
+import { exportCustomerReport } from '../../api/statistics/customerStatistics';
 
 export function CustomerReport() {
   // Filter panel state
@@ -45,6 +47,41 @@ export function CustomerReport() {
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState<CustomerReportResponse | null>(null);
   const [chartData, setChartData] = useState<CustomerChartResponse | null>(null);
+
+  const { setExportHandler } = useReport();
+
+  const handleExport = useCallback(async () => {
+    if (!dateFrom || !dateTo) return;
+
+    try {
+      const params = {
+        displayType: 'report',
+        startDate: format(dateFrom, 'yyyy-MM-dd'),
+        endDate: format(dateTo, 'yyyy-MM-dd'),
+        customerGroupIds: selectedGroupIds.length > 0 ? selectedGroupIds : undefined,
+        search: customerSearch || undefined
+      };
+
+      const blob = await exportCustomerReport(params);
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `BaoCaoKhachHang_${format(new Date(), 'ddMMyyyy_HHmm')}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Xuất báo cáo thành công');
+    } catch (error) {
+      console.error('Error exporting customer report:', error);
+      toast.error('Lỗi khi xuất báo cáo');
+    }
+  }, [dateFrom, dateTo, selectedGroupIds, customerSearch]);
+
+  // Register export handler
+  useEffect(() => {
+    setExportHandler(handleExport);
+    return () => setExportHandler(null as any);
+  }, [handleExport, setExportHandler]);
 
   // Fetch customer groups on mount
   useEffect(() => {

@@ -118,3 +118,12 @@ export const getStaffStatistics = async (
     const response = await axiosClient.get('/reports/staff', { params })
     return response.data.metaData
 }
+
+export const exportStaffReport = async (
+    params: StaffStatisticsRequest
+) => {
+    const response = await axiosClient.post('/reports/export/staff', params, {
+        responseType: 'blob'
+    })
+    return response.data
+}

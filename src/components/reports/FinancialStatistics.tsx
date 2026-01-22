@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
     DollarSign,
     TrendingUp,
@@ -10,6 +10,7 @@ import {
     Filter,
     ChevronDown,
     ChevronUp,
+    Download,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -45,9 +46,11 @@ import { vi } from 'date-fns/locale';
 import { createSmartFormatter } from '../../utils/chartFormatters';
 import {
     getFinancialReport,
+    exportFinancialReport,
     UnifiedReportResponse,
     ChartResponse,
 } from '../../api/statistics/financialStatistics';
+import { useReport } from '../../context/ReportContext';
 
 export function FinancialStatistics() {
     // Filter panel state
@@ -74,6 +77,43 @@ export function FinancialStatistics() {
         { id: 'cost', label: 'Chi phí' },
         { id: 'profit', label: 'Lợi nhuận' },
     ];
+
+    const { setExportHandler } = useReport();
+
+    const handleExport = useCallback(async () => {
+        if (!dateFrom || !dateTo) return;
+
+        try {
+            const startDate = format(dateFrom, 'yyyy-MM-dd');
+            const endDate = format(dateTo, 'yyyy-MM-dd');
+
+            // Always export in report format
+            const params = {
+                displayType: 'report' as const,
+                startDate,
+                endDate,
+            };
+
+            const blob = await exportFinancialReport(params);
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `BaoCaoTaiChinh_${startDate}_${endDate}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            toast.success('Xuất báo cáo thành công');
+        } catch (error) {
+            console.error('Error exporting financial report:', error);
+            toast.error('Lỗi khi xuất báo cáo');
+        }
+    }, [dateFrom, dateTo]);
+
+    // Register export handler
+    useEffect(() => {
+        setExportHandler(handleExport);
+        return () => setExportHandler(null as any);
+    }, [handleExport, setExportHandler]);
 
     // Convert preset to date range
     useEffect(() => {
@@ -121,6 +161,8 @@ export function FinancialStatistics() {
             setLoading(false);
         }
     };
+
+
 
     // Calculate active filter count
     const getActiveFilterCount = () => {

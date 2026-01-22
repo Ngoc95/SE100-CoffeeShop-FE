@@ -8,12 +8,14 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { CustomerTimeFilter } from '../reports/CustomerTimeFilter';
-import { getSalesStatistics } from '../../api/statistics/salesStatistics';
+import { getSalesStatistics, exportSalesStatistics } from '../../api/statistics/salesStatistics';
 import { toast } from 'sonner';
 import { convertPresetToDateRange, TimePreset } from '../../utils/timePresets';
 import { MultiSelectFilter } from '../MultiSelectFilter';
 import { getAreas, Area } from '../../api/area';
 import { getTables, Table } from '../../api/table';
+import { useReport } from '../../context/ReportContext';
+import { useCallback } from 'react';
 
 type ViewType = 'chart' | 'report';
 type ConcernType = 'time' | 'profit' | 'invoice_discount' | 'returns' | 'tables' | 'categories';
@@ -46,6 +48,47 @@ export function SalesStatistics() {
     }
     setExpandedRows(newExpanded);
   };
+
+  const { setExportHandler } = useReport();
+
+  const handleExport = useCallback(async () => {
+    if (!dateFrom || !dateTo) return;
+
+    try {
+      const params: any = {
+        concern: concern,
+        startDate: format(dateFrom, 'yyyy-MM-dd'),
+        endDate: format(dateTo, 'yyyy-MM-dd'),
+        displayType: 'report' // Always export report data
+      };
+
+      if (selectedAreas.length > 0) {
+        params.areaIds = selectedAreas;
+      }
+      if (selectedTables.length > 0) {
+        params.tableIds = selectedTables;
+      }
+
+      const blob = await exportSalesStatistics(params);
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `BaoCaoBanHang_${concern}_${format(new Date(), 'ddMMyyyy_HHmm')}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Xuất báo cáo thành công');
+    } catch (error) {
+       console.error('Error exporting report:', error);
+       toast.error('Lỗi khi xuất báo cáo');
+    }
+  }, [dateFrom, dateTo, concern, selectedAreas, selectedTables]);
+
+  // Register export handler
+  useEffect(() => {
+    setExportHandler(handleExport);
+    return () => setExportHandler(null as any);
+  }, [handleExport, setExportHandler]);
 
   // Data for filters
   const [areas, setAreas] = useState<Array<{ id: number; name: string }>>([]);
@@ -125,6 +168,8 @@ export function SalesStatistics() {
       setLoading(false);
     }
   };
+
+
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
@@ -544,6 +589,7 @@ export function SalesStatistics() {
               Xóa bộ lọc
             </Button>
           )}
+          <div className="flex-1" />
         </div>
 
         {isFilterOpen && (

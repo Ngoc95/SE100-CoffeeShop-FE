@@ -1,18 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Filter, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
+import { Filter, ChevronDown, ChevronUp, ChevronRight, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { EmployeeFilter } from '../EmployeeFilter';
 import { CustomerTimeFilter } from './CustomerTimeFilter';
 import { MultiSelectFilter } from '../MultiSelectFilter';
-import { getEndOfDayReport, EndOfDayConcern } from '../../api/statistics/endOfDayStatistics';
+import { getEndOfDayReport, exportEndOfDayReport, EndOfDayConcern } from '../../api/statistics/endOfDayStatistics';
 import { toast } from 'sonner';
 import staffApi from '../../api/staffApi';
 import { convertPresetToDateRange } from '../../utils/timePresets';
+import { useReport } from '../../context/ReportContext';
 
 type ConcernType = 'sales' | 'cashflow' | 'products' | 'cancellations';
 
@@ -57,6 +58,69 @@ export function EndOfDayStatistics() {
       setDateTo(to);
     }
   }, [dateRangeType, timePreset]);
+
+  const { setExportHandler } = useReport();
+
+  const handleExport = useCallback(async () => {
+    if (!dateFrom || !dateTo) return;
+
+    try {
+      const concernMap: Record<ConcernType, EndOfDayConcern> = {
+        sales: 'sales',
+        cashflow: 'revenue_expenses',
+        products: 'inventory',
+        cancellations: 'cancelled_items'
+      };
+
+      const params: any = {
+        concern: concernMap[concern],
+        startDate: format(dateFrom, 'yyyy-MM-dd'),
+        endDate: format(dateTo, 'yyyy-MM-dd'),
+      };
+
+      if (concern === 'sales' || concern === 'cancellations') {
+        if (customerSearch) params.customerSearch = customerSearch;
+        if (selectedStaffIds.length > 0) params.staffIds = selectedStaffIds.map(Number);
+        if (selectedPaymentMethods.length > 0 && concern === 'sales') {
+          params.paymentMethods = selectedPaymentMethods;
+        }
+        if (productSearch && concern === 'cancellations') {
+          params.productSearch = productSearch;
+        }
+      }
+
+      if (concern === 'cashflow') {
+        if (customerSearch) params.customerSearch = customerSearch;
+        if (selectedStaffIds.length > 0) params.staffIds = selectedStaffIds.map(Number);
+        if (selectedPaymentMethods.length > 0) params.paymentMethods = selectedPaymentMethods;
+        if (selectedCategoryIds.length > 0) params.categoryIds = selectedCategoryIds.map(Number);
+      }
+
+      if (concern === 'products') {
+        if (productSearch) params.productSearch = productSearch;
+        if (selectedCategoryIds.length > 0) params.categoryIds = selectedCategoryIds.map(Number);
+      }
+
+      const blob = await exportEndOfDayReport(params);
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `BaoCaoCuoiNgay_${concern}_${format(new Date(), 'ddMMyyyy_HHmm')}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Xuất báo cáo thành công');
+    } catch (error) {
+      console.error('Error exporting report:', error);
+      toast.error('Lỗi khi xuất báo cáo');
+    }
+  }, [dateFrom, dateTo, concern, customerSearch, selectedStaffIds, selectedPaymentMethods, productSearch, selectedCategoryIds]);
+
+  // Register export handler
+  useEffect(() => {
+    setExportHandler(handleExport);
+    return () => setExportHandler(null as any);
+  }, [handleExport, setExportHandler]);
 
   // Fetch employees on mount
   useEffect(() => {
@@ -144,6 +208,8 @@ export function EndOfDayStatistics() {
       setLoading(false);
     }
   };
+
+
 
   const toggleSalesRow = (id: string) => {
     setExpandedSalesRows(prev => {
@@ -449,6 +515,7 @@ export function EndOfDayStatistics() {
               Xóa bộ lọc
             </Button>
           )}
+          <div className="flex-1" />
         </div>
 
         {isFilterOpen && (

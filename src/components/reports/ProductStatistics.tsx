@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Filter, ChevronDown, ChevronUp, X, CheckCircle2, Award, TrendingUp, LineChart as LineChartIcon } from 'lucide-react';
+import { Filter, ChevronDown, ChevronUp, X, CheckCircle2, Award, TrendingUp, LineChart as LineChartIcon, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { CustomerTimeFilter } from './CustomerTimeFilter';
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -14,6 +14,7 @@ import { convertPresetToDateRange, TimePreset } from '../../utils/timePresets';
 import { getCategories } from '../../api/category';
 import {
     getProductStatistics,
+    exportProductReport,
     DisplayType,
     ChartConcern,
     ProductReportResponse,
@@ -22,6 +23,7 @@ import {
 } from '../../api/statistics/productStatistics';
 import { ProductsReportExcel } from './ProductsReportExcel';
 import { MultiSelectFilter } from '../MultiSelectFilter';
+import { useReport } from '../../context/ReportContext';
 
 interface SelectableItem {
     id: number;
@@ -55,6 +57,48 @@ export function ProductStatistics() {
     const [reportData, setReportData] = useState<ProductReportResponse | null>(null);
     const [salesChartData, setSalesChartData] = useState<SalesChartResponse | null>(null);
     const [profitChartData, setProfitChartData] = useState<ProfitChartResponse | null>(null);
+
+    const { setExportHandler } = useReport();
+
+    const handleExport = useCallback(async () => {
+        if (!dateFrom || !dateTo) return;
+
+        try {
+            const startDate = format(dateFrom, 'yyyy-MM-dd');
+            const endDate = format(dateTo, 'yyyy-MM-dd');
+
+            const params = {
+                displayType: 'report' as DisplayType,
+                 // For report, concern depends on viewType being report? No, exportProductReport logic usually defaults.
+                 // But backend exportProductReport (StatisticsServices) takes filters.
+                 // Let's pass what we have.
+                concern: undefined,
+                startDate,
+                endDate,
+                productSearch: productSearch || undefined,
+                categoryIds: selectedCategories.length > 0 ? selectedCategories.map(c => c.id) : undefined,
+            };
+
+            const blob = await exportProductReport(params);
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `BaoCaoHangHoa_${startDate}_${endDate}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            toast.success('Xuất báo cáo thành công');
+        } catch (error) {
+            console.error('Error exporting product report:', error);
+            toast.error('Lỗi khi xuất báo cáo');
+        }
+    }, [dateFrom, dateTo, productSearch, selectedCategories]);
+
+    // Register export handler
+    useEffect(() => {
+        setExportHandler(handleExport);
+        return () => setExportHandler(null as any);
+    }, [handleExport, setExportHandler]);
 
     // Load categories on mount
     useEffect(() => {
@@ -122,6 +166,8 @@ export function ProductStatistics() {
             setLoading(false);
         }
     };
+
+
 
     // Helper functions
     const handleMultiSelect = (item: SelectableItem) => {

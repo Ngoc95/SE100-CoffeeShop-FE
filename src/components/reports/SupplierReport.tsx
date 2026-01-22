@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
@@ -10,8 +10,10 @@ import {
   getSupplierStatistics,
   SupplierPurchasingResponse,
   SupplierDebtResponse,
-  SupplierChartResponse
+  SupplierChartResponse,
+  exportSupplierReport
 } from '../../api/statistics/supplierStatistics';
+import { useReport } from '../../context/ReportContext';
 import { convertPresetToDateRange } from '../../utils/timePresets';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -38,6 +40,41 @@ export function SupplierReport() {
   const [purchasingData, setPurchasingData] = useState<SupplierPurchasingResponse | null>(null);
   const [debtData, setDebtData] = useState<SupplierDebtResponse | null>(null);
   const [chartData, setChartData] = useState<SupplierChartResponse | null>(null);
+
+  const { setExportHandler } = useReport();
+
+  const handleExport = useCallback(async () => {
+    if (!dateFrom || !dateTo) return;
+
+    try {
+      const params = {
+        displayType: 'report',
+        concern,
+        startDate: format(dateFrom, 'yyyy-MM-dd'),
+        endDate: format(dateTo, 'yyyy-MM-dd'),
+        search: supplierSearch || undefined
+      };
+
+      const blob = await exportSupplierReport(params);
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `BaoCaoNhaCungCap_${concern}_${format(new Date(), 'ddMMyyyy_HHmm')}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Xuất báo cáo thành công');
+    } catch (error) {
+      console.error('Error exporting supplier report:', error);
+      toast.error('Lỗi khi xuất báo cáo');
+    }
+  }, [dateFrom, dateTo, concern, supplierSearch]);
+
+  // Register export handler
+  useEffect(() => {
+    setExportHandler(handleExport);
+    return () => setExportHandler(null as any);
+  }, [handleExport, setExportHandler]);
 
   // Format currency
   const formatCurrency = (value: number) => {
