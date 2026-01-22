@@ -5,6 +5,7 @@ export type SortField = "name" | "currentStock" | "totalValue" | "expiryDate" | 
 export type SortOrder = "asc" | "desc" | "none";
 
 export interface BatchInfo {
+  id?: number;
   batchCode: string;
   quantity: number;
   unitCost: number;

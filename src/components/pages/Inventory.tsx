@@ -2524,15 +2524,6 @@ export function Inventory() {
                         </TableHead>
                         <TableHead
                           className="cursor-pointer hover:bg-blue-100 transition-colors"
-                          onClick={() => handleSort("batches")}
-                        >
-                          <div className="flex items-center">
-                            Lô hàng
-                            {getSortIcon("batches")}
-                          </div>
-                        </TableHead>
-                        <TableHead
-                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("currentStock")}
                         >
                           <div className="flex items-center">
@@ -2622,9 +2613,6 @@ export function Inventory() {
                                 }
                               </TableCell>
                               <TableCell className="text-sm text-slate-600">{item.unit}</TableCell>
-                              <TableCell className="text-sm text-slate-600">
-                                {item.batches?.length || 0} lô
-                              </TableCell>
                               <TableCell>
                                 <div>
                                   <p className="text-sm text-slate-900">
@@ -3292,15 +3280,6 @@ export function Inventory() {
                         </TableHead>
                         <TableHead
                           className="cursor-pointer hover:bg-blue-100 transition-colors"
-                          onClick={() => handleSort("batches")}
-                        >
-                          <div className="flex items-center">
-                            Lô hàng
-                            {getSortIcon("batches")}
-                          </div>
-                        </TableHead>
-                        <TableHead
-                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => handleSort("currentStock")}
                         >
                           <div className="flex items-center">
@@ -3333,15 +3312,6 @@ export function Inventory() {
                           <div className="flex items-center">
                             HSD gần nhất
                             {getSortIcon("expiryDate")}
-                          </div>
-                        </TableHead>
-                        <TableHead
-                          className="cursor-pointer hover:bg-blue-100 transition-colors"
-                          onClick={() => handleSort("supplier")}
-                        >
-                          <div className="flex items-center">
-                            Nhà cung cấp
-                            {getSortIcon("supplier")}
                           </div>
                         </TableHead>
                         <TableHead
@@ -3401,9 +3371,6 @@ export function Inventory() {
                                 }
                               </TableCell>
                               <TableCell className="text-sm text-slate-600">{item.unit}</TableCell>
-                              <TableCell className="text-sm text-slate-600">
-                                {item.batches?.length || 0} lô
-                              </TableCell>
                               <TableCell>
                                 <div>
                                   <p className="text-sm text-slate-900">
@@ -3444,9 +3411,6 @@ export function Inventory() {
                                 ) : (
                                   <span className="text-slate-400">—</span>
                                 )}
-                              </TableCell>
-                              <TableCell className="text-sm text-slate-700">
-                                {primarySupplier}
                               </TableCell>
                               <TableCell className="text-sm text-slate-900">
                                 {item.sellingPrice ? `${item.sellingPrice.toLocaleString()}₫` : "—"}
