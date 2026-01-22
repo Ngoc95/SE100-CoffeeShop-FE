@@ -67,3 +67,35 @@ export interface InventoryItem {
   availableToppings?: ToppingRelation[];
   applicableProducts?: ToppingRelation[];
 }
+
+export interface ProductPricingItem {
+  id: number;
+  name: string;
+  category: {
+    id: number;
+    name: string;
+  };
+  itemType: {
+    id: number;
+    name: string;
+  };
+  unit: {
+    id: number;
+    name: string;
+    symbol: string;
+  };
+  costPrice: number;
+  lastPurchasePrice: number;
+  sellingPrice: number;
+  margin: number;
+  lastPurchaseDate: string | null;
+  ingredients?: {
+    ingredientId: number;
+    quantity: number;
+    unitCost: number;
+  }[];
+  batches?: {
+    unitCost: number;
+    entryDate: string;
+  }[];
+}

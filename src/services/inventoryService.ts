@@ -6,7 +6,7 @@ const API_BASE_URL = "http://localhost:4000/api";
    AUTH TOKEN
 ====================== */
 const getAuthToken = (): string | null => {
-  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInRva2VuVHlwZSI6ImFjY2Vzc190b2tlbiIsImlhdCI6MTc2OTA1OTQyOSwiZXhwIjoxNzY5MDYwMzI5fQ.1hj0hBXJTMUhiZmrOaoZ2A_q--HWoYIn3nL1h2qBb2o";
+  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInRva2VuVHlwZSI6ImFjY2Vzc190b2tlbiIsImlhdCI6MTc2OTA2NTI0MSwiZXhwIjoxNzY5MDY2MTQxfQ.Hj_CYkfcAVvJDHeG-mf2x97zq8ojH-QsQjTTT3quPxw";
 }
 
 const getHeaders = (): HeadersInit => {
@@ -642,6 +642,106 @@ export const inventoryService = {
 
     if (!response.ok) {
       throw new Error(`CREATE bank-account failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  /* ---------- Pricing ---------- */
+
+  async getPricing(
+    page = 1,
+    limit = 100,
+    filters?: {
+      search?: string;
+      categoryId?: string;
+      itemTypeId?: string;
+      sort?: string;
+    }
+  ) {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+
+    if (filters?.search) params.append("search", filters.search);
+    if (filters?.categoryId) params.append("categoryId", filters.categoryId);
+    if (filters?.itemTypeId) params.append("itemTypeId", filters.itemTypeId);
+    if (filters?.sort) params.append("sort", filters.sort);
+
+    const response = await fetch(
+      `${API_BASE_URL}/pricing?${params.toString()}`,
+      {
+        method: "GET",
+        headers: getHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`GET pricing failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async updateSinglePrice(data: {
+    itemId: number;
+    baseType: "cost" | "current" | "lastPurchase";
+    adjustmentValue: number;
+    adjustmentType: "percent" | "amount";
+  }) {
+    const response = await fetch(
+      `${API_BASE_URL}/pricing/single`,
+      {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`UPDATE single price failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async updateCategoryPrice(data: {
+    categoryId: number;
+    baseType: "cost" | "current" | "lastPurchase";
+    adjustmentValue: number;
+    adjustmentType: "percent" | "amount";
+  }) {
+    const response = await fetch(
+      `${API_BASE_URL}/pricing/category`,
+      {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`UPDATE category price failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async updateBatchPrice(data: {
+    items: { id: number; sellingPrice: number }[];
+  }) {
+    const response = await fetch(
+      `${API_BASE_URL}/pricing/batch`,
+      {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`UPDATE batch price failed: ${response.status}`);
     }
 
     return response.json();

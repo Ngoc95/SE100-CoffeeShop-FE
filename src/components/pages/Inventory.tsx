@@ -252,6 +252,7 @@ export function Inventory() {
 
 
       // Map API response to InventoryItem type, ensuring 'type' and 'status' are set for filtering
+      console.log("[Inventory] Sample raw item:", itemsArray[0]);
       const mappedItems: InventoryItem[] = itemsArray.map((item: any) => {
         // Determine type
         let type: ItemType = "ingredient";
@@ -279,10 +280,16 @@ export function Inventory() {
           id: String(item.id),
           name: item.name || "",
           type,
-          category: item.category?.name || (typeof item.category === "string" ? item.category : ""),
+          category: item.category?.name ||
+            (typeof item.category === "string" ? item.category : "") ||
+            (item.categoryId ? categoryOptions.find(c => String(c.id) === String(item.categoryId))?.name : "") ||
+            "",
           categoryId: item.category?.id ? Number(item.category.id) : (item.categoryId ? Number(item.categoryId) : undefined),
           currentStock: stock,
-          unit: item.unit?.name || (typeof item.unit === "string" ? item.unit : ""),
+          unit: item.unit?.name ||
+            (typeof item.unit === "string" ? item.unit : "") ||
+            (item.unitId ? unitOptions.find(u => String(u.id) === String(item.unitId))?.name : "") ||
+            "",
           unitId: item.unit?.id ? Number(item.unit.id) : (item.unitId ? Number(item.unitId) : undefined),
           minStock,
           maxStock: item.maxStock ? Number(item.maxStock) : 0,
@@ -2608,8 +2615,7 @@ export function Inventory() {
                               </TableCell>
                               <TableCell className="text-sm text-slate-600">
                                 {
-                                  categories.find((c) => c.id === item.category)
-                                    ?.name
+                                  item.category
                                 }
                               </TableCell>
                               <TableCell className="text-sm text-slate-600">{item.unit}</TableCell>
@@ -2731,9 +2737,7 @@ export function Inventory() {
                                             </span>
                                             <span className="ml-2 text-slate-900">
                                               {
-                                                categories.find(
-                                                  (c) => c.id === item.category
-                                                )?.name
+                                                item.category
                                               }
                                             </span>
                                           </div>
@@ -2960,8 +2964,7 @@ export function Inventory() {
                               </TableCell>
                               <TableCell className="text-sm text-slate-700">
                                 {
-                                  categories.find((c) => c.id === item.category)
-                                    ?.name
+                                  item.category
                                 }
                               </TableCell>
                               <TableCell className="text-sm text-slate-700">{item.unit}</TableCell>
@@ -3051,9 +3054,7 @@ export function Inventory() {
                                             </span>
                                             <span className="ml-2 text-slate-900">
                                               {
-                                                categories.find(
-                                                  (c) => c.id === item.category
-                                                )?.name
+                                                item.category
                                               }
                                             </span>
                                           </div>
@@ -3366,8 +3367,7 @@ export function Inventory() {
                               </TableCell>
                               <TableCell className="text-sm text-slate-600">
                                 {
-                                  categories.find((c) => c.id === item.category)
-                                    ?.name
+                                  item.category
                                 }
                               </TableCell>
                               <TableCell className="text-sm text-slate-600">{item.unit}</TableCell>
@@ -3487,9 +3487,7 @@ export function Inventory() {
                                             </span>
                                             <span className="ml-2 text-slate-900">
                                               {
-                                                categories.find(
-                                                  (c) => c.id === item.category
-                                                )?.name
+                                                item.category
                                               }
                                             </span>
                                           </div>
@@ -3626,7 +3624,7 @@ export function Inventory() {
           { header: 'Mã hàng', accessor: (row: any) => row.id },
           { header: 'Tên hàng', accessor: (row: any) => row.name },
           { header: 'Loại', accessor: (row: any) => row.type === 'ready-made' ? 'Hàng bán sẵn' : row.type === 'ingredient' ? 'Nguyên liệu' : 'Hàng cấu thành' },
-          { header: 'Danh mục', accessor: (row: any) => categories.find(c => c.id === row.category)?.name || row.category },
+          { header: 'Danh mục', accessor: (row: any) => row.category },
           { header: 'Đơn vị', accessor: (row: any) => row.unit },
           { header: 'Tồn kho', accessor: (row: any) => row.currentStock },
           { header: 'Tồn tối thiểu', accessor: (row: any) => row.minStock },
