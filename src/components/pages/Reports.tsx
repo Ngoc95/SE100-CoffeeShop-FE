@@ -3,9 +3,9 @@ import { EndOfDayStatistics } from '../reports/EndOfDayStatistics';
 import { CustomerReport } from '../reports/CustomerReport';
 import { SupplierReport } from '../reports/SupplierReport';
 import { EmployeesReportTable } from '../reports/EmployeesReportTable';
-import { FinanceReport } from '../reports/FinanceReport';
+import { FinancialStatistics } from '../reports/FinancialStatistics';
 import { SalesStatistics } from '../reports/SalesStatistics';
-import { ProductsReportTable } from '../reports/ProductsReportTable';
+import { ProductStatistics } from '../reports/ProductStatistics';
 import { Button } from '../ui/button';
 import { Download } from 'lucide-react';
 
@@ -20,9 +20,9 @@ export function Reports({ initialTab = 'endofday' }: ReportsProps = {}) {
       case 'endofday':
         return <EndOfDayStatistics />;
       case 'finance':
-        return <FinanceReport />;
+        return <FinancialStatistics />;
       case 'products':
-        return <ProductsReportTable />;
+        return <ProductStatistics />;
       case 'sales':
         return <SalesStatistics />;
       case 'customers':

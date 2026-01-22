@@ -21,7 +21,7 @@ type ConcernType = 'time' | 'profit' | 'invoice_discount' | 'returns' | 'tables'
 export function SalesStatistics() {
   // Filter states
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [viewType, setViewType] = useState<ViewType>('report');
+  const [viewType, setViewType] = useState<ViewType>('chart');
   const [concern, setConcern] = useState<ConcernType>('time');
   const [selectedAreas, setSelectedAreas] = useState<number[]>([]);
   const [selectedTables, setSelectedTables] = useState<number[]>([]);
@@ -612,18 +612,18 @@ export function SalesStatistics() {
         <div>
           <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
             <button
-              onClick={() => setViewType('report')}
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${viewType === 'report' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:text-slate-900'
-                }`}
-            >
-              Báo cáo
-            </button>
-            <button
               onClick={() => setViewType('chart')}
               className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${viewType === 'chart' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:text-slate-900'
                 }`}
             >
               Biểu đồ
+            </button>
+            <button
+              onClick={() => setViewType('report')}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${viewType === 'report' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
+            >
+              Báo cáo
             </button>
           </div>
         </div>
