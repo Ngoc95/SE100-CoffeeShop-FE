@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Pencil, Filter, Plus, Minus, ArrowUp, ArrowDown, X } from 'lucide-react';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { categories } from '../../data/categories';
+import { toast } from 'sonner';
+import { inventoryService } from '../../services/inventoryService';
+import { ProductPricingItem } from '../../types/inventory';
 import {
   Dialog,
   DialogContent,
@@ -34,7 +36,13 @@ interface PriceEditDialogProps {
   open: boolean;
   onClose: () => void;
   product: any;
-  onSave: (productId: number, newPrice: number, applyToAll: boolean) => void;
+  onSave: (data: {
+    productId: number;
+    priceType: string;
+    adjustmentValue: number;
+    adjustmentType: 'amount' | 'percent';
+    applyToAll: boolean;
+  }) => void;
 }
 
 function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProps) {
@@ -43,9 +51,9 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
   const [adjustmentType, setAdjustmentType] = useState<'amount' | 'percent'>('amount');
   const [applyToAll, setApplyToAll] = useState(false);
 
-  const categoryLabel = categories.find(c => c.id === product?.category)?.name || product?.category;
+  const categoryLabel = product?.category?.name || "";
   const currentPrice = product?.sellingPrice || 0;
-  
+
   // Calculate new price based on selection and adjustment
   const getBasePrice = () => {
     switch (priceType) {
@@ -72,7 +80,13 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
   const newPrice = calculateNewPrice();
 
   const handleSave = () => {
-    onSave(product.id, newPrice, applyToAll);
+    onSave({
+      productId: product.id,
+      priceType,
+      adjustmentValue,
+      adjustmentType,
+      applyToAll
+    });
     onClose();
   };
 
@@ -97,7 +111,7 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
             <span className="text-sm text-slate-700 whitespace-nowrap shrink-0">
               Giá mới <span className="text-blue-600">[{currentPrice.toLocaleString('vi-VN')}]</span> =
             </span>
-            
+
             {/* Base Price Selector */}
             <Select value={priceType} onValueChange={setPriceType}>
               <SelectTrigger className="w-[180px] shrink-0 bg-white border-slate-300 shadow-none">
@@ -138,21 +152,19 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
             <div className="flex gap-2 shrink-0">
               <button
                 onClick={() => setAdjustmentType('amount')}
-                className={`px-4 py-2.5 text-sm font-medium rounded transition-colors ${
-                  adjustmentType === 'amount'
-                    ? 'bg-slate-600 text-white'
-                    : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                }`}
+                className={`px-4 py-2.5 text-sm font-medium rounded transition-colors ${adjustmentType === 'amount'
+                  ? 'bg-slate-600 text-white'
+                  : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                  }`}
               >
                 VNĐ
               </button>
               <button
                 onClick={() => setAdjustmentType('percent')}
-                className={`px-4 py-2.5 text-sm font-medium rounded transition-colors ${
-                  adjustmentType === 'percent'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                }`}
+                className={`px-4 py-2.5 text-sm font-medium rounded transition-colors ${adjustmentType === 'percent'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                  }`}
               >
                 %
               </button>
@@ -180,10 +192,10 @@ function PriceEditDialog({ open, onClose, product, onSave }: PriceEditDialogProp
 
           {/* Apply to All Checkbox */}
           <div className="flex items-start space-x-3 p-4 border border-slate-300 rounded-lg bg-white">
-            <Checkbox 
+            <Checkbox
               id="applyToAll"
               checked={applyToAll}
-              onCheckedChange={(checked) => setApplyToAll(checked as boolean)}
+              onCheckedChange={(checked: boolean) => setApplyToAll(checked)}
               className="mt-0.5 border-slate-300"
             />
             <Label htmlFor="applyToAll" className="text-sm text-slate-700 cursor-pointer leading-relaxed">
@@ -213,19 +225,58 @@ export function ProductPricing() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['all']);
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['ready-made', 'composite', 'ingredient']);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [selectedProduct, setSelectedProduct] = useState<ProductPricingItem | null>(null);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("none");
   const [showFilters, setShowFilters] = useState(false);
 
-  // Mock data
-  const [products, setProducts] = useState([
-    { id: 1, code: 'CF001', name: 'Cà phê đen đá', category: 'bottled-beverages', type: 'composite', costPrice: 8000, lastPurchasePrice: 7500, sellingPrice: 25000 },
-    { id: 2, code: 'CF002', name: 'Bạc xỉu', category: 'bottled-beverages', type: 'composite', costPrice: 10000, lastPurchasePrice: 9800, sellingPrice: 30000 },
-    { id: 3, code: 'TR001', name: 'Trà sữa trân châu', category: 'tea-coffee', type: 'composite', costPrice: 12000, lastPurchasePrice: 11500, sellingPrice: 35000 },
-    { id: 4, code: 'BK001', name: 'Bánh croissant', category: 'packaging', type: 'ready-made', costPrice: 7000, lastPurchasePrice: 6800, sellingPrice: 20000 },
-    { id: 5, code: 'NL001', name: 'Cà phê hạt Arabica', category: 'tea-coffee', type: 'ingredient', costPrice: 350000, lastPurchasePrice: 340000, sellingPrice: 380000 },
-  ]);
+  const [products, setProducts] = useState<ProductPricingItem[]>([]);
+  const [categoriesList, setCategoriesList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [itemsRes, categoriesRes] = await Promise.all([
+          inventoryService.getPricing(1, 1000),
+          inventoryService.getCategories()
+        ]);
+
+        // Handle items response
+        let items: ProductPricingItem[] = [];
+        const rawItems = itemsRes?.metaData?.items;
+
+        if (Array.isArray(rawItems)) {
+          items = rawItems.map((i): ProductPricingItem => ({
+            id: i.id,
+            name: i.name,
+            category: i.category,
+            itemType: i.itemType,
+            unit: i.unit,
+            costPrice: Number(i.costPrice),
+            lastPurchasePrice: Number(i.lastPurchasePrice),
+            sellingPrice: Number(i.sellingPrice),
+            margin: Number(i.margin),
+            lastPurchaseDate: i.lastPurchaseDate
+          }));
+        }
+
+        console.log('[ProductPricing] Mapped items:', items);
+        setProducts(items);
+
+        // Handle categories
+        setCategoriesList(categoriesRes?.metaData || categoriesRes?.items || categoriesRes || []);
+
+      } catch (error) {
+        console.error("Error fetching pricing data:", error);
+        toast.error("Không thể tải dữ liệu giá");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const toggleCategory = (categoryId: string) => {
     if (categoryId === 'all') {
@@ -251,21 +302,67 @@ export function ProductPricing() {
     setEditDialogOpen(true);
   };
 
-  const handleSavePrice = (productId: number, newPrice: number, applyToAll: boolean) => {
-    if (applyToAll && selectedProduct) {
-      // Apply to all products in the same category
-      setProducts(products.map(p => 
-        p.category === selectedProduct.category 
-          ? { ...p, sellingPrice: newPrice }
-          : p
-      ));
-    } else {
-      // Apply to single product
-      setProducts(products.map(p => 
-        p.id === productId 
-          ? { ...p, sellingPrice: newPrice }
-          : p
-      ));
+  const handleSavePrice = async (data: {
+    productId: number;
+    priceType: string;
+    adjustmentValue: number;
+    adjustmentType: 'amount' | 'percent';
+    applyToAll: boolean;
+  }) => {
+    if (!selectedProduct) return;
+
+    try {
+      // Map UI priceType to API baseType
+      const baseTypeMap: Record<string, "cost" | "current" | "lastPurchase"> = {
+        current: "current",
+        cost: "cost",
+        lastPurchase: "lastPurchase"
+      };
+
+      if (data.applyToAll) {
+        // Apply to all products in the same category
+        await inventoryService.updateCategoryPrice({
+          categoryId: selectedProduct.category.id,
+          baseType: baseTypeMap[data.priceType] || "current",
+          adjustmentValue: data.adjustmentValue,
+          adjustmentType: data.adjustmentType
+        });
+
+        toast.success(`Đã cập nhật giá cho danh mục ${selectedProduct.category.name}`);
+      } else {
+        // Apply to single product
+        await inventoryService.updateSinglePrice({
+          itemId: data.productId,
+          baseType: baseTypeMap[data.priceType] || "current",
+          adjustmentValue: data.adjustmentValue,
+          adjustmentType: data.adjustmentType
+        });
+
+        toast.success("Cập nhật giá thành công");
+      }
+
+      // Refresh data
+      setEditDialogOpen(false);
+      const itemsRes = await inventoryService.getPricing(1, 1000);
+      const rawItems = itemsRes?.metaData?.items;
+      if (Array.isArray(rawItems)) {
+        const items = rawItems.map((i): ProductPricingItem => ({
+          id: i.id,
+          name: i.name,
+          category: i.category,
+          itemType: i.itemType,
+          unit: i.unit,
+          costPrice: Number(i.costPrice),
+          lastPurchasePrice: Number(i.lastPurchasePrice),
+          sellingPrice: Number(i.sellingPrice),
+          margin: Number(i.margin),
+          lastPurchaseDate: i.lastPurchaseDate
+        }));
+        setProducts(items);
+      }
+    } catch (error) {
+      console.error("Error updating price:", error);
+      toast.error("Lỗi khi cập nhật giá");
     }
   };
 
@@ -300,6 +397,8 @@ export function ProductPricing() {
     }
   };
 
+
+
   const getSortIcon = (field: SortField) => {
     if (sortField !== field || sortOrder === "none") {
       return null;
@@ -311,10 +410,10 @@ export function ProductPricing() {
   };
 
   let filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         product.code.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategories.includes('all') || selectedCategories.includes(product.category);
-    const matchesType = selectedTypes.includes(product.type);
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(product.id).includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategories.includes('all') || selectedCategories.includes(String(product.category.id));
+    const matchesType = selectedTypes.includes(product.itemType?.name.toLowerCase() === "ready_made" ? "ready-made" : product.itemType?.name.toLowerCase() || "");
     return matchesSearch && matchesCategory && matchesType;
   });
 
@@ -325,19 +424,17 @@ export function ProductPricing() {
       let bValue: any;
 
       if (sortField === "code") {
-        aValue = a.code;
-        bValue = b.code;
+        aValue = a.id;
+        bValue = b.id;
       } else if (sortField === "name") {
         aValue = a.name;
         bValue = b.name;
       } else if (sortField === "category") {
-        const aCategory = categories.find((c) => c.id === a.category)?.name || "";
-        const bCategory = categories.find((c) => c.id === b.category)?.name || "";
-        aValue = aCategory;
-        bValue = bCategory;
+        aValue = a.category.name;
+        bValue = b.category.name;
       } else if (sortField === "type") {
-        aValue = getTypeLabel(a.type);
-        bValue = getTypeLabel(b.type);
+        aValue = getTypeLabel(a.itemType.name);
+        bValue = getTypeLabel(b.itemType.name);
       } else if (sortField === "unit") {
         aValue = a.unit || "";
         bValue = b.unit || "";
@@ -418,20 +515,20 @@ export function ProductPricing() {
                   <div className="space-y-2">
                     <Label className="text-xs text-slate-600">Danh mục</Label>
                     <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2 max-h-60 overflow-y-auto">
-                      {categories.map((cat) => (
+                      {categoriesList.map((cat) => (
                         <div key={cat.id} className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
-                            <Checkbox 
-                              id={cat.id} 
-                              checked={selectedCategories.includes(cat.id)}
-                              onCheckedChange={() => toggleCategory(cat.id)}
+                            <Checkbox
+                              id={String(cat.id)}
+                              checked={selectedCategories.includes(String(cat.id))}
+                              onCheckedChange={() => toggleCategory(String(cat.id))}
                               className="border-slate-300"
                             />
-                            <Label htmlFor={cat.id} className="text-sm text-slate-700 cursor-pointer font-normal">
+                            <Label htmlFor={String(cat.id)} className="text-sm text-slate-700 cursor-pointer font-normal">
                               {cat.name}
                             </Label>
                           </div>
-                          <span className="text-xs text-slate-500">{cat.count}</span>
+                          {/* <span className="text-xs text-slate-500">{cat.count}</span> */}
                         </div>
                       ))}
                     </div>
@@ -447,7 +544,7 @@ export function ProductPricing() {
                         { id: 'ingredient', label: 'Nguyên liệu' },
                       ].map((type) => (
                         <div key={type.id} className="flex items-center space-x-2">
-                          <Checkbox 
+                          <Checkbox
                             id={type.id}
                             checked={selectedTypes.includes(type.id)}
                             onCheckedChange={() => toggleType(type.id)}
@@ -532,6 +629,7 @@ export function ProductPricing() {
                       {getSortIcon("type")}
                     </div>
                   </TableHead>
+                  <TableHead className="text-sm">Đơn vị</TableHead>
                   <TableHead
                     className="text-right cursor-pointer hover:bg-blue-100 transition-colors"
                     onClick={() => handleSort("costPrice")}
@@ -573,31 +671,39 @@ export function ProductPricing() {
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product, index) => {
-                  const margin = ((product.sellingPrice - product.costPrice) / product.sellingPrice * 100).toFixed(0);
-                  const categoryLabel = categories.find(c => c.id === product.category)?.name || product.category;
-                  
+                  const categoryLabel = product.category.name;
+                  const isComposite = product.itemType.name === "composite";
+
+                  // Use API provided fields directly
+                  const costPrice = product.costPrice || 0;
+                  const lastPurchasePrice = product.lastPurchasePrice || 0;
+                  const margin = product.margin || 0;
+
                   return (
                     <TableRow key={product.id} className="hover:bg-slate-50">
                       <TableCell className="text-sm text-slate-600 text-center">
                         {index + 1}
                       </TableCell>
-                      <TableCell className="text-sm text-slate-700">{product.code}</TableCell>
+                      <TableCell className="text-sm text-slate-700">{product.id}</TableCell>
                       <TableCell className="text-sm text-slate-900">{product.name}</TableCell>
                       <TableCell className="text-sm text-slate-700">{categoryLabel}</TableCell>
                       <TableCell className="text-sm text-slate-700">
-                        {getTypeLabel(product.type)}
+                        {getTypeLabel(product.itemType.name === "ready_made" ? "ready-made" : product.itemType.name)}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-700">
+                        {product.unit.symbol || product.unit.name}
                       </TableCell>
                       <TableCell className="text-sm text-slate-900 text-right">
-                        {product.costPrice.toLocaleString('vi-VN')}đ
+                        {Math.round(costPrice).toLocaleString('vi-VN')}đ
                       </TableCell>
                       <TableCell className="text-sm text-blue-600 text-right">
-                        {product.lastPurchasePrice.toLocaleString('vi-VN')}đ
+                        {isComposite ? "-" : `${Math.round(lastPurchasePrice).toLocaleString('vi-VN')}đ`}
                       </TableCell>
                       <TableCell className="text-sm text-slate-900 text-right">
                         {product.sellingPrice.toLocaleString('vi-VN')}đ
                       </TableCell>
-                      <TableCell className="text-sm text-green-600 text-right">
-                        {margin}%
+                      <TableCell className={`text-sm text-right ${margin < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                        {margin.toFixed(0)}%
                       </TableCell>
                       <TableCell className="text-center">
                         <Button variant="ghost" size="sm" onClick={() => handleEditClick(product)}>
@@ -620,6 +726,6 @@ export function ProductPricing() {
         product={selectedProduct}
         onSave={handleSavePrice}
       />
-    </div>
+    </div >
   );
 }

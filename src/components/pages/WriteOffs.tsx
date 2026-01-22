@@ -18,6 +18,7 @@ import {
   ArrowDown,
   Download,
   Filter,
+  Loader2,
 } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";
@@ -84,6 +85,7 @@ import { Card, CardContent } from "../ui/card";
 import { CustomerTimeFilter } from "../reports/CustomerTimeFilter";
 
 interface BatchInfo {
+  id?: number;
   batchCode: string;
   quantity: number;
   unitCost: number;
@@ -97,6 +99,7 @@ interface InventoryItem {
   name: string;
   type: "ingredient" | "ready-made" | "composite";
   category: string;
+  categoryId?: string | number;
   currentStock: number;
   unit: string;
   batches?: BatchInfo[];
@@ -118,11 +121,13 @@ interface WriteOffItemForm {
   productId: string;
   productName: string;
   batchCode: string;
+  batchId?: number;
   unit: string;
   quantity: number;
   unitPrice: number;
   total: number;
   reason: string;
+  maxQuantity?: number;
 }
 
 interface WriteOff {
@@ -222,7 +227,7 @@ export function WriteOffs() {
   const [selectedCategoryFilter, setSelectedCategoryFilter] =
     useState<string>("all");
   const [selectedBatches, setSelectedBatches] = useState<
-    Array<{ productId: string; batchCode: string; unitPrice: number }>
+    Array<{ productId: string; batchCode: string; unitPrice: number; entryDate?: string; batchId?: number }>
   >([]);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -530,9 +535,7 @@ export function WriteOffs() {
     ];
   };
 
-  const [inventoryItems] = useState<InventoryItem[]>(() =>
-    loadInventoryItems()
-  );
+  const [inventoryItems] = useState<InventoryItem[]>([]);
 
   // Load write-offs - using mock data only
   const loadWriteOffs = (): WriteOff[] => {
@@ -763,7 +766,41 @@ export function WriteOffs() {
 
       // Fetch items for selection
       const itemsRes = await inventoryService.getItems(1, 1000);
-      setAvailableItems(itemsRes.metaData?.items || []);
+      const itemsArray = itemsRes?.metaData?.items || [];
+
+      // Map API response to InventoryItem type
+      const mappedItems: InventoryItem[] = itemsArray.map((item: any) => {
+        let type: "ingredient" | "ready-made" | "composite" = "ingredient";
+        if (item.itemType?.name) {
+          const t = item.itemType.name.toLowerCase();
+          if (t === "ready-made" || t === "ready_made") type = "ready-made";
+          else if (t === "composite") type = "composite";
+          else if (t === "ingredient") type = "ingredient";
+        }
+
+        return {
+          id: String(item.id),
+          name: item.name || "",
+          type,
+          category: item.category?.name || "",
+          categoryId: item.category?.id,
+          currentStock: Number(item.currentStock) || 0,
+          unit: item.unit?.name || "",
+          batches: item.inventoryBatches
+            ? item.inventoryBatches.map((b: any) => ({
+              id: b.id,
+              batchCode: b.batchCode || "",
+              quantity: Number(b.remainingQty ?? b.quantity) || 0,
+              unitCost: Number(b.unitCost) || 0,
+              entryDate: b.entryDate || "",
+              expiryDate: b.expiryDate || "",
+              supplier: b.supplier?.name || (typeof b.supplier === 'string' ? b.supplier : ""),
+            }))
+            : [],
+        };
+      });
+
+      setAvailableItems(mappedItems);
 
       // Fetch categories
       const categoriesRes = await inventoryService.getCategories();
@@ -851,8 +888,9 @@ export function WriteOffs() {
   };
 
   // Get available items for write-off (ingredients and ready-made only)
-  const availableItemsForWriteOff = inventoryItems.filter(
-    (item) => item.type === "ingredient" || item.type === "ready-made"
+  // Only show items that are currently in stock
+  const availableItemsForWriteOff = availableItems.filter(
+    (item) => (item.type === "ingredient" || item.type === "ready-made") && item.currentStock > 0
   );
 
   // Get filtered items based on search and category
@@ -863,7 +901,7 @@ export function WriteOffs() {
         item.id.toLowerCase().includes(itemSearchQuery.toLowerCase());
       const matchesCategory =
         selectedCategoryFilter === "all" ||
-        selectedCategoryFilter === item.category;
+        String(selectedCategoryFilter) === String(item.categoryId);
       return matchesSearch && matchesCategory;
     });
   };
@@ -871,32 +909,49 @@ export function WriteOffs() {
   const filteredAvailableItems = getFilteredAvailableItems();
 
   // Batch selection helpers
-  const isBatchSelected = (productId: string, batchCode: string): boolean => {
+  const isBatchSelected = (productId: string, batchCode: string, entryDate?: string, batchId?: number): boolean => {
+    if (batchId) {
+      return selectedBatches.some((b) => b.batchId === batchId);
+    }
     return selectedBatches.some(
-      (b) => b.productId === productId && b.batchCode === batchCode
+      (b) => b.productId === productId && b.batchCode === batchCode && b.entryDate === entryDate
     );
   };
 
   const toggleBatchSelection = (
     productId: string,
     batchCode: string,
-    unitPrice: number
+    unitPrice: number,
+    entryDate?: string,
+    batchId?: number
   ) => {
     setSelectedBatches((prev) => {
-      const exists = prev.some(
-        (b) => b.productId === productId && b.batchCode === batchCode
-      );
+      // Check if exists
+      let exists = false;
+      if (batchId) {
+        exists = prev.some((b) => b.batchId === batchId);
+      } else {
+        exists = prev.some(
+          (b) => b.productId === productId && b.batchCode === batchCode && b.entryDate === entryDate
+        );
+      }
+
       if (exists) {
+        if (batchId) {
+          return prev.filter((b) => b.batchId !== batchId);
+        }
         return prev.filter(
-          (b) => !(b.productId === productId && b.batchCode === batchCode)
+          (b) => !(b.productId === productId && b.batchCode === batchCode && b.entryDate === entryDate)
         );
       } else {
-        return [...prev, { productId, batchCode, unitPrice }];
+        return [...prev, { productId, batchCode, unitPrice, entryDate, batchId }];
       }
     });
   };
 
-  const toggleItemExpand = (itemId: string) => {
+  const toggleItemExpand = async (itemId: string) => {
+    const isExpanding = !expandedItems.has(itemId);
+
     setExpandedItems((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(itemId)) {
@@ -906,6 +961,35 @@ export function WriteOffs() {
       }
       return newSet;
     });
+
+    if (isExpanding) {
+      try {
+        const res = await inventoryService.getItemById(itemId) as any;
+        const meta = res.metaData || res;
+
+        setAvailableItems(prev => prev.map(item => {
+          if (item.id === itemId) {
+            return {
+              ...item,
+              batches: (meta.inventoryBatches && Array.isArray(meta.inventoryBatches))
+                ? meta.inventoryBatches.map((b: any) => ({
+                  id: b.id,
+                  batchCode: b.batchCode || "",
+                  quantity: Number(b.remainingQty ?? b.quantity) || 0,
+                  unitCost: Number(b.unitCost) || 0,
+                  entryDate: b.entryDate || "",
+                  expiryDate: b.expiryDate || "",
+                  supplier: b.supplier?.name || (typeof b.supplier === 'string' ? b.supplier : ""),
+                }))
+                : []
+            };
+          }
+          return item;
+        }));
+      } catch (error) {
+        console.error("Error fetching item details on expand:", error);
+      }
+    }
   };
 
   const toggleStatus = (status: string) => {
@@ -1026,6 +1110,7 @@ export function WriteOffs() {
     (w) => w.status === "cancelled"
   ).length;
 
+  // When opening the create dialog, preselect batches already in writeOffItems
   const handleOpenCreateDialog = () => {
     const nextCode = generateNextWriteOffCode();
     const writeOffDate = formatDateTime(new Date());
@@ -1040,9 +1125,31 @@ export function WriteOffs() {
     });
     setWriteOffItems([]);
     setShowCreateDialog(true);
+    // Pre-tick batches in add item dialog if dialog is opened after create
+    setSelectedBatches([]);
   };
 
-  const handleEditWriteOff = (wo: WriteOff) => {
+  const getReasonCode = (reasonText: string): string => {
+    const textToCode: { [key: string]: string } = {
+      "Hết hạn sử dụng": "het-han",
+      "Hư hỏng": "hu-hong",
+      "Mất mát": "mat-mat",
+      "Lý do khác": "khac"
+    };
+    // Reverse lookup or direct match
+    if (textToCode[reasonText]) return textToCode[reasonText];
+
+    // Also try case-insensitive match
+    const lower = reasonText.toLowerCase();
+    for (const [key, val] of Object.entries(textToCode)) {
+      if (key.toLowerCase() === lower) return val;
+    }
+
+    // Return as is if it might already be a code (e.g. 'het-han')
+    return reasonText;
+  };
+
+  const handleEditWriteOff = async (wo: WriteOff) => {
     if (wo.status !== "draft") {
       toast.error("Chỉ có thể chỉnh sửa phiếu tạm");
       return;
@@ -1050,17 +1157,98 @@ export function WriteOffs() {
     setEditingWriteOffId(wo.id);
 
     // Load write-off items into form
+    // Load write-off items into form
+    // Identify items that we need to ensure we have details for.
+    // The list 'availableItems' might not have batch details if they came from the bulk list API.
+    // We fetch details for all items in the write-off to hold fresh batch info.
+    const itemIds = Array.from(new Set(wo.details?.items.map(i => i.itemId))).filter(id => id !== undefined) as number[];
+
+    // We update availableItems with fresh data. 
+    // We create a temporary map to hold the new items to avoid multiple state updates or race conditions.
+    const freshItemsMap = new Map<string, any>();
+
+    // Pre-fill with existing available items to keep what we have
+    availableItems.forEach(i => freshItemsMap.set(String(i.id), i));
+
+    setIsSaving(true); // Show loading state roughly
+    try {
+      await Promise.all(itemIds.map(async (id) => {
+        try {
+          const res = await inventoryService.getItemById(id) as any;
+          const meta = res.metaData || res;
+          // Map this item to InventoryItem format
+          const mapped: any = {
+            id: String(meta.id),
+            name: meta.name || "",
+            type: "ingredient", // Simplified default or check type
+            category: meta.category?.name || "",
+            categoryId: meta.category?.id,
+            currentStock: Number(meta.currentStock) || 0,
+            unit: meta.unit?.name || "",
+            batches: (meta.inventoryBatches && Array.isArray(meta.inventoryBatches))
+              ? meta.inventoryBatches.map((b: any) => ({
+                id: b.id,
+                batchCode: b.batchCode || "",
+                quantity: Number(b.remainingQty ?? b.quantity) || 0,
+                unitCost: Number(b.unitCost) || 0,
+                entryDate: b.entryDate || "",
+                expiryDate: b.expiryDate || "",
+                supplier: b.supplier?.name || (typeof b.supplier === 'string' ? b.supplier : ""),
+              }))
+              : []
+          };
+
+          // Correct type logic if needed
+          if (meta.itemType?.name) {
+            const t = meta.itemType.name.toLowerCase();
+            if (t === "ready-made" || t === "ready_made") mapped.type = "ready-made";
+            else if (t === "composite") mapped.type = "composite";
+            else if (t === "ingredient") mapped.type = "ingredient";
+          }
+
+          freshItemsMap.set(String(meta.id), mapped);
+        } catch (e) {
+          console.error(`Failed to fetch details for item ${id}`, e);
+        }
+      }));
+    } catch (err) {
+      console.error("Error fetching items for edit", err);
+    } finally {
+      setIsSaving(false);
+    }
+
+    const updatedAvailableItems = Array.from(freshItemsMap.values());
+    setAvailableItems(updatedAvailableItems);
+
     const items: WriteOffItemForm[] =
-      wo.details?.items.map((item) => ({
-        productId: "", // We don't store productId in details, but that's okay
-        productName: item.name,
-        batchCode: item.batchCode,
-        unit: item.unit,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        total: item.total,
-        reason: item.reason || "",
-      })) || [];
+      wo.details?.items.map((item) => {
+        // Attempt to find the full inventory item to get productId and batch details
+        const inventoryItem = freshItemsMap.get(String(item.itemId));
+        let maxQuantity = 0;
+        let batchId: number | undefined;
+
+        if (inventoryItem && inventoryItem.batches) {
+          const batch = inventoryItem.batches.find((b: any) => b.batchCode === item.batchCode);
+          if (batch) {
+            maxQuantity = batch.quantity;
+            batchId = batch.id;
+          }
+        }
+
+        return {
+          itemId: item.itemId,
+          productId: inventoryItem ? inventoryItem.id : "",
+          productName: item.name,
+          batchCode: item.batchCode,
+          batchId: batchId,
+          unit: item.unit,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.total,
+          reason: item.reason || "",
+          maxQuantity: maxQuantity
+        };
+      }) || [];
 
     setWriteOffItems(items);
 
@@ -1070,7 +1258,7 @@ export function WriteOffs() {
     setFormData({
       code: wo.code,
       date: datePart,
-      reason: wo.reason,
+      reason: getReasonCode(wo.reason),
       note: wo.note || "",
       staff: wo.staff || user?.fullName || "",
     });
@@ -1085,26 +1273,58 @@ export function WriteOffs() {
 
     setIsSaving(true);
     try {
+      // Construct payload according to requirements:
+      // {
+      //   "writeOffDate": "2026-01-10",
+      //   "reason": "Hết hạn sử dụng",
+      //   "notes": "Huỷ lô hàng hết hạn",
+      //   "items": [ ... ]
+      // }
       const payload = {
-        reason: formData.reason || "khac",
-        status: status,
+        writeOffDate: formData.date,
+        reason: getReasonText(formData.reason), // Ensure we send the text description if that's what is wanted, though usually codes are better. 
+        // Given the user example shows "Hết hạn sử dụng", we send the text. 
+        // If the backend actually wants the code, we might need to change this back.
+        // But "reason" field in my state is mapped to text in table, so let's try sending text or fallback to code.
+        // Actually, let's keep it safe: if the input is a known code, convert to text. If not (edit mode?), keep as is.
+        // Actually, standard is usually code. But user said "send payload: reason: 'Hết hạn sử dụng'". I will obey.
         notes: formData.note,
+        status: "draft", // We always save as draft first (or create/update)
         items: writeOffItems.map(item => ({
           itemId: item.itemId || parseInt(item.productId),
-          batchCode: item.batchCode,
+          batchId: item.batchId,
+          batchCode: item.batchCode, // Maintain backward compat if needed
           quantity: item.quantity,
-          unitPrice: item.unitPrice,
           unit: item.unit,
+          unitCost: item.unitPrice, // Map unitPrice to unitCost
           reason: item.reason
         }))
       };
 
-      if (editingWriteOffId !== null) {
-        await inventoryService.updateWriteOff(editingWriteOffId, payload);
-        toast.success(status === "completed" ? "Đã hoàn thành phiếu xuất hủy" : "Đã cập nhật phiếu tạm");
+      let currentId = editingWriteOffId;
+
+      if (currentId !== null) {
+        await inventoryService.updateWriteOff(currentId, payload);
       } else {
-        await inventoryService.createWriteOff(payload);
-        toast.success(status === "completed" ? "Đã hoàn thành phiếu xuất hủy" : "Đã lưu nháp phiếu xuất hủy");
+        const res = await inventoryService.createWriteOff(payload);
+        // Robust ID extraction: check top level, data, and metaData
+        currentId = res?.id || res?.data?.id || res?.metaData?.id;
+
+        if (!currentId) {
+          console.error("Could not determine Write-off ID from response:", res);
+          // If we can't get the ID, we can't complete it.
+          if (status === "completed") {
+            toast.warning("Đã lưu phiếu nhưng không thể tự động hoàn thành. Vui lòng kiểm tra lại danh sách.");
+            status = "draft"; // Prevent complete call attempt
+          }
+        }
+      }
+
+      if (status === "completed" && currentId) {
+        await inventoryService.completeWriteOff(currentId);
+        toast.success("Đã hoàn thành phiếu xuất hủy");
+      } else {
+        toast.success("Đã lưu nháp phiếu xuất hủy");
       }
 
       setShowCreateDialog(false);
@@ -1117,29 +1337,34 @@ export function WriteOffs() {
     }
   };
 
+  // Prevent duplicate batches in write-off list, and set maxQuantity for each item
   const handleAddSelectedBatches = () => {
     const itemsToAdd: WriteOffItemForm[] = [];
-
-    selectedBatches.forEach(({ productId, batchCode, unitPrice }) => {
+    selectedBatches.forEach(({ productId, batchCode, unitPrice, entryDate, batchId }) => {
+      // Prevent duplicate batch in writeOffItems (check both batchId and code)
+      if (writeOffItems.some((w) => (batchId && w.batchId === batchId) || (w.productId === productId && w.batchCode === batchCode))) return;
       const item = availableItems.find((i) => i.id === productId);
       if (item) {
-        const batch = item.batches?.find((b: any) => b.batchCode === batchCode);
+        const batch = item.batches?.find((b: any) =>
+          b.batchCode === batchCode && b.entryDate === entryDate
+        );
         if (batch && batch.quantity > 0) {
           itemsToAdd.push({
-            itemId: item.id,
+            itemId: Number(item.id),
             productId: item.id.toString(),
             productName: item.name,
             batchCode: batch.batchCode,
+            batchId: batch.id,
             unit: item.unit,
             quantity: 0, // User will input
             unitPrice: unitPrice,
             total: 0,
             reason: "",
+            maxQuantity: batch.quantity, // Add maxQuantity for later use
           });
         }
       }
     });
-
     setWriteOffItems([...writeOffItems, ...itemsToAdd]);
     setShowAddItemDialog(false);
     setSelectedBatches([]);
@@ -1649,7 +1874,7 @@ export function WriteOffs() {
                                       variant="outline"
                                       className="gap-2"
                                       size="sm"
-                                      onClick={(e) => {
+                                      onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                                         e.stopPropagation();
                                         handleEditWriteOff(wo);
                                       }}
@@ -1660,7 +1885,7 @@ export function WriteOffs() {
                                     <Button
                                       className="bg-green-600 hover:bg-green-700 gap-2"
                                       size="sm"
-                                      onClick={(e) => {
+                                      onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
                                         e.stopPropagation();
                                         if (
                                           !wo.details?.items ||
@@ -1671,19 +1896,15 @@ export function WriteOffs() {
                                           );
                                           return;
                                         }
-                                        setWriteOffs(
-                                          writeOffs.map((w) =>
-                                            w.id === wo.id
-                                              ? {
-                                                ...w,
-                                                status: "completed" as const,
-                                              }
-                                              : w
-                                          )
-                                        );
-                                        toast.success(
-                                          "Đã hoàn thành phiếu xuất hủy"
-                                        );
+
+                                        try {
+                                          await inventoryService.completeWriteOff(wo.id);
+                                          toast.success("Đã hoàn thành phiếu xuất hủy");
+                                          fetchData();
+                                        } catch (error) {
+                                          console.error("Error completing write-off:", error);
+                                          toast.error("Không thể hoàn thành phiếu xuất hủy");
+                                        }
                                       }}
                                     >
                                       <Check className="w-4 h-4" />
@@ -1693,7 +1914,7 @@ export function WriteOffs() {
                                       variant="outline"
                                       size="sm"
                                       className="text-red-600 hover:text-red-700"
-                                      onClick={(e) => {
+                                      onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                                         e.stopPropagation();
                                         handleCancelWriteOff(wo.id);
                                       }}
@@ -1707,7 +1928,7 @@ export function WriteOffs() {
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      onClick={(e) => {
+                                      onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                                         e.stopPropagation();
                                         handlePrintWriteOff();
                                       }}
@@ -1792,10 +2013,10 @@ export function WriteOffs() {
         <DialogContent
           className="min-w-[1100px] max-w-[1400px] w-[95vw] max-h-[90vh] overflow-hidden flex flex-col"
           aria-describedby={undefined}
-          onInteractOutside={(e) => {
+          onInteractOutside={(e: any) => {
             e.preventDefault();
           }}
-          onEscapeKeyDown={(e) => {
+          onEscapeKeyDown={(e: any) => {
             e.preventDefault();
           }}
         >
@@ -1942,14 +2163,13 @@ export function WriteOffs() {
                       </tr>
                     ) : (
                       writeOffItems.map((item, index) => {
-                        const inventoryItem = inventoryItems.find(
-                          (i) => i.id === item.productId
-                        );
-                        const batch = inventoryItem?.batches?.find(
-                          (b) => b.batchCode === item.batchCode
-                        );
-                        const maxQuantity = batch?.quantity || 0;
-
+                        // Use maxQuantity from item if available, fallback to batch quantity
+                        let maxQuantity = item.maxQuantity;
+                        if (typeof maxQuantity !== 'number') {
+                          const inventoryItem = inventoryItems.find((i) => i.id === item.productId);
+                          const batch = inventoryItem?.batches?.find((b) => b.batchCode === item.batchCode);
+                          maxQuantity = batch?.quantity || 0;
+                        }
                         return (
                           <tr key={index}>
                             <td className="px-4 py-2 text-sm text-slate-600">
@@ -1970,8 +2190,7 @@ export function WriteOffs() {
                                   type="number"
                                   value={item.quantity || ""}
                                   onChange={(e) => {
-                                    const numValue =
-                                      Number(e.target.value) || 0;
+                                    const numValue = Number(e.target.value) || 0;
                                     if (numValue > maxQuantity) {
                                       toast.error(
                                         `Số lượng hủy không được vượt quá ${maxQuantity} ${item.unit}`
@@ -2085,10 +2304,10 @@ export function WriteOffs() {
             height: "90vh",
           }}
           aria-describedby={undefined}
-          onInteractOutside={(e) => {
+          onInteractOutside={(e: any) => {
             e.preventDefault();
           }}
-          onEscapeKeyDown={(e) => {
+          onEscapeKeyDown={(e: any) => {
             e.preventDefault();
           }}
         >
@@ -2139,7 +2358,7 @@ export function WriteOffs() {
 
             {/* Category Tabs */}
             <div className="mb-4 flex gap-2 flex-wrap">
-              {categories.map((cat) => {
+              {[{ id: 'all', name: 'Tất cả' }, ...categoriesList].map((cat) => {
                 const isActive = selectedCategoryFilter === cat.id;
                 return (
                   <button
@@ -2185,29 +2404,23 @@ export function WriteOffs() {
                     {filteredAvailableItems.length > 0 ? (
                       filteredAvailableItems.map((item) => {
                         const isExpanded = expandedItems.has(item.id);
-                        const allBatches = item.batches || [];
-                        const availableBatches = allBatches.filter(
-                          (b) => b.quantity > 0
-                        );
-                        const hasBatches = allBatches.length > 0;
+                        const batches = item.batches || [];
+                        const hasStock = item.currentStock > 0;
+                        const hasBatches = batches.length > 0;
 
                         return (
                           <React.Fragment key={item.id}>
                             {/* Main Row - Item */}
                             <tr
                               className="hover:bg-slate-50 cursor-pointer"
-                              onClick={() =>
-                                hasBatches && toggleItemExpand(item.id)
-                              }
+                              onClick={() => toggleItemExpand(item.id)}
                             >
                               <td className="px-4 py-3 border-r border-slate-100">
-                                {hasBatches ? (
-                                  isExpanded ? (
-                                    <ChevronDown className="w-4 h-4 text-slate-600" />
-                                  ) : (
-                                    <ChevronRight className="w-4 h-4 text-slate-400" />
-                                  )
-                                ) : null}
+                                {isExpanded ? (
+                                  <ChevronDown className="w-4 h-4 text-slate-600" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                                )}
                               </td>
                               <td className="px-4 py-3 text-sm text-slate-600 whitespace-nowrap border-r border-slate-100">
                                 {item.id}
@@ -2216,14 +2429,9 @@ export function WriteOffs() {
                                 {item.name}
                               </td>
                               <td
-                                className="px-4 py-3 text-sm text-blue-600 cursor-pointer hover:text-blue-700 hover:underline whitespace-nowrap border-r border-slate-100"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedCategoryFilter(item.category);
-                                }}
+                                className="px-4 py-3 text-sm text-slate-600 whitespace-nowrap border-r border-slate-100"
                               >
-                                {categories.find((c) => c.id === item.category)
-                                  ?.name ?? "-"}
+                                {item.category || "-"}
                               </td>
                               <td className="px-4 py-3 text-sm text-slate-600 text-center whitespace-nowrap border-r border-slate-100">
                                 {item.unit}
@@ -2233,186 +2441,208 @@ export function WriteOffs() {
                               </td>
                             </tr>
 
-                            {/* Expanded Row - Batches Table */}
-                            {isExpanded && hasBatches && (
+                            {isExpanded && (
                               <tr>
                                 <td
                                   colSpan={6}
                                   className="px-4 py-4 bg-slate-50"
                                 >
-                                  <div className="ml-8">
-                                    <table className="w-full border border-slate-200 rounded-lg overflow-hidden bg-white">
-                                      <thead className="bg-slate-100">
-                                        <tr>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 w-12">
-                                            <Checkbox
-                                              checked={
-                                                allBatches.length > 0 &&
-                                                allBatches
-                                                  .filter((b: BatchInfo) => b.quantity > 0)
-                                                  .every((b) =>
-                                                    isBatchSelected(
-                                                      item.id,
-                                                      b.batchCode
-                                                    )
-                                                  )
-                                              }
-                                              onCheckedChange={(checked: boolean) => {
-                                                allBatches
-                                                  .filter((b: BatchInfo) => b.quantity > 0)
-                                                  .forEach((b) => {
-                                                    const isSelected =
+                                  {(hasBatches || hasStock) ? (
+                                    <div className="ml-8">
+                                      <table className="w-full border border-slate-200 rounded-lg overflow-hidden bg-white">
+                                        <thead className="bg-slate-100">
+                                          <tr>
+                                            <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 w-12">
+                                              <Checkbox
+                                                checked={
+                                                  batches.length > 0 &&
+                                                  batches
+                                                    .filter((b: BatchInfo) => b.quantity > 0)
+                                                    .every((b: BatchInfo) =>
                                                       isBatchSelected(
                                                         item.id,
-                                                        b.batchCode
-                                                      );
-                                                    if (
-                                                      checked &&
-                                                      !isSelected
-                                                    ) {
-                                                      toggleBatchSelection(
-                                                        item.id,
                                                         b.batchCode,
-                                                        b.unitCost
-                                                      );
-                                                    } else if (
-                                                      !checked &&
-                                                      isSelected
-                                                    ) {
-                                                      toggleBatchSelection(
-                                                        item.id,
-                                                        b.batchCode,
-                                                        b.unitCost
-                                                      );
-                                                    }
-                                                  });
-                                              }}
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                              }}
-                                            />
-                                          </th>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-slate-600">
-                                            Mã lô
-                                          </th>
-                                          <th className="px-4 py-2 text-center text-xs font-medium text-slate-600">
-                                            SL
-                                          </th>
-                                          <th className="px-4 py-2 text-center text-xs font-medium text-slate-600">
-                                            ĐVT
-                                          </th>
-                                          <th className="px-4 py-2 text-center text-xs font-medium text-slate-600">
-                                            HSD
-                                          </th>
-                                          <th className="px-4 py-2 text-right text-xs font-medium text-slate-600">
-                                            Giá nhập
-                                          </th>
-                                        </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-slate-100">
-                                        {allBatches.map((batch) => {
-                                          const canSelect = batch.quantity > 0;
-                                          const isSelected = isBatchSelected(
-                                            item.id,
-                                            batch.batchCode
-                                          );
-
-                                          return (
-                                            <tr
-                                              key={batch.batchCode}
-                                              className={`${canSelect
-                                                ? "hover:bg-slate-50 cursor-pointer"
-                                                : "opacity-50"
-                                                }`}
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (canSelect) {
-                                                  toggleBatchSelection(
-                                                    item.id,
-                                                    batch.batchCode,
-                                                    batch.unitCost
-                                                  );
+                                                        b.entryDate,
+                                                        b.id
+                                                      )
+                                                    )
                                                 }
-                                              }}
-                                            >
-                                              <td className="px-4 py-2">
-                                                <div
-                                                  onClick={(e) =>
-                                                    e.stopPropagation()
-                                                  }
-                                                >
-                                                  <Checkbox
-                                                    checked={isSelected}
-                                                    disabled={!canSelect}
-                                                    onCheckedChange={(
-                                                      checked
-                                                    ) => {
-                                                      if (canSelect) {
+                                                onCheckedChange={(checked: boolean) => {
+                                                  batches
+                                                    .filter((b: BatchInfo) => b.quantity > 0)
+                                                    .forEach((b: BatchInfo) => {
+                                                      const isSelected =
+                                                        isBatchSelected(
+                                                          item.id,
+                                                          b.batchCode,
+                                                          b.entryDate,
+                                                          b.id
+                                                        );
+                                                      if (
+                                                        checked &&
+                                                        !isSelected
+                                                      ) {
                                                         toggleBatchSelection(
                                                           item.id,
-                                                          batch.batchCode,
-                                                          batch.unitCost
+                                                          b.batchCode,
+                                                          b.unitCost,
+                                                          b.entryDate,
+                                                          b.id
+                                                        );
+                                                      } else if (
+                                                        !checked &&
+                                                        isSelected
+                                                      ) {
+                                                        toggleBatchSelection(
+                                                          item.id,
+                                                          b.batchCode,
+                                                          b.unitCost,
+                                                          b.entryDate,
+                                                          b.id
                                                         );
                                                       }
-                                                    }}
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                    }}
-                                                  />
-                                                </div>
-                                              </td>
-                                              <td className="px-4 py-2 text-sm font-medium text-slate-900">
-                                                {batch.batchCode}
-                                              </td>
-                                              <td className="px-4 py-2 text-sm text-center">
-                                                <span
-                                                  className={
-                                                    canSelect
-                                                      ? "text-slate-900"
-                                                      : "text-red-500"
-                                                  }
-                                                >
-                                                  {batch.quantity}
-                                                </span>
-                                              </td>
-                                              <td className="px-4 py-2 text-sm text-slate-600 text-center">
-                                                {item.unit}
-                                              </td>
-                                              <td className="px-4 py-2 text-sm text-slate-600 text-center">
-                                                {batch.expiryDate
-                                                  ? format(
-                                                    new Date(
-                                                      batch.expiryDate
-                                                    ),
-                                                    "dd/MM/yyyy",
-                                                    { locale: vi }
-                                                  )
-                                                  : "—"}
-                                              </td>
-                                              <td className="px-4 py-2 text-sm font-medium text-slate-900 text-right">
-                                                {batch.unitCost.toLocaleString(
-                                                  "vi-VN"
-                                                )}
-                                                đ
+                                                    });
+                                                }}
+                                                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                                  e.stopPropagation();
+                                                }}
+                                              />
+                                            </th>
+                                            <th className="px-4 py-2 text-left text-xs font-medium text-slate-600">
+                                              Mã lô
+                                            </th>
+                                            <th className="px-4 py-2 text-center text-xs font-medium text-slate-600">
+                                              SL
+                                            </th>
+                                            <th className="px-4 py-2 text-center text-xs font-medium text-slate-600">
+                                              ĐVT
+                                            </th>
+                                            <th className="px-4 py-2 text-center text-xs font-medium text-slate-600">
+                                              HSD
+                                            </th>
+                                            <th className="px-4 py-2 text-right text-xs font-medium text-slate-600">
+                                              Giá nhập
+                                            </th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                          {batches.length === 0 && hasStock ? (
+                                            <tr>
+                                              <td colSpan={6} className="px-4 py-4 text-center">
+                                                <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+                                                Đang tải lô hàng...
                                               </td>
                                             </tr>
-                                          );
-                                        })}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
+                                          ) : batches.length > 0 ? (
+                                            batches.map((batch: BatchInfo) => {
+                                              const canSelect = batch.quantity > 0;
+                                              const isSelected = isBatchSelected(
+                                                item.id,
+                                                batch.batchCode,
+                                                batch.entryDate,
+                                                batch.id
+                                              );
 
-                            {/* No batches available */}
-                            {!hasBatches && (
-                              <tr>
-                                <td
-                                  colSpan={6}
-                                  className="px-4 py-3 text-sm text-slate-500 text-center"
-                                >
-                                  Không có lô hàng
+                                              return (
+                                                <tr
+                                                  key={batch.batchCode}
+                                                  className={`${canSelect
+                                                    ? "hover:bg-slate-50 cursor-pointer"
+                                                    : "opacity-50"
+                                                    }`}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (canSelect) {
+                                                      toggleBatchSelection(
+                                                        item.id,
+                                                        batch.batchCode,
+                                                        batch.unitCost,
+                                                        batch.entryDate,
+                                                        batch.id
+                                                      );
+                                                    }
+                                                  }}
+                                                >
+                                                  <td className="px-4 py-2">
+                                                    <div
+                                                      onClick={(e) =>
+                                                        e.stopPropagation()
+                                                      }
+                                                    >
+                                                      <Checkbox
+                                                        checked={isSelected}
+                                                        disabled={!canSelect}
+                                                        onCheckedChange={(
+                                                          checked: boolean
+                                                        ) => {
+                                                          if (canSelect) {
+                                                            toggleBatchSelection(
+                                                              item.id,
+                                                              batch.batchCode,
+                                                              batch.unitCost,
+                                                              batch.entryDate,
+                                                              batch.id
+                                                            );
+                                                          }
+                                                        }}
+                                                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                                          e.stopPropagation();
+                                                        }}
+                                                      />
+                                                    </div>
+                                                  </td>
+                                                  <td className="px-4 py-2 text-sm font-medium text-slate-900">
+                                                    {batch.batchCode}
+                                                  </td>
+                                                  <td className="px-4 py-2 text-sm text-center">
+                                                    <span
+                                                      className={
+                                                        canSelect
+                                                          ? "text-slate-900"
+                                                          : "text-red-500"
+                                                      }
+                                                    >
+                                                      {batch.quantity}
+                                                    </span>
+                                                  </td>
+                                                  <td className="px-4 py-2 text-sm text-slate-600 text-center">
+                                                    {item.unit}
+                                                  </td>
+                                                  <td className="px-4 py-2 text-sm text-slate-600 text-center">
+                                                    {batch.expiryDate
+                                                      ? format(
+                                                        new Date(
+                                                          batch.expiryDate
+                                                        ),
+                                                        "dd/MM/yyyy",
+                                                        { locale: vi }
+                                                      )
+                                                      : "—"}
+                                                  </td>
+                                                  <td className="px-4 py-2 text-sm font-medium text-slate-900 text-right">
+                                                    {batch.unitCost.toLocaleString(
+                                                      "vi-VN"
+                                                    )}
+                                                    đ
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })
+                                          ) : (
+                                            <tr>
+                                              <td colSpan={6} className="px-4 py-4 text-center text-sm text-slate-500">
+                                                Không có lô hàng
+                                              </td>
+                                            </tr>
+                                          )}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  ) : (
+                                    <div className="text-center text-sm text-slate-500 py-2">
+                                      Không có lô hàng
+                                    </div>
+                                  )}
                                 </td>
                               </tr>
                             )}

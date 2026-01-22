@@ -5,6 +5,7 @@ export type SortField = "name" | "currentStock" | "totalValue" | "expiryDate" | 
 export type SortOrder = "asc" | "desc" | "none";
 
 export interface BatchInfo {
+  id?: number;
   batchCode: string;
   quantity: number;
   unitCost: number;
@@ -65,4 +66,36 @@ export interface InventoryItem {
   productIds?: number[];
   availableToppings?: ToppingRelation[];
   applicableProducts?: ToppingRelation[];
+}
+
+export interface ProductPricingItem {
+  id: number;
+  name: string;
+  category: {
+    id: number;
+    name: string;
+  };
+  itemType: {
+    id: number;
+    name: string;
+  };
+  unit: {
+    id: number;
+    name: string;
+    symbol: string;
+  };
+  costPrice: number;
+  lastPurchasePrice: number;
+  sellingPrice: number;
+  margin: number;
+  lastPurchaseDate: string | null;
+  ingredients?: {
+    ingredientId: number;
+    quantity: number;
+    unitCost: number;
+  }[];
+  batches?: {
+    unitCost: number;
+    entryDate: string;
+  }[];
 }
