@@ -54,9 +54,9 @@ export type PageType =
   | "reports-finance"
   | "reports-products"
   | "reports-sales"
+  | "reports-staff"
   | "reports-customers"
   | "reports-suppliers"
-  | "reports-employees"
   | "invoices"
   | "returns"
   | "purchase-orders"
@@ -129,9 +129,9 @@ function AppContent() {
       'reports-finance': 'reports:view',
       'reports-products': 'reports:view',
       'reports-sales': 'reports:view',
+      'reports-staff': 'reports:view',
       'reports-customers': 'reports:view',
       'reports-suppliers': 'reports:view',
-      'reports-employees': 'reports:view',
       'invoices': 'invoices:view',
       'returns': 'returns:view',
       'purchase-orders': 'purchase_orders:view',
@@ -144,7 +144,7 @@ function AppContent() {
 
     const requiredPermission = pagePermissions[page];
     if (!requiredPermission) return true; // Allow access if no permission defined
-    
+
     if (Array.isArray(requiredPermission)) {
       return requiredPermission.some(permission => hasPermission(permission as any));
     }
@@ -172,7 +172,7 @@ function AppContent() {
       } else if (user?.role === "cashier" || user?.role === "server") {
         const posUserRole =
           user?.role === "cashier" ||
-          (user?.roleLabel?.toLowerCase().includes("thu ngân") ?? false)
+            (user?.roleLabel?.toLowerCase().includes("thu ngân") ?? false)
             ? "cashier"
             : "waiter";
         return <POSOrdering userRole={posUserRole} />;
@@ -187,7 +187,7 @@ function AppContent() {
         {
           const posUserRole =
             user?.role === "cashier" ||
-            (user?.roleLabel?.toLowerCase().includes("thu ngân") ?? false)
+              (user?.roleLabel?.toLowerCase().includes("thu ngân") ?? false)
               ? "cashier"
               : "waiter";
           return <POSOrdering userRole={posUserRole} />;
@@ -232,12 +232,12 @@ function AppContent() {
         return <Reports initialTab="products" />;
       case "reports-sales":
         return <Reports initialTab="sales" />;
+      case "reports-staff":
+        return <Reports initialTab="staff" />;
       case "reports-customers":
         return <Reports initialTab="customers" />;
       case "reports-suppliers":
         return <Reports initialTab="suppliers" />;
-      case "reports-employees":
-        return <Reports initialTab="employees" />;
       case "invoices":
         return <Invoices />;
       case "returns":
@@ -260,9 +260,9 @@ function AppContent() {
   };
 
   // Hide sidebar on mobile for waiter/cashier/barista roles
-  const shouldHideSidebarOnMobile = 
-    user?.role === "server" || 
-    user?.role === "barista" || 
+  const shouldHideSidebarOnMobile =
+    user?.role === "server" ||
+    user?.role === "barista" ||
     user?.role === "cashier";
 
   return (
