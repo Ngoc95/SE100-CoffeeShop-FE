@@ -1389,7 +1389,19 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
                 }
             } else {
                 if (selectedTable) {
-                    fetchTableOrder(selectedTable);
+                    if (selectedTable.order_id) {
+                         const res = await axiosClient.get(`/orders/${selectedTable.order_id}`);
+                         const orderData = res?.data?.metaData ?? res?.data;
+                         if (orderData && orderData.status === 'cancelled') {
+                             await refreshTables();
+                             setSelectedTable(null);
+                             toast.info("Đơn hàng đã bị hủy do hết món");
+                         } else {
+                             fetchTableOrder(selectedTable);
+                         }
+                    } else {
+                        fetchTableOrder(selectedTable);
+                    }
                 }
             }
         } catch (err: any) {
@@ -1467,7 +1479,19 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
                         }
                     }
                 } else if (selectedTable) {
-                    fetchTableOrder(selectedTable);
+                    if (selectedTable.order_id) {
+                        const res = await axiosClient.get(`/orders/${selectedTable.order_id}`);
+                        const orderData = res?.data?.metaData ?? res?.data;
+                        if (orderData && orderData.status === 'cancelled') {
+                            await refreshTables();
+                            setSelectedTable(null);
+                            toast.info("Đơn hàng đã bị hủy do hết món");
+                        } else {
+                            fetchTableOrder(selectedTable);
+                        }
+                    } else {
+                        fetchTableOrder(selectedTable);
+                    }
                 }
 
                 // Check for allItemsCanceled flag
@@ -1520,7 +1544,19 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
             }
           }
         } else if (selectedTable) {
-          fetchTableOrder(selectedTable);
+          if (selectedTable.order_id) {
+             const res = await axiosClient.get(`/orders/${selectedTable.order_id}`);
+             const orderData = res?.data?.metaData ?? res?.data;
+             if (orderData && orderData.status === 'cancelled') {
+                 await refreshTables();
+                 setSelectedTable(null);
+                 toast.info("Đơn hàng đã bị hủy do hết món");
+             } else {
+                 fetchTableOrder(selectedTable);
+             }
+          } else {
+             fetchTableOrder(selectedTable);
+          }
         }
       } catch (err: any) {
         toast.error(`Xóa món thất bại: ${err?.message}`);
@@ -1579,7 +1615,19 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
                     }
                 }
             } else if (selectedTable) {
-                fetchTableOrder(selectedTable);
+                if (selectedTable.order_id) {
+                    const res = await axiosClient.get(`/orders/${selectedTable.order_id}`);
+                    const orderData = res?.data?.metaData ?? res?.data;
+                    if (orderData && orderData.status === 'cancelled') {
+                        await refreshTables();
+                        setSelectedTable(null);
+                        toast.info("Đơn hàng đã bị hủy do hết món");
+                    } else {
+                        fetchTableOrder(selectedTable);
+                    }
+                } else {
+                    fetchTableOrder(selectedTable);
+                }
             }
         } catch (err: any) {
             toast.error(`Xóa món thất bại: ${err?.message}`);
@@ -1610,7 +1658,19 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
                         }
                     }
                 } else if (selectedTable) {
-                    fetchTableOrder(selectedTable);
+                    if (selectedTable.order_id) {
+                         const res = await axiosClient.get(`/orders/${selectedTable.order_id}`);
+                         const orderData = res?.data?.metaData ?? res?.data;
+                         if (orderData && orderData.status === 'cancelled') {
+                             await refreshTables();
+                             setSelectedTable(null);
+                             toast.info("Đơn hàng đã bị hủy do hết món");
+                         } else {
+                             fetchTableOrder(selectedTable);
+                         }
+                    } else {
+                         fetchTableOrder(selectedTable);
+                    }
                 }
             } catch (err: any) {
                 toast.error(`Hủy món thất bại: ${err?.message}`);
@@ -1719,7 +1779,20 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
                 }
             }
         } else if (selectedTable) {
-            fetchTableOrder(selectedTable);
+            // Check if order is cancelled by fetching it
+            if (selectedTable.order_id) {
+                const res = await axiosClient.get(`/orders/${selectedTable.order_id}`);
+                const orderData = res?.data?.metaData ?? res?.data;
+                if (orderData && orderData.status === 'cancelled') {
+                    await refreshTables();
+                    setSelectedTable(null);
+                    toast.info("Đơn hàng đã bị hủy do hết món");
+                } else {
+                    fetchTableOrder(selectedTable);
+                }
+            } else {
+                 fetchTableOrder(selectedTable);
+            }
         }
 
     } catch (err: any) {
@@ -2668,10 +2741,30 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
               const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
               const orderData = res?.data?.metaData ?? res?.data;
               if (orderData) {
-                setTakeawayOrders(mapOrderToCartItems(orderData));
+                   if (orderData.status === 'cancelled') {
+                       setTakeawayOrders([]);
+                       setTakeawayOrderId(null);
+                       setTakeawayOrderCode(null);
+                       localStorage.removeItem("pos_takeaway_order_id");
+                       toast.info("Đơn hàng đã bị hủy do hết món");
+                  } else {
+                      setTakeawayOrders(mapOrderToCartItems(orderData));
+                  }
               }
             } else if (selectedTable) {
-              fetchTableOrder(selectedTable);
+                if (selectedTable.order_id) {
+                     const res = await axiosClient.get(`/orders/${selectedTable.order_id}`);
+                     const orderData = res?.data?.metaData ?? res?.data;
+                     if (orderData && orderData.status === 'cancelled') {
+                         await refreshTables();
+                         setSelectedTable(null);
+                         toast.info("Đơn hàng đã bị hủy do hết món");
+                     } else {
+                         fetchTableOrder(selectedTable);
+                     }
+                } else {
+                     fetchTableOrder(selectedTable);
+                }
             }
           } catch (err: any) {
             toast.error(`Xóa topping thất bại: ${err?.message}`);
@@ -2738,7 +2831,19 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
             }
         }
       } else if (selectedTable) {
-        fetchTableOrder(selectedTable);
+        if (selectedTable.order_id) {
+             const res = await axiosClient.get(`/orders/${selectedTable.order_id}`);
+             const orderData = res?.data?.metaData ?? res?.data;
+             if (orderData && orderData.status === 'cancelled') {
+                 await refreshTables();
+                 setSelectedTable(null);
+                 toast.info("Đơn hàng đã bị hủy do hết món");
+             } else {
+                 fetchTableOrder(selectedTable);
+             }
+        } else {
+             fetchTableOrder(selectedTable);
+        }
       }
       
       // Reset modal
