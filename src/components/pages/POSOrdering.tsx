@@ -1455,7 +1455,17 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
                  if (isTakeaway && takeawayOrderId) {
                     const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
                     const orderData = res?.data?.metaData ?? res?.data;
-                    if (orderData) setTakeawayOrders(mapOrderToCartItems(orderData));
+                    if (orderData) {
+                        if (orderData.status === 'cancelled') {
+                             setTakeawayOrders([]);
+                             setTakeawayOrderId(null);
+                             setTakeawayOrderCode(null);
+                             localStorage.removeItem("pos_takeaway_order_id");
+                             toast.info("Đơn hàng đã bị hủy do hết món");
+                        } else {
+                             setTakeawayOrders(mapOrderToCartItems(orderData));
+                        }
+                    }
                 } else if (selectedTable) {
                     fetchTableOrder(selectedTable);
                 }
@@ -1499,7 +1509,15 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
           const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
           const orderData = res?.data?.metaData ?? res?.data;
           if (orderData) {
-            setTakeawayOrders(mapOrderToCartItems(orderData));
+             if (orderData.status === 'cancelled') {
+                 setTakeawayOrders([]);
+                 setTakeawayOrderId(null);
+                 setTakeawayOrderCode(null);
+                 localStorage.removeItem("pos_takeaway_order_id");
+                 toast.info("Đơn hàng đã bị hủy do hết món");
+            } else {
+                setTakeawayOrders(mapOrderToCartItems(orderData));
+            }
           }
         } else if (selectedTable) {
           fetchTableOrder(selectedTable);
@@ -1550,7 +1568,15 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
                 const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
                 const orderData = res?.data?.metaData ?? res?.data;
                 if (orderData) {
-                    setTakeawayOrders(mapOrderToCartItems(orderData));
+                     if (orderData.status === 'cancelled') {
+                         setTakeawayOrders([]);
+                         setTakeawayOrderId(null);
+                         setTakeawayOrderCode(null);
+                         localStorage.removeItem("pos_takeaway_order_id");
+                         toast.info("Đơn hàng đã bị hủy do hết món");
+                    } else {
+                        setTakeawayOrders(mapOrderToCartItems(orderData));
+                    }
                 }
             } else if (selectedTable) {
                 fetchTableOrder(selectedTable);
@@ -1573,7 +1599,15 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
                     const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
                     const orderData = res?.data?.metaData ?? res?.data;
                     if (orderData) {
-                        setTakeawayOrders(mapOrderToCartItems(orderData));
+                         if (orderData.status === 'cancelled') {
+                             setTakeawayOrders([]);
+                             setTakeawayOrderId(null);
+                             setTakeawayOrderCode(null);
+                             localStorage.removeItem("pos_takeaway_order_id");
+                             toast.info("Đơn hàng đã bị hủy do hết món");
+                        } else {
+                            setTakeawayOrders(mapOrderToCartItems(orderData));
+                        }
                     }
                 } else if (selectedTable) {
                     fetchTableOrder(selectedTable);
@@ -1669,10 +1703,21 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
         }
 
         // Refresh data
+        // Refresh data
         if (isTakeaway && takeawayOrderId) {
             const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
             const orderData = res?.data?.metaData ?? res?.data;
-            if (orderData) setTakeawayOrders(mapOrderToCartItems(orderData));
+            if (orderData) {
+                 if (orderData.status === 'cancelled') {
+                     setTakeawayOrders([]);
+                     setTakeawayOrderId(null);
+                     setTakeawayOrderCode(null);
+                     localStorage.removeItem("pos_takeaway_order_id");
+                     toast.info("Đơn hàng đã bị hủy do hết món");
+                } else {
+                    setTakeawayOrders(mapOrderToCartItems(orderData));
+                }
+            }
         } else if (selectedTable) {
             fetchTableOrder(selectedTable);
         }
@@ -2682,7 +2727,15 @@ const [orderTotalAmount, setOrderTotalAmount] = useState<number>(0);
         const res = await axiosClient.get(`/orders/${takeawayOrderId}`);
         const orderData = res?.data?.metaData ?? res?.data;
         if (orderData) {
-          setTakeawayOrders(mapOrderToCartItems(orderData));
+             if (orderData.status === 'cancelled') {
+                 setTakeawayOrders([]);
+                 setTakeawayOrderId(null);
+                 setTakeawayOrderCode(null);
+                 localStorage.removeItem("pos_takeaway_order_id");
+                 toast.info("Đơn hàng đã bị hủy do hết món");
+            } else {
+                setTakeawayOrders(mapOrderToCartItems(orderData));
+            }
         }
       } else if (selectedTable) {
         fetchTableOrder(selectedTable);
